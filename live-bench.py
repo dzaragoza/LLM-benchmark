@@ -10,8 +10,9 @@ Conversations come from a fixed corpus file (LMSYS Chatbot Arena, English
 sample, seed 1024), so the workload is standardized and citable — the same
 philosophy as the cached ARC-Challenge question set.
 
-Companion script: arena_filter.py (English extraction + sampling) — see
-report Data availability; both scripts published in the companion repo.
+Repo-relative: run everything from the repository root after cloning.
+Paths default to ./..., the llama-server binary is passed via --server-bin
+or the $LLAMA_SERVER_BIN environment variable.
 
 Protocol (fixed, pre-registered):
   - N conversations from the corpus, played verbatim (user turns sent;
@@ -22,13 +23,27 @@ Protocol (fixed, pre-registered):
   - Temperature 0 (greedy): deterministic, repeatable — same discipline
     as strict-ARC
   - The server's own timing (timings.predicted_per_second) is the
-    authoritative metric; wall-clock printed as sanity check
-  - Repeats (--repeats, default 3); report conversation mean + spread
+    authoritative metric; an external wall-clock cross-check (generation
+    span = wall time minus prompt processing) is computed per turn
+  - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
+
+Usage (from repo root):
+  # step 0 (once): extract English conversations from Arena parquet shards
+  python3 live-bench.py --make-sample
+
+  # step 1 (once): build the fixed corpus (prints reply p75 -> answer cap)
+  python3 live-bench.py --make-corpus
+
+  # step 2: benchmark models (qualifying tier: 1 rep)
+  set -x LLAMA_SERVER_BIN /path/to/llama-server     # fish; export in bash
+  python3 live-bench.py --corpus ./live-corpus.json \
+      --models ./path/model_a.gguf ./path/model_b.gguf --dump live-dump.json
 """
 
 import argparse
 import glob
 import json
+import os
 import random
 import subprocess
 import sys
@@ -36,9 +51,8 @@ import time
 import urllib.request
 import urllib.error
 
-SERVER_BIN = "/home/daniela/technical_reports/llama-b10964-gpu/llama-server"
-ARENA_DIR = "/home/daniela/technical_reports/arena/data"
-SAMPLE_OUT = "/home/daniela/technical_reports/arena/english_sample.json"
+ARENA_DIR = os.environ.get("ARENA_DIR", "./arena/data")
+SAMPLE_OUT = os.environ.get("SAMPLE_OUT", "./arena/english_sample.json")
 SEED = 1024  # pre-registered; part of the protocol
 
 
@@ -49,9 +63,11 @@ SEED = 1024  # pre-registered; part of the protocol
 def make_english_sample(n_sample=5000):
     import pyarrow.parquet as pq
 
-    files = sorted(glob.glob(ARENA_DIR + "/**/*.parquet", recursive=True))
+    files = sorted(glob.glob(os.path.join(ARENA_DIR, "**", "*.parquet"),
+                             recursive=True))
     if not files:
-        sys.exit(f"No parquet found under {ARENA_DIR}")
+        sys.exit(f"No parquet found under {ARENA_DIR}. Download the "
+                 "lmsys/lmsys-chat-1m dataset first (see README).")
     english = []
     for f in files:
         table = pq.read_table(f)
@@ -68,8 +84,8 @@ def make_english_sample(n_sample=5000):
     sample = english[:n_sample]
     with open(SAMPLE_OUT, "w") as f:
         json.dump(sample, f)
-    print(f"{len(english)} English conversations; wrote {len(sample)}-conv sample "
-          f"-> {SAMPLE_OUT}")
+    print(f"{len(english)} English conversations; wrote {len(sample)}-conv "
+          f"sample -> {SAMPLE_OUT}")
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +102,8 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
     for conv in items:
         msgs = conv["conversation"]
         user_msgs = [m["content"] for m in msgs if m.get("role") == "user"]
-        asst_chars = [len(m["content"]) for m in msgs if m.get("role") == "assistant"]
+        asst_chars = [len(m["content"]) for m in msgs
+                      if m.get("role") == "assistant"]
         if not (min_turns <= len(user_msgs) <= max_turns):
             continue
         joined = " ".join(user_msgs)
@@ -105,7 +122,8 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
         sys.exit("No conversations matched the filters.")
 
     # Deterministic order: stable sort by content hash, take N
-    selected.sort(key=lambda c: __import__("hashlib").sha256(
+    import hashlib
+    selected.sort(key=lambda c: hashlib.sha256(
         json.dumps(c["user_turns"]).encode()).hexdigest())
     corpus = selected[:n_conversations]
 
@@ -115,9 +133,9 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
 
     out = {
         "source": "LMSYS Chatbot Arena (lmsys-chat-1m), English sample, seed 1024",
-        "selection": (f"{len(corpus)} conversations, {min_turns}-{max_turns} user "
-                      "turns, English, no URLs, turns 1-4000 chars, deterministic "
-                      "sha256 order"),
+        "selection": (f"{len(corpus)} conversations, {min_turns}-{max_turns} "
+                      "user turns, English, no URLs, turns 1-4000 chars, "
+                      "deterministic sha256 order"),
         "reply_length_p75_chars": p75,
         "answer_cap_tokens": cap_tokens,
         "temperature": 0,
@@ -141,7 +159,8 @@ def wait_for_server(port, timeout=300):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(f"http://localhost:{port}/health", timeout=2) as r:
+            with urllib.request.urlopen(
+                    f"http://localhost:{port}/health", timeout=2) as r:
                 if r.status == 200:
                     return True
         except (urllib.error.URLError, OSError):
@@ -189,7 +208,13 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
 
         t = data.get("timings", {})
         server_tps = t.get("predicted_per_second")
-        n_pred = t.get("predicted_n", data.get("usage", {}).get("completion_tokens"))
+        n_pred = t.get("predicted_n",
+                       data.get("usage", {}).get("completion_tokens"))
+        prompt_ms = t.get("prompt_ms")
+
+        # External cross-check: generation span = wall time minus prefill
+        ext_gen_s = wall_s - (prompt_ms / 1000.0) if prompt_ms else wall_s
+        ext_tps = (n_pred / ext_gen_s) if (n_pred and ext_gen_s > 0) else None
 
         history_chars = sum(len(m["content"]) for m in history[:-1])
         depth_tokens = history_chars // 4
@@ -199,7 +224,10 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
             "depth_tokens_est": depth_tokens,
             "gen_tokens": n_pred,
             "server_tps": server_tps,
-            "wall_tps": (n_pred / wall_s) if n_pred and wall_s else None,
+            "ext_tps": ext_tps,
+            "wall_tps": (n_pred / wall_s) if (n_pred and wall_s) else None,
+            "prompt_ms": prompt_ms,
+            "wall_s": wall_s,
         })
     return results
 
@@ -209,16 +237,24 @@ def main():
     ap.add_argument("--corpus")
     ap.add_argument("--models", nargs="+")
     ap.add_argument("--port", type=int, default=8077)
-    ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="qualifying tier default: 1 rep; use 3 for final "
+                         "podium numbers")
     ap.add_argument("--ctx", type=int, default=4096)
+    ap.add_argument("--server-bin",
+                    default=os.environ.get("LLAMA_SERVER_BIN"),
+                    help="path to llama-server; alternatively set the "
+                         "$LLAMA_SERVER_BIN environment variable")
+    ap.add_argument("--dump",
+                    help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
                     help="step 0: English extraction from Arena parquet")
     ap.add_argument("--make-corpus", action="store_true",
                     help="step 1: build fixed corpus from english_sample.json")
-    ap.add_argument("--corpus-out", default="/home/daniela/technical_reports/live-corpus.json")
+    ap.add_argument("--corpus-out", default="./live-corpus.json")
     ap.add_argument("--n-conversations", type=int, default=5)
     ap.add_argument("--min-turns", type=int, default=4)
-    ap.add_argument("--max-turns", type=int,default=8)
+    ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)
     args = ap.parse_args()
 
@@ -231,13 +267,21 @@ def main():
         return
 
     if not args.corpus:
-        ap.error("--corpus is required for benchmarking (or use --make-sample/--make-corpus)")
+        ap.error("--corpus is required for benchmarking "
+                 "(or use --make-sample/--make-corpus)")
+    if not args.server_bin:
+        ap.error("no llama-server binary: pass --server-bin or set "
+                 "$LLAMA_SERVER_BIN")
+    if not os.path.isfile(args.server_bin):
+        ap.error(f"llama-server not found at {args.server_bin}")
+
     with open(args.corpus) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
     cap_tokens = corpus["answer_cap_tokens"]
 
     all_summary = []
+    all_turns = []
     for model in args.models or []:
         label = model.split("/")[-1]
         print(f"\n=== {label} ===")
@@ -245,8 +289,8 @@ def main():
         for rep in range(1, args.repeats + 1):
             print(f"  [rep {rep}/{args.repeats}] starting server...", flush=True)
             proc = subprocess.Popen(
-                [SERVER_BIN, "-m", model, "-ngl", "99", "-c", str(args.ctx),
-                 "--port", str(args.port)],
+                [args.server_bin, "-m", model, "-ngl", "99",
+                 "-c", str(args.ctx), "--port", str(args.port)],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
             try:
@@ -258,6 +302,8 @@ def main():
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
                                            cap_tokens, args.ctx)
+                    for r in res:
+                        all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
                     cmean = sum(tps) / len(tps) if tps else None
                     conv_means.append(cmean)
@@ -276,10 +322,16 @@ def main():
 
         if repeat_means:
             conv_mean = sum(repeat_means) / len(repeat_means)
-            spread = (max(repeat_means) - min(repeat_means)) if len(repeat_means) > 1 else 0.0
+            spread = ((max(repeat_means) - min(repeat_means))
+                      if len(repeat_means) > 1 else 0.0)
             print(f"\n  {label}: LIVE = {conv_mean:.1f} t/s "
                   f"(mean of {len(repeat_means)} reps, spread {spread:.1f})")
             all_summary.append((label, conv_mean, spread))
+
+    if args.dump:
+        with open(args.dump, "w") as f:
+            json.dump(all_turns, f, indent=1)
+        print(f"\nper-turn results written to {args.dump}")
 
     print("\n" + "=" * 60)
     print("FINAL LIVE SCORES (conversation means, server-timed)")
