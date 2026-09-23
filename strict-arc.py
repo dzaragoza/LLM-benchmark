@@ -40,7 +40,16 @@ THREADS = 8
 NGPU_LAYERS = 99
 
 HOME = os.path.expanduser("~")
-VULKAN_SERVER = HOME + "/technical_reports/llama-b10964-gpu/llama-server"
+def _find_server():
+    """Repo-relative first (conventions ruling), pre-reorg HOME path as
+    fallback for the old technical_reports layout."""
+    for p in ("./llama-b10964-gpu/llama-server",
+              HOME + "/technical_reports/llama-b10964-gpu/llama-server"):
+        if os.path.isfile(p):
+            return p
+    return "./llama-b10964-gpu/llama-server"
+
+VULKAN_SERVER = _find_server()
 QUESTIONS_DIR = HOME + "/technical_reports"          # cross-report dataset cache
 OUT_DIRS = {
     "study2": HOME + "/technical_reports/102.4/arc-results",
@@ -392,25 +401,37 @@ def main():
                     choices=["ARC-Challenge", "ARC-Easy"])
     ap.add_argument("--csv", default=None,
                     help="enable per-question timing CSVs (one per model)")
+    ap.add_argument("--model", default=None,
+                    help="generic mode: run ONE local .gguf file (used by "
+                         "select-quant.py phase 5); ignores --roster")
+    ap.add_argument("--label", default=None,
+                    help="config name for generic mode (default: filename)")
+    ap.add_argument("--out-dir", default=None,
+                    help="CSV output dir for generic mode (default ./arc-results)")
     ap.add_argument("--roster", default="study2", choices=["study2", "51.2", "study3"],
                     help="which roster to run (51.2 = study #1 grid auto-resolved; study3 = F16 crossover, T14s side)")
     args = ap.parse_args()
 
-    out_dir = OUT_DIRS[args.roster]
-    os.makedirs(out_dir, exist_ok=True)
-
-    if args.roster == "51.2":
-        roster = build_roster_51()
-        if not roster:
-            print(f"ERROR: no quantized GGUFs found under {DIR_51} "
-                  f"(looked for tags: {', '.join(QUANT_TAGS)})", file=sys.stderr)
-            sys.exit(1)
-        print("Auto-discovered 51.2 roster:", file=sys.stderr)
-        for name, specs in roster:
-            spec = specs[0]
-            print(f"  {name}  <-  {spec[0]} {spec[1]}", file=sys.stderr)
+    if args.model:
+        # generic single-model mode (driven by select-quant.py phase 5)
+        name = args.label or os.path.basename(args.model)
+        roster = [(name, [["-m", args.model]])]
+        out_dir = args.out_dir or "./arc-results"
     else:
-        roster = ROSTER_STUDY2 if args.roster == "study2" else ROSTER_STUDY3
+        out_dir = OUT_DIRS[args.roster]
+        if args.roster == "51.2":
+            roster = build_roster_51()
+            if not roster:
+                print(f"ERROR: no quantized GGUFs found under {DIR_51} "
+                      f"(looked for tags: {', '.join(QUANT_TAGS)})", file=sys.stderr)
+                sys.exit(1)
+            print("Auto-discovered 51.2 roster:", file=sys.stderr)
+            for name, specs in roster:
+                spec = specs[0]
+                print(f"  {name}  <-  {spec[0]} {spec[1]}", file=sys.stderr)
+        else:
+            roster = ROSTER_STUDY2 if args.roster == "study2" else ROSTER_STUDY3
+    os.makedirs(out_dir, exist_ok=True)
 
     print(f"Loading {args.num} {args.config} questions...", file=sys.stderr)
     questions = load_questions(args.config, args.num)
