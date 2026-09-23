@@ -10,16 +10,30 @@ plain downward search, automated so the process itself is the artifact.
 Rung resolution, in order:
   1. local: a matching quant file already in ./models/<family>/
   2. download: the repo ships that quant -> download into ./models/<family>/
-  3. quantize: download the repo's f16 (once per family) and quantize with
-     the pinned llama-quantize (b10964)
+  3. quantize: from the family's f16 GGUF source, with the pinned
+     llama-quantize (b10964)
+
+f16 GGUF source resolution, in order:
+  1. local: an f16/fp16 GGUF already in ./models/<family>/
+  2. download: an f16/fp16 GGUF from the f16 repo (sharded files handled)
+  3. convert: the f16 repo has safetensors -> download them and convert
+     with the pinned llama.cpp converter (./llama.cpp/convert_hf_to_gguf.py)
+     -> ./models/<family>/<family>-f16.gguf
+
+Family spec syntax: "model_repo" or "model_repo=source_repo".
+  - model_repo: where downloadable rung files are looked up
+  - source_repo: where the f16/fp16 GGUF or safetensors live (defaults to
+    model_repo)
+Example (gemma: rungs checked in the QAT repo, source = first-party
+safetensors):
+  "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+Example (llama: no first-party GGUF exists at all; rungs and source both
+come from the gated first-party safetensors repo):
+  "meta-llama/Llama-3.2-3B-Instruct"
 
 No HF cache is used for model files: everything lands in ./models/<family>/
 so the folder IS the provenance record (see selection-results.json for the
 per-file provenance entries).
-
-Family spec syntax: "model_repo" or "model_repo=f16_repo"
-(the latter when the f16 GGUF lives in a different repo than the quants,
-e.g. "google/gemma-3-4b-it-qat-q4_0-gguf=ggml-org/gemma-3-4b-it-GGUF").
 
 Usage (from repo root):
   # plan only, no downloads:
@@ -29,23 +43,24 @@ Usage (from repo root):
   python3 select-quant.py \
       "Qwen/Qwen2.5-3B-Instruct-GGUF" \
       "microsoft/Phi-3-mini-4k-instruct-gguf" \
-      "meta-llama/Llama-3.2-3B-Instruct-GGUF" \
-      "google/gemma-3-4b-it-qat-q4_0-gguf=ggml-org/gemma-3-4b-it-GGUF"
+      "meta-llama/Llama-3.2-3B-Instruct" \
+      "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
 """
 
 import argparse
+import glob
 import json
 import os
-import re
 import subprocess
 import sys
 
 try:
-    from huggingface_hub import hf_hub_download, list_repo_files
+    from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download
 except ImportError:
     sys.exit("huggingface_hub is required (pip install huggingface_hub)")
 
 QUANTIZE_BIN = "./llama-b10964-gpu/llama-quantize"
+CONVERTER = "./llama.cpp/convert_hf_to_gguf.py"
 LIVE_BENCH = "./live-bench.py"
 CORPUS_DEFAULT = "./live-corpus.json"
 MODELS_DIR_DEFAULT = "./models"
@@ -70,18 +85,86 @@ def find_rung_file(names, rung):
     return None
 
 
-def find_f16_file(names):
-    """Return the f16 source filename (or None)."""
-    fallback = None
+def find_f16_files(names):
+    """Return f16 GGUF filenames (handles sharded files). Single or list."""
+    singles = []
+    shards = []
     for f in names:
         low = f.lower()
         if not low.endswith(".gguf") or "mmproj" in low:
             continue
-        if low.endswith("f16.gguf") or low.endswith("fp16.gguf"):
-            return f
-        if "f16" in low or "fp16" in low:
-            fallback = fallback or f
-    return fallback
+        if "00001-of-" in low and ("f16" in low or "fp16" in low):
+            prefix = low.split("00001-of-")[0]
+            shards.append([n for n in names
+                           if n.lower().startswith(prefix)
+                           and n.lower().endswith(".gguf")])
+        elif (low.endswith("f16.gguf") or low.endswith("fp16.gguf")
+              or "f16" in low or "fp16" in low):
+            singles.append(f)
+    if shards:
+        # prefer shard sets (they are complete); use the first set
+        return sorted(shards[0], key=lambda s: s.lower())
+    if singles:
+        # prefer a plain "-f16.gguf" over incidental matches
+        for f in singles:
+            if f.lower().endswith("-f16.gguf") or f.lower().endswith("-fp16.gguf"):
+                return [f]
+        return [singles[0]]
+    return []
+
+
+def has_safetensors(names):
+    for f in names:
+        if f.lower().endswith(".safetensors"):
+            return True
+    return False
+
+
+def resolve_f16_local(famdir):
+    """An f16 GGUF already in the family folder?"""
+    if not os.path.isdir(famdir):
+        return None
+    hits = sorted(glob.glob(os.path.join(famdir, "*f16*.gguf")))
+    hits = [h for h in hits if "mmproj" not in os.path.basename(h).lower()]
+    return hits[0] if hits else None
+
+
+def get_f16(fam, famdir, source_repo, source_files, dry_run):
+    """Return local path to the f16 GGUF, downloading/converting as needed."""
+    local = resolve_f16_local(famdir)
+    if local:
+        return local, f"local: {os.path.basename(local)}"
+
+    f16_names = find_f16_files(source_files)
+    if f16_names:
+        prov = f"downloaded: {source_repo}/{'+'.join(f16_names)}"
+        if dry_run:
+            print(f"  f16 would download: {', '.join(f16_names)}")
+            return None, prov
+        print(f"  f16 downloading from {source_repo}: {', '.join(f16_names)}")
+        os.makedirs(famdir, exist_ok=True)
+        for name in f16_names:
+            hf_hub_download(source_repo, name, local_dir=famdir)
+        return resolve_f16_local(famdir), prov
+
+    if has_safetensors(source_files):
+        prov = f"converted from {source_repo} safetensors (pinned converter)"
+        if dry_run:
+            print(f"  f16 would convert from {source_repo} safetensors")
+            return None, prov
+        print(f"  f16 converting from {source_repo} safetensors "
+              "(this downloads the whole repo, ~several GB)")
+        os.makedirs(famdir, exist_ok=True)
+        st_dir = os.path.join(famdir, "safetensors-source")
+        snapshot_download(source_repo, local_dir=st_dir)
+        out = os.path.join(famdir, fam + "-f16.gguf")
+        r = subprocess.run([sys.executable, CONVERTER, st_dir,
+                            "--outfile", out, "--outtype", "f16"])
+        if r.returncode != 0 or not os.path.isfile(out):
+            return None, "conversion failed"
+        return out, prov
+
+    return None, "no f16 source"
 
 
 def live_worst_turn(model_path, corpus):
@@ -102,9 +185,9 @@ def live_worst_turn(model_path, corpus):
 
 def process_family(spec, ladder, corpus, floor, models_dir, dry_run):
     if "=" in spec:
-        model_repo, f16_repo = spec.split("=", 1)
+        model_repo, source_repo = spec.split("=", 1)
     else:
-        model_repo, f16_repo = spec, spec
+        model_repo, source_repo = spec, spec
     fam = os.path.basename(model_repo.rstrip("/"))
     famdir = os.path.join(models_dir, fam)
 
@@ -112,19 +195,29 @@ def process_family(spec, ladder, corpus, floor, models_dir, dry_run):
     print("=" * 60)
     print(f"family: {fam}")
     print(f"  model repo : {model_repo}")
-    print(f"  f16 repo   : {f16_repo}")
+    print(f"  source repo: {source_repo}")
     print(f"  folder     : {famdir}")
 
     model_files = list_repo_files(model_repo)
-    f16_files = (model_files if f16_repo == model_repo
-                 else list_repo_files(f16_repo))
-    f16_name = find_f16_file(f16_files)
-    if not f16_name:
-        print(f"  ERROR: no f16 GGUF found in {f16_repo} — cannot quantize")
+    source_files = (model_files if source_repo == model_repo
+                    else list_repo_files(source_repo))
+
+    f16_path, f16_prov = get_f16(fam, famdir, source_repo, source_files,
+                                 dry_run)
+    if dry_run and f16_path is None and f16_prov != "no f16 source":
+        # plan printed inside get_f16; nothing else to do in dry-run
+        pass
+    if f16_path is None and f16_prov == "no f16 source":
+        print(f"  ERROR: no f16 GGUF and no safetensors in {source_repo} "
+              "— cannot quantize")
         return {"family": fam, "spec": spec, "error": "no f16 source",
                 "history": [], "selected": None}
-
-    print(f"  f16 source : {f16_repo}/{f16_name}")
+    if not dry_run and (f16_path is None or not os.path.isfile(f16_path)):
+        print(f"  ERROR: f16 resolution failed ({f16_prov})")
+        return {"family": fam, "spec": spec, "error": f16_prov,
+                "history": [], "selected": None}
+    if not dry_run:
+        print(f"  f16 source : {f16_path}  [{f16_prov}]")
 
     history = []
     selected = None
@@ -148,17 +241,15 @@ def process_family(spec, ladder, corpus, floor, models_dir, dry_run):
                 path = hf_hub_download(model_repo, repo_file,
                                        local_dir=famdir)
             else:
-                prov = f"quantized from {f16_repo}/{f16_name}"
+                prov = f"quantized from f16 [{f16_prov}]"
                 if dry_run:
                     print(f"  [{rung}] would quantize (repo has no "
                           f"{rung} file)")
                     history.append({"rung": rung, "plan": prov})
                     continue
                 print(f"  [{rung}] not in repo — quantizing from f16")
-                f16_local = hf_hub_download(f16_repo, f16_name,
-                                            local_dir=famdir)
                 out = os.path.join(famdir, fam + "-" + rung + ".gguf")
-                r = subprocess.run([QUANTIZE_BIN, f16_local, out, rung])
+                r = subprocess.run([QUANTIZE_BIN, f16_path, out, rung])
                 if r.returncode != 0 or not os.path.isfile(out):
                     print(f"  [{rung}] ERROR: quantize failed — "
                           "aborting this family")
@@ -181,9 +272,8 @@ def process_family(spec, ladder, corpus, floor, models_dir, dry_run):
             selected = history[-1]
             break
 
-    return {"family": fam, "spec": spec,
-            "f16": f"{f16_repo}/{f16_name}", "history": history,
-            "selected": selected}
+    return {"family": fam, "spec": spec, "f16_provenance": f16_prov,
+            "history": history, "selected": selected}
 
 
 def main():
@@ -191,7 +281,7 @@ def main():
         description="automated downward quant selection by the live "
                     "worst-turn >= floor rule")
     ap.add_argument("families", nargs="+",
-                    help='family specs: "model_repo" or "model_repo=f16_repo"')
+                    help='family specs: "model_repo" or "model_repo=source_repo"')
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT)
     ap.add_argument("--ladder", default=",".join(LADDER_DEFAULT),
