@@ -56,9 +56,12 @@ try:
     from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download
 except ImportError:
     sys.exit("huggingface_hub is required: pip install -r requirements.txt "
-             "(then use the repo venv: . .venv/bin/activate.fish)")
+             "(then activate the repo venv: .venv/bin/activate on "
+             "Linux/macOS, .venv\\Scripts\\Activate.ps1 on Windows)")
 
-QUANTIZE_BIN = "./llama-b10964-gpu/llama-quantize"
+QUANTIZE_BIN = os.path.join(".", "llama-b10964-gpu",
+                            "llama-quantize.exe" if os.name == "nt"
+                            else "llama-quantize")
 LIVE_BENCH = "./live-bench.py"
 CORPUS_DEFAULT = "./live-corpus.json"
 MODELS_DIR_DEFAULT = "./models"
@@ -75,13 +78,16 @@ ARC_NGPU = 99
 
 
 def find_server():
-    """llama-server binary: repo-relative first, pre-reorg HOME fallback."""
+    """llama-server binary: repo-relative first, pre-reorg HOME fallback.
+    Windows builds ship llama-server.exe - pick the right name."""
     home = os.path.expanduser("~")
-    for p in ("./llama-b10964-gpu/llama-server",
-              home + "/technical_reports/llama-b10964-gpu/llama-server"):
+    exe = "llama-server.exe" if os.name == "nt" else "llama-server"
+    for d in (os.path.join(".", "llama-b10964-gpu"),
+              os.path.join(home, "technical_reports", "llama-b10964-gpu")):
+        p = os.path.join(d, exe)
         if os.path.isfile(p):
             return p
-    return "./llama-b10964-gpu/llama-server"
+    return os.path.join(".", "llama-b10964-gpu", exe)
 
 
 SERVER_BIN = find_server()
@@ -119,7 +125,9 @@ GUIDE = {
         "llama-server missing: ./llama-b10964-gpu/llama-server must exist",
         "corpus missing: python3 live-bench.py --make-corpus",
         "port conflict: stop other llama-server instances (or pass --port)",
-        "GPU stack: check the server log reports RADV/AMD, not llvmpipe",
+        "GPU stack: the server startup log names the GPU - it must "
+        "be the real one via the vendor driver, never a software "
+        "rasterizer (llvmpipe on Linux)",
     ],
     4: [
         "dump unreadable: the .live-dump.json is malformed or empty",
@@ -486,7 +494,12 @@ def arc_stop_server(proc):
     try:
         proc.wait(timeout=15)
     except subprocess.TimeoutExpired:
-        proc.kill()
+        if os.name == "nt":
+            # Windows: kill the whole tree (children may hold the port).
+            subprocess.run(["taskkill", "/PID", str(proc.pid),
+                            "/T", "/F"], capture_output=True)
+        else:
+            proc.kill()
     deadline = time.time() + 60
     while time.time() < deadline:
         try:
@@ -714,6 +727,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
                   f"threshold {res['threshold']:.1f}) -> {res['verdict']}")
         if str(run["verdict"]).startswith("PASS"):
             fst["selected"] = rung
+            run["rung"] = rung
             save_state(state_path, state)
             print(f"  SELECTED {rung} for {fam}")
             break
@@ -783,7 +797,7 @@ def main():
             for fam, fst in state["families"].items():
                 if fst.get("selected"):
                     run = fst["runs"][fst["selected"]]
-                    jobs.append((f"{fam} {run['rung']}", run["file"]))
+                    jobs.append((f"{fam} {fst['selected']}", run["file"]))
             if not jobs:
                 sys.exit("no selections in state - run the full pipeline "
                          "first, or pass --arc-models")
@@ -822,7 +836,7 @@ def main():
         questions = load_questions(args.arc_config, args.arc_num)
         labels = []
         for fam, sel in selections.items():
-            label = f"{fam} {sel['rung']}"
+            label = f"{fam} {state['families'][fam]['selected']}"
             labels.append(label)
             phase5_arc(label, sel["file"], questions, args.arc_num,
                        args.arc_results_dir, state, args.state_file, False)

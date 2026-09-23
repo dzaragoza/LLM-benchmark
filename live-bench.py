@@ -12,7 +12,8 @@ philosophy as the cached ARC-Challenge question set.
 
 Repo-relative: run everything from the repository root after cloning.
 No environment variables needed. Paths default to ./... The llama-server
-binary is expected at ./llama-b10964-gpu/llama-server (place the llama.cpp
+binary is expected at ./llama-b10964-gpu/llama-server (llama-server.exe
+on Windows) — place the llama.cpp
 b10964 build directory in the repo root with that name); the only override
 is the --server-bin flag.
 
@@ -57,7 +58,9 @@ import urllib.error
 
 ARENA_DIR = "./arena/data"
 SAMPLE_OUT = "./arena/english_sample.json"
-SERVER_BIN_DEFAULT = "./llama-b10964-gpu/llama-server"
+SERVER_BIN_DEFAULT = os.path.join(
+    ".", "llama-b10964-gpu",
+    "llama-server.exe" if os.name == "nt" else "llama-server")
 SEED = 1024  # pre-registered; part of the protocol
 
 
@@ -179,8 +182,17 @@ def stop_server(proc):
     try:
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
+        if os.name == "nt":
+            # Windows: terminate() may leave children holding the port;
+            # kill the whole process tree, then wait for the port to free.
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True)
+        else:
+            proc.kill()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 # ---------------------------------------------------------------------------
