@@ -1,0 +1,27 @@
+# requirements.txt — technical_reports shared venv
+# Python-side tooling for the local-LLM measurement series.
+# NOTE: the GGUF conversion/quantization pipeline (convert_hf_to_gguf.py,
+#       llama-quantize, llama-bench, llama-server) is NOT pip-managed —
+#       those are llama.cpp's own tools from the pinned build
+#       b10964 (commit b29c606e2) at ~/technical_reports/llama-b10964-gpu/
+
+# --- Model downloads (Hugging Face) ---
+huggingface_hub        # `hf` CLI: model + dataset downloads (safetensors, GGUF, Arena data)
+
+# --- GGUF conversion dependencies (for the pinned llama.cpp converter) ---
+# convert_hf_to_gguf.py imports these; versions must be compatible with the
+# pinned llama.cpp checkout's requirements/convert_hf_to_gguf.txt
+torch                   # converter backend (safetensors loading)
+safetensors             # safetensors file format
+numpy
+gguf                    # GGUF file writing (llama.cpp's pip package)
+sentencepiece           # tokenizer conversion (some model families)
+protobuf                # tokenizer protobuf parsing
+
+# --- Data processing ---
+pandas
+pyarrow                 # Parquet reader: Arena dataset shards, dataset filtering
+
+# --- Measurement & analysis scripts (strict-arc.py, paired-arc.py, live-bench.py) ---
+requests                # HTTP: ARC dataset fetch, HF API, llama-server REST calls
+scipy                   # paired exact McNemar statistics
