@@ -11,10 +11,8 @@ sample, seed 1024), so the workload is standardized and citable — the same
 philosophy as the cached ARC-Challenge question set.
 
 Repo-relative: run everything from the repository root after cloning.
-Paths default to ./... The llama-server binary is expected at
-./llama-b10964-gpu/llama-server (place the llama.cpp b10964 build directory
-in the repo root with that name); override with --server-bin or the
-$LLAMA_SERVER_BIN environment variable.
+Paths default to ./..., the llama-server binary is passed via --server-bin
+or the $LLAMA_SERVER_BIN environment variable.
 
 Protocol (fixed, pre-registered):
   - N conversations from the corpus, played verbatim (user turns sent;
@@ -44,8 +42,7 @@ Usage (from repo root):
 
 import argparse
 import glob
-impor
-t json
+import json
 import os
 import random
 import subprocess
@@ -248,13 +245,9 @@ def main():
                          "podium numbers")
     ap.add_argument("--ctx", type=int, default=4096)
     ap.add_argument("--server-bin",
-                    default=os.environ.get(
-                        "LLAMA_SERVER_BIN",
-                        os.path.join(".", "llama-b10964-gpu", "llama-server")),
-                    help="path to llama-server. Default: ./llama-b10964-gpu/"
-                         "llama-server (place the llama.cpp b10964 build in the "
-                         "repo root with that name). Alternatively set the "
-                         "$LLAMA_SERVER_BIN environment variable.")
+                    default=os.environ.get("LLAMA_SERVER_BIN"),
+                    help="path to llama-server; alternatively set the "
+                         "$LLAMA_SERVER_BIN environment variable")
     ap.add_argument("--dump",
                     help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
