@@ -11,8 +11,10 @@ sample, seed 1024), so the workload is standardized and citable — the same
 philosophy as the cached ARC-Challenge question set.
 
 Repo-relative: run everything from the repository root after cloning.
-Paths default to ./..., the llama-server binary is passed via --server-bin
-or the $LLAMA_SERVER_BIN environment variable.
+Paths default to ./... The llama-server binary is expected at
+./llama-b10964-gpu/llama-server (place the llama.cpp b10964 build directory
+in the repo root with that name); override with --server-bin or the
+$LLAMA_SERVER_BIN environment variable.
 
 Protocol (fixed, pre-registered):
   - N conversations from the corpus, played verbatim (user turns sent;
@@ -42,7 +44,8 @@ Usage (from repo root):
 
 import argparse
 import glob
-import json
+impor
+t json
 import os
 import random
 import subprocess
@@ -98,7 +101,8 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
         items = json.load(f)
 
     selected = []
-    reply_chars = []
+ 
+   reply_chars = []
     for conv in items:
         msgs = conv["conversation"]
         user_msgs = [m["content"] for m in msgs if m.get("role") == "user"]
@@ -148,7 +152,8 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
     total_turns = sum(len(c["user_turns"]) for c in corpus)
     print(f"Corpus written: {out_file}")
     print(f"  conversations: {len(corpus)}   total turns: {total_turns}")
-    print(f"  reply p75: {p75} chars -> answer cap: {cap_tokens} tokens")
+  
+  print(f"  reply p75: {p75} chars -> answer cap: {cap_tokens} tokens")
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +213,8 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
 
         t = data.get("timings", {})
         server_tps = t.get("predicted_per_second")
-        n_pred = t.get("predicted_n",
+        n_pred = t.get("pr
+edicted_n",
                        data.get("usage", {}).get("completion_tokens"))
         prompt_ms = t.get("prompt_ms")
 
@@ -242,9 +248,13 @@ def main():
                          "podium numbers")
     ap.add_argument("--ctx", type=int, default=4096)
     ap.add_argument("--server-bin",
-                    default=os.environ.get("LLAMA_SERVER_BIN"),
-                    help="path to llama-server; alternatively set the "
-                         "$LLAMA_SERVER_BIN environment variable")
+                    default=os.environ.get(
+                        "LLAMA_SERVER_BIN",
+                        os.path.join(".", "llama-b10964-gpu", "llama-server")),
+                    help="path to llama-server. Default: ./llama-b10964-gpu/"
+                         "llama-server (place the llama.cpp b10964 build in the "
+                         "repo root with that name). Alternatively set the "
+                         "$LLAMA_SERVER_BIN environment variable.")
     ap.add_argument("--dump",
                     help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
@@ -253,7 +263,8 @@ def main():
                     help="step 1: build fixed corpus from english_sample.json")
     ap.add_argument("--corpus-out", default="./live-corpus.json")
     ap.add_argument("--n-conversations", type=int, default=5)
-    ap.add_argument("--min-turns", type=int, default=4)
+    ap.add_argument("-
+-min-turns", type=int, default=4)
     ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)
     args = ap.parse_args()
@@ -302,7 +313,8 @@ def main():
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
                                            cap_tokens, args.ctx)
-                    for r in res:
+                    for r in re
+s:
                         all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
                     cmean = sum(tps) / len(tps) if tps else None
