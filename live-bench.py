@@ -11,10 +11,10 @@ sample, seed 1024), so the workload is standardized and citable — the same
 philosophy as the cached ARC-Challenge question set.
 
 Repo-relative: run everything from the repository root after cloning.
-Paths default to ./... The llama-server binary is expected at
-./llama-b10964-gpu/llama-server (place the llama.cpp b10964 build directory
-in the repo root with that name); override with --server-bin or the
-$LLAMA_SERVER_BIN environment variable.
+No environment variables needed. Paths default to ./... The llama-server
+binary is expected at ./llama-b10964-gpu/llama-server (place the llama.cpp
+b10964 build directory in the repo root with that name); the only override
+is the --server-bin flag.
 
 Protocol (fixed, pre-registered):
   - N conversations from the corpus, played verbatim (user turns sent;
@@ -37,7 +37,6 @@ Usage (from repo root):
   python3 live-bench.py --make-corpus
 
   # step 2: benchmark models (qualifying tier: 1 rep)
-  set -x LLAMA_SERVER_BIN /path/to/llama-server     # fish; export in bash
   python3 live-bench.py --corpus ./live-corpus.json \
       --models ./path/model_a.gguf ./path/model_b.gguf --dump live-dump.json
 """
@@ -53,8 +52,9 @@ import time
 import urllib.request
 import urllib.error
 
-ARENA_DIR = os.environ.get("ARENA_DIR", "./arena/data")
-SAMPLE_OUT = os.environ.get("SAMPLE_OUT", "./arena/english_sample.json")
+ARENA_DIR = "./arena/data"
+SAMPLE_OUT = "./arena/english_sample.json"
+SERVER_BIN_DEFAULT = "./llama-b10964-gpu/llama-server"
 SEED = 1024  # pre-registered; part of the protocol
 
 
@@ -243,14 +243,11 @@ def main():
                     help="qualifying tier default: 1 rep; use 3 for final "
                          "podium numbers")
     ap.add_argument("--ctx", type=int, default=4096)
-    ap.add_argument("--server-bin",
-                    default=os.environ.get(
-                        "LLAMA_SERVER_BIN",
-                        os.path.join(".", "llama-b10964-gpu", "llama-server")),
-                    help="path to llama-server. Default: ./llama-b10964-gpu/"
-                         "llama-server (place the llama.cpp b10964 build in "
-                         "the repo root with that name). Alternatively set "
-                         "the $LLAMA_SERVER_BIN environment variable.")
+    ap.add_argument("--server-bin", default=SERVER_BIN_DEFAULT,
+                    help="path to the llama-server binary. Default: "
+                         "./llama-b10964-gpu/llama-server (place the "
+                         "llama.cpp b10964 build in the repo root with "
+                         "that name)")
     ap.add_argument("--dump",
                     help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
@@ -275,11 +272,14 @@ def main():
     if not args.corpus:
         ap.error("--corpus is required for benchmarking "
                  "(or use --make-sample/--make-corpus)")
-    if not args.server_bin:
-        ap.error("no llama-server binary: pass --server-bin or set "
-                 "$LLAMA_SERVER_BIN")
+    if os.path.isdir(args.server_bin):
+        ap.error(f"{args.server_bin} is a directory, not the llama-server "
+                 f"binary — point --server-bin at the binary itself "
+                 f"(default: {SERVER_BIN_DEFAULT})")
     if not os.path.isfile(args.server_bin):
-        ap.error(f"llama-server not found at {args.server_bin}")
+        ap.error(f"llama-server not found at {args.server_bin} — place the "
+                 "llama.cpp b10964 build directory in the repo root as "
+                 "./llama-b10964-gpu/ or pass --server-bin")
 
     with open(args.corpus) as f:
         corpus = json.load(f)
