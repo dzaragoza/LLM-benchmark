@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """
-strict-arc.py — Phase 2 edition (minimal diff from Phase 1 reference)
+strict-arc.py — cross-study strict ARC runner (T14s / 7840U, Linux)
+Methodology IDENTICAL across studies: raw /v1/completions prompt,
+logprob scoring of answer letters, max_tokens=1, temperature=0,
+top-20 logprobs, stdlib only, port hygiene, port 8081, -ngl 99, -c 2048.
 
-Evaluated models (Phase 2, 2 GiB class, first-party/self-made only):
-  - Qwen3-1.7B Q4_K_M (self-made: official safetensors -> convert 7d4b92b -> F16 -> Q4_K_M)
-  - Qwen3-1.7B Q8_0   (official Qwen/Qwen3-1.7B-GGUF repo)
+NO EDITING NEEDED to switch studies — use --roster:
+    python3 strict-arc.py --roster study2 --num 800 --csv runX
+    python3 strict-arc.py --roster 51.2  --num 800 --csv runY
 
-Methodology IDENTICAL to Phase 1 reference version:
-  raw /v1/completions prompt, logprob scoring of answer letters,
-  max_tokens=1, temperature=0, top-20 logprobs, stdlib only,
-  taskkill port hygiene, port 8081, -ngl 99, -c 2048.
+  study2 (default): fixed Study #2 roster (Qwen2.5-3B, Phi-3-mini,
+      Llama3.2-3B via -hf / self-made files)
+  51.2: AUTO-DISCOVERED — scans ~/technical_reports/51.2/ recursively
+      for *.gguf files whose names contain a quant tag (q4_k_m, q4_0,
+      q5_0, q5_k_m, q6_k, q8_0). F16/full-precision files are excluded
+      automatically. Roster names come from filenames, so CSVs never
+      collide (full sanitized names, post-bugfix).
 
-NOTE: no chat template is involved, so Qwen3 thinking-mode cannot
-contaminate results (logprob scoring, single token, raw completion).
-
-Usage:
-    python strict_arc.py                        (both models, 32 questions)
-    python strict_arc.py --num 800              (full Phase 2 run)
-    python strict_arc.py --csv results          (per-question timing dump)
+CSV output dirs:
+  study2 -> ~/technical_reports/102.4/arc-results/
+  51.2   -> ~/technical_reports/51.2/arc-results/
+  study3 -> ~/technical_reports/study3/arc-results/   (crossover bracket, T14s side)
 """
 
 import urllib.request
@@ -29,27 +32,127 @@ import subprocess
 import time
 import sys
 import os
+import glob as _glob
 
-# ============ EDIT ME ============
+# ============ constants (no user edits expected) ============
 PORT = 8081
 THREADS = 8
 NGPU_LAYERS = 99
 
-VULKAN_SERVER = r"C:\Users\danie\llama-b10964-bin-win-vulkan-x64\llama-server.exe"
+HOME = os.path.expanduser("~")
+VULKAN_SERVER = HOME + "/technical_reports/llama-b10964-gpu/llama-server"
+QUESTIONS_DIR = HOME + "/technical_reports"          # cross-report dataset cache
+OUT_DIRS = {
+    "study2": HOME + "/technical_reports/102.4/arc-results",
+    "51.2":  HOME + "/technical_reports/51.2/arc-results",
+    "study3": HOME + "/technical_reports/study3/arc-results",
+}
+DIR_51 = HOME + "/technical_reports/51.2"
+QUANT_TAGS = ("q4_k_m", "q4_0", "q5_0", "q5_k_m", "q6_k", "q8_0")
 
-# Phase 2 roster — specs are full llama-server arg lists.
-# (-hf for repo models, -m for local self-made files.)
-ROSTER = [
-    ("SmolLM2-1.7B Q4_K_M official",  [["-hf", "HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF:Q4_K_M"]]),
-    ("SmolLM2-1.7B Q6_K self-made",   [["-m", r"C:\Users\danie\smollm2-1.7b-Q6_K.gguf"]]),
-    ("SmolLM2-1.7B Q5_0 self-made",   [["-m", r"C:\Users\danie\smollm2-1.7b-Q5_0.gguf"]]),
-    ("SmolLM2-1.7B Q5_K_M self-made", [["-m", r"C:\Users\danie\smollm2-1.7b-Q5_K_M.gguf"]]),
-    ("Qwen2.5-1.5B Q5_0 official",    [["-hf", "Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q5_0"]]),
-    ("Qwen2.5-1.5B Q5_K_M official",  [["-hf", "Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q5_K_M"]]),
-    ("glm-edge-1.5b Q5_0 official",   [["-hf", "zai-org/glm-edge-1.5b-chat-gguf:Q5_0"]]),
-    ("glm-edge-1.5b Q5_K_M official", [["-hf", "zai-org/glm-edge-1.5b-chat-gguf:Q5_K_M"]]),
+# Study #2 roster — specs are full llama-server arg lists.
+ROSTER_STUDY2 = [
+    ("Qwen2.5-3B Q4_0",   [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_0"]]),
+    ("Qwen2.5-3B Q4_K_M", [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M"]]),
+    ("Qwen2.5-3B Q5_0",   [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q5_0"]]),
+    ("Qwen2.5-3B Q5_K_M", [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q5_K_M"]]),
+    ("Qwen2.5-3B Q6_K",   [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q6_K"]]),
+    ("Qwen2.5-3B Q8_0",   [["-hf", "Qwen/Qwen2.5-3B-Instruct-GGUF:Q8_0"]]),
+    ("Phi-3-mini Q4_K_M (shipped)", [["-hf", "microsoft/Phi-3-mini-4k-instruct-gguf:Q4"]]),
+    ("Phi-3-mini Q5_K_M (self-made)", [["-m", HOME + "/technical_reports/102.4/phi3-mini/phi3-mini-q5_k_m.gguf"]]),
+    ("Llama3.2-3B Q4_K_M", [["-m", HOME + "/technical_reports/102.4/llama3.2-3b/llama3.2-3b-q4_k_m.gguf"]]),
+    ("Llama3.2-3B Q5_K_M", [["-m", HOME + "/technical_reports/102.4/llama3.2-3b/llama3.2-3b-q5_k_m.gguf"]]),
+    ("Llama3.2-3B Q6_K",   [["-m", HOME + "/technical_reports/102.4/llama3.2-3b/llama3.2-3b-q6_k.gguf"]]),
+    ("Llama3.2-3B Q8_0",   [["-m", HOME + "/technical_reports/102.4/llama3.2-3b/llama3.2-3b-q8_0.gguf"]]),
 ]
-# ================================
+
+# Study #3 (crossover bracket) — T14s side: top 1.5B at full precision.
+# Tests the zero-damage ceiling: does F16 beat the quant ladder?
+# -hf only (no local file copies, per owner's provenance rule). The repo file
+# is qwen2.5-1.5b-instruct-fp16.gguf — the :tag matcher resolves against
+# filenames, so try "FP16" then "fp16" (exact matcher behavior unverified).
+ROSTER_STUDY3 = [
+    ("Qwen2.5-1.5B F16", [
+        ["-hf", "Qwen/Qwen2.5-1.5B-Instruct-GGUF:FP16"],
+        ["-hf", "Qwen/Qwen2.5-1.5B-Instruct-GGUF:fp16"],
+    ]),
+    # Phi-3-mini tiny-quant ladder (self-made: pinned converter at
+    # ~/technical_reports/llama.cpp, quantizer = b10964 bundle, from official
+    # microsoft/Phi-3-mini-4k-instruct safetensors via phi3-mini-f16.gguf)
+    ("Phi-3-mini Q3_K_M", [["-m", HOME + "/technical_reports/study3/phi3-mini-q3_k_m.gguf"]]),
+    # 2.x-bpw rung: Q2_K (2.96 bpw) — owner's call, swapped for IQ2_M to skip
+    # the imatrix build (IQ formats require calibration; K-quants don't).
+    ("Phi-3-mini Q2_K",  [["-m", HOME + "/technical_reports/study3/phi3-mini-q2_k.gguf"]]),
+    # 1.x-bpw rung: Q1_0 (1.125 bpw, group 64) — same swap rationale.
+    ("Phi-3-mini Q1_0",  [["-m", HOME + "/technical_reports/study3/phi3-mini-q1_0.gguf"]]),
+]
+
+
+def build_roster_51():
+    """Study #1 (51.2 GB/s) roster — 12 configs, 3 families, from the report:
+      Qwen2.5-1.5B-Instruct, glm-edge-1.5b-chat, SmolLM2-1.7B-Instruct,
+      each at Q4_K_M / Q5_0 / Q5_K_M / Q6_K.
+    Spec resolution per config, in order:
+      1. local GGUF anywhere under ~/technical_reports/51.2/ whose path
+         contains the family hint AND the quant tag (self-made files
+         live here too)
+      2. first-party -hf repo fallback (GLM ships the full ladder;
+         Qwen and SmolLM2 official repos ship only Q4_K_M and Q8_0 —
+         their Q5_0/Q5_K_M/Q6_K have NO -hf fallback and must be local,
+         or re-quantized from official safetensors first)
+    Configs with no resolvable spec are reported at roster-print time,
+    with a y/N prompt, BEFORE anything runs."""
+    FAMILIES = [
+        # (family label, filename hint, first-party HF repo, study-#1 quant grid)
+        ("Qwen2.5-1.5B", "qwen2.5-1.5b-instruct", "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+         ["Q4_0", "Q5_0", "Q5_K_M", "Q6_K"]),          # all self-made in study #1
+        ("glm-edge-1.5b", "glm", "zai-org/glm-edge-1.5b-chat-gguf",
+         ["Q4_1", "Q5_0", "Q5_1", "Q5_K_M", "Q6_K"]),  # repo ships full ladder
+        ("SmolLM2-1.7B", "smollm2", "HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF",
+         ["Q4_K_M", "Q5_0", "Q5_K_M", "Q6_K"]),        # only Q4_K_M shipped
+    ]
+    # per-family quants that the first-party repo genuinely ships
+    # (Qwen 1.5B repo confirmed full set 2026-09-22: q4_0..q8_0 — earlier
+    #  "only Q4_K_M/Q8_0" note was the 3B repo, wrongly carried over)
+    HF_AVAILABLE = {
+        "glm": {"Q4_1", "Q5_0", "Q5_1", "Q5_K_M", "Q6_K"},  # full ladder
+        "qwen2.5-1.5b-instruct": {"Q4_0", "Q5_0", "Q5_K_M", "Q6_K"},
+        "smollm2": {"Q4_K_M"},                               # repo ships Q4_K_M only
+    }
+
+    # index all local ggufs once (case-insensitive matching)
+    local_files = []
+    for f in sorted(_glob.glob(os.path.join(DIR_51, "**", "*.gguf"), recursive=True)):
+        local_files.append((f, os.path.basename(f).lower()))
+
+    roster, missing = [], []
+    for fam_label, hint, repo, quants in FAMILIES:
+        for quant in quants:
+            tag = quant.lower()
+            name = f"{fam_label} {quant}"
+            # candidate 1: local file(s) matching family + quant tag
+            # (hint excludes the *base* model: 'qwen2.5-1.5b-base' lacks 'instruct')
+            specs = [["-m", f] for f, low in local_files if hint in low and tag in low]
+            # candidate 2: first-party -hf, only if the repo ships that tag
+            if quant in HF_AVAILABLE[hint]:
+                specs.append(["-hf", f"{repo}:{quant}"])
+            if specs:
+                roster.append((name, specs))
+            else:
+                missing.append(name)
+
+    if missing:
+        print("WARNING — no local file and no first-party -hf fallback for:",
+              file=sys.stderr)
+        for m in missing:
+            print(f"  {m}  (self-made quant; if the .gguf is not under 51.2/, "
+                  f"re-quantize from official safetensors with the pinned "
+                  f"llama-quantize, then re-run)", file=sys.stderr)
+        print("These will be SKIPPED. Continue? [y/N] ", end="", flush=True)
+        if input().strip().lower() != "y":
+            sys.exit(1)
+    return roster
+# ============================================================
 
 
 def http_get_json(url, params=None, timeout=60, retries=4):
@@ -78,8 +181,10 @@ def http_post_json(url, payload, timeout=120):
 
 def load_questions(config, n):
     """Fetch ARC questions from the HuggingFace datasets-server API.
-    Caches to a local JSON file so repeat runs don't refetch."""
-    cache_file = f"arc-{config}-test-{n}.json"
+    Cache is pinned to the cross-report directory so repeat runs and
+    repeat studies don't refetch (same 800 questions across studies —
+    this is what makes McNemar pairing valid)."""
+    cache_file = os.path.join(QUESTIONS_DIR, f"arc-{config}-test-{n}.json")
     if os.path.exists(cache_file):
         print(f"    using cached questions: {cache_file}", file=sys.stderr)
         with open(cache_file, encoding="utf-8") as f:
@@ -203,12 +308,11 @@ def start_server(specs):
 
 
 def stop_server(proc):
-    """Hard-kill the server (soft terminate is not reliable for llama-server
-    on Windows — it can survive and keep holding the port, which silently
-    redirects subsequent runs at the WRONG model). Verifies the port is free."""
+    """Kill the server and verify the port is free. On Linux, escalate
+    terminate -> kill; llama-server can also linger here and silently
+    redirect subsequent runs at the WRONG model."""
     if proc.poll() is None:
         if os.name == "nt":
-            # /T kills the process tree, /F forces it
             subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
@@ -287,17 +391,35 @@ def main():
     ap.add_argument("--config", default="ARC-Challenge",
                     choices=["ARC-Challenge", "ARC-Easy"])
     ap.add_argument("--csv", default=None,
-                    help="basename for per-question timing CSV (one per model)")
+                    help="enable per-question timing CSVs (one per model)")
+    ap.add_argument("--roster", default="study2", choices=["study2", "51.2", "study3"],
+                    help="which roster to run (51.2 = study #1 grid auto-resolved; study3 = F16 crossover, T14s side)")
     args = ap.parse_args()
+
+    out_dir = OUT_DIRS[args.roster]
+    os.makedirs(out_dir, exist_ok=True)
+
+    if args.roster == "51.2":
+        roster = build_roster_51()
+        if not roster:
+            print(f"ERROR: no quantized GGUFs found under {DIR_51} "
+                  f"(looked for tags: {', '.join(QUANT_TAGS)})", file=sys.stderr)
+            sys.exit(1)
+        print("Auto-discovered 51.2 roster:", file=sys.stderr)
+        for name, specs in roster:
+            spec = specs[0]
+            print(f"  {name}  <-  {spec[0]} {spec[1]}", file=sys.stderr)
+    else:
+        roster = ROSTER_STUDY2 if args.roster == "study2" else ROSTER_STUDY3
 
     print(f"Loading {args.num} {args.config} questions...", file=sys.stderr)
     questions = load_questions(args.config, args.num)
-    print(f"{len(questions)} questions loaded. Roster: {len(ROSTER)} models.", file=sys.stderr)
+    print(f"{len(questions)} questions loaded. Roster: {len(roster)} models.", file=sys.stderr)
 
     url = f"http://127.0.0.1:{PORT}/v1/completions"
     results = []
 
-    for name, specs in ROSTER:
+    for name, specs in roster:
         # sanity check: make sure we're not talking to a leftover server
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=2):
@@ -317,7 +439,10 @@ def main():
             print(f"    prompt tokens: mean {mean_tok:.1f}  total {total_tok}", flush=True)
         except Exception as e:
             print(f"    tokenize_stats failed: {e}", file=sys.stderr)
-        csv_path = f"{name.split()[0]}-arc-timing.csv" if args.csv else None
+        # CSV naming: FULL sanitized config name (bugfix 2026-09-22 — the old
+        # name.split()[0] scheme made family-prefixed configs overwrite each other).
+        safe = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in name)
+        csv_path = os.path.join(out_dir, f"{safe}-arc-timing.csv") if args.csv else None
         t_start = time.perf_counter()
         try:
             correct, timings = run_quiz(questions, url, name, csv_path)
@@ -341,7 +466,7 @@ def main():
     print("FINAL SCORES (sorted)")
     for name, c, n in sorted(results, key=lambda r: -r[1] / r[2]):
         print(f"  {name}: {c}/{n} = {c / n:.1%}")
-    skipped = len(ROSTER) - len(results)
+    skipped = len(roster) - len(results)
     if skipped:
         print(f"\n({skipped} models skipped — failed to start)")
 
