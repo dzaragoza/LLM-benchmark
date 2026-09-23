@@ -98,8 +98,7 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
         items = json.load(f)
 
     selected = []
- 
-   reply_chars = []
+    reply_chars = []
     for conv in items:
         msgs = conv["conversation"]
         user_msgs = [m["content"] for m in msgs if m.get("role") == "user"]
@@ -149,8 +148,7 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
     total_turns = sum(len(c["user_turns"]) for c in corpus)
     print(f"Corpus written: {out_file}")
     print(f"  conversations: {len(corpus)}   total turns: {total_turns}")
-  
-  print(f"  reply p75: {p75} chars -> answer cap: {cap_tokens} tokens")
+    print(f"  reply p75: {p75} chars -> answer cap: {cap_tokens} tokens")
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +208,8 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
 
         t = data.get("timings", {})
         server_tps = t.get("predicted_per_second")
-        n_pred = t.get("pr
+        n_pred = t.get("
+pr
 edicted_n",
                        data.get("usage", {}).get("completion_tokens"))
         prompt_ms = t.get("prompt_ms")
@@ -256,7 +255,8 @@ def main():
                     help="step 1: build fixed corpus from english_sample.json")
     ap.add_argument("--corpus-out", default="./live-corpus.json")
     ap.add_argument("--n-conversations", type=int, default=5)
-    ap.add_argument("-
+    ap.add_argument
+("-
 -min-turns", type=int, default=4)
     ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)
@@ -306,7 +306,8 @@ def main():
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
                                            cap_tokens, args.ctx)
-                    for r in re
+                    for r i
+n re
 s:
                         all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
