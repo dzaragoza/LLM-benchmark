@@ -27,6 +27,9 @@ Protocol (fixed, pre-registered):
   - The server's own timing (timings.predicted_per_second) is the
     authoritative metric; an external wall-clock cross-check (generation
     span = wall time minus prompt processing) is computed per turn
+  - THE RESULT IS THE WORST TURN: each conversation reports its slowest
+    turn; the final score is the global worst turn across all
+    conversations. The comfort-line rule is strict: worst turn >= 20.
   - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
 
 Usage (from repo root):
@@ -291,7 +294,7 @@ def main():
     for model in args.models or []:
         label = model.split("/")[-1]
         print(f"\n=== {label} ===")
-        repeat_means = []
+        repeat_worsts = []
         for rep in range(1, args.repeats + 1):
             print(f"  [rep {rep}/{args.repeats}] starting server...", flush=True)
             proc = subprocess.Popen(
@@ -304,35 +307,41 @@ def main():
                     print("  ERROR: server did not become healthy; skipping")
                     stop_server(proc)
                     continue
-                conv_means = []
+                conv_worsts = []
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
                                            cap_tokens, args.ctx)
                     for r in res:
                         all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
+                    cworst = min(tps) if tps else None
                     cmean = sum(tps) / len(tps) if tps else None
-                    conv_means.append(cmean)
+                    conv_worsts.append(cworst)
                     print(f"    conv {ci}: turns t/s: "
                           + ", ".join(f"{x:.1f}" for x in tps)
-                          + (f"   mean {cmean:.1f}" if cmean else ""))
+                          + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
+                             if cworst else ""))
             finally:
                 stop_server(proc)
-            valid = [m for m in conv_means if m]
+            valid = [w for w in conv_worsts if w]
             if valid:
-                rep_mean = sum(valid) / len(valid)
-                repeat_means.append(rep_mean)
-                print(f"  rep {rep}: conversation means -> "
+                rep_worst = min(valid)
+                repeat_worsts.append(rep_worst)
+                rep_mean_of_worsts = sum(valid) / len(valid)
+                print(f"  rep {rep}: conversation worsts -> "
                       + ", ".join(f"{x:.1f}" for x in valid)
-                      + f"   [rep mean {rep_mean:.1f}]")
+                      + f"   [rep worst {rep_worst:.1f}, "
+                        f"avg-of-worsts {rep_mean_of_worsts:.1f}]")
 
-        if repeat_means:
-            conv_mean = sum(repeat_means) / len(repeat_means)
-            spread = ((max(repeat_means) - min(repeat_means))
-                      if len(repeat_means) > 1 else 0.0)
-            print(f"\n  {label}: LIVE = {conv_mean:.1f} t/s "
-                  f"(mean of {len(repeat_means)} reps, spread {spread:.1f})")
-            all_summary.append((label, conv_mean, spread))
+        if repeat_worsts:
+            worst = min(repeat_worsts)
+            avg_worsts = sum(repeat_worsts) / len(repeat_worsts)
+            print(f"\n  {label}: WORST TURN = {worst:.1f} t/s "
+                  f"(min of {len(repeat_worsts)} reps; "
+                  f"avg-of-rep-worsts {avg_worsts:.1f})")
+            verdict = "PASS" if worst >= 20 else "FAIL"
+            print(f"  {label}: floor >= 20 t/s: {verdict}")
+            all_summary.append((label, worst, avg_worsts, verdict))
 
     if args.dump:
         with open(args.dump, "w") as f:
@@ -340,9 +349,10 @@ def main():
         print(f"\nper-turn results written to {args.dump}")
 
     print("\n" + "=" * 60)
-    print("FINAL LIVE SCORES (conversation means, server-timed)")
-    for label, mean, spread in sorted(all_summary, key=lambda x: -x[1]):
-        print(f"  {label}: {mean:.1f} t/s  (spread {spread:.1f})")
+    print("FINAL LIVE SCORES (worst turn, strict floor >= 20)")
+    for label, worst, avg_worsts, verdict in sorted(all_summary, key=lambda x: -x[1]):
+        print(f"  {label}: worst {worst:.1f} t/s "
+              f"(avg-of-worsts {avg_worsts:.1f})  [{verdict}]")
     print("=" * 60)
 
 
