@@ -13,10 +13,10 @@ integrated GPUs, with the llama.cpp Vulkan backend.
 
 ```
 python full-benchmark.py ^
-    "Qwen/Qwen2.5-3B-Instruct-GGUF" ^
-    "microsoft/Phi-3-mini-4k-instruct-gguf" ^
-    "meta-llama/Llama-3.2-3B-Instruct" ^
-    "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+    "meta-llama/Llama-3.2-1B-Instruct-GGUF" ^
+    "Qwen/Qwen2.5-1.5B-Instruct-GGUF" ^
+    "google/gemma-3-1b-it-qat-q4_0-gguf=google/gemma-3-1b-it" ^
+    "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 ```
 
 (Linux: replace `^` with `\` line continuations, or put it on one line.)
@@ -45,9 +45,63 @@ downloading anything.
 
 ---
 
+## Roster selection (pre-registered, transparent)
+
+The four model families were chosen **before any measurement**, by a
+fixed procedure with recorded numbers — anyone can audit or repeat it.
+
+**Rules (fixed in advance):**
+1. Start from the [Ollama library](https://ollama.com/library?sort=popular)
+   ranked by pull count (snapshot: 2026-09-23).
+2. **Distinct families only** — no two models from the same model
+   family/owner.
+3. **No thinking models** (reasoning-token models are incompatible with
+   the strict letter-answer ARC protocol).
+4. The family must have a size class **predicted to pass the speed
+   floor** on the target machine class (51.2 GB/s system RAM; live
+   t/s ≈ 26 ÷ model size in GiB, so floor 20 t/s requires ≲ 1.3 GiB
+   files, i.e. roughly 1–2B parameters at 4–6 bit).
+5. Weights are always **first-party** (the model owner's official
+   Hugging Face repos) — popularity picks the family, never the
+   weight file.
+
+**Popularity snapshot and the walk down the list** (Ollama pull counts):
+
+| # | Ollama family | Pulls | Small variant | Verdict |
+|---|---|---|---|---|
+| 1 | llama3.1 | 119.8M | 8b | excluded — no variant under ~4 GB |
+| 2 | deepseek-r1 | 93.1M | 1.5b | excluded — thinking model; 1.5b is a Qwen distill |
+| 3 | nomic-embed-text | 86.9M | — | excluded — embedding model |
+| 4 | **llama3.2** | **84.2M** | **1b** | **SELECTED** |
+| 5 | **qwen2.5** | **40.8M** | **1.5b** | **SELECTED** |
+| 6 | **gemma3** | **40.7M** | **1b** | **SELECTED** |
+| 7 | qwen3 | 37.8M | 1.7b | excluded — thinking model; same family as qwen2.5 |
+| 8 | mistral | 33.7M | 7b | excluded — no small variant |
+| 9 | gemma2 | 33.2M | 2b | excluded — same family as gemma3 (superseded) |
+| 10 | gemma4 | 25.6M | e2b | excluded — thinking model; same family as gemma3 |
+| 11 | llama3 | 25.3M | 8b | excluded — same family as llama3.2 |
+| 12 | qwen2.5-coder | 21.7M | 1.5b | excluded — same family as qwen2.5 |
+| 13 | qwen3.5 | 20.8M | 0.8b | excluded — same family as qwen2.5 (Qwen series) |
+| 14 | phi3 | 18.2M | 3.8b | excluded — smallest variant ~2.2 GiB at Q4, predicted ~10.6 t/s: fails floor 20 at every rung |
+| 15 | llava | 15.0M | 7b | excluded — vision model, too big |
+| 16 | mxbai-embed-large | 15.0M | — | excluded — embedding model |
+| 17 | gpt-oss | 13.1M | 20b | excluded — thinking model; too big |
+| 18 | qwen3-coder | 9.5M | 30b | excluded — same family; too big |
+| 19 | gemma | 8.3M | 2b | excluded — same family as gemma3 |
+| 20 | **smollm2** | **4M** | **1.7b** | **SELECTED** |
+
+Selected, in popularity order: **llama3.2:1b, qwen2.5:1.5b, gemma3:1b,
+smollm2:1.7b** — the first four families in the popularity ranking that
+satisfy all rules. SmolLM2 was also a study #1 family, giving a direct
+cross-study replication check. Its official repo ships safetensors
+only, so every rung on its ladder is self-quantized via the pinned
+toolchain — the same provenance path as study #1's SmolLM2 variants.
+
+---
+
 ## Reproduction guide (Windows 10/11 and Linux)
 
-You need about **50 GB of free disk** and a **Vulkan-capable GPU**
+You need about **20 GB of free disk** and a **Vulkan-capable GPU**
 (any modern AMD/Intel/NVIDIA iGPU or dGPU with an up-to-date driver).
 Everything below is run from the repository root.
 
@@ -134,8 +188,8 @@ system-wide).
 
 1. Create/log in to a Hugging Face account.
 2. Accept the license on the gated model pages (visit while logged in):
-   - https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct
-   - https://huggingface.co/google/gemma-3-4b-it
+   - https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct-GGUF
+   - https://huggingface.co/google/gemma-3-1b-it
 3. Create a read token at https://huggingface.co/settings/tokens and:
 
 ```powershell
@@ -148,25 +202,25 @@ hf auth login
 
 ```powershell
 python full-benchmark.py ^
-    "Qwen/Qwen2.5-3B-Instruct-GGUF" ^
-    "microsoft/Phi-3-mini-4k-instruct-gguf" ^
-    "meta-llama/Llama-3.2-3B-Instruct" ^
-    "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+    "meta-llama/Llama-3.2-1B-Instruct-GGUF" ^
+    "Qwen/Qwen2.5-1.5B-Instruct-GGUF" ^
+    "google/gemma-3-1b-it-qat-q4_0-gguf=google/gemma-3-1b-it" ^
+    "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 ```
 
-Expect several hours total (dominated by downloads and the 4 x 1,172
-ARC questions). Every phase prints its progress; on failure it stops
-with **possible causes and fixes** — address the cause and rerun the
-same command to resume.
+Expect a few hours total (dominated by the 4 x 1,172 ARC questions).
+Every phase prints its progress; on failure it stops with **possible
+causes and fixes** — address the cause and rerun the same command to
+resume.
 
 **The speed floor is tier-specific.** The default `--floor 20` (worst
-turn, tokens/s) is the comfort line calibrated on a **102.4 GB/s**
-system-RAM machine (LPDDR5X dual channel). Generation speed scales
-roughly linearly with memory bandwidth, so on a 51.2 GB/s machine pass
-`--floor 10`, on 25.6 GB/s pass `--floor 5`, etc. — or keep the default
-and expect the ladder to descend to smaller quants (a family may find
-no passing rung, which the script reports cleanly). Pick the floor
-**before** the run and keep it fixed: it is part of the protocol.
+turn, tokens/s) is the comfort line calibrated on a **51.2 GB/s**
+system-RAM machine (DDR4-3200 dual channel — the study #1 machine
+class; live t/s ≈ 26 ÷ model size in GiB). This roster of ~1–2B models
+is sized for that tier. On other tiers scale the floor with bandwidth
+(102.4 GB/s → `--floor 40`, 25.6 GB/s → `--floor 10`) and expect the
+ladder to land on different rungs. Pick the floor **before** the run
+and keep it fixed: it is part of the protocol.
 
 ### Step 7 — outputs
 
@@ -187,11 +241,13 @@ Every selected model file traces to **first-party model-owner weights**
 plus the **pinned toolchain**: llama.cpp build b10964 (commit b29c606e2)
 for binaries and converter, with quantization done locally by
 `llama-quantize`. No third-party quantizations are used for selection.
-Pre-made rungs are downloaded only from the model owner's official
-repos. The QAT Q4_0 file for Gemma is the first-party
-google/gemma-3-4b-it-qat-q4_0-gguf release; other Gemma rungs are
-self-quantized from google/gemma-3-4b-it safetensors (the `=` in the
-family spec separates "download repo" from "source repo").
+The model families were chosen by **Ollama library popularity** (pull
+counts, snapshot 2026-09-23) under the pre-registered roster rules
+(see "Roster selection" above), but all weights come from the model
+owners' official Hugging Face repos. The QAT Q4_0 file for Gemma is
+the first-party google/gemma-3-1b-it-qat-q4_0-gguf release; other Gemma
+rungs are self-quantized from google/gemma-3-1b-it safetensors (the
+`=` in the family spec separates "download repo" from "source repo").
 
 ## Protocol notes (pre-registered, fixed)
 
