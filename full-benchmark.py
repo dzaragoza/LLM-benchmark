@@ -43,6 +43,11 @@ Usage (from the repo root):
         "microsoft/Phi-3-mini-4k-instruct-gguf" \
         "meta-llama/Llama-3.2-3B-Instruct" \
         "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+
+  Hybrid non-thinking mode (--no-thinking): for hybrid models in the
+  non-thinking category - threads --no-thinking to live-bench.py
+  (chat_template_kwargs enable_thinking=false; first-turn dump check
+  confirms no reasoning appears).
 """
 
 import argparse
@@ -310,7 +315,7 @@ def phase2_create(fam, famdir, rung, source_repo, plan, dry_run):
     return out
 
 
-def phase3_bench(path, corpus, dry_run, thinking=False):
+def phase3_bench(path, corpus, dry_run, thinking=False, no_thinking=False):
     dump = path + ".live-dump.json"
     label = os.path.basename(path)
 
@@ -334,6 +339,8 @@ def phase3_bench(path, corpus, dry_run, thinking=False):
            "--models", path, "--repeats", "1", "--dump", dump]
     if thinking:
         cmd.append("--thinking")
+    if no_thinking:
+        cmd.append("--no-thinking")
     r = subprocess.run(cmd)
     if r.returncode != 0 or not dump_valid():
         fail(3, label, "live-bench.py failed or produced no usable dump "
@@ -662,7 +669,8 @@ def phase6_rank(labels, arc_num, arc_dir, state, state_path):
 # =========================================================== selection
 
 def process_family(spec, ladder, corpus, floor, models_dir, state,
-                   state_path, dry_run, force, thinking=False):
+                   state_path, dry_run, force, thinking=False,
+                   no_thinking=False):
     model_repo, _, source_repo = spec.partition("=")
     if not source_repo:
         source_repo = model_repo
@@ -721,7 +729,8 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             print(f"  [4] would analyze (floor {floor:g} - 2*sigma)")
             continue
         if 3 not in run["phases_done"]:
-            dump = phase3_bench(path, corpus, dry_run, thinking)
+            dump = phase3_bench(path, corpus, dry_run, thinking,
+                                no_thinking)
             run["phases_done"].append(3)
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
@@ -774,7 +783,14 @@ def main():
                          "live-bench (same worst-turn gate; reasoning "
                          "measured descriptively). Use separate "
                          "--state-file/--results-file for this category.")
+    ap.add_argument("--no-thinking", action="store_true",
+                    help="hybrid models, non-thinking category: "
+                         "run with thinking disabled "
+                         "(threads --no-thinking to live-bench.py)")
     args = ap.parse_args()
+
+    if args.thinking and args.no_thinking:
+        ap.error("--thinking and --no-thinking are mutually exclusive")
 
     ladder = [x.strip() for x in args.ladder.split(",") if x.strip()]
 
@@ -830,7 +846,8 @@ def main():
     for spec in args.families:
         process_family(spec, ladder, args.corpus, args.floor,
                        args.models_dir, state, args.state_file,
-                       args.dry_run, args.force, args.thinking)
+                       args.dry_run, args.force, args.thinking,
+                       args.no_thinking)
 
     if args.dry_run:
         print("\ndry run complete - no files were downloaded or tested")
