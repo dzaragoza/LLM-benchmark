@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
-"""hf-download.py -- every Hugging Face interaction for the study.
+"""hf_download.py -- the Hugging Face interface (bottom layer).
+
+Every interaction with Hugging Face services in the study goes through
+this module and nothing else: model downloads (premade rung GGUF, f16
+GGUF, safetensors snapshots), repo/file listings, and the ARC question
+fetch from the HF datasets-server. Not a CLI - the phase scripts and
+the orchestrator import it.
 
 Download stage of the pipeline (its phase 1): given a family spec
-("model_repo" or "model_repo=source_repo") and a rung, acquire whatever
-is needed to end up with that rung file - the premade rung GGUF from
-the model repo, an f16 GGUF to quantize from (downloaded from the
-source repo or already local), or the safetensors snapshot to convert
-+ quantize from. Also owns the repo/file-inventory helpers (rung
-matching, f16 matching, local-file checks) - no other pipeline script
-talks to the Hub.
+("model_repo" or "model_repo=source_repo") and a rung, acquire
+whatever is needed to end up with that rung file. Also owns the
+repo/file-inventory helpers (rung matching, f16 matching,
+local-file checks).
 
-Standalone use (from the repo root):
-    python3 hf-download.py "Qwen/Qwen3.5-4B" --rung Q5_K_M
-    python3 hf-download.py \
-        "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it" \
-        --rung Q6_K --dry-run
-
-Imported by full-benchmark.py (acquire, list_repo_files, local_rung,
-resolve_f16_local - the last two also imported by convert-quant.py).
+Imported by full_benchmark.py, speed_gate.py, arc_eval.py,
+convert_quant.py.
 """
 
-import argparse
 import glob
+import json
 import os
 import sys
+import time
+import urllib.parse
+import urllib.request
 
 try:
     from huggingface_hub import (hf_hub_download, list_repo_files,
@@ -33,24 +33,13 @@ except ImportError:
 
 
 def require_hub():
-    """Only scripts that actually talk to the Hub need the dependency -
+    """Only callers that actually talk to the Hub need the dependency -
     importing this module for its file helpers must not exit."""
     if list_repo_files is None:
         sys.exit("huggingface_hub is required: pip install -r "
                  "requirements.txt (then activate the repo venv: "
                  ".venv/bin/activate on Linux/macOS, "
                  ".venv\\Scripts\\Activate.ps1 on Windows)")
-
-MODELS_DIR_DEFAULT = "./models"
-
-GUIDE = {
-    1: [
-        "gated repo: accept the license on hf.co and log in (hf auth login)",
-        "wrong repo id: verify it exists at https://huggingface.co/<repo>",
-        "network / disk space: check the download progress and df -h",
-        "python deps: pip install -r requirements.txt (huggingface_hub)",
-    ],
-}
 
 
 def fail(phase, rung, what, causes):
@@ -65,6 +54,16 @@ def fail(phase, rung, what, causes):
     print("idempotent and will resume from this phase.")
     print("=" * 60)
     sys.exit(1)
+
+
+GUIDE = {
+    1: [
+        "gated repo: accept the license on hf.co and log in (hf auth login)",
+        "wrong repo id: verify it exists at https://huggingface.co/<repo>",
+        "network / disk space: check the download progress and df -h",
+        "python deps: pip install -r requirements.txt (huggingface_hub)",
+    ],
+}
 
 
 # =========================================================== rung helpers
@@ -186,43 +185,48 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
          f"{source_repo} - nothing to download or quantize from", GUIDE[1])
 
 
-# =========================================================== main
+# =========================================================== ARC questions
 
-def main():
-    ap = argparse.ArgumentParser(
-        description="download stage: acquire a rung file (or the data to "
-                    "create it) from Hugging Face - all Hub interaction "
-                    "lives here")
-    ap.add_argument("spec",
-                    help='family spec: "model_repo" or '
-                         '"model_repo=source_repo"')
-    ap.add_argument("--rung", required=True,
-                    help="quantization rung to acquire (e.g. Q6_K)")
-    ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
-    ap.add_argument("--dry-run", action="store_true",
-                    help="print the plan only, download nothing")
-    args = ap.parse_args()
+def _http_get_json(url, params=None, timeout=60, retries=4):
+    if params:
+        url = url + "?" + urllib.parse.urlencode(params)
+    last_err = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            last_err = e
+            wait = 5 * (attempt + 1)
+            print(f"    http get failed (attempt {attempt + 1}/{retries}): "
+                  f"{e} - retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+    raise last_err
 
+
+def load_questions(config, n):
+    """ARC questions from the HF datasets-server; cached in the repo root
+    (same questions across runs and models - McNemar pairing depends
+    on it)."""
+    cache_file = f"arc-{config}-test-{n}.json"
+    if os.path.exists(cache_file):
+        print(f"    using cached questions: {cache_file}", file=sys.stderr)
+        with open(cache_file, encoding="utf-8") as f:
+            return json.load(f)
     require_hub()
-    model_repo, _, source_repo = args.spec.partition("=")
-    if not source_repo:
-        source_repo = model_repo
-    fam = os.path.basename(model_repo.rstrip("/"))
-    famdir = os.path.join(args.models_dir, fam)
-    try:
-        model_files = list_repo_files(model_repo)
-        source_files = (model_files if source_repo == model_repo
-                        else list_repo_files(source_repo))
-    except Exception as e:
-        fail(1, "-", f"cannot list repo files for {model_repo}: {e}",
-             GUIDE[1])
-    path, plan = acquire(fam, famdir, args.rung, model_repo, model_files,
-                         source_repo, source_files, args.dry_run)
-    if path:
-        print(f"[1] rung file ready: {path}  (plan: {plan})")
-    else:
-        print(f"[1] {plan}")
-
-
-if __name__ == "__main__":
-    main()
+    qs = []
+    for offset in range(0, n, 100):
+        batch = min(100, n - offset)
+        rows = _http_get_json(
+            "https://datasets-server.huggingface.co/rows",
+            params={"dataset": "allenai/ai2_arc", "config": config,
+                    "split": "test", "offset": offset, "length": batch})
+        for row in rows["rows"]:
+            item = row["row"]
+            qs.append({"q": item["question"],
+                       "choices": list(zip(item["choices"]["label"],
+                                           item["choices"]["text"])),
+                       "ans": item["answerKey"]})
+    with open(cache_file, "w") as f:
+        json.dump(qs, f)
+    return qs

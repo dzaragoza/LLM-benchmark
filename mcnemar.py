@@ -20,7 +20,7 @@ import os
 import sys
 from itertools import combinations
 
-ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (owner ruling 2026-09-23)
+ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 
 GUIDE = {

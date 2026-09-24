@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""full-benchmark.py -- the end-to-end benchmark orchestrator.
+"""full_benchmark.py -- the end-to-end benchmark orchestrator.
 
 One command, four stages, one final output: the RANKING of the selected
 models by strict ARC-Challenge score, with exact McNemar separation
@@ -8,21 +8,22 @@ only - state/resume, the per-family ladder walk, and the final results
 file. Each stage lives in its own dedicated script (split from this
 file 2026-09-24; same protocol, same state, byte-identical behavior):
 
-  hf-download.py   STAGE A phase 1: every Hugging Face interaction -
-                   premade rung file, f16 GGUF, or safetensors snapshot.
-  convert-quant.py STAGE A phase 2: everything that touches llama.cpp
-                   conversion tooling - safetensors -> f16, f16 -> rung.
-  speed-gate.py    STAGE A phases 3-4: the worst-turn speed gate - the
-                   llama-server interface, mode-suffixed dumps, verdict.
-  arc-eval.py      STAGE B (phase 5): strict ARC-Challenge on every
-                   selected model (raw protocol, logprob letter scoring).
-  mcnemar.py       STAGE C (phase 6): pairwise exact McNemar; the final
-                   ranking with separation verdicts.
+  hf_download.py  STAGE A phase 1: every Hugging Face interaction -
+                  premade rung file, f16 GGUF, or safetensors snapshot.
+  convert_quant.py STAGE A phase 2: everything that touches llama.cpp
+                  conversion tooling - safetensors -> f16, f16 -> rung.
+  speed_gate.py   STAGE A phases 3-4: the worst-turn speed gate - the
+                  llama-server bench interface, mode-suffixed dumps,
+                  verdict.
+  arc_eval.py     STAGE B (phase 5): strict ARC-Challenge on every
+                  selected model (raw protocol, logprob letter scoring).
+  mcnemar.py      STAGE C (phase 6): pairwise exact McNemar; the final
+                  ranking with separation verdicts.
 
   STAGE A (phases 1-4, per family, downward quant ladder):
     1. DOWNLOAD - premade rung file or the data to create it later.
     2. CREATE   - convert safetensors -> f16, quantize f16 -> rung.
-    3. BENCH    - live-bench.py, 1 rep, worst-turn metric.
+    3. BENCH    - speed_gate.py, 1 rep, worst-turn metric.
     4. ANALYZE  - verdict: PASS if worst >= floor - 2*sigma (lenient
                   2-sigma ruling, 2026-09-23); first PASS = selected.
   STAGE B (phase 5): strict ARC-Challenge on every selected model
@@ -36,30 +37,30 @@ are never re-downloaded/re-quantized; complete ARC CSVs are never
 re-run. Every failure stops the script with reader guidance.
 
 Supersedes select-quant.py + strict-arc.py + paired-arc.py (removed
-2026-09-23 by owner ruling; their final commits remain in git history).
+2026-09-23 by author ruling; their final commits remain in git history).
 The ARC protocol is IDENTICAL to strict-arc.py: raw /v1/completions
 prompt, max_tokens=1, temperature=0, top-20 logprobs, port 8081,
 -ngl 99, -c 2048, -t 8.
 
-Thinking-model category (owner ruling 2026-09-24): benchmarked
+Thinking-model category (author ruling 2026-09-24): benchmarked
 separately with --thinking (the SAME worst-turn gate and ARC protocol;
 reasoning tokens are measured descriptively - latency spent thinking
 is the user's informed choice and is NOT gated). Keep the category in
 its own --state-file/--results-file so rankings stay separate.
 
 Ad-hoc use (no selection stage): rank arbitrary model files directly:
-    python3 full-benchmark.py --arc-only \\
+    python3 full_benchmark.py --arc-only \\
         --arc-models "./models/A/q8.gguf,./models/B/q6.gguf"
 
 Usage (from the repo root):
-    python3 full-benchmark.py --dry-run "Qwen/Qwen2.5-3B-Instruct-GGUF" ...
-    python3 full-benchmark.py "Qwen/Qwen2.5-3B-Instruct-GGUF" \\
+    python3 full_benchmark.py --dry-run "Qwen/Qwen2.5-3B-Instruct-GGUF" ...
+    python3 full_benchmark.py "Qwen/Qwen2.5-3B-Instruct-GGUF" \\
         "microsoft/Phi-3-mini-4k-instruct-gguf" \\
         "meta-llama/Llama-3.2-3B-Instruct" \\
         "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
 
   Hybrid non-thinking mode (--no-thinking): for hybrid models in the
-  non-thinking category - threads --no-thinking to live-bench.py
+  non-thinking category - benchmarks with thinking disabled
   (chat_template_kwargs enable_thinking=false; first-turn dump check
   confirms no reasoning appears).
 """
@@ -71,34 +72,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from importlib.util import spec_from_file_location, module_from_spec
-
-
-def _load(name, path):
-    """Import a sibling script with a hyphenated filename. The canonical
-    module name is the filename with hyphens as underscores - every
-    script in the pipeline uses these names, so a script imported here
-    is the SAME instance a standalone run would build."""
-    mod_name = name.replace(".py", "").replace("-", "_")
-    if mod_name in sys.modules:
-        return sys.modules[mod_name]
-    spec = spec_from_file_location(mod_name, path)
-    mod = module_from_spec(spec)
-    sys.modules[mod_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_REPO = os.path.dirname(os.path.abspath(__file__))
-hf_download = _load("hf-download.py", os.path.join(_REPO, "hf-download.py"))
-convert_quant = _load("convert-quant.py", os.path.join(_REPO, "convert-quant.py"))
-speed_gate = _load("speed-gate.py", os.path.join(_REPO, "speed-gate.py"))
-arc_eval = _load("arc-eval.py", os.path.join(_REPO, "arc-eval.py"))
-mcnemar = _load("mcnemar.py", os.path.join(_REPO, "mcnemar.py"))
+import arc_eval
+import convert_quant
+import hf_download
+import llama_server
+import mcnemar
+import speed_gate
 
 
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
-LIVE_BENCH = speed_gate.LIVE_BENCH
 CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
 MODELS_DIR_DEFAULT = "./models"
 STATE_FILE_DEFAULT = "./benchmark-state.json"
@@ -108,16 +90,14 @@ FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
 ARC_RESULTS_DIR_DEFAULT = arc_eval.ARC_RESULTS_DIR_DEFAULT
 ARC_PORT = arc_eval.ARC_PORT
-SERVER_BIN = arc_eval.SERVER_BIN
+SERVER_BIN = llama_server.find_server()
 
-find_server = arc_eval.find_server
 local_rung = hf_download.local_rung
-resolve_f16_local = hf_download.resolve_f16_local
 list_repo_files = hf_download.list_repo_files
 safe_label = arc_eval.safe_label
 arc_csv_path = arc_eval.arc_csv_path
 arc_csv_valid = arc_eval.arc_csv_valid
-load_questions = arc_eval.load_questions
+load_questions = hf_download.load_questions
 GUIDE = {}
 GUIDE[1] = hf_download.GUIDE[1]
 GUIDE[2] = convert_quant.GUIDE[2]
@@ -256,14 +236,15 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="redo families that already have a selection")
     ap.add_argument("--thinking", action="store_true",
-                    help="thinking-model category: pass --thinking to "
-                         "live-bench (same worst-turn gate; reasoning "
-                         "measured descriptively). Use separate "
+                    help="thinking-model category: benchmark with "
+                         "thinking enabled (same worst-turn gate; "
+                         "reasoning measured descriptively). Use separate "
                          "--state-file/--results-file for this category.")
     ap.add_argument("--no-thinking", action="store_true",
                     help="hybrid models, non-thinking category: "
-                         "run with thinking disabled "
-                         "(threads --no-thinking to live-bench.py)")
+                         "run with thinking disabled (chat-template "
+                         "kwargs enable_thinking=false; first-turn dump "
+                         "check confirms no reasoning appears)")
     args = ap.parse_args()
 
     if args.thinking and args.no_thinking:
@@ -273,10 +254,8 @@ def main():
 
     if not args.dry_run:
         for path, msg in [
-            (LIVE_BENCH, f"live-bench.py not found at {LIVE_BENCH} - run "
-                         "from the repo root"),
             (args.corpus, f"corpus not found at {args.corpus} - build it: "
-                          "python3 live-bench.py --make-corpus"),
+                          "python3 speed_gate.py --make-corpus"),
             (QUANTIZE_BIN, f"llama-quantize not found at {QUANTIZE_BIN} - "
                            "place the b10964 build in the repo root"),
             ("./llama.cpp/convert_hf_to_gguf.py",

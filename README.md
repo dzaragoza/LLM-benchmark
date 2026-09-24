@@ -12,7 +12,7 @@ integrated GPUs, with the llama.cpp Vulkan backend.
 ## The one command (after setup)
 
 ```
-python full-benchmark.py ^
+python full_benchmark.py ^
     "meta-llama/Llama-3.2-1B-Instruct-GGUF" ^
     "Qwen/Qwen2.5-1.5B-Instruct-GGUF" ^
     "google/gemma-3-1b-it-qat-q4_0-gguf=google/gemma-3-1b-it" ^
@@ -29,7 +29,7 @@ That single command runs the **entire study** for the four families:
   1. **Download** the rung file (or the f16 / safetensors to create it).
   2. **Create** missing quants (safetensors -> f16 -> quantize, pinned
      toolchain).
-  3. **Bench** it with `live-bench.py` (5 real multi-turn conversations,
+  3. **Bench** it with `speed_gate.py` (5 real multi-turn conversations,
      worst-turn metric).
   4. **Analyze**: PASS if worst turn >= floor - 2*sigma. First PASS wins.
 - **Stage B — accuracy**: full strict **ARC-Challenge** (1,172 questions,
@@ -45,6 +45,37 @@ downloading anything.
 
 ---
 
+## Repository layout (three layers)
+
+The pipeline is split across scripts in three layers. Users normally
+touch only the orchestrator's CLI:
+
+| Layer | Script | Role | Callable as |
+|---|---|---|---|
+| Top | `full_benchmark.py` | the orchestrator: state/resume, the per-family ladder walk, results assembly | CLI (the main entry point) |
+| Middle | `speed_gate.py` | phases 3–4: the worst-turn speed gate (live conversations, mode-suffixed dumps, verdict) | CLI + import |
+| Middle | `arc_eval.py` | phase 5: strict ARC-Challenge evaluation | CLI + import |
+| Middle | `mcnemar.py` | phase 6: pairwise exact McNemar, the final ranking | CLI + import |
+| Bottom | `hf_download.py` | every Hugging Face interaction: downloads, repo listings, ARC question fetch | import only |
+| Bottom | `convert_quant.py` | llama.cpp conversion tooling: safetensors -> f16, f16 -> rung | import only |
+| Bottom | `llama_server.py` | llama-server lifecycle (launch, health, teardown) and HTTP | import only |
+
+The middle layer never talks to an outside tool directly — all
+Hugging Face, llama.cpp-converter and llama-server contact happens in
+the bottom-layer interfaces. The former `live-bench.py` was split
+along the same seam: its measurement half lives in `speed_gate.py`,
+its server-management half in `llama_server.py`.
+
+The corpus build (`--make-sample` / `--make-corpus`) also lives in
+`speed_gate.py`:
+
+```
+python3 speed_gate.py --make-sample
+python3 speed_gate.py --make-corpus
+```
+
+---
+
 ## Roster selection (pre-registered, transparent)
 
 The four model families were chosen **before any measurement**, by a
@@ -55,10 +86,11 @@ fixed procedure with recorded numbers — anyone can audit or repeat it.
    ranked by pull count (snapshot: 2026-09-23).
 2. **Distinct families only** — no two models from the same model
    family/owner.
-3. **No thinking models** (reasoning-token models are incompatible with
-   the strict letter-answer ARC protocol).
-   (Thinking models get their own category - see
-   "Thinking-model category" below.)
+3. **Non-thinking category: models must run in non-thinking mode.**
+   Pure-reasoning models (no off switch) are excluded here - the
+   strict letter-answer ARC protocol requires plain answers. Hybrid
+   models (reasoning can be toggled) ARE allowed, run with thinking
+   disabled (rule 8).
 4. The family must have a size class **predicted to pass the speed
    floor** on the target machine class (51.2 GB/s system RAM; live
    t/s ≈ 26 ÷ model size in GiB, so floor 20 t/s requires ≲ 1.3 GiB
@@ -71,6 +103,11 @@ fixed procedure with recorded numbers — anyone can audit or repeat it.
 7. **Prefer the latest generation** within a family: the newest
    model generation supersedes older ones of the same family
    (e.g. qwen3.5 supersedes qwen3).
+8. **Hybrid models (toggleable reasoning) are allowed in BOTH
+   categories** and are always run in the mode that matches the
+   category: thinking enabled in the thinking category, disabled in
+   the non-thinking category. Mode control is part of the protocol
+   and is logged per run.
 
 **Popularity snapshot and the walk down the list** (Ollama pull counts):
 
@@ -208,7 +245,7 @@ hf auth login
 ### Step 6 — run the benchmark
 
 ```powershell
-python full-benchmark.py ^
+python full_benchmark.py ^
     "meta-llama/Llama-3.2-1B-Instruct-GGUF" ^
     "Qwen/Qwen2.5-1.5B-Instruct-GGUF" ^
     "google/gemma-3-1b-it-qat-q4_0-gguf=google/gemma-3-1b-it" ^
@@ -236,7 +273,7 @@ and keep it fixed: it is part of the protocol.
 | `benchmark-state.json` | resume state (safe to delete to start over) |
 | `benchmark-results.json` | full results: selection history, ARC scores, McNemar ranking |
 | `arc-results/*.csv` | per-question ARC results (pairwise analysis, timings) |
-| `models/<family>/*.live-dump.json` | per-turn live-bench data for every rung tested |
+| `models/<family>/*.live-dump.json` | per-turn speed-gate data for every rung tested |
 
 Rerunning is always safe: complete results are detected and reused.
 
@@ -280,6 +317,10 @@ non-thinking category - the worst-turn speed gate and the full ARC
 score - but always in a separate category, never mixed with the
 non-thinking ranking.
 
+**Mode rule (rule 8):** hybrid models run here with thinking ENABLED.
+The same model may appear in the non-thinking category with thinking
+disabled - the pair is a controlled mode comparison.
+
 **Ruling (pre-registered):**
 
 1. The user actively chose a thinking model, so the extra latency
@@ -288,7 +329,7 @@ non-thinking ranking.
    tokens (the server's `reasoning_content`) and their estimated share
    of generated tokens are logged per turn.
 3. Thinking is unrestricted: no reasoning budget is imposed. The
-   completion cap is the answer cap + 1024 (`THINK_ALLOWANCE`); turns
+   completion cap is the answer cap + 2048 (`THINK_ALLOWANCE`); turns
    where the model spends the whole budget reasoning are flagged
    `answer_empty` in the dump.
 4. The server is launched with `--reasoning-format deepseek` (via the
@@ -311,24 +352,32 @@ raw-prompt single-token completions where thinking never engages.
   rule 6; first-party safetensors - Qwen publishes no first-party
   Qwen3.5 GGUF, so this pick takes the full self-quantize path.
   Selected over qwen3:4b by rule 7 (latest generation). Variant note:
-  the 4b is the 102.4-class member - 9b and up fail the gate)
+  the 4b is the 102.4-class member - 9b and up fail the gate). A hybrid model: run in this
+category with thinking enabled, and in the non-thinking category
+(thinking disabled) as the Qwen family's rule-7 representative there
+- superseding the measured qwen2.5:3b, which is retired from the
+roster (its result is retained in the results file as a
+superseded-family data point)
 - `nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF` (Ollama `nemotron-3-nano:4b`,
   839K pulls; paper: Nemotron 3 white paper + Nano 3 technical report,
   arXiv 2512.19017; first-party GGUF, Q4_K_M ships at 2.8 GB - one of
   the very few 4b-class files that is itself borderline for the gate;
-  the rung walk may have to descend to Q4_0 to pass floor 20)
+  the rung walk may have to descend to Q4_0 to pass floor 20). A hybrid model: run here with
+  reasoning enabled; its non-thinking mode is NOT measured unless it
+  is needed as a family representative (the NVIDIA family's
+  non-thinking slot is not part of this study's roster)
 
 Walk-down exclusions (thinking families, with the rule that removes
 them): deepseek-r1 (93.1M - no class member: 1.5b is a 51.2-class
 model, 7b is too big for the gate), qwen3 (superseded by
 qwen3.5, rule 7), qwen3.6 / qwen3.8 / qwen3-vl (same Qwen family as
 qwen3.5), gemma4 (e2b at 2.3B effective
-is sub-class, owner ruling; e4b ~5 GB fails the gate at every rung),
+is sub-class, author ruling; e4b ~5 GB fails the gate at every rung),
 gpt-oss / glm-4.7-flash / glm-5.1 / magistral / minimax-m2.7 /
 nemotron-3-super (no variant passes the gate), lfm2.5-thinking (1.2b,
-sub-class, owner ruling), phi4-mini-reasoning (reasoning in substance
+sub-class, author ruling), phi4-mini-reasoning (reasoning in substance
 but carries no Ollama thinking tag - category membership is
-tag-defined, owner ruling).
+tag-defined, author ruling).
 
 
 
@@ -341,7 +390,7 @@ Run it with `--thinking` and separate state/results files so the two
 categories stay independent:
 
 ```
-python3 full-benchmark.py --thinking \
+python3 full_benchmark.py --thinking \
   --state-file benchmark-state-thinking.json \
   --results-file benchmark-results-thinking.json \
   "Qwen/Qwen3.5-4B" \

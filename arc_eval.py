@@ -1,36 +1,37 @@
 #!/usr/bin/env python3
-"""arc-eval.py -- strict ARC-Challenge evaluation on a list of models.
+"""arc_eval.py -- strict ARC-Challenge evaluation on a list of models.
 
 Accuracy stage of the pipeline (its phase 5): full ARC-Challenge test
-split (1172 questions, owner ruling 2026-09-23), raw /v1/completions
+split (1172 questions, author ruling 2026-09-23), raw /v1/completions
 prompt, max_tokens=1, temperature=0, top-20 logprobs, letter scoring -
 the protocol IDENTICAL to the former strict-arc.py. Everything needed
-to run ARC lives here: question fetch/cache, prompt build, llama-server
-launch/teardown, per-question CSV output, and the completeness check
-that guards the ranking stage. Mode-blind by design: the raw single-
-token protocol never engages a chat template, so thinking mode is
-irrelevant here.
+to run ARC lives here: prompt build, server launch/teardown (via
+llama_server.py, the bottom-layer interface), per-question CSV output,
+and the completeness check that guards the ranking stage. Questions
+are fetched and cached by hf_download.py (the HF interface). Mode-blind
+by design: the raw single-token protocol never engages a chat
+template, so thinking mode is irrelevant here.
 
 Standalone use (from the repo root):
-    python3 arc-eval.py \
+    python3 arc_eval.py \
         --models "./models/A/A-Q6_K.gguf,./models/B/B-Q8_0.gguf"
-    python3 arc-eval.py --models <file> --arc-num 100
+    python3 arc_eval.py --models <file> --arc-num 100
 
-Imported by full-benchmark.py (arc_run, arc_csv_path, arc_csv_valid,
-load_questions, safe_label).
+Imported by full_benchmark.py (arc_run, arc_csv_path, arc_csv_valid,
+safe_label).
 """
 
 import argparse
 import csv as _csv
-import json
 import os
-import subprocess
 import sys
 import time
-import urllib.parse
-import urllib.request
 
-ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (owner ruling 2026-09-23)
+import hf_download
+import llama_server
+from llama_server import start_server, stop_server
+
+ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 ARC_PORT = 8081
 ARC_THREADS = 8
@@ -62,74 +63,9 @@ def fail(phase, rung, what, causes):
     sys.exit(1)
 
 
-def find_server():
-    """llama-server binary: repo-relative first, pre-reorg HOME fallback.
-    Windows builds ship llama-server.exe - pick the right name."""
-    home = os.path.expanduser("~")
-    exe = "llama-server.exe" if os.name == "nt" else "llama-server"
-    for d in (os.path.join(".", "llama-b10964-gpu"),
-              os.path.join(home, "technical_reports", "llama-b10964-gpu")):
-        p = os.path.join(d, exe)
-        if os.path.isfile(p):
-            return p
-    return os.path.join(".", "llama-b10964-gpu", exe)
-
-
-SERVER_BIN = find_server()
-
+SERVER_BIN = llama_server.find_server()
 
 # =========================================================== questions
-
-def http_get_json(url, params=None, timeout=60, retries=4):
-    if params:
-        url = url + "?" + urllib.parse.urlencode(params)
-    last_err = None
-    for attempt in range(retries):
-        try:
-            with urllib.request.urlopen(url, timeout=timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            last_err = e
-            wait = 5 * (attempt + 1)
-            print(f"    http get failed (attempt {attempt + 1}/{retries}): "
-                  f"{e} - retrying in {wait}s", file=sys.stderr)
-            time.sleep(wait)
-    raise last_err
-
-
-def http_post_json(url, payload, timeout=120):
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
-def load_questions(config, n):
-    """ARC questions from the HF datasets-server; cached in the repo root
-    (same questions across runs and models - McNemar pairing depends on it)."""
-    cache_file = f"arc-{config}-test-{n}.json"
-    if os.path.exists(cache_file):
-        print(f"    using cached questions: {cache_file}", file=sys.stderr)
-        with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)
-    qs = []
-    for offset in range(0, n, 100):
-        batch = min(100, n - offset)
-        rows = http_get_json(
-            "https://datasets-server.huggingface.co/rows",
-            params={"dataset": "allenai/ai2_arc", "config": config,
-                    "split": "test", "offset": offset, "length": batch})
-        for row in rows["rows"]:
-            item = row["row"]
-            qs.append({"q": item["question"],
-                       "choices": list(zip(item["choices"]["label"],
-                                           item["choices"]["text"])),
-                       "ans": item["answerKey"]})
-    with open(cache_file, "w") as f:
-        json.dump(qs, f)
-    return qs
-
 
 def build_prompt(q):
     prompt = f"Question: {q['q']}\n"
@@ -141,12 +77,14 @@ def build_prompt(q):
 
 # =========================================================== scoring
 
-def arc_score_one(q, url):
+def arc_score_one(q, port):
     """One question: compare logprobs of answer letters."""
     prompt = build_prompt(q)
     t0 = time.perf_counter()
-    r = http_post_json(url, {"prompt": prompt, "max_tokens": 1,
-                              "temperature": 0, "logprobs": 20})
+    r = llama_server.post_json(port, "/v1/completions",
+                               {"prompt": prompt, "max_tokens": 1,
+                                "temperature": 0, "logprobs": 20},
+                               timeout=120)
     elapsed = time.perf_counter() - t0
     labels = {label for label, _ in q["choices"]}
     logps = {}
@@ -173,53 +111,16 @@ def arc_score_one(q, url):
 # =========================================================== server
 
 def arc_start_server(model_path):
-    """Launch llama-server for ARC. Returns proc."""
-    cmd = [SERVER_BIN, "-m", model_path,
-           "-t", str(ARC_THREADS), "--port", str(ARC_PORT),
-           "-c", str(ARC_CTX), "-ngl", str(ARC_NGPU)]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL)
-    url = f"http://127.0.0.1:{ARC_PORT}/health"
-    deadline = time.time() + 1800
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
-                if resp.status == 200:
-                    return proc
-        except OSError:
-            pass
-        if proc.poll() is not None:
-            return None
-        time.sleep(2)
-    proc.terminate()
-    return None
+    """Launch llama-server for ARC (llama_server.py does the lifecycle).
+    Returns (proc, healthy)."""
+    extra = ["-t", str(ARC_THREADS), "-c", str(ARC_CTX),
+             "-ngl", str(ARC_NGPU)]
+    return start_server(model_path, ARC_PORT, extra, SERVER_BIN)
 
 
 def arc_stop_server(proc):
-    """Kill the server and verify the port is free (a lingering server
-    silently redirects the next run at the WRONG model)."""
-    if proc.poll() is None:
-        proc.terminate()
-    try:
-        proc.wait(timeout=15)
-    except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            # Windows: kill the whole tree (children may hold the port).
-            subprocess.run(["taskkill", "/PID", str(proc.pid),
-                            "/T", "/F"], capture_output=True)
-        else:
-            proc.kill()
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(
-                    f"http://127.0.0.1:{ARC_PORT}/health", timeout=2):
-                pass
-        except OSError:
-            return
-        time.sleep(2)
-    print(f"    WARNING: port {ARC_PORT} still busy after 60s - results "
-          "may be invalid!", file=sys.stderr)
+    """Kill the server and verify the port is free (llama_server.py)."""
+    stop_server(proc, ARC_PORT)
 
 
 # =========================================================== csv
@@ -262,10 +163,9 @@ def arc_run(label, model_path, questions, arc_num, arc_dir,
         print(f"  [5] would run ARC ({arc_num} questions) on {label}")
         return csv_path
     os.makedirs(arc_dir, exist_ok=True)
-    url = f"http://127.0.0.1:{ARC_PORT}/v1/completions"
     print(f"  [5] ARC run: {label}  ({arc_num} questions)")
-    proc = arc_start_server(model_path)
-    if proc is None:
+    proc, healthy = arc_start_server(model_path)
+    if not healthy:
         fail(5, label, "llama-server did not become healthy for "
              f"{os.path.basename(model_path)}", GUIDE[5])
     correct, done = 0, 0
@@ -276,7 +176,7 @@ def arc_run(label, model_path, questions, arc_num, arc_dir,
                         "prompt_chars"])
             for i, q in enumerate(questions):
                 try:
-                    ok, secs, pchars = arc_score_one(q, url)
+                    ok, secs, pchars = arc_score_one(q, ARC_PORT)
                     done += 1
                     if ok:
                         correct += 1
@@ -323,7 +223,7 @@ def main():
         jobs.append((safe_label(os.path.basename(p)), p))
     if not jobs:
         sys.exit("no model files given")
-    questions = load_questions(args.arc_config, args.arc_num)
+    questions = hf_download.load_questions(args.arc_config, args.arc_num)
     for label, path in jobs:
         arc_run(label, path, questions, args.arc_num,
                 args.arc_results_dir, dry_run=args.dry_run)
