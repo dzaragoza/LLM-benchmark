@@ -315,8 +315,21 @@ def phase2_create(fam, famdir, rung, source_repo, plan, dry_run):
     return out
 
 
+def live_dump_name(path, thinking=False, no_thinking=False):
+    """Mode-suffixed dump name: a thinking-mode dump must NEVER be reused
+    by a non-thinking run (or vice versa) - the resume check compares
+    timestamps only, so the mode must live in the filename (Session 25
+    bug: --no-thinking run inherited thinking-mode dumps and reported
+    the thinking gate numbers as its own)."""
+    if thinking:
+        return path + ".live-dump.think.json"
+    if no_thinking:
+        return path + ".live-dump.nothink.json"
+    return path + ".live-dump.json"
+
+
 def phase3_bench(path, corpus, dry_run, thinking=False, no_thinking=False):
-    dump = path + ".live-dump.json"
+    dump = live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
 
     def dump_valid():
@@ -348,8 +361,8 @@ def phase3_bench(path, corpus, dry_run, thinking=False, no_thinking=False):
     return dump
 
 
-def phase4_analyze(path, floor):
-    dump = path + ".live-dump.json"
+def phase4_analyze(path, floor, thinking=False, no_thinking=False):
+    dump = live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
     try:
         with open(dump) as f:
@@ -735,7 +748,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
         if 4 not in run["phases_done"]:
-            res = phase4_analyze(path, floor)
+            res = phase4_analyze(path, floor, thinking, no_thinking)
             run.update(res)
             run["phases_done"].append(4)
             save_state(state_path, state)
