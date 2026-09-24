@@ -74,7 +74,12 @@ SERVER_BIN_DEFAULT = os.path.join(
     ".", "llama-b10964-gpu",
     "llama-server.exe" if os.name == "nt" else "llama-server")
 SEED = 1024  # pre-registered; part of the protocol
-THINK_ALLOWANCE = 1024  # thinking category: generation room on top
+THINK_ALLOWANCE = 2048  # thinking category: generation room on top
+                 # (raised 1024->2048 by author ruling 2026-09-24: Qwen3.5-4B
+                 #  measured 790-1440 natural thinking tokens/turn; at 1024 the
+                 #  allowance, 82% of turns ran out mid-thinking (answer_empty)
+                 #  - Session 25. Unrestricted-thinking ruling preserved: we never
+                 #  tell the model to stop, we just don't cut it off mid-sentence.)
                    # of the answer cap (unrestricted thinking; overruns
                    # are flagged, not cut short by a forced end-of-thinking)
 
