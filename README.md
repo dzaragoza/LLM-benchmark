@@ -57,6 +57,8 @@ fixed procedure with recorded numbers — anyone can audit or repeat it.
    family/owner.
 3. **No thinking models** (reasoning-token models are incompatible with
    the strict letter-answer ARC protocol).
+   (Thinking models get their own category - see
+   "Thinking-model category" below.)
 4. The family must have a size class **predicted to pass the speed
    floor** on the target machine class (51.2 GB/s system RAM; live
    t/s ≈ 26 ÷ model size in GiB, so floor 20 t/s requires ≲ 1.3 GiB
@@ -64,6 +66,11 @@ fixed procedure with recorded numbers — anyone can audit or repeat it.
 5. Weights are always **first-party** (the model owner's official
    Hugging Face repos) — popularity picks the family, never the
    weight file.
+6. At least one model in the family has a **published research
+   paper** (technical report or peer-reviewed).
+7. **Prefer the latest generation** within a family: the newest
+   model generation supersedes older ones of the same family
+   (e.g. qwen3.5 supersedes qwen3).
 
 **Popularity snapshot and the walk down the list** (Ollama pull counts):
 
@@ -265,6 +272,83 @@ rungs are self-quantized from google/gemma-3-1b-it safetensors (the
 - Both servers run on fixed ports (8077 live, 8081 ARC); leftover
   servers are killed and their ports verified free between runs
   (Windows uses `taskkill /T /F` automatically).
+
+## Thinking-model category (study #2)
+
+Thinking/reasoning models are judged by the same criteria as the
+non-thinking category - the worst-turn speed gate and the full ARC
+score - but always in a separate category, never mixed with the
+non-thinking ranking.
+
+**Ruling (pre-registered):**
+
+1. The user actively chose a thinking model, so the extra latency
+   before an answer is an informed choice and is NOT gated.
+2. Reasoning is measured descriptively, not as a penalty: reasoning
+   tokens (the server's `reasoning_content`) and their estimated share
+   of generated tokens are logged per turn.
+3. Thinking is unrestricted: no reasoning budget is imposed. The
+   completion cap is the answer cap + 1024 (`THINK_ALLOWANCE`); turns
+   where the model spends the whole budget reasoning are flagged
+   `answer_empty` in the dump.
+4. The server is launched with `--reasoning-format deepseek` (via the
+   script's `--thinking` flag) so reasoning text arrives in
+   `reasoning_content`, separate from the answer.
+
+**Roster (final, pre-registered 2026-09-24):** walking the same Ollama
+popularity snapshot with the rules above minus rule 3, plus "must be a
+thinking model (Ollama thinking tag)" and "must have a variant in this
+machine's weight class (102.4 GB/s, floor 20: model file <= ~2.6 GiB
+after the rung walk, i.e. roughly 3-4B parameters)", yields exactly
+two families. Every other thinking family on the walk-down fails a
+rule - see the exclusions below. The category is therefore a two-model
+head-to-head; exact-McNemar still applies, and ARC scores are directly
+comparable to the non-thinking category, because the ARC protocol is
+raw-prompt single-token completions where thinking never engages.
+
+- `Qwen/Qwen3.5-4B` (Ollama `qwen3.5:4b`, 20.8M pulls; paper:
+  Qwen3.5-Omni Technical Report arXiv 2604.15804, family-level per
+  rule 6; first-party safetensors - Qwen publishes no first-party
+  Qwen3.5 GGUF, so this pick takes the full self-quantize path.
+  Selected over qwen3:4b by rule 7 (latest generation). Variant note:
+  the 4b is the 102.4-class member - 9b and up fail the gate)
+- `nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF` (Ollama `nemotron-3-nano:4b`,
+  839K pulls; paper: Nemotron 3 white paper + Nano 3 technical report,
+  arXiv 2512.19017; first-party GGUF, Q4_K_M ships at 2.8 GB - one of
+  the very few 4b-class files that is itself borderline for the gate;
+  the rung walk may have to descend to Q4_0 to pass floor 20)
+
+Walk-down exclusions (thinking families, with the rule that removes
+them): deepseek-r1 (93.1M - no class member: 1.5b is a 51.2-class
+model, 7b is too big for the gate), qwen3 (superseded by
+qwen3.5, rule 7), qwen3.6 / qwen3.8 / qwen3-vl (same Qwen family as
+qwen3.5), gemma4 (e2b at 2.3B effective
+is sub-class, owner ruling; e4b ~5 GB fails the gate at every rung),
+gpt-oss / glm-4.7-flash / glm-5.1 / magistral / minimax-m2.7 /
+nemotron-3-super (no variant passes the gate), lfm2.5-thinking (1.2b,
+sub-class, owner ruling), phi4-mini-reasoning (reasoning in substance
+but carries no Ollama thinking tag - category membership is
+tag-defined, owner ruling).
+
+
+
+Reasoning capture uses `--reasoning-format deepseek`. Caveat: Gemma 4
+marks thinking with its own channel tokens and LFM2.5's convention is
+unverified - check the first turn dump of each family before a full run
+(reasoning landing in `content` is a measured finding, not a silent miss).
+
+Run it with `--thinking` and separate state/results files so the two
+categories stay independent:
+
+```
+python3 full-benchmark.py --thinking \
+  --state-file benchmark-state-thinking.json \
+  --results-file benchmark-results-thinking.json \
+  "Qwen/Qwen3.5-4B" \
+  "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
+```
+
+(Pass `--thinking` on any `--arc-only` rerun too.)
 
 ## License
 

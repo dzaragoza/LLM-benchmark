@@ -32,6 +32,13 @@ Protocol (fixed, pre-registered):
     turn; the final score is the global worst turn across all
     conversations. The comfort-line rule is strict: worst turn >= 20.
   - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
+  - Thinking-model category (--thinking): the SAME worst-turn gate
+    applies (thinking tokens are generated at the same t/s); latency
+    spent thinking is the user's informed choice and is NOT gated.
+    Thinking is returned separately (reasoning_content) and measured
+    (tokens + estimated time share). Unrestricted thinking: max_tokens
+    = answer cap + THINK_ALLOWANCE; turns whose thinking consumes the
+    whole allowance are flagged (answer_empty).
 
 Usage (from repo root):
   # step 0 (once): extract English conversations from Arena parquet shards
@@ -62,6 +69,9 @@ SERVER_BIN_DEFAULT = os.path.join(
     ".", "llama-b10964-gpu",
     "llama-server.exe" if os.name == "nt" else "llama-server")
 SEED = 1024  # pre-registered; part of the protocol
+THINK_ALLOWANCE = 1024  # thinking category: generation room on top
+                   # of the answer cap (unrestricted thinking; overruns
+                   # are flagged, not cut short by a forced end-of-thinking)
 
 
 # ---------------------------------------------------------------------------
@@ -199,14 +209,16 @@ def stop_server(proc):
 # The benchmark
 # ---------------------------------------------------------------------------
 
-def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
+def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
+                     thinking=False):
     history = []
     results = []
     for i, question in enumerate(user_turns):
         history.append({"role": "user", "content": question})
         payload = {
             "messages": list(history),
-            "max_tokens": cap_tokens,
+            "max_tokens": (cap_tokens + THINK_ALLOWANCE)
+                           if thinking else cap_tokens,
             "temperature": 0,
             "stream": False,
         }
@@ -220,7 +232,9 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
             data = json.loads(r.read())
         wall_s = time.time() - wall_start
 
-        answer = data["choices"][0]["message"]["content"]
+        message = data["choices"][0]["message"]
+        answer = message.get("content") or ""
+        reasoning = message.get("reasoning_content") or ""
         history.append({"role": "assistant", "content": answer})
 
         t = data.get("timings", {})
@@ -245,6 +259,9 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens):
             "wall_tps": (n_pred / wall_s) if (n_pred and wall_s) else None,
             "prompt_ms": prompt_ms,
             "wall_s": wall_s,
+            "reasoning_chars": len(reasoning),
+            "thinking_tokens_est": len(reasoning) // 4,
+            "answer_empty": 1 if (thinking and not answer.strip()) else 0,
         })
     return results
 
@@ -263,6 +280,12 @@ def main():
                          "./llama-b10964-gpu/llama-server (place the "
                          "llama.cpp b10964 build in the repo root with "
                          "that name)")
+    ap.add_argument("--thinking", action="store_true",
+                    help="thinking-model category: same worst-turn gate, "
+                         "reasoning returned separately and measured; "
+                         "max_tokens = answer cap + %d thinking "
+                         "allowance (unrestricted; overruns flagged)"
+                         % THINK_ALLOWANCE)
     ap.add_argument("--dump",
                     help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
@@ -309,9 +332,12 @@ def main():
         repeat_worsts = []
         for rep in range(1, args.repeats + 1):
             print(f"  [rep {rep}/{args.repeats}] starting server...", flush=True)
+            cmd = [args.server_bin, "-m", model, "-ngl", "99",
+                   "-c", str(args.ctx), "--port", str(args.port)]
+            if args.thinking:
+                cmd += ["--reasoning-format", "deepseek"]
             proc = subprocess.Popen(
-                [args.server_bin, "-m", model, "-ngl", "99",
-                 "-c", str(args.ctx), "--port", str(args.port)],
+                cmd,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
             try:
@@ -322,7 +348,8 @@ def main():
                 conv_worsts = []
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
-                                           cap_tokens, args.ctx)
+                                           cap_tokens, args.ctx,
+                                           args.thinking)
                     for r in res:
                         all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
@@ -333,6 +360,13 @@ def main():
                           + ", ".join(f"{x:.1f}" for x in tps)
                           + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
                              if cworst else ""))
+                    if args.thinking:
+                        tk = [r["thinking_tokens_est"] for r in res]
+                        empt = sum(r["answer_empty"] for r in res)
+                        print("      thinking tokens: "
+                              + ", ".join(str(x) for x in tk)
+                              + (f"   ({empt} empty answer(s))"
+                                 if empt else ""))
             finally:
                 stop_server(proc)
             valid = [w for w in conv_worsts if w]

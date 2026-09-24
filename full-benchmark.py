@@ -27,6 +27,12 @@ The ARC protocol is IDENTICAL to strict-arc.py: raw /v1/completions
 prompt, max_tokens=1, temperature=0, top-20 logprobs, port 8081,
 -ngl 99, -c 2048, -t 8.
 
+Thinking-model category (owner ruling 2026-09-24): benchmarked
+separately with --thinking (the SAME worst-turn gate and ARC protocol;
+reasoning tokens are measured descriptively - latency spent thinking
+is the user's informed choice and is NOT gated). Keep the category in
+its own --state-file/--results-file so rankings stay separate.
+
 Ad-hoc use (no selection stage): rank arbitrary model files directly:
     python3 full-benchmark.py --arc-only \
         --arc-models "./models/A/q8.gguf,./models/B/q6.gguf"
@@ -304,7 +310,7 @@ def phase2_create(fam, famdir, rung, source_repo, plan, dry_run):
     return out
 
 
-def phase3_bench(path, corpus, dry_run):
+def phase3_bench(path, corpus, dry_run, thinking=False):
     dump = path + ".live-dump.json"
     label = os.path.basename(path)
 
@@ -324,9 +330,11 @@ def phase3_bench(path, corpus, dry_run):
         return dump
     if dry_run:
         return dump
-    r = subprocess.run([sys.executable, LIVE_BENCH, "--corpus", corpus,
-                        "--models", path, "--repeats", "1",
-                        "--dump", dump])
+    cmd = [sys.executable, LIVE_BENCH, "--corpus", corpus,
+           "--models", path, "--repeats", "1", "--dump", dump]
+    if thinking:
+        cmd.append("--thinking")
+    r = subprocess.run(cmd)
     if r.returncode != 0 or not dump_valid():
         fail(3, label, "live-bench.py failed or produced no usable dump "
              "(see its output above)", GUIDE[3])
@@ -654,7 +662,7 @@ def phase6_rank(labels, arc_num, arc_dir, state, state_path):
 # =========================================================== selection
 
 def process_family(spec, ladder, corpus, floor, models_dir, state,
-                   state_path, dry_run, force):
+                   state_path, dry_run, force, thinking=False):
     model_repo, _, source_repo = spec.partition("=")
     if not source_repo:
         source_repo = model_repo
@@ -713,7 +721,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             print(f"  [4] would analyze (floor {floor:g} - 2*sigma)")
             continue
         if 3 not in run["phases_done"]:
-            dump = phase3_bench(path, corpus, dry_run)
+            dump = phase3_bench(path, corpus, dry_run, thinking)
             run["phases_done"].append(3)
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
@@ -761,6 +769,11 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="redo families that already have a selection")
+    ap.add_argument("--thinking", action="store_true",
+                    help="thinking-model category: pass --thinking to "
+                         "live-bench (same worst-turn gate; reasoning "
+                         "measured descriptively). Use separate "
+                         "--state-file/--results-file for this category.")
     args = ap.parse_args()
 
     ladder = [x.strip() for x in args.ladder.split(",") if x.strip()]
@@ -817,7 +830,7 @@ def main():
     for spec in args.families:
         process_family(spec, ladder, args.corpus, args.floor,
                        args.models_dir, state, args.state_file,
-                       args.dry_run, args.force)
+                       args.dry_run, args.force, args.thinking)
 
     if args.dry_run:
         print("\ndry run complete - no files were downloaded or tested")
