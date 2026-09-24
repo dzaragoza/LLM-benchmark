@@ -39,6 +39,11 @@ Protocol (fixed, pre-registered):
     (tokens + estimated time share). Unrestricted thinking: max_tokens
     = answer cap + THINK_ALLOWANCE; turns whose thinking consumes the
     whole allowance are flagged (answer_empty).
+    - Hybrid non-thinking mode (--no-thinking): sends
+    chat_template_kwargs {"enable_thinking": false} with every request
+    and launches the server with --chat-template-kwargs; for hybrid
+    models run in the non-thinking category. Verify with the first-turn
+    dump: no reasoning, no inline think tags must appear.
 
 Usage (from repo root):
   # step 0 (once): extract English conversations from Arena parquet shards
@@ -210,7 +215,7 @@ def stop_server(proc):
 # ---------------------------------------------------------------------------
 
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
-                     thinking=False):
+                     thinking=False, no_thinking=False):
     history = []
     results = []
     for i, question in enumerate(user_turns):
@@ -222,6 +227,8 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "temperature": 0,
             "stream": False,
         }
+        if no_thinking:
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
         req = urllib.request.Request(
             f"http://localhost:{port}/v1/chat/completions",
             data=json.dumps(payload).encode(),
@@ -286,6 +293,10 @@ def main():
                          "max_tokens = answer cap + %d thinking "
                          "allowance (unrestricted; overruns flagged)"
                          % THINK_ALLOWANCE)
+    ap.add_argument("--no-thinking", action="store_true",
+                    help="hybrid model, non-thinking mode: per-request "
+                         "chat_template_kwargs enable_thinking=false; "
+                         "server also launched with --chat-template-kwargs")
     ap.add_argument("--dump",
                     help="write per-turn results to this JSON file")
     ap.add_argument("--make-sample", action="store_true",
@@ -298,6 +309,9 @@ def main():
     ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)
     args = ap.parse_args()
+
+    if args.thinking and args.no_thinking:
+        ap.error("--thinking and --no-thinking are mutually exclusive")
 
     if args.make_sample:
         make_english_sample()
@@ -336,6 +350,9 @@ def main():
                    "-c", str(args.ctx), "--port", str(args.port)]
             if args.thinking:
                 cmd += ["--reasoning-format", "deepseek"]
+            if args.no_thinking:
+                cmd += ["--chat-template-kwargs",
+                        '{"enable_thinking": false}']
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -349,7 +366,8 @@ def main():
                 for ci, conv in enumerate(conversations, 1):
                     res = run_conversation(args.port, conv["user_turns"],
                                            cap_tokens, args.ctx,
-                                           args.thinking)
+                                           args.thinking,
+                                           args.no_thinking)
                     for r in res:
                         all_turns.append({"model": label, "conv": ci, **r})
                     tps = [r["server_tps"] for r in res if r["server_tps"]]
