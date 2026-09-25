@@ -66,9 +66,9 @@ GIB_BYTES = 1 << 30
 GIB_TO_GB = 1.073741824
 
 READER_PROFILES = {          # Brysbaert 2019, silent English non-fiction,
-    "fast": 300.0,           # adults; anchor A is the author ruling
-    "mean": 238.0,           # (canonical): outpace a 300-wpm reader by
-    "2sigma-fast": 340.0,    # 3x = 50 ms/token = floor 20
+    "fast": 300.0,           # adults; the canonical anchor (author
+    "mean": 238.0,           # ruling): MATCH the fast reader - tokens
+    "2sigma-fast": 340.0,    # arrive at reading pace, never slower
 }
 
 
@@ -184,10 +184,13 @@ def main():
                     help="derive the comfort budget from a Brysbaert-2019 "
                          "reader anchor instead of a floor: T_max = "
                          "(60000 x words_per_token / wpm) / reader_k. "
-                         "Canonical form (author ruling A): "
-                         "--reader fast --reader-k 3 = 50 ms = floor 20")
-    ap.add_argument("--reader-k", type=float, default=3.0, metavar="K",
-                    help="outpace factor for --reader (default 3)")
+                         "Canonical form (author ruling): "
+                         "--reader fast = 150 ms = floor 6.7 (MATCH the "
+                         "300-wpm reader)")
+    ap.add_argument("--reader-k", type=float, default=1.0, metavar="K",
+                    help="speed factor vs the reader anchor (default 1 = "
+                         "MATCH the reader, the minimum that never "
+                         "makes them wait; >1 buys buffering headroom)")
     ap.add_argument("--words-per-token", type=float, default=0.75,
                     metavar="RATIO",
                     help="words per token for --reader (default 0.75, the "
@@ -274,10 +277,10 @@ def main():
     if args.reader is not None:
         wpm = READER_PROFILES[args.reader]
         print(f"  reader anchor: {args.reader} = {wpm:.0f} wpm (Brysbaert "
-              f"2019), outpaced {args.reader_k:g}x at "
-              f"{args.words_per_token:g} words/token")
+              f"2019), {'matched' if args.reader_k == 1 else f'{args.reader_k:g}x'} "
+              f"at {args.words_per_token:g} words/token")
         print(f"  -> T_max = {1000 / floor:.0f} ms/token (the canonical "
-              "author-ruling-A form)")
+              "author-ruling form: match the reader)")
     print("  the boundary in time language (no floor needed): a token "
           "costs")
     overhead_ms = 1000.0 / tinf if tinf != float("inf") else 0.0
