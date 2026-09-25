@@ -151,6 +151,16 @@ def law_worst(size_gib, a, b):
     return 1.0 / (a * size_gib + b)
 
 
+def kv_gib(layers, kv_heads, head_dim, depth, bpe=2.0):
+    """KV cache size at depth, from architecture constants.
+
+    One K and one V vector per layer per token, each kv_heads x
+    head_dim elements of bpe bytes (fp16 KV = 2). Sliding-window
+    layers cap at their window: pass depth = min(depth, window)
+    for them, or pass the model's effective depth directly."""
+    return 2.0 * layers * kv_heads * head_dim * bpe * depth / GIB_BYTES
+
+
 def print_fit(name, a, b, r2, n):
     bw = 1.0 / a if a > 0 else float("inf")
     tinf = 1.0 / b if b > 0 else float("inf")
@@ -201,6 +211,16 @@ def main():
                          "efficiency fraction")
     ap.add_argument("--predict-size", type=float, default=None,
                     help="also print the law's worst t/s at this size (GiB)")
+    ap.add_argument("--kv", action="append", default=[],
+                    metavar="'label,layers,kv_heads,head_dim[,bytes_per_elem]'",
+                    help="KV depth tax: architecture spec (repeatable; fp16 "
+                         "KV unless bytes_per_elem given). Prints the KV GiB "
+                         "at --kv-depth and the depth-adjusted boundary "
+                         "size*(D) = size*(0) - KV(D). Sliding-window "
+                         "models: pass window-capped constants yourself")
+    ap.add_argument("--kv-depth", type=int, default=4096,
+                    help="context depth for the --kv tax (default 4096, "
+                         "the study's protocol constant)")
     ap.add_argument("--json", default=None,
                     help="write the fit to this JSON file")
     args = ap.parse_args()
@@ -314,6 +334,29 @@ def main():
               f"worst {t:.1f} t/s = {1000.0 / t:.0f} ms/token "
               f"({'meets' if t >= floor else 'exceeds'} the "
               f"{1000.0 / floor:.0f} ms comfort budget)")
+
+    if args.kv:
+        print()
+        print("  KV DEPTH TAX (the law's third term, from architecture "
+              "constants)")
+        print("    the KV cache is read once per token, like the model:")
+        print("    T_token(D) = (size + KV(D)) x ms/GiB + overhead")
+        print(f"    so context depth EATS boundary size: size*({args.kv_depth})"
+              " = size* - KV(D)")
+        for spec in args.kv:
+            parts = [p.strip() for p in spec.split(",")]
+            if len(parts) < 4:
+                sys.exit(f"bad --kv spec (need label,layers,kv_heads,"
+                         f"head_dim): {spec}")
+            label = parts[0]
+            layers, kvh, hd = int(parts[1]), int(parts[2]), int(parts[3])
+            bpe = float(parts[4]) if len(parts) > 4 else 2.0
+            kvg = kv_gib(layers, kvh, hd, args.kv_depth, bpe)
+            adj = size_star - kvg
+            tax_ms = kvg * 1000.0 / bw
+            print(f"      {label:24} {kvg:5.2f} GiB at depth "
+                  f"{args.kv_depth} (+{tax_ms:.1f} ms/token)"
+                  f"  -> size* at depth = {adj:.2f} GiB")
 
     if args.json:
         out = {
