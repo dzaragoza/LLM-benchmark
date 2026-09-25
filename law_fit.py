@@ -165,7 +165,13 @@ def main():
                     metavar="'label,size_gib,worst[,mean]'",
                     help="manual archive point (repeatable)")
     ap.add_argument("--floor", type=float, default=20.0,
-                    help="comfort floor in t/s (default 20)")
+                    help="comfort floor in t/s (default 20; or pass "
+                         "--latency-budget for the time-based form)")
+    ap.add_argument("--latency-budget", type=float, default=None,
+                    metavar="MS",
+                    help="comfort budget in ms per generated token; "
+                         "replaces --floor (floor = 1000/budget); the "
+                         "floor-free form of the boundary")
     ap.add_argument("--bw-theoretical", type=float, default=None,
                     help="theoretical bandwidth in GB/s, to report the "
                          "efficiency fraction")
@@ -230,16 +236,34 @@ def main():
                 continue
             print_fit(m, f[0], f[1], f[2], f[3])
 
+    if args.latency_budget is not None:
+        floor = 1000.0 / args.latency_budget
+    else:
+        floor = args.floor
+
     print()
     print("=" * 72)
-    print(f"RIGHT-SIZING  (floor {args.floor:g} t/s worst turn)")
+    print(f"RIGHT-SIZING  (comfort boundary: floor {floor:g} t/s worst "
+          f"turn = {1000 / floor:.0f} ms per generated token)")
     print("=" * 72)
+    print("  the boundary in time language (no floor needed): a token "
+          "costs")
+    overhead_ms = 1000.0 / tinf if tinf != float("inf") else 0.0
+    print(f"    T_token = size/GW_eff + T_overhead = size x "
+          f"{1000.0 / bw:.2f} ms/GiB + {overhead_ms:.1f} ms")
+    print("    (GW_eff = effective GiB read per second; the whole model "
+          "is")
+    print("     read once per token - that is the cost of autoregressive "
+          "decode)")
     if b <= 0:
-        size_star = bw / args.floor
+        size_star = bw / floor
         print(f"  overhead term vanished with this data; "
               f"pure-BW approximation:")
     else:
-        size_star = bw * (1.0 / args.floor - 1.0 / tinf)
+        size_star = bw * (1000.0 / floor - overhead_ms) / 1000.0
+        print(f"    comfort budget {1000 / floor:.0f} ms/token = read "
+              f"budget {1000 / floor - overhead_ms:.1f} ms -> "
+              f"size* = GW_eff x read budget")
     print(f"  size* = {size_star:.2f} GiB  (band {size_star * 0.9:.2f}"
           f"-{size_star * 1.1:.2f}, family factors +-10%)")
     print("  biggest model class that fits size* at plateau rungs "
@@ -252,16 +276,18 @@ def main():
     if args.predict_size is not None:
         t = law_worst(args.predict_size, a, b)
         print(f"  law prediction at {args.predict_size:.2f} GiB: "
-              f"worst {t:.1f} t/s "
-              f"({'PASS' if t >= args.floor else 'FAIL'} at floor "
-              f"{args.floor:g})")
+              f"worst {t:.1f} t/s = {1000.0 / t:.0f} ms/token "
+              f"({'meets' if t >= floor else 'exceeds'} the "
+              f"{1000.0 / floor:.0f} ms comfort budget)")
 
     if args.json:
         out = {
             "points": pts,
             "fit": {"bw_eff_gib_s": 1.0 / a, "t_inf": (None if b <= 0
                     else 1.0 / b), "r2": r2, "n": n},
-            "size_star": {"floor": args.floor, "gib": size_star,
+            "size_star": {"floor": floor,
+                          "latency_budget_ms": 1000.0 / floor,
+                          "gib": size_star,
                           "band": [size_star * 0.9, size_star * 1.1]},
         }
         with open(args.json, "w") as f:
