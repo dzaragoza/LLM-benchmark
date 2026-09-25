@@ -41,6 +41,7 @@ Usage (from the repo root, on the machine that ran the benchmark):
 
     python3 law_fit.py                          # ./benchmark-state.json
     python3 law_fit.py --state-file a.json --state-file b.json
+    python3 law_fit.py --reader fast --bw-theoretical 102.4
     python3 law_fit.py --floor 20 --bw-theoretical 102.4
     python3 law_fit.py --point "session18q Qwen Q8_0,3.36,21.5"
     python3 law_fit.py --predict-size 5.0        # t/s at 5 GiB from the fit
@@ -63,6 +64,12 @@ BPW_APPROX = {          # llama.cpp average bits-per-weight; varies per model
 }
 GIB_BYTES = 1 << 30
 GIB_TO_GB = 1.073741824
+
+READER_PROFILES = {          # Brysbaert 2019, silent English non-fiction,
+    "fast": 300.0,           # adults; anchor A is the author ruling
+    "mean": 238.0,           # (canonical): outpace a 300-wpm reader by
+    "2sigma-fast": 340.0,    # 3x = 50 ms/token = floor 20
+}
 
 
 def harvest_state(state_files):
@@ -172,6 +179,20 @@ def main():
                     help="comfort budget in ms per generated token; "
                          "replaces --floor (floor = 1000/budget); the "
                          "floor-free form of the boundary")
+    ap.add_argument("--reader", choices=sorted(READER_PROFILES),
+                    default=None,
+                    help="derive the comfort budget from a Brysbaert-2019 "
+                         "reader anchor instead of a floor: T_max = "
+                         "(60000 x words_per_token / wpm) / reader_k. "
+                         "Canonical form (author ruling A): "
+                         "--reader fast --reader-k 3 = 50 ms = floor 20")
+    ap.add_argument("--reader-k", type=float, default=3.0, metavar="K",
+                    help="outpace factor for --reader (default 3)")
+    ap.add_argument("--words-per-token", type=float, default=0.75,
+                    metavar="RATIO",
+                    help="words per token for --reader (default 0.75, the "
+                         "unanchored rule of thumb; replace with the "
+                         "measured per-model ratio once tokenized)")
     ap.add_argument("--bw-theoretical", type=float, default=None,
                     help="theoretical bandwidth in GB/s, to report the "
                          "efficiency fraction")
@@ -238,6 +259,10 @@ def main():
 
     if args.latency_budget is not None:
         floor = 1000.0 / args.latency_budget
+    elif args.reader is not None:
+        wpm = READER_PROFILES[args.reader]
+        budget_ms = (60000.0 * args.words_per_token / wpm) / args.reader_k
+        floor = 1000.0 / budget_ms
     else:
         floor = args.floor
 
@@ -246,6 +271,13 @@ def main():
     print(f"RIGHT-SIZING  (comfort boundary: floor {floor:g} t/s worst "
           f"turn = {1000 / floor:.0f} ms per generated token)")
     print("=" * 72)
+    if args.reader is not None:
+        wpm = READER_PROFILES[args.reader]
+        print(f"  reader anchor: {args.reader} = {wpm:.0f} wpm (Brysbaert "
+              f"2019), outpaced {args.reader_k:g}x at "
+              f"{args.words_per_token:g} words/token")
+        print(f"  -> T_max = {1000 / floor:.0f} ms/token (the canonical "
+              "author-ruling-A form)")
     print("  the boundary in time language (no floor needed): a token "
           "costs")
     overhead_ms = 1000.0 / tinf if tinf != float("inf") else 0.0
