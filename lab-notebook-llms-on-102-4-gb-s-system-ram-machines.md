@@ -1431,4 +1431,40 @@ python3 live-bench.py --corpus ./live-corpus.json \
 
 **Consequence for the old dumps:** the three thinking-mode dumps (Q8_0/Q6_K/Q5_K_M .live-dump.json) are now orphans of the old naming; they hold the allowance-1024 measurements (kept as data, referenced in the Session-25 ruling) but will never be reused by the new build. The thinking rerun at allowance 2048 writes fresh `.live-dump.think.json` files. The non-thinking rerun writes `.live-dump.nothink.json` — no stale reuse possible.
 
-**Author ritual:** git pull; base64 -d full-benchmark.py.b64 > full-benchmark.py (36,524 B, sha256 8ea152c0...); py_compile; commit; then RERUN the --no-thinking qwen3.5 command — fresh no-think dumps, fresh selection. Predictions unchanged: same rung Q5_K_M (mode-blindness check), worst 21.0-21.3, reasoning_chars 0 in the dump.
+**Author ritual:** git pull; base64 -d full-benchmark.py.b64 > full-benchmark.py (36,524 B, sha256 8ea152c0...); py_compile; commit; then RERUN the --no-thinking qwen3.5 command — fresh no-think dumps, fresh selection. Predictions unchanged: same rung Q5_K_M (mode-blindness check), worst 21.0-21.3, reasoning_chars 0 in the dump.## Session 26 — 2026-09-24 (direction pivot: the speed gate becomes the bandwidth→size law; right-sizing replaces selection)
+
+**Author's motivation (on record):** the methodology (strict ARC + exact McNemar, live-bench protocol, pre-registered predictions) is solid, but the report's goal is misaligned with practitioner needs. Practitioners ask: "what's the best model for MY hardware?" There is a widespread misunderstanding of hardware capabilities vs model expectations. The thinking/non-thinking split is unsatisfying (categories don't provide the same user experience — they can't be ranked against each other), and the speed gate, while better than report #1, still feels arbitrary. New direction: the relationship between bandwidth, model size, speed, and quality — WITHIN a model, across its quant ladder (no inter-model confounds).
+
+**The pivot, honestly derived (how we got from the speed gate to the law):**
+1. The worst-turn speed gate + ladder walk was, all along, an empirical binary search for a boundary: the largest file that still meets the floor. We searched for it per model (~8 min each); we never asked what the boundary IS.
+2. Session 18q's calibration failure was the clue: the per-family "constants" (0.86–0.98) were symptoms of a missing parameter. A one-parameter "BW/size" rule cannot fit data where implied bandwidth varies with file size.
+3. The two-machine record confirms the mechanism: 51.2 GB/s → 1.5B class, 102.4 GB/s → 3–4B class, same floor 20, both machines landing their rosters at the first passing rung. The gate boundary is set by bandwidth; the ladder walk just finds it per model.
+
+**The law (within one model, one machine, across its quant ladder):**
+1/t = size/BW_eff + 1/t_inf, where t = worst turn (t/s), size = file on disk (GiB), BW_eff = effective bandwidth, t_inf = the fixed-overhead ceiling as size→0 (KV/activation reads, kernel dispatch — amortized better by bigger files).
+
+**Fit on measured data (Qwen3.5-4B ladder, T14s, worst turns 15.3/18.8/21.1):**
+- BW_eff = 76.5 GiB/s = 82.2 GB/s = **80% of the 102.4 theoretical**; t_inf = 74 t/s; R² = 0.9996.
+- **size*(floor 20) = 2.79 GiB.** The ladder's verdicts straddle it exactly: Q5_K_M (~2.58 GiB) PASS at 21.1, Q6_K (~3.05 GiB) FAIL at 18.8. The "arbitrary" gate was measuring this boundary all along.
+- Caveat, on record: file sizes in this first fit are bpw-derived ESTIMATES (Qwen3.5 has no first-party size table carried in the notebook; Session 25's back-solve said 2.28 GiB for Q5_K_M vs bpw-math 2.58). The committed protocol: rerun `law_fit.py` with `ls -l` sizes before publishing. (Qwen3.5 file sizes were measured by the author's run on the target machine — pending carry-back into this notebook.)
+
+**Cross-family honesty check (pooled 7-point fit): R² = 0.16 — the law is WITHIN-model, not universal.** Family architecture (MoE vs dense, vocab, depth decay) shifts BW_eff ±15%. This grades Session 18q's lesson permanently: no pooled constants; per-model calibration, exactly as the author's "same model, no intermodel" framing demands.
+
+**The quality side (already measured, n=800 grids, within-model):**
+- Plateau from ~Q4_K_M/Q5 through F16: McNemar cannot separate ANY pair (Qwen2.5-1.5B: Q5_0/Q5_K_M/Q6_K/F16 all p > 0.1; deltas ≤ 0.6 pp). Full 16-bit buys ZERO measurable ARC over Q5/Q6.
+- First damage at Q4 (~3.4 pp), superlinear cliff below ~3 bpw (Phi-3: Q3_K_M −1.3 pp, Q2_K **−10.4 pp**, Q1_0 below chance = format collapse, not damage).
+- Therefore within the plateau: **the rung is a free variable** — quant choice is a pure speed dial; model choice is the only quality decision.
+
+**The right-sizing question (author's framing, now answerable):** "In a 102.4 GB/s machine a 1.7B model runs fast but leaves both smarts and bandwidth on the table; a 9B model is smart but starves. What is the exact size my bandwidth can handle?"
+Answer: **size\* = BW_eff × (1/floor − 1/t_inf)** — the biggest file that meets the comfort floor. At the T14s fit: 2.79 GiB ≈ 4B dense at Q5_K_M / ~5B at Q4_K_M / ~2.8B at Q8_0. The practitioner's recipe: (1) measure/fit BW_eff and t_inf once (any two rungs of any one ladder + the instrument), (2) compute size*, (3) pick the SMARTEST model whose plateau rung fits inside size* — never below Q4_K_M (the cliff), never above size* (the floor). Hardware upgrades enter as: doubling bandwidth doubles size* → one model class up, exactly the two-machine record.
+
+**Tooling:** `law_fit.py` (repo root): harvests (size, worst, mean) per rung from state files (real `ls -l` sizes) and/or manual archive points, fits the law, prints BW_eff/t_inf/R², per-point residuals (family factors, now principled), size* with the ±10% band, and the params-per-rung table. Validated on synthetic truth (recovered BW 75→73.5, t_inf 70→74, R² 0.9999) and on the measured Qwen3.5 ladder (R² 0.9996). Post-hoc instrument; not part of the pipeline layers.
+
+**Pre-registered predictions (before any new measurement):**
+1. With real `ls -l` sizes, the Qwen3.5 within-model fit stays R² ≥ 0.99 and size* lands in 2.5–3.1 GiB.
+2. The 51.2 GB/s machine's archive pairs (Qwen2.5-1.5B Q4_0 1.07 GiB/28.35 tg128, Q6_K 1.36/21.23; GLM Q6_K 1.25/27.27) fit the same law form with BW_eff ≈ 27–31 GB/s and the size*(20) boundary at ~1.2–1.4 GiB — explaining study #1's sweet spot post hoc.
+3. phi4-mini's selected rung (Q6_K) sits within the ±10% band of size* (its file size from disk).
+4. Gemma-3-4B Q6_K's disk size is materially BELOW the 4.30 GiB notebook estimate (the pooled-fit residual +12% says the estimate is wrong, not the law).
+5. Across the two machine tiers, size* scales with BW_eff within ±15% (the bandwidth-proportionality claim, testable once both tiers have real-size fits).
+
+**Consequences for the report (draft):** the champion ceremony and the two-category thinking split are demoted to appendix/data status; the centerpiece becomes the right-sizing method (law + size* + the plateau/cliff quality rule) with the within-category ARC rankings as the "which model is smartest in class" layer. The thinking category's user-decision metric (Δaccuracy vs Δlatency, per hybrid) is reported descriptively per model, not as a category ranking. Author's call pending: whether report #2 is rewritten around right-sizing or ships as-is with right-sizing as report #3.
