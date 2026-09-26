@@ -1727,3 +1727,11 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf
 python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking
 python3 depth_probe.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf
 ```
+
+---
+
+### Session 27, addendum 15 — author workflow ruling: direct-to-main
+
+**Ruling.** The author will not review every PR: code changes land directly on main; review happens only when explicitly requested. The PR-based workflow (PRs #1–#3) is retired as the default delivery path — it served the review-by-default sessions, and the three-layer refactor, the bandwidth→size law, and the depth-prefill gate all landed through it, reviewed and merged by the author. From this session forward: commits land on main directly; the notebook remains the review artifact (every finding, ruling, and grading lands as a numbered, committed addendum — that discipline is unchanged, standing practice since addendum 7).
+
+**Housekeeping executed under the ruling:** main carried the PR-#3 merge (e696798) but was missing the post-merge fix commit 23e616b (the noise prefix-cache fix, the empty-answer warning, and this session's addendum 14) — the merge happened before that push landed. Cherry-picked to main as 92d41e1 and pushed; main and the work branch are now content-identical.
