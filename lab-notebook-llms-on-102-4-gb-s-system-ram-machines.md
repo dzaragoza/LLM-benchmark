@@ -2312,3 +2312,24 @@ Note: --force re-benches every family including llama3.2 and mistral whose v2.2 
 (phases 1-4 re-run only for the two named families; the ranking then covers the full roster from state — mistral's and llama's selections are reused, not re-benched; llama's Q8_0 walk happens to be already v2.2-honest since it ran fresh in the addendum-40 session).
 
 **Verified by test:** synthetic state with 7 families (3 study-#2 leftovers + the v2.2 four), real-schema CSVs — without the flag, 7 rank; with `--roster`, exactly the 4 v2.2 families rank and no Phi/Qwen2.5 label appears. The corrected ranking's separations recompute correctly from the run's own CSVs.
+
+### Session 29, addendum 42 — two corrections: --force was a no-op past the family check; addendum 41's separations were synthetic
+
+**Bug 1 (the author's run caught it): --force did not re-bench.** The author ran the addendum-41 command with --force; the output shows NO rung walks for qwen3.5-4b or gemma-3-4b — the family blocks printed nothing between the headers and phase 5. Root cause: --force only bypassed the family-level "already selected - skipping" return; the per-rung loop below then hit `verdict.startswith("PASS")` → break and `verdict == "FAIL"` → continue on the STORED verdicts, so the ladder walk skipped every rung and fell straight through to phases 5-6. A second layer underneath: even had phase 3 been reached, `speed_gate.bench` would have reused the existing dumps (its own force flag was never passed). The bug's history: --force was built and mock-tested for the standalone speed_gate path (where it works), then the pipeline grew the family-level return and the stored-verdict shortcuts WITHOUT re-testing the force path end to end — the same class of miss as the Session-25 mode/dump-reuse bug: two resume layers, only one tested.
+
+**Fix (both layers):** with --force, process_family clears every rung's verdict and phases 3-4 (phases 1-2 stay done — the rung files exist and are reused, no re-download), resets the family's selection, prints "--force: re-benching the ladder (N stored verdict(s) cleared; files reused)", and threads force=True into speed_gate.bench so dumps are re-measured. E2E-verified with a synthetic state (stored FAIL at Q8_0 + stored PASS at Q5_K_M): force clears both, the walk restarts at Q8_0, re-benches, re-selects; force arrives at bench; without force, the skip path is unchanged.
+
+**Bug 2 (mine, and worse - a record-keeping error): addendum 41's separation numbers were synthetic.** The "three clean roster-internal separations" table recorded in addendum 41 was computed from the TEST CSVs (deterministic prefix-correct synthetic data), not from the run's real ARC CSVs. The author's real ranking (this session's output) separates ONLY THE CHAMPION:
+
+- #1 vs #2 (qwen3.5-4b 90.2% vs mistral 75.6%): b=33, c=204, **p < 0.0001 SEPARATED** — the champion's margin is real and enormous (-14.59 pp).
+- #2 vs #3 (mistral 75.6% vs gemma 73.3%): b=140, c=113, **p = 0.1019 NOT separated**.
+- #3 vs #4 (gemma 73.3% vs llama 72.6%): b=124, c=132, **p = 0.6618 NOT separated**.
+
+**Correction of record:** the v2.2 roster's honest statistical picture is **one decisive champion and a three-way tie for second** (mistral/gemma/llama, spans 75.6-72.6%, every pairwise p > 0.10). Addendum 41's claim of "three clean separations" is RETRACTED; its roster-filter fix and corrected ranking MEMBERSHIP stand (the real run confirms both — the ranking now lists exactly the four v2.2 families). Lesson recorded: test-data outputs must never be pasted into the notebook as if they were run data — the notebook cites the run's own output or it cites nothing.
+
+**The re-run still pending (unchanged in purpose, now actually functional):** qwen3.5-4b and gemma-3-4b under the v2.2 gate with --force, to grade addendum-37 predictions 2, 3 and 7. The command is the addendum-41 one, now working as intended:
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,Qwen3.5-4B,gemma-3-4b-it-qat-q4_0-gguf,Mistral-7B-Instruct-v0.3" "Qwen/Qwen3.5-4B" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+
+Expected per addendum-37 predictions: qwen3.5-4b re-walks Q8_0 (4.29 GiB → 15.3 t/s → 7.5 w/s predicted, PASS; w/t_min 0.49 family value) and gemma-3-4b walks Q8_0 from its Q6_K floor-20-era selection (3.96 GiB → 15.3 t/s → 6.6-7.5 w/s predicted). Both walks re-bench every rung above their stored selections too (Q8_0 for both) — the dumps are re-measured, so the mem_cost_gib instrument (addendum 40) reports on every rung for the first time.
