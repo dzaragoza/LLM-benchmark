@@ -527,6 +527,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
         if no_thinking:
             extra += ["--chat-template-kwargs",
                       '{"enable_thinking": false}']
+        mem_before = llama_server.system_memavailable_gib()
         proc, healthy = llama_server.start_server(model, port, extra,
                                                   server_bin,
                                                   log_path=log_path)
@@ -604,15 +605,25 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                     break
         finally:
             peak = llama_server.peak_rss_gib(proc)
+            cost = llama_server.memory_cost_gib(
+                mem_before, llama_server.system_memavailable_gib())
             llama_server.stop_server(proc, port)
+            file_gib = os.path.getsize(model) / (1024 ** 3)
             if peak is not None:
                 mem_reports.append({
                     "rep": rep,
                     "peak_rss_gib": peak,
+                    "mem_cost_gib": cost,
                     **llama_server.parse_memory_log(log_path)})
-                print(f"    memory: peak RSS {peak:.2f} GiB "
-                      "(the server's everything: weights + KV + buffers "
-                      "+ runtime; VmHWM, addendum 36)", flush=True)
+                note = (""
+                        if (peak >= file_gib or cost is None)
+                        else " - SUSPECT undercount (below the file size; "
+                             "see mem_cost_gib)")
+                print(f"    memory: peak RSS {peak:.2f} GiB"
+                      + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
+                      + " (weights + KV + buffers + runtime; VmHWM + "
+                      "MemAvailable delta, addendum 36/40)" + note,
+                      flush=True)
         if early_fail:
             break
         valid = [w for w in conv_worsts if w]

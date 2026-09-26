@@ -2241,3 +2241,43 @@ Ruled out under the Q6 filter: Llama-3.1-8B (Q4-only by measurement: Q4_K_M earl
 **The honest centrepiece of the registry is the [M] section** - five inherited numbers that were never ruled on, each now carrying an exit plan: ctx 4096 (already promoted, addendum 9); the 0.75 words/token rule of thumb (unanchored, display-only since v2.1, to be single-sourced or deleted); its 6.5 t/s derivative in lag_analyze/depth_probe (second-order magic - the tools print the w/s line alongside); ARC_CTX 2048 (exit: verify no ARC prompt exceeds it, then register [P]); BPW_APPROX as a duplicate of RUNG_BITS (exit: single-source). The DEPTH_HEADROOM 64-vs-32 pair is registered as INTENTIONAL (the gate's conversations reserve noise room on top of the blob; the probe's single prompt does not).
 
 **Cost:** one file, ~9.4 KB, zero code changes. **Gain:** every number in the report traceable to a ruling, a citation, a measurement, or an honest "inherited - here is the plan". This is the artifact that makes the 51.2-class replication and the eventual w/t calibration pass (addendum-37 discussion) auditable end to end.
+
+### Session 29, addendum 40 — the v2.2 roster run graded: a new champion, the Q6 filter's first miss, and the memory instrument's undercount found and fixed
+
+**The run (author machine, protocol v2.2, --no-thinking):** four families walked. Llama-3.2-3B Q8_0, Qwen3.5-4B Q5_K_M, gemma-3-4b Q6_K already selected in state (skipped, idempotent); Mistral-7B-v0.3 walked fresh: Q8_0 FAIL (early-fail conv 2 turn 1, 3.34 w/s), Q6_K FAIL (early-fail conv 2 turn 1, 4.44 w/s), **Q5_K_M PASS (worst 5.25 w/s, mean 8.92, sigma 0.78) → SELECTED**. Phase 5-6: ARC completed for Mistral (886/1172 = 75.6%), final ranking computed on the full n=1172 with exact McNemar.
+
+**The ranking (study #3's headline, n=1172):**
+
+1. **Qwen3.5-4B Q5_K_M: 1057/1172 = 90.2%** — new champion; Phi-3-mini's 84.8% (draft champion since Session 20) is dethroned.
+2. Phi-3-mini Q6_K: 84.8%
+3. Phi-4-mini Q6_K: 80.3%
+4. Qwen2.5-3B Q8_0: 76.1% (superseded data point)
+5. Mistral-7B-v0.3 Q5_K_M: 75.6%
+6. gemma-3-4b Q6_K: 73.3%
+7. Llama-3.2-3B Q8_0: 72.6%
+
+Separations: #1 vs #2 SEPARATED (p<0.0001, -5.38 pp), #2 vs #3 SEPARATED (p=0.0001), #3 vs #4 SEPARATED (p=0.0011); #4-#5, #5-#6, #6-#7 not separated (p=0.76/0.10/0.66). The top of the ranking is decisively ordered; the 72-76% band is a statistical tie.
+
+**Prediction grades (addendum 37, pre-registered):**
+
+1. **Llama-3.2-3B selects Q8_0 — HIT** (state-confirmed: PASS confident at 20.6 t/s; the w/t_min question below).
+2. **Qwen3.5-4B selects Q8_0 — MISS on the rung, by state reuse.** The state file carried its thinking-era Q5_K_M selection (Session 24, floor-20 protocol); the pipeline correctly reused it rather than re-benching. The v2.2 non-thinking rung prediction (Q8_0) was never re-measured. Consequence: **the qwen3.5-4b non-thinking selection must be re-run with --force** to grade prediction 2 honestly (Q8_0 predicted: 4.29 GiB → 15.3 t/s → 7.5 w/s at w/t_min 0.49, PASS). Until then the roster's qwen slot carries a floor-20-era selection. Honest label required in the results file.
+3. **Gemma-3-4B selects Q8_0 — MISS, state reuse again** (Q6_K selected in the floor-20 era; the v2.2 prediction Q8_0 unmeasured). Same consequence: re-run with --force.
+4. **Mistral Q6_K PASS (worst 5.0-7.0) — MISS.** Measured Q6_K FAIL at 4.44 w/s; the killer turn's w/t = 0.367. The 0.43-0.49 band was optimistic for mistral; its true w/t_min is 0.37 (measured). **Prediction 4b (the Q6 filter misses): HIT as pre-registered** — mistral selected Q5_K_M, one rung below the filter; graded as an estimator miss, not a model failure.
+5. **Law transfer at the new sizes — HIT again (+4% to +9%).** Mistral Q8_0 predicted 9.3 vs measured 9.3-9.8; Q6_K 11.6 vs 11.9-12.5; Q5_K_M 13.2 vs 13.6-14.3. Third family confirming the ±15% band is generous in the right direction (all misses inside +10%).
+6. **w/t_min lands:** llama-3.2-3b (from its study-#2 dump: worst-turn w/t to be re-extracted), qwen 0.49, gemma to extract, **mistral 0.37 measured** (killer turn 4.44 w/s at 12.1 t/s; the Q8_0 killer 3.34 at 9.7 → 0.344; Q5_K_M worst conv 5.25 at ~13.8 → 0.380 — consistent ~0.34-0.38 across rungs: w/t_min is a model property, rung-independent, as predicted).
+7. **Mode blindness (qwen):** pending the --force rerun (state reuse skipped the check).
+8. **No selection below Q5_K_M — HIT** (all four selections at Q8_0/Q6_K/Q5_K_M).
+
+**The w/t_min table after this run:** llama-3.1-8b 0.144 · **mistral-7b 0.37** · qwen3.5-4b 0.49 · (llama-3.2-3b, gemma-3-4b to extract from existing dumps). The family spread is real (0.14-0.49), confirming the per-family constant, not a pooled one. Mistral's 0.37 also revises the roster-criterion arithmetic: at w/t_min 0.37, the gate needs t/s ≥ 13.5 at Q6_K → size ≤ ~4.9 GiB — the 7B was admitted by a band that did not know its family value; with 0.37 it would not have been predicted to pass Q6_K (11.6 t/s × 0.37 = 4.3 w/s < 5.0). **The estimator now has three measured families and a growing lesson: the w/t_min band must be per-family measured before selection; the conservative 0.43-0.49 default band is retired for selection use** (kept for display).
+
+**The memory instrument's undercount (found in this run's output, fixed same session):** the run printed peak RSS 0.58 / 0.10 / 1.06 GiB for 7.17 / 5.54 / 4.78 GiB files — impossible values (below the model file itself), non-monotonic in size. Root cause: VmHWM of the server process undercounts when weights are mmap-loaded and shared with the page cache — the resident accounting never sees the whole file as process-private. Fix shipped: `system_memavailable_gib()` + `memory_cost_gib()` in llama_server.py — the system-wide MemAvailable delta across the launch is the honest "cost to the machine" number, immune to mmap/page-cache accounting quirks. Both instruments now report side by side; a peak below the file size prints "SUSPECT undercount". The addendum-36 expectation ("peak ~ file + 1.5-2.5 GiB") is graded: VmHWM was the wrong instrument for the mmap case — MemAvailable delta is the authoritative number going forward. **The addendum-35 memory-shortcut validation must use mem_cost_gib, not VmHWM.**
+
+**Verified by test:** a real 200 MiB allocation read correctly by both instruments (VmHWM 0.205 GiB, MemAvailable delta 0.200 GiB on a live process); the suspect-undercount warning fires only when peak < file size.
+
+**Next actions (in order):**
+
+1. Re-run qwen3.5-4b and gemma-3-4b selections with --force (grade predictions 2, 3, 7 honestly under v2.2; qwen's is also the mode-blindness check).
+2. Re-run mistral with --force once is enough? No — mistral's walk is complete and honest (fresh state, no reuse). Its Q5_K_M selection stands.
+3. The w/t calibration pass (addendum-37 discussion, author-approved "for later"): larger arena resample per family on its selected rung, publishing w/t_min as a quantile.
+4. ARC for the champion pair (qwen3.5-4b Q5_K_M vs phi-3-mini Q6_K) — already complete from the ranking run (both in state). The McNemar is computed: SEPARATED, p<0.0001. The champion pair's separation is final.
