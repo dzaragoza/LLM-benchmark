@@ -18,11 +18,25 @@ to the gate instead of hand-assembled:
     inter-token gap distribution, the Andes view the non-streaming
     gate cannot see.
 
+  --interactive: the live pass waits for the author to press Enter
+  before each user turn is sent - the conversation is felt as a real
+  chat (send, wait, read), not read as a transcript. The history is
+  still verbatim (gate-faithful); only the pacing is human. Each
+  turn's send-to-first-token wait is recorded: the FIRST send carries
+  the whole blob prefill (~2600 tokens, seconds); follow-up sends
+  prefill only the new tail (cache_prompt), so their TTFT should be
+  near-instant - the cold-start/warm-follow-up structure a real chat
+  with a deep context has, which the gate's per-turn dump never
+  separated. Telemetry is suppressed during the chat (perception
+  matters); a per-turn summary prints at the end.
+
 Usage (repo root, the author's machine):
     python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf
     python3 session_replicate.py --model <file> --conv 3   # any conversation
     python3 session_replicate.py --model <file> --stream-only  # skip the
         non-streaming replay, go straight to the live part
+    python3 session_replicate.py --model <file> --interactive  # press
+        Enter to send each turn yourself - the real-chat feel
 
 Writes <model>.session.json next to the model file (both passes' turn
 records plus the streamed arrival-time telemetry).
@@ -113,6 +127,10 @@ def main():
     ap.add_argument("--thinking", action="store_true")
     ap.add_argument("--stream-only", action="store_true",
                     help="skip the non-streaming replay pass")
+    ap.add_argument("--interactive", action="store_true",
+                    help="press Enter to send each user turn yourself "
+                         "(real-chat feel; implies the live pass only; "
+                         "per-turn TTFT recorded)")
     ap.add_argument("--reader-wps", type=float,
                     default=READER_WPS_DEFAULT)
     ap.add_argument("--keep-server", action="store_true",
@@ -150,7 +168,10 @@ def main():
 
         # pass 1: gate-faithful non-streaming replay (matches the dump)
         records = []
-        if not args.stream_only:
+        if args.interactive:
+            print("  interactive mode: press Enter to send each turn "
+                  "yourself.")
+        if not args.stream_only and not args.interactive:
             print(f"\n--- pass 1: gate replay (non-streaming) ---")
             print(f"    blob: {blob_tokens} tokens (budget {budget})")
             history = [{"role": "user", "content": blob},
@@ -168,22 +189,44 @@ def main():
 
         # pass 2: the live streaming session
         print(f"\n--- pass 2: LIVE session (streaming) ---")
-        print("    reading pace calibration: the answer streams at the "
-              "model's true pace; read it as it arrives.\n")
+        if args.interactive:
+            print("    the conversation is yours: each turn is shown, you "
+                  "press Enter to send it,")
+            print("    then read the answer as it streams. The first "
+                  "send carries the context prefill;")
+            print("    the follow-ups should start near-instantly.\n")
+        else:
+            print("    reading pace calibration: the answer streams at the "
+                  "model's true pace; read it as it arrives.\n")
         history = [{"role": "user", "content": blob},
                    {"role": "assistant", "content": "Understood."}]
         for i, question in enumerate(user_turns, 1):
             history.append({"role": "user", "content": question})
-            print(f"  [you] {question}")
-            print("  [model] ", end="", flush=True)
+            if args.interactive:
+                print(f"[you] {question}")
+                input("(press Enter to send) ")
+                print("[model] ", end="", flush=True)
+            else:
+                print(f"  [you] {question}")
+                print("  [model] ", end="", flush=True)
             answer, tel = stream_turn(args.port, history, cap_tokens,
                                       args.thinking, args.no_thinking)
             history.append({"role": "assistant", "content": answer})
             tel.update({"turn": i})
-            records.append({"turn": i, "pass": "stream", **tel})
-            print(f"    (ttft {tel['ttft_s']}s, {tel['streamed_wps']} w/s "
-                  f"streamed, mean gap {tel['mean_gap_ms']} ms, "
-                  f"max gap {tel['max_gap_ms']} ms)")
+            records.append({"turn": i, "pass": "stream",
+                            "interactive": args.interactive, **tel})
+            if not args.interactive:
+                print(f"    (ttft {tel['ttft_s']}s, {tel['streamed_wps']} w/s "
+                      f"streamed, mean gap {tel['mean_gap_ms']} ms, "
+                      f"max gap {tel['max_gap_ms']} ms)")
+                print()
+        if args.interactive:
+            print("\n--- session summary (send-to-first-token per turn) "
+                  "---")
+            for r in (t for t in records if t.get("pass") == "stream"):
+                print(f"    turn {r['turn']}: TTFT {r['ttft_s']}s, "
+                      f"{r['streamed_wps']} w/s streamed, "
+                      f"mean gap {r['mean_gap_ms']} ms")
             print()
 
         dump = os.path.join(os.path.dirname(args.model),
@@ -195,15 +238,17 @@ def main():
         print(f"session telemetry written to {dump}")
 
         if not args.keep_server:
-            print("\nPre-registered feel-prediction bands (addendum 26):")
-            print("  1. Q8_0 at ~15 t/s feels smooth WHILE STREAMING "
-                  "(no waiting mid-answer);")
-            print("  2. the wait that IS felt is the prefill "
-                  "(TTFT ~8-10 s at 4k depth) before each answer;")
-            print("  3. streamed w/s at reading pace ~ 10-13 w/s "
-                  "(min 8) stays above your 300-wpm line;")
-            print("  4. the verdict (PASS at 5.0 w/s) matches the felt "
-                  "experience for a fast reader.")
+            print("\nPre-registered feel predictions (notebook addenda "
+                  "26 and 28):")
+            print("  1. streaming at ~15 t/s feels smooth; no mid-answer "
+                  "waiting for a 300-wpm reader;")
+            print("  2. the wait that IS felt is the FIRST send "
+                  "(context prefill, ~seconds); follow-up sends are "
+                  "near-instant (cache_prompt);")
+            print("  3. streamed w/s stays above the 5.0 w/s reader line "
+                  "on every turn;")
+            print("  4. the verdict (PASS at the 5.0 w/s line) matches the "
+                  "felt experience.")
     finally:
         if args.keep_server:
             print(f"server left running on port {args.port}")

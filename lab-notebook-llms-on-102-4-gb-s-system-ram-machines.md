@@ -1964,3 +1964,23 @@ Expected: blob sizes ~224 smaller (conv 1: 2799 → ~2575), noise on ALL five co
 **The feel datum that tightens the comfort bracket.** The author's revealed preference now reads: 6 t/s atrocious (below reading pace, Andes worst case), 12 t/s still bad, 15 t/s streamed *seamless* - "couldn't catch up". The comfort line sits in (12, 15] t/s at STABLE pacing - and notably k~2 (15 t/s ~ 10 w/s ~ 2x the author's 5 w/s reading) sufficed in feel here, with no need for the k=3 margin. Consistent with Andes: the earlier 12 t/s frustration implicated deviation (stalls), not the mean - stable pacing above reading speed is what "smooth" means. The k=3 floor-20 default keeps its role as margin against variance (worst turns, off-machine noise), but the felt calibration says the guarantee line (k=1) has real margin in feel: even the worst turn of the worst conversation (~8.2 w/s) outran a fast reader by ~1.6x.
 
 **Standing: qwen3.5-4b Q8_0 is now closed on every axis** - instrument (addendum 24), physics (KV tax, depth cross-validation), and feel (this addendum). The remaining open measurement is the full-roster rerun (addendum 23's rank #1).
+
+### Session 27, addendum 28 — the interactive session (the author's realism catch): send-wait-read rhythm, per-turn TTFT
+
+**The author's catch:** the first live session read "like the transcript of an interview" - the turns were machine-paced, so the send-wait-read rhythm of a real chat was never felt. Perception matters; the calibration must be had in the instrument's own mode of use. **Ruling: the live pass gains --interactive** - the author presses Enter to send each user turn herself; the history stays verbatim (gate-faithful), only the pacing is human. Telemetry is suppressed during the chat (a real chat does not print timers); a per-turn summary prints at the end.
+
+**What the interactive mode newly measures: per-turn send-to-first-token (TTFT).** The gate's dump never separated it: in the gate, turn 1's prompt carries the whole ~2600-token blob prefill, while follow-up prompts hit the prompt cache (cache_prompt, default on) and prefill only the new tail. A real chat with deep context has exactly this cold-start/warm-follow-up structure, and the author will now FEEL it: the first send after loading a deep context waits seconds; every subsequent send should start near-instantly.
+
+**Pre-registered predictions for the interactive session (recorded before it runs):**
+
+1. *First-send TTFT in 6-10 s* (the blob prefill: ~2600 tokens at the measured ~434 tok/s prefill rate, addendum 23, plus template and generation head).
+2. *Follow-up TTFT < 1.5 s* (only the new tail prefills: ~10-300 tokens per turn - the cache_prompt hit the depth-probe samples already demonstrated, prompt_ms ~100 ms there; generous margin for chat-template rendering).
+3. *The streaming feel is unchanged from addendum 27* (smooth, never catching up) - the interactive pacing adds the send-wait, it does not change the read.
+4. *The author's dominant felt wait is the first send* - and it is a one-time cost per context load, not a per-turn cost; this is the honest shape of the TTFT operating note for the report (the un-gated axis): "deep contexts cost one prefill wait at load; follow-ups are instant".
+
+Mock-verified before delivery: interactive E2E with an honest prefix-cache simulation - first send TTFT 0.27 s (scaled), follow-ups 0.07 s, cold-start/warm-follow-up structure confirmed, telemetry suppressed during the chat, per-turn summary and .session.json dump correct.
+
+**The session commands (author's machine, pull-first):**
+
+    git pull --ff-only
+    python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking --interactive
