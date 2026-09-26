@@ -30,8 +30,15 @@ That single command runs the **entire study** for the four families:
   2. **Create** missing quants (safetensors -> f16 -> quantize, pinned
      toolchain).
   3. **Bench** it with `speed_gate.py` (5 real multi-turn conversations,
-     worst-turn metric).
-  4. **Analyze**: PASS if worst turn >= floor - 2*sigma. First PASS wins.
+     each running ON TOP of a depth prefill — a corpus-text blob sized
+     per conversation via `/tokenize` so the deepest turn lands just
+     under the 4096 reference depth; worst-turn metric at depth).
+  4. **Analyze**: PASS if worst turn >= reader line − 2*sigma
+     (protocol v2.1: the k=1 reader guarantee, anchored in WORDS per
+     second — 5.0 w/s = 300 wpm, Brysbaert 2019 — so even a fast
+     reader is never made to wait; t/s is printed as the token-side
+     view via the measured words/token ratio; floor 20 is reported as
+     headroom, not gated). First PASS wins.
 - **Stage B — accuracy**: full strict **ARC-Challenge** (1,172 questions,
   logprob letter scoring, temperature 0) on each selected model.
 - **Stage C — ranking**: exact **McNemar** pairwise tests; the final
@@ -297,8 +304,20 @@ rungs are self-quantized from google/gemma-3-1b-it safetensors (the
 
 - **Speed metric:** worst turn across 5 fixed Arena conversations
   (corpus committed at `live-corpus.json`, seed 1024, reply-length
-  p75 answer cap). Verdict: worst >= floor - 2*sigma (sigma = standard
-  error of per-conversation worsts).
+  p75 answer cap), each conversation depth-prefilled to the 4096
+  reference depth via a `/tokenize`-sized corpus-text blob (the KV
+  cost is content-independent, so the blob guarantees the measurement
+  happens at depth). Verdict: worst >= reader line − 2*sigma in WORDS
+  per second (reader line 5.0 w/s = 300 wpm, k=1 guarantee,
+  Brysbaert 2019; sigma = standard error of per-conversation
+  worsts; each turn's w/s is measured from the generated text itself —
+  whitespace words / generation span — and the words/token ratio is
+  reported per dump, replacing the 0.75 rule of thumb; the t/s view
+  is printed alongside). Floor 20 (k=3) is reported as headroom, not
+  gated. After
+  each conversation the gate also takes same-depth noise samples
+  (identical follow-ups on the warm slot) — the machine's noise at
+  depth, cleanly separated from the KV trend.
 - **Accuracy metric:** strict ARC-Challenge letter-answer protocol —
   raw completion prompt, max_tokens=1, temperature 0, logprob scoring;
   no chain-of-thought. Full test split, 1,172 questions, cached in
