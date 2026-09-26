@@ -210,7 +210,9 @@ Verify: `llama.cpp\convert_hf_to_gguf.py` (Windows) /
 
 ### Step 4 — Python environment
 
-Python 3.10+ required (the scripts are pure stdlib + the pinned deps).
+Python 3.13+ required (the author's target machine runs 3.13; the
+scripts are pure stdlib + the pinned deps, and may use any language
+feature through 3.13).
 
 ```powershell
 py -m venv .venv
