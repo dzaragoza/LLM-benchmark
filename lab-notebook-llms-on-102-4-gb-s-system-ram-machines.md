@@ -1762,3 +1762,30 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thin
 ```
 
 Expected differences vs the crashed run: five conversations with words/s lines throughout, noise samples riding the history but capped to fit (some conversations may report "noise at depth: skipped" when the history fills the context — the room guard's honest note), the full dump written, and the verdict line reading "(measured)" words/token. Prediction on record before the rerun: pooled words/token in 0.65-0.75; worst measured w/s in 8.5-11.5; verdict PASS; headroom below floor; noise-at-depth (riding history) w/m in 0.95-1.00, consistent with the depth probe's 0.997.
+
+---
+
+### Session 27, addendum 17 — the mode-true qwen Q8_0 run completes: w/s verdict MEASURED; the noise skip bug; grades
+
+**The run (T14s, --no-thinking, 2026-09-26, completed):** 5 conversations, 22 turns at depth, all with measured words/s. Verdict: **worst 7.48 w/s → PASS (confident)** at the 5.0 w/s reader line; pooled **words/token 0.680 (measured)** — the unanchored 0.75 era is over for this model; token-side worst 15.3 t/s; headroom below floor 20, honestly reported.
+
+**Grading the addendum-16 pre-registrations (recorded before this rerun):**
+
+1. **Pooled words/token 0.65-0.75 — HIT** (measured 0.680). The addendum-3 protocol (per-model words/token via the runs themselves) is now executed per conversation: Qwen3.5-4B at Q8_0 delivers ~0.68 words per generated token on corpus-shaped answers. Note the honest consequence: at 0.68, the 6.5 t/s token-line equals only 4.42 w/s — BELOW the 5.0 w/s reader line. The old t/s-anchored gate would have passed a model at 6.5 t/s that fails the READER at 0.68 w/t. The author's v2.1 catch was not academic: it changes verdicts.
+2. **Worst measured w/s 8.5-11.5 — MISS (7.48, just under the band).** The miss is informative: conv 4's first turn (7.5 w/s) — a short answer turn (few words) — and conv 3's 9.1s pull the worst down; the w/s worst is answer-shape-dependent in a way t/s is not (a short answer with the same t/s carries a different word rate only if content density varies; here the short first turn's low count meets the fixed generation span). The per-turn w/s spread (7.5-13.0 within a single model, single rung) is the honest w/s noise floor of the instrument. The band was built from t/s band x w/t band; the w/s worst is the min over turns of a content-dependent ratio, and the min operator punishes short answers. Refined prediction form for future runs: worst-turn w/s in [0.9 x w/t_pooled x tps_worst_min, 1.3 x w/t_pooled x tps_worst_min].
+3. **Verdict PASS — HIT.** 7.48 w/s clears 5.0 by 1.50x, and the guarantee holds on the worst measured turn, not the mean (mean 10.68 w/s).
+4. **Noise-at-depth w/m 0.95-1.00 — UNGRADED (instrument bug, see below); the depth probe's 0.997 (addendum 16) remains the at-depth noise anchor.**
+5. **Live-session felt experience — pending the author's live session.**
+
+**The noise skip bug (the third instrument bug this arc, all caught by the run's own output):** every conversation printed "noise at depth: skipped (history fills the context: ~6632 of 4096 tokens, room -2536)" — impossible numbers, and the fingerprint of the double-count: the room guard estimated depth as blob_tokens + history_chars/4, but the blob IS history[0] — its exact token count was added once as blob_tokens and again (as chars/4) inside the history sum. Every estimate inflated ~1.8x, room went negative, and the guard skipped all ten noise samples. The guard itself worked as designed (no crash, honest note); the estimate inside it was wrong. Fixed: the estimate now mirrors run_conversation's depth math (blob tokens exact + non-blob history chars at 4 chars/token). Verified against the exact conv-5 shape: corrected estimate 3943 of 4096, room 153 → noise proceeds, capped at 128 tokens (fits). The at-depth noise-at-depth measurement for qwen Q8_0 is therefore still pending one more rerun; the honest current value is the depth probe's 0.997 at exact 4000 depth.
+
+**The dump (.live-dump.nothink.json) is the first complete mode-true v2.1 dump** — the reference artifact for the rerun-after-rerun grading: per-turn t/s, measured w/s, measured words/token, depth estimates, and (post-fix) at-depth noise records. The Session-27 prediction that all five families select their top rung at the reader line is now graded for qwen3.5: **Q8_0 PASSES the v2.1 gate** (the Session-20 floor-20 FAIL is superseded). Session-27 prediction 1 (top-rung selection) on track; prediction 2's KV-tax band is dead (addendum 16, tax ≈ 0); prediction 3's noise w/m 0.90-1.00 partially anchored (0.997 via depth probe; the gate's own riding-history value pending).
+
+**Next runs:**
+
+```
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking
+python3 depth_probe.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --depth 2048 --depth 4000
+```
+
+(The first re-collects the noise samples with the fixed guard; the second is the two-depth linearity check — the addendum-11 prediction 4 grade, now with the KV tax known ≈ 0, so the check tests the noise story, not the tax.)
