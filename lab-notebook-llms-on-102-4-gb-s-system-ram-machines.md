@@ -2333,3 +2333,21 @@ Note: --force re-benches every family including llama3.2 and mistral whose v2.2 
     python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,Qwen3.5-4B,gemma-3-4b-it-qat-q4_0-gguf,Mistral-7B-Instruct-v0.3" "Qwen/Qwen3.5-4B" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
 
 Expected per addendum-37 predictions: qwen3.5-4b re-walks Q8_0 (4.29 GiB → 15.3 t/s → 7.5 w/s predicted, PASS; w/t_min 0.49 family value) and gemma-3-4b walks Q8_0 from its Q6_K floor-20-era selection (3.96 GiB → 15.3 t/s → 6.6-7.5 w/s predicted). Both walks re-bench every rung above their stored selections too (Q8_0 for both) — the dumps are re-measured, so the mem_cost_gib instrument (addendum 40) reports on every rung for the first time.
+
+### Session 29, addendum 43 — stale-state guard: a stored rung file missing on disk crashed phase 3 (author's run caught it)
+
+**The author's --force re-run crashed at qwen3.5-4b Q8_0 phase 3** with a bare `FileNotFoundError: ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf.server.log`. The walk started correctly (the addendum-42 fix works: verdicts cleared, banner printed, Q8_0 visited first) — but the family folder was missing from disk entirely. The state file still marked phases 1-2 done with a stored `file` path, so the orchestrator skipped download/quantize and handed speed_gate a path that was not there; llama_server tried to open the server log inside the nonexistent folder and died with a traceback instead of guidance.
+
+**Root cause:** the resume machinery trusts `benchmark-state.json` exclusively — nothing validates that a stored rung file still exists on disk. Files CAN vanish (folder moved/deleted by hand, disk cleanup); the state is the only memory of phases 1-2, and it was lying about the disk.
+
+**Fix (two layers, commit this addendum):**
+
+1. `full_benchmark.py` process_family: a stale-state guard now runs before the ladder walk — every stored rung file is checked against the disk; a missing one clears phases 1-2 AND the stored plan entirely (not merely the file pointer: an earlier draft of the guard kept phases 1-2 "done" and popped only `file`, which made the walk skip the re-acquire stages and bench `None` — caught by the E2E test before it reached the author), printing `stored rung file missing on disk (<path>) - phases 1-2 invalidated; will re-acquire`. The walk then re-downloads/re-quantizes normally (both stages idempotent).
+2. `speed_gate.py` bench: a standalone guard — `model file not found: <path>` with guidance (rerun full_benchmark.py which re-acquires automatically / verify the path / run from the repo root) instead of a raw traceback, since speed_gate.py is a standalone CLI too.
+
+**Verified by test:**
+- E2E (synthetic state, Q8_0 file present + Q6_K stored file missing, force): the guard prints, phases 1-2 clear, the walk re-acquires Q6_K (download + quantize mocked), benches, selects — `phases_done == [1,2,3,4]`, verdict stored, selection updated.
+- Regression (file present, force): NO spurious re-download — acquire is not called, phases 1-2 stay marked, bench/analyze proceed normally.
+- Standalone guard: `speed_gate.bench` on a missing file exits with guidance, not a traceback.
+
+**Consequence for the pending re-run:** the qwen3.5-4b folder being absent means the safetensors re-download is back on the table for that family (the pipeline will do it automatically and silently now — quiet tooling, addendum 38). Expected walk unchanged from addendum 42: Q8_0 first, prediction 7.5 w/s PASS (w/t_min 0.49); gemma next from its floor-20-era Q6_K selection, prediction Q8_0 PASS at 6.6-7.5 w/s.

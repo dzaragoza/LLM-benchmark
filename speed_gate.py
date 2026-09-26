@@ -688,6 +688,13 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
     bench aborts as soon as a turn measures below the reader line."""
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
+    if not dry_run and not os.path.isfile(path):
+        fail(3, label, f"model file not found: {path}",
+             ["the file was moved or deleted since the state marked it "
+              "ready (rerun full_benchmark.py - it detects the missing "
+              "file and re-acquires it automatically)",
+              "wrong path: verify it exists (ls)",
+              "run from the repo root so ./models/... resolves"])
 
     def dump_valid():
         if not os.path.isfile(dump):
