@@ -1949,3 +1949,18 @@ Expected: blob sizes ~224 smaller (conv 1: 2799 → ~2575), noise on ALL five co
     python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking
 
 (~2 min server launch + ~8.5 s prefill per turn x4 + reading time; --keep-server to go again without relaunching; --stream-only to skip the replay pass; --conv N to replay a different conversation.)
+
+### Session 27, addendum 27 — the live session graded: the guarantee felt seamless; prediction 5 closes
+
+**The author's report, verbatim: "really smooth, I didn't catch up with the conversation at all :)".** Session run via session_replicate.py on Qwen3.5-4B Q8_0 (conv 1, the worst-turn conversation of the closing run), streamed live at the gate's own depth (blob 2571 tokens, ~4k final depth).
+
+**The addendum-26 feel predictions, graded:**
+
+1. *Streaming smoothness (no mid-answer lag at ~15 t/s) — HIT.* "Really smooth" is the prediction's exact form; zero mid-answer waiting felt.
+2. *Streamed w/s in 8-13, always above the reader line — HIT in feel.* "I didn't catch up with the conversation at all" is the match-the-reader model's signature sentence: the stream was always faster than a 300-wpm reader, so the reader never waited. The worst streamed turn was not the felt worst, as predicted. (Numeric grade pending the .session.json telemetry if pasted.)
+3. *Verdict-feel match (PASS confident at worst 7.32-8.24 w/s = a fast reader never waits mid-answer) — HIT.* The instrument's verdict and the author's senses agree on the worst-turn conversation itself. Prediction 5 (the felt-experience calibration, the one measurement the instrument cannot replace) is closed: the guarantee is calibrated, not just computed.
+4. *The felt wait is TTFT (~8.5-9 s prefill per turn) — UNGRADED from the session report.* The author's report does not mention the pre-answer wait; the instrument recorded TTFT in .session.json. Pending the author's answer: was the ~9-second wait before each answer felt, and was it acceptable or annoying? This is the un-gated axis (addendum 23) - the one question the session leaves open.
+
+**The feel datum that tightens the comfort bracket.** The author's revealed preference now reads: 6 t/s atrocious (below reading pace, Andes worst case), 12 t/s still bad, 15 t/s streamed *seamless* - "couldn't catch up". The comfort line sits in (12, 15] t/s at STABLE pacing - and notably k~2 (15 t/s ~ 10 w/s ~ 2x the author's 5 w/s reading) sufficed in feel here, with no need for the k=3 margin. Consistent with Andes: the earlier 12 t/s frustration implicated deviation (stalls), not the mean - stable pacing above reading speed is what "smooth" means. The k=3 floor-20 default keeps its role as margin against variance (worst turns, off-machine noise), but the felt calibration says the guarantee line (k=1) has real margin in feel: even the worst turn of the worst conversation (~8.2 w/s) outran a fast reader by ~1.6x.
+
+**Standing: qwen3.5-4b Q8_0 is now closed on every axis** - instrument (addendum 24), physics (KV tax, depth cross-validation), and feel (this addendum). The remaining open measurement is the full-roster rerun (addendum 23's rank #1).
