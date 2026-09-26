@@ -110,3 +110,45 @@ def post_json(port, endpoint, payload, timeout=1800):
         url, data=data, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def tokenize(port, content, timeout=300):
+    """POST /tokenize: the server's own token count for a text.
+    The depth-prefill gate budgets its blob with this (exact per
+    model - tokenizers differ), and the words-per-token protocol
+    rides it too."""
+    data = post_json(port, "/tokenize", {"content": content}, timeout)
+    toks = data.get("tokens")
+    if toks is None:
+        raise ValueError("no tokens field in /tokenize response")
+    return toks
+
+
+def trim_to_tokens(port, text, target, tolerance=8, max_iter=24):
+    """Trim text down to a token budget: returns (text, n_tokens)
+    with n_tokens <= target, within tolerance when possible.
+    Converges by bisection on character count (tokenizers are
+    near-linear in chars). Never returns over budget - the depth
+    arithmetic depends on that."""
+    n = len(tokenize(port, text))
+    if n <= target:
+        return text, n
+    lo, hi = 0, len(text)
+    best = None
+    for _ in range(max_iter):
+        mid = (lo + hi) // 2
+        cand = text[:mid]
+        n = len(tokenize(port, cand))
+        if n > target:
+            hi = mid
+        else:
+            if target - n <= tolerance:
+                return cand, n
+            if best is None or n > best[1]:
+                best = (cand, n)
+            lo = mid + 1
+        if hi - lo <= 1:
+            break
+    if best is None:
+        raise ValueError(f"cannot trim text under {target} tokens")
+    return best
