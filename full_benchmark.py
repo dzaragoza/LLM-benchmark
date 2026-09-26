@@ -222,6 +222,19 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
                      else " (0.75 default, unanchored)"))
             print(f"      headroom vs floor {floor:g} t/s: "
                   f"{res['headroom']}")
+            mem_sidecar = dump + ".mem.json"
+            if os.path.isfile(mem_sidecar):
+                try:
+                    with open(mem_sidecar) as f:
+                        mem = json.load(f)
+                    peaks = [m["peak_rss_gib"] for m in mem
+                             if m.get("peak_rss_gib")]
+                    if peaks:
+                        print(f"      memory: peak RSS {max(peaks):.2f} "
+                              "GiB (weights + KV + buffers + runtime; "
+                              "VmHWM, addendum 36)")
+                except Exception:
+                    pass
         if str(run["verdict"]).startswith("PASS"):
             fst["selected"] = rung
             run["rung"] = rung

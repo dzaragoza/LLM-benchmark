@@ -288,8 +288,9 @@ def main():
         # under-reported depth). A restart per depth gives every depth
         # a clean slot and an honest prompt_n (Session 27, addendum 18)
         print(f"\n--- depth {d} ---")
+        log_path = args.model + ".server.log"
         proc, healthy = llama_server.start_server(args.model, args.port,
-                                                  extra)
+                                                  extra, log_path=log_path)
         try:
             if not healthy:
                 sys.exit("server did not become healthy")
@@ -300,7 +301,12 @@ def main():
                                args.samples)
             results.append(summarize(recs, d, args.reader_tp, args.floor))
         finally:
+            peak = llama_server.peak_rss_gib(proc)
             llama_server.stop_server(proc, args.port)
+            if peak is not None:
+                print(f"  memory: peak RSS {peak:.2f} GiB at depth {d} "
+                      "(VmHWM; weights + KV(D) + buffers + runtime, "
+                      "addendum 36)")
 
     print("\n" + "=" * 72)
     print("DEPTH SUMMARY  (decode t/s at depth; the law's third term)")

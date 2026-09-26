@@ -516,6 +516,9 @@ def bench_model(model, corpus_file, port, ctx, repeats,
     all_turns = []
     noise_records = []
     repeat_worsts = []
+    mem_reports = []
+    log_path = os.path.join(os.path.dirname(model) or ".",
+                            os.path.basename(model) + ".server.log")
     for rep in range(1, repeats + 1):
         print(f"  [rep {rep}/{repeats}] starting server...", flush=True)
         extra = ["-ngl", "99", "-c", str(ctx)]
@@ -525,7 +528,8 @@ def bench_model(model, corpus_file, port, ctx, repeats,
             extra += ["--chat-template-kwargs",
                       '{"enable_thinking": false}']
         proc, healthy = llama_server.start_server(model, port, extra,
-                                                  server_bin)
+                                                  server_bin,
+                                                  log_path=log_path)
         try:
             if not healthy:
                 print("  ERROR: server did not become healthy; skipping")
@@ -599,7 +603,16 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           "(the verdict is unrecoverable, addendum 34)")
                     break
         finally:
+            peak = llama_server.peak_rss_gib(proc)
             llama_server.stop_server(proc, port)
+            if peak is not None:
+                mem_reports.append({
+                    "rep": rep,
+                    "peak_rss_gib": peak,
+                    **llama_server.parse_memory_log(log_path)})
+                print(f"    memory: peak RSS {peak:.2f} GiB "
+                      "(the server's everything: weights + KV + buffers "
+                      "+ runtime; VmHWM, addendum 36)", flush=True)
         if early_fail:
             break
         valid = [w for w in conv_worsts if w]
@@ -627,7 +640,14 @@ def bench_model(model, corpus_file, port, ctx, repeats,
             nm = sum(ntps) / len(ntps)
             print(f"  {label}: NOISE AT DEPTH: worst {nw:.2f}  mean {nm:.2f}"
                   f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})")
-    return all_turns, summary
+    if mem_reports:
+        peaks = [m["peak_rss_gib"] for m in mem_reports]
+        print(f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
+              f"across {len(peaks)} rep(s) - file "
+              f"{os.path.getsize(model) / (1024 ** 3):.2f} GiB, i.e. "
+              f"{max(peaks) - os.path.getsize(model) / (1024 ** 3):.2f} "
+              "GiB beyond the file (KV + buffers + runtime)")
+    return all_turns, summary, mem_reports
 
 
 # =========================================================== dump + verdict
@@ -669,18 +689,33 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
         return any(t.get("model") == label and t.get("server_tps")
                    for t in turns)
 
+    mem_sidecar = dump + ".mem.json"
     if not force and dump_valid() and \
             os.path.getmtime(dump) > os.path.getmtime(path):
         print("  [3] reusing existing dump (newer than model file; "
               "pass --force to re-measure)")
+        if os.path.isfile(mem_sidecar):
+            try:
+                with open(mem_sidecar) as f:
+                    mem = json.load(f)
+                peaks = [m["peak_rss_gib"] for m in mem
+                         if m.get("peak_rss_gib")]
+                if peaks:
+                    print(f"    memory: peak RSS {max(peaks):.2f} GiB "
+                          "(from this dump's run; VmHWM, addendum 36)")
+            except Exception:
+                pass
         return dump
     if dry_run:
         return dump
-    turns, _ = bench_model(path, corpus, port, ctx, repeats,
-                           thinking, no_thinking, label=label,
-                           reader_wps=reader_wps)
+    turns, _, mem_reports = bench_model(path, corpus, port, ctx, repeats,
+                                       thinking, no_thinking, label=label,
+                                       reader_wps=reader_wps)
     with open(dump, "w") as f:
         json.dump(turns, f, indent=1)
+    if mem_reports:
+        with open(mem_sidecar, "w") as f:
+            json.dump(mem_reports, f, indent=1)
     if not dump_valid():
         fail(3, label, "live bench produced no usable dump "
              "(see the output above)", GUIDE[3])
