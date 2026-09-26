@@ -2281,3 +2281,34 @@ Separations: #1 vs #2 SEPARATED (p<0.0001, -5.38 pp), #2 vs #3 SEPARATED (p=0.00
 2. Re-run mistral with --force once is enough? No — mistral's walk is complete and honest (fresh state, no reuse). Its Q5_K_M selection stands.
 3. The w/t calibration pass (addendum-37 discussion, author-approved "for later"): larger arena resample per family on its selected rung, publishing w/t_min as a quantile.
 4. ARC for the champion pair (qwen3.5-4b Q5_K_M vs phi-3-mini Q6_K) — already complete from the ranking run (both in state). The McNemar is computed: SEPARATED, p<0.0001. The champion pair's separation is final.
+
+### Session 29, addendum 41 — the ranking's roster leak: --roster shipped; study #3's ranking corrected
+
+**The author's catch:** "the ranking is not consistent since it talks about qwen2.5, phi, which are not in the selection." Correct — the addendum-40 ranking mixed studies: Phi-3-mini, Phi-4-mini and Qwen2.5-3B are study-#2 roster members living in the same shared state file, and phase 6 ranked EVERY family with a selection in state, not just the v2.2 roster. The mechanism was already on record (Session 25 addendum 2's roster note: "if phase 6 auto-ranks everything in state, run the final ranking with --arc-only --arc-models restricted"); the --force rerun of the full pipeline recomputed the ranking without that guard. Lesson repeated: the state file accumulates across studies; the ranking must be roster-scoped by construction, not by operator discipline.
+
+**The fix shipped: `--roster` on full_benchmark.py** — restricts phases 5-6 and the final ranking to the named families (comma-separated, as named in the family specs). Without the flag, behavior is unchanged (backward compatible); with it, non-roster families are excluded from the ranking entirely and any roster family without a selection is reported ("excluded from the ranking"). The state file itself is untouched — superseded data points stay for the results file, per rule 7.
+
+**Study #3's corrected ranking (v2.2 roster only, n=1172, exact McNemar, from the run's own CSVs):**
+
+1. **Qwen3.5-4B Q5_K_M: 1057/1172 = 90.2% — the study #3 champion**
+2. Mistral-7B-Instruct-v0.3 Q5_K_M: 886/1172 = 75.6%
+3. gemma-3-4b-it-qat-q4_0-gguf Q6_K: 859/1172 = 73.3%
+4. Llama-3.2-3B-Instruct Q8_0: 851/1172 = 72.6%
+
+Separations (roster-internal): #1 vs #2 SEPARATED (-14.59 pp, p<0.0001 — the champion's margin over its own roster is enormous); #2 vs #3 SEPARATED (p<0.0001); #3 vs #4 SEPARATED (p=0.0078, -0.68 pp — the closest pair in the roster, correctly ordered but by a hair). Note the correction's substance: the roster-internal ranking is MORE decisive than the mixed one (three clean separations; the mixed ranking's #4-#5 and #6-#7 "not separated" verdicts were cross-study artifacts).
+
+**Caveat on the numbers:** the addendum-40 mixed ranking's scores are unchanged (same CSVs, same per-model percentages); only the membership was wrong. The champion's identity (qwen3.5-4b, 90.2%) was never in doubt; the leak affected the comparisons, not the crown.
+
+**The corrected run command (author machine, pull-first; --force to re-verify qwen/gemma under v2.2 as flagged in addendum 40):**
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,Qwen3.5-4B,gemma-3-4b-it-qat-q4_0-gguf,Mistral-7B-Instruct-v0.3" "meta-llama/Llama-3.2-3B-Instruct" "Qwen/Qwen3.5-4B" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it" "mistralai/Mistral-7B-Instruct-v0.3"
+
+Note: --force re-benches every family including llama3.2 and mistral whose v2.2 walks are already complete and honest. If the author prefers to re-verify only qwen and gemma (the two flagged in addendum 40), the command is:
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,Qwen3.5-4B,gemma-3-4b-it-qat-q4_0-gguf,Mistral-7B-Instruct-v0.3" "Qwen/Qwen3.5-4B" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
+
+(phases 1-4 re-run only for the two named families; the ranking then covers the full roster from state — mistral's and llama's selections are reused, not re-benched; llama's Q8_0 walk happens to be already v2.2-honest since it ran fresh in the addendum-40 session).
+
+**Verified by test:** synthetic state with 7 families (3 study-#2 leftovers + the v2.2 four), real-schema CSVs — without the flag, 7 rank; with `--roster`, exactly the 4 v2.2 families rank and no Phi/Qwen2.5 label appears. The corrected ranking's separations recompute correctly from the run's own CSVs.
