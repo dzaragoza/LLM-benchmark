@@ -43,11 +43,15 @@ Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
     authoritative metric; an external wall-clock cross-check (generation
     span = wall time minus prompt processing) is computed per turn
   - THE RESULT IS THE WORST TURN across all depth-conditioned turns;
-    verdict: PASS if worst >= reader line - 2*sigma (the lenient
-    2-sigma ruling, now applied to the guarantee line); first PASS =
-    selected - which, at the reader line, walks the ladder to the
-    TOP rung that still guarantees the reader (the old floor-20 gate
-    was a headroom judgment and rejected rungs the guarantee admits).
+    verdict (addendum 34): PASS only if EVERY conversation's worst
+    turn is at or above the reader line - a single sub-line
+    conversation is unrecoverable (the worst is a min), so the
+    rung FAILS outright and the bench aborts in flight; the lenient
+    2-sigma rescue is retired (sigma stays a reported diagnostic);
+    first PASS = selected - which, at the reader line, walks the
+    ladder to the TOP rung that still guarantees the reader (the old
+    floor-20 gate was a headroom judgment and rejected rungs the
+    guarantee admits).
   - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
 
 Thinking-model category (author ruling 2026-09-24): the SAME worst-turn
@@ -277,7 +281,7 @@ def build_blob(port, pool, budget):
 
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
                      thinking=False, no_thinking=False, blob=None,
-                     blob_tokens=0):
+                     blob_tokens=0, reader_wps=None):
     """Protocol v2: the conversation runs ON TOP of the depth prefill.
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
@@ -285,7 +289,12 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     content-independent; only the depth matters.
     Returns (turn records, final history) - the history feeds the
     same-depth noise samples, which must ride it: the slot cache
-    reuses only the longest common token prefix."""
+    reuses only the longest common token prefix.
+    Early-fail (addendum 34): with reader_wps set, a turn measured
+    below the reader line aborts the conversation immediately - the
+    rung's worst is a min over turns and conversations, so nothing
+    after it can recover the verdict. The failing turn is flagged
+    `below_reader_line` in its record."""
     history = []
     results = []
     if blob:
@@ -359,6 +368,14 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "thinking_tokens_est": len(reasoning) // 4,
             "answer_empty": 1 if not answer.strip() else 0,
         })
+        if (reader_wps is not None and words_per_sec is not None
+                and words_per_sec < reader_wps):
+            results[-1]["below_reader_line"] = 1
+            print(f"      turn {i + 1} measured {words_per_sec:.2f} w/s < "
+                  f"reader line {reader_wps:g} w/s - the rung is "
+                  "unrecoverable (worst is a min); aborting the "
+                  "conversation early (addendum 34)", flush=True)
+            break
     return results, history
 
 
@@ -479,11 +496,16 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
 
 def bench_model(model, corpus_file, port, ctx, repeats,
                thinking=False, no_thinking=False, server_bin=None,
-               label=None):
+               label=None, reader_wps=None):
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
-    same-depth noise samples. Returns (all_turns, summary)."""
+    same-depth noise samples. Returns (all_turns, summary).
+    Early-fail (addendum 34): with reader_wps set, the first turn
+    measured below the reader line aborts its conversation and skips
+    the remaining conversations and reps - the verdict is a min and
+    cannot recover. Partial dumps are still written (the failing
+    turn is flagged); the verdict machinery grades them honestly."""
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
@@ -520,9 +542,11 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           "at the shallower reference depth as-is)")
                 res, conv_history = run_conversation(
                     port, conv["user_turns"], cap_tokens, ctx, thinking,
-                    no_thinking, blob, blob_tokens)
+                    no_thinking, blob, blob_tokens,
+                    reader_wps=reader_wps)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
+                early_fail = any(r.get("below_reader_line") for r in res)
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
                 wps = [r["server_wps"] for r in res if r["server_wps"]]
                 cworst = min(tps) if tps else None
@@ -533,9 +557,11 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                       + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
                          if cworst else ""))
                 if wps:
+                    line = reader_wps if reader_wps is not None \
+                        else READER_WPS_DEFAULT
                     print(f"      words/s: "
                           + ", ".join(f"{x:.1f}" for x in wps)
-                          + f"   (reader line {READER_WPS_DEFAULT:g} w/s)")
+                          + f"   (reader line {line:g} w/s)")
                 if thinking:
                     tk = [r["thinking_tokens_est"] for r in res]
                     empt = sum(r["answer_empty"] for r in res)
@@ -566,8 +592,16 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 if ntps:
                     print(f"      noise at depth: "
                           + ", ".join(f"{x:.1f}" for x in ntps))
+                if early_fail:
+                    print(f"    conv {ci}: early-fail - skipping the "
+                          f"remaining {len(conversations) - ci} "
+                          "conversation(s) and any further reps "
+                          "(the verdict is unrecoverable, addendum 34)")
+                    break
         finally:
             llama_server.stop_server(proc, port)
+        if early_fail:
+            break
         valid = [w for w in conv_worsts if w]
         if valid:
             rep_worst = min(valid)
@@ -613,12 +647,14 @@ def live_dump_name(path, thinking=False, no_thinking=False):
 
 def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
           port=PORT_DEFAULT, ctx=CTX_DEFAULT, repeats=REPEATS_DEFAULT,
-          dump_override=None, force=False):
+          dump_override=None, force=False, reader_wps=None):
     """Phase 3: live-bench the model file; returns the dump path.
     force: re-measure even if a valid newer dump exists (the resume
     machinery is the pipeline default; --force is the re-measurement
     path - e.g. after an instrument fix, when the existing dump
-    predates the fix and its noise records are missing/wrong)."""
+    predates the fix and its noise records are missing/wrong).
+    reader_wps (addendum 34): enables the in-flight early-fail - the
+    bench aborts as soon as a turn measures below the reader line."""
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
 
@@ -641,7 +677,8 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
     if dry_run:
         return dump
     turns, _ = bench_model(path, corpus, port, ctx, repeats,
-                           thinking, no_thinking, label=label)
+                           thinking, no_thinking, label=label,
+                           reader_wps=reader_wps)
     with open(dump, "w") as f:
         json.dump(turns, f, indent=1)
     if not dump_valid():
@@ -708,10 +745,16 @@ def analyze(path, floor, thinking=False, no_thinking=False,
     else:
         sigma = 0.0
     threshold = reader_wps - 2 * sigma
-    if worst_wps >= reader_wps:
+    # Protocol v2.1 early-fail ruling (addendum 34): the verdict is a
+    # MIN over conversation worsts, so a single conversation below
+    # the reader line is unrecoverable - it is impossible for later
+    # turns or conversations to repair the worst. Any sub-line
+    # conversation therefore FAILS the rung outright; the lenient
+    # 2-sigma rescue is retired (sigma stays a reported diagnostic:
+    # the spread of conversation worsts), and the bench aborts
+    # in-flight the moment such a turn is measured.
+    if all(w >= reader_wps for w in conv_worsts):
         verdict = "PASS (confident)"
-    elif worst_wps >= threshold:
-        verdict = "PASS (within 2-sigma)"
     else:
         verdict = "FAIL"
     # token-side view: continuity + the law's currency + headroom
@@ -797,10 +840,11 @@ def main():
 
     dump = bench(args.model, args.corpus, args.dry_run, args.thinking,
                  args.no_thinking, args.port, args.ctx, args.repeats,
-                 args.dump, args.force)
+                 args.dump, args.force, args.reader_wps)
     if args.dry_run:
-        print(f"[4] would analyze (reader line {args.reader_wps:g} w/s "
-              f"- 2*sigma; floor {args.floor:g} t/s as headroom)")
+        print(f"[4] would analyze (every conversation's worst turn at "
+              f"or above the reader line {args.reader_wps:g} w/s; "
+              f"floor {args.floor:g} t/s as headroom)")
         return
     res = analyze(args.model, args.floor, args.thinking, args.no_thinking,
                   args.dump, args.reader_wps)

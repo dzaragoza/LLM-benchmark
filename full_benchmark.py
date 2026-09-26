@@ -24,8 +24,11 @@ file 2026-09-24; same protocol, same state, byte-identical behavior):
     1. DOWNLOAD - premade rung file or the data to create it later.
     2. CREATE   - convert safetensors -> f16, quantize f16 -> rung.
     3. BENCH    - speed_gate.py, 1 rep, worst-turn metric.
-    4. ANALYZE  - verdict: PASS if worst >= floor - 2*sigma (lenient
-                  2-sigma ruling, 2026-09-23); first PASS = selected.
+    4. ANALYZE  - verdict: PASS only if EVERY conversation's worst
+                  turn is at or above the reader line (addendum 34:
+                  a sub-line conversation is unrecoverable - the worst
+                  is a min; the bench aborts early); first PASS =
+                  selected.
   STAGE B (phase 5): strict ARC-Challenge on every selected model
     (FULL test split, 1172 questions; logprob letter scoring,
     temperature 0; per-question CSVs in --arc-results-dir).
@@ -184,12 +187,13 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
         path = run.get("file") or local_rung(famdir, rung)
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
-            print(f"  [4] would analyze (reader line {reader_wps:g} "
-                  f"w/s - 2*sigma; floor {floor:g} t/s as headroom)")
+            print(f"  [4] would analyze (every conversation's worst turn "
+                  f"at or above the reader line {reader_wps:g} w/s; "
+                  f"floor {floor:g} t/s as headroom)")
             continue
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(path, corpus, dry_run, thinking,
-                                    no_thinking)
+                                    no_thinking, reader_wps=reader_wps)
             run["phases_done"].append(3)
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
