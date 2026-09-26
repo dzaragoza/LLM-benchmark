@@ -1,0 +1,113 @@
+# PROTOCOL.md - The Constants Registry
+
+Every number the study uses, with its provenance. The registry is the
+single source of truth for the report: it appears in (or is referenced
+by) the final paper, and no number enters the code without a row here.
+
+Provenance categories:
+
+- **[A] Author choice** - ruled by the study author, on record in the
+  lab notebook with the ruling's rationale.
+- **[P] Practical limit** - a wall of the world (hardware, tooling,
+  safety margin), not a scientific claim; tuned, not derived.
+- **[D] Derived** - computed from other registered constants, or
+  measured by this study's own instruments.
+- **[M] Magic** - inherited or assumed without derivation. Each row
+  states its exit plan; a magic number that gains a derivation is
+  re-registered as [D].
+
+Governance rule (standing): a constant may appear in exactly one
+place in the code (single-sourced); other files import it. Changing a
+constant is a protocol change - it requires a notebook addendum, not
+a silent edit.
+
+---
+
+## The anchor
+
+The study has ONE anchor. Everything else derives from it or is
+independent of it:
+
+```
+[A]  reader line 5.0 w/s  <-  300 wpm (Brysbaert 2019, silent English
+                               non-fiction adults) / 60 s
+```
+
+Chain of derivation from the anchor:
+
+```
+5.0 w/s  --/w/t_min-->  t/s needed per model/rung  --law-->  size*(rung)
+    |                                        (per-family w/t_min, [D])
+    --k-->  floor 20 t/s = k=3 x (5.0 w/s / 0.75 w/t), reported not gated
+```
+
+The guarantee: **the worst turn at depth 4096, measured in words per
+second on the reference corpus, is at or above the reader line** -
+a 300-wpm reader never waits on the model mid-answer.
+
+---
+
+## [A] Author choices (ruled, on record)
+
+| Constant | Value | Where | Ruling / derivation |
+|---|---|---|---|
+| Reader line (k=1 guarantee) | 5.0 w/s | `speed_gate.py` READER_WPS_DEFAULT | Match the FAST reader: 300 wpm / 60. The canonical anchor. |
+| Fast-reader anchor | 300 wpm | `law_fit.py` READER_PROFILES | Cited: Brysbaert 2019 meta-analysis, silent reading, English non-fiction, adult mean. |
+| Floor (k=3 headroom) | 20 t/s | `speed_gate.py` FLOOR_DEFAULT | Legacy default, demoted in protocol v2: REPORTED, never gated. The practitioner headroom line, cited to the absorption literature, not derived. |
+| Corpus shape | 5 conversations, 4-8 user turns | `live-corpus.json` | Corpus construction (Session 10); re-ruled vs n=1 in addendum 23: the verdict is a min, fewer samples = anti-conservative PASS. |
+| Repeats | 1 qualifying / 3 podium | `speed_gate.py` REPEATS_DEFAULT | Author ruling: "simplify, accept the worst with confidence"; 3 reps only for final published numbers. |
+| Thinking allowance | 2048 tokens | `speed_gate.py` THINK_ALLOWANCE | Author ruling after 82% answer_empty at 1024 - thinking tokens are the user's informed choice, measured descriptively, never gated. |
+| Determinism | temperature 0, seed 1024 | corpus + every payload | Pre-registered; seed is part of the protocol. |
+| Reaction time | 0.45 s | `session_replicate.py` | Derived (addendum 31): 0.25 s simple visual RT + 0.20 s saccade latency (Carpenter 1988). Flag-tunable; deltas allow post-hoc re-simulation. |
+| Reader band (re-sim) | 0.6-1.5x reader speed | `session_replicate.py` | Author ruling: reading speed is variable run-to-run; the band sweep is post-hoc, no server. |
+| ARC sample | full test split, n=1172 | `arc_eval.py` ARC_NUM_DEFAULT | Author ruling 2026-09-23: no sampling - the whole split. |
+| Quant-6 inclusion filter | Q6_K predicted pass | study #3 selection | Author ruling (addendum 37): a pick must be estimated to pass the gate at quant 6. |
+| Ladder | Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, Q2_K | `full_benchmark.py` LADDER_DEFAULT | Ecosystem enumeration; Q7 dropped (no 7-bit rung exists in modern llama.cpp), Q4_0 dropped by author ruling (addendum 37: redundant with Q4_K_M). |
+
+## [P] Practical limits
+
+| Constant | Value | Where | Nature |
+|---|---|---|---|
+| RAM reserve | 4.0 GiB | `hf_download.py` RAM_RESERVE_GIB | OS + KV reserve for the memory shortcut (addendum 35); being validated rung-by-rung by the addendum-36 peak-RSS report. |
+| Server ports | 8077 / 8078 / 8079 / 8081 | speed_gate / depth_probe / session_replicate / arc_eval | Collision avoidance only; no protocol meaning. |
+| Health / post timeouts | 1800 s wall | `llama_server.py` | Generous walls for 12B-class cold loads; retry ladders on HTTP errors. |
+| Noise-sample guards | NOISE_MIN_ROOM 24, NOISE_TOKENS 128 | `speed_gate.py` | Shakeout-tuned: skip noise when the history nearly fills ctx; decode span small enough to fit the worst case. |
+| Depth guards | DEPTH_HEADROOM 64 (gate) / 32 (probe), DEPTH_TOLERANCE 8 | `speed_gate.py`, `depth_probe.py` | Blob-budget safety margins. The 64/32 difference: the gate's conversations ride the blob AND reserve noise room; the probe's single prompt does not. Registered here so the pair is intentional. |
+| Noise template overhead | 96 tokens | `speed_gate.py` NOISE_OVERHEAD | Measured-in-shakeout: 32 was too tight (qwen's template adds ~60+ rendered tokens); exact guard, retry ladder on 400. |
+| Snapshot scope | safetensors + configs only | `hf_download.py` allow_patterns | Scoped after the Meta 32 GB crash (addendum 35): the conversion path needs no `original/*.pth`. |
+| Conversion tooling pins | llama.cpp b10964 build; converter checkout b29c606e2 | `convert_quant.py` | Pinned builds - reproducibility of the quantization path itself. |
+
+## [D] Derived / measured by this study
+
+| Constant | Value | Where | Derivation |
+|---|---|---|---|
+| Answer cap | 299 tokens | `live-corpus.json` | Arena reply p75 = 1197 chars, measured at corpus construction. |
+| Law parameters (102.4 tier) | BW_eff 76.5 GiB/s, t_inf 74 t/s | law fit (Session 26) | Fitted: 1/t = size/BW_eff + 1/t_inf, R2 0.9996 in-family; cross-family error band +-15%. |
+| Bandwidth tiers | 102.4 / 51.2 GB/s | study frame | Hardware facts of the two machine classes; the law refits per tier. |
+| Bits-per-weight table | Q8_0 8.5 ... Q2_K 3.4 | `hf_download.py` RUNG_BITS | llama.cpp average bits-per-weight; used for size estimates before download. Exit plan for [M]-status duplicate: law_fit's BPW_APPROX is the same table - single-source it (see [M] rows). |
+| words/token minimum, qwen family | 0.49 | addendum 37 | Measured worst-turn words/token (three runs, 40+ turns, stable). |
+| words/token minimum, llama family | 0.144 | addendum 37 | The joke-answer turn (30 words / 208 tokens). |
+| words/token band (unmeasured families) | 0.43-0.49 | addendum 37 | Conservative band until the family's first run grades it; exits to [D] per family as the roster runs. |
+| ms per GiB | 13.07 | notebook | Inverse of the fitted effective bandwidth. |
+| Reader profiles (mean / 2-sigma-fast) | 238 / 340 wpm | `law_fit.py` READER_PROFILES | Brysbaert 2019: mean adults; 2-sigma above the fast anchor. |
+| Selection estimator | w/s_pass = t/s(rung) x w/t_min(family) | addendum 37 | Pre-registered after the llama miss; retro-predicts both measured families (7.5 pred vs 7.32-8.24 meas; 2.0 pred vs 2.09 meas). |
+
+## [M] Magic - inherited or assumed, each with an exit plan
+
+| Constant | Value | Where | Status / exit plan |
+|---|---|---|---|
+| Context depth | 4096 | `speed_gate.py` CTX_DEFAULT | llama-server's own default, inherited (addendum 9) - PROMOTED to protocol constant: the guarantee is honestly stated AT the tool's depth. Overflow behavior documented (context shift; gemma hard-errors). Exit: none needed - the promotion IS the fix; a practitioner menu (k_min as a function of D) is the report's extension. |
+| words/token rule of thumb | 0.75 | `speed_gate.py` WORDS_PER_TOKEN_DEFAULT, `law_fit.py` | UNANCHORED rule of thumb. Display-only since protocol v2.1 (w/s is measured per turn). Exit: single-source the constant and label it display-only in every printout, or delete from the verdict path entirely (it is already out of the verdict). |
+| Reader line in t/s (lag/probe view) | 6.5 t/s | `lag_analyze.py`, `depth_probe.py` READER_TPS_DEFAULT | Second-order magic: 5.0 w/s / 0.75 w/t - inherits the 0.75 anchor problem. Exit: print the w/s line alongside (the tools already do); re-anchor to w/t_min when the family is known, or keep as the fixed display convention with the 0.75 caveat stated once. |
+| ARC context | 2048 | `arc_eval.py` ARC_CTX | Inherited from strict-arc era, never re-ruled. Exit: verify no ARC prompt + template exceeds it (they don't - one-shot letter answers), then register as [P] with that check on record. |
+| ARC server flags | threads 8, ngl 99, max_tokens 1, top-20 logprobs | `arc_eval.py` | llama.cpp conventions; 99 = "all layers offloaded". Exit: none - register as [P] conventions of the pinned build. |
+| BPW duplicate | BPW_APPROX | `law_fit.py` | Duplicate of RUNG_BITS. Exit: import from hf_download (single-source), delete the copy. |
+| Depth-probe defaults | depth 4000, 5 samples x 64 tokens | `depth_probe.py` | Chosen in Session 27 for the KV-term measurement; 64 tokens is a short decode span, 5 samples the noise set. Exit: register as [P] instrument settings; the depth sweep (2048 vs 4000) already validated linearity. |
+
+---
+
+## Change log
+
+| Date | Entry | Addendum |
+|---|---|---|
+| 2026-09-26 | Registry created from the full-code sweep; anchor chain stated; categories A/P/D/M assigned; exit plans registered for every [M]. | 39 |

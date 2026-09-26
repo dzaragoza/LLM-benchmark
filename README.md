@@ -499,6 +499,14 @@ Meta is license-gated on Hugging Face (accept the Llama 3 family
 license and log in with `hf auth login`); Google's QAT repo is
 gated likewise.
 
+## Protocol (constants registry)
+
+Every constant the study uses - author rulings, practical limits,
+derived/measured values, and inherited defaults - is registered with
+its provenance in [PROTOCOL.md](PROTOCOL.md). Governance rule: a
+constant is single-sourced in the code, and changing one is a
+protocol change requiring a notebook addendum.
+
 ## License
 
 - **Report and notebook:** CC BY 4.0
