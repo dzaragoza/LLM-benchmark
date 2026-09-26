@@ -1629,3 +1629,40 @@ python3 depth_probe.py --model <gemma-3-4b Q6_K.gguf>    --depth 2048 --depth 40
 ```
 
 (Constants per the addendum-10 table; the author verifies the printed layer/KV-head values at server startup - the only check needed. Gemma-3 runs WITHOUT --kv deliberately: its mixed windows (6 full-attention layers + 28 sliding-window layers capped at 1024) do not reduce to the tool's single uniform-window spec, and a wrong single spec would corrupt the KV column - the addendum-10 effective-KV arithmetic stands on its own for the report. The two-depth implied-BW linearity grade therefore runs on qwen3.5 and llama-3.2 only; gemma-3's depth pair still grades predictions 1-3 (speed at depth, noise at depth) without the KV attribution.) Pre-registered predictions unchanged: qwen3.5 17.5-19.5 t/s at depth (a miss revises the KV-tax or the noise story); llama-3.2 24.9, gemma-3 21.2 stay above 20; w/m at depth similar to shallow if noise is machine-constant; two-depth implied BW near 13.07 ms/GiB grades both the KV-tax arithmetic and the noise attribution. Item (c) of the experiment list (the /tokenize words-per-token pass) can ride the same server session if the author wants it in one sitting - separate tool, to be added when that item is reached.
+
+## Session 27 — 2026-09-26 (protocol v2: the depth-prefill gate; the reader guarantee replaces the floor)
+
+**Author ruling (opening the session):** the speed gate must measure what the guarantee actually says. The guarantee (Session 26, addenda 2–6) is "the worst experienced lag will never fall below the 6.5 t/s of a fast reader, at the context size" — so even a fast reader is never bothered by slow token generation. The old gate graded the worst turn against floor 20 at SHALLOW depth (~1.2k tokens of accumulated history): wrong line (floor 20 is a headroom judgment, not the guarantee) and wrong depth (the guarantee is stated at the reference depth, addendum 9). "We're not aiming at 6.5 t/s" — the guarantee is the FLOOR of the experience, and the refinement (how many t/s above 6.5 makes it smooth, via the k_min / absorption analysis) rides on top as measurement, not as the pass line. The author's expectation on record: the new criteria "might open the door to higher quants or even bigger models."
+
+**Protocol v2 (implemented this session, both layers):**
+
+1. **Depth prefill per conversation.** Each corpus conversation runs ON TOP of a blob of corpus text (content irrelevant — the KV cost is content-independent, addendum 11), prepended as a user turn inside the history (the chat template wraps it; cache_prompt retains it turn-to-turn). Sized per conversation via the server's own `/tokenize` so the DEEPEST turn lands just under the 4096 reference depth, and never exceeds ctx (context shift would silently discard the blob; gemma-3 hard-errors on shift — addendum 9). The budget is worst-case (every answer at the 299-token cap), so real depth lands conservatively under the reference.
+2. **The verdict line is the reader guarantee:** worst turn at depth >= 6.5 t/s − 2σ (the lenient 2-sigma ruling, moved to the guarantee line). Floor 20 (k=3) is reported as a HEADROOM column, never gated. The gate prints both, the state records both.
+3. **Same-depth noise samples.** After each conversation, identical tiny follow-ups on the warm slot: worst/mean across them is the machine's noise at depth — the addendum-10 attribution (KV trend vs noise), now a standing part of every run.
+4. **Thinking mode:** the blob budget subtracts the 2048-token THINK_ALLOWANCE per turn (reasoning + answer both persist in history); at the allowance, the deepest conversations may leave no blob budget — printed honestly when so (the conversation alone fills the context; the measurement runs at that natural depth).
+
+**Tooling:** `speed_gate.py` protocol v2 (depth_budget / build_blob / blob-in-history / noise_sample; `--reader-tp` flag, default 6.5; `--floor` re-documented as the headroom line); `full_benchmark.py` threads `--reader-tp`; `llama_server.py` gains `tokenize()` + `trim_to_tokens()` (bisection on chars, never over budget — depth_probe.py keeps its own trim until a follow-up unifies them). Verified against a mock llama-server simulating /tokenize and KV-tax depth decay: blob budgets differ per conversation and never exceed ctx; the blob lands in the history (depth estimates exact for the blob, 4 chars/token for the conversation side); worst turn is depth-conditioned; verdicts PASS at 6.5 / FAIL above the fake speed; headroom reported; the orchestrator ladder walk SELECTS THE TOP RUNG (Q8_0) at the reader line with headroom honestly "below floor (k=3)" — the mock encodes exactly the author's expected effect. lag_analyze.py compatibility preserved (v2 dumps carry every legacy field).
+
+**Honest consequences, on record before the rerun:**
+
+- The old gate's floor-20 rejections were headroom judgments. Qwen3.5's Q6_K (18.8) and Q8_0 (15.3) clear 6.5 by 2.3–2.9×. **Every rung previously measured in this study passes the reader guarantee with large margin** — the ladder walk should now stop at each family's TOP rung (Q8_0 where first-party or self-made), and the selection question becomes the RIGHT-SIZING question (Session 26): the guarantee admits anything up to size*(6.5) ≈ 10.4 GiB on the T14s — the constraint that actually binds is quality-per-class and the plateau/cliff rule, not speed.
+- The gate therefore stops discriminating comfort and becomes a SAFETY CHECK; comfort moves entirely into the reported headroom column and the k_min/absorption analysis. The prediction: all five non-thinking families select their top rung, subject only to file availability and the never-below-Q4_K_M quality cliff.
+- Session 20's ranking is NOT invalidated (accuracy is orthogonal), but its SELECTED RUNGS are protocol-v1 artifacts: the v2 ranking must be re-measured on the new selections. ARC is unaffected per model file; new rungs need new ARC runs.
+
+**Pre-registered predictions (the rerun, before any measurement):**
+
+1. Every roster family selects its top available rung at the reader line (qwen3.5 Q8_0 or Q6_K — pending its first-party/self-made availability; llama-3.2 Q8_0; gemma-3: whatever the top first-party rung is, its QAT repo ships Q4_0 only, so self-quant or acceptance of Q4_0 as top; phi-4-mini per its repo's top).
+2. Worst turn at depth per default rung lands in the addendum-10 KV-tax bands: qwen3.5 Q5_K_M 17.5–19.5 (and proportionally lower for its higher rungs: Q6_K ~15.5–17.5, Q8_0 ~12–15 at depth); llama-3.2 Q8_0 ~24–26; gemma-3 ~20–22. A miss on any band revises the +ms/token tax or the noise story (the addendum-11 stakes, unchanged).
+3. The noise-at-depth w/m (same-depth samples) sits in 0.90–1.00 on this machine if noise is machine-constant (the addendum-10 hypothesis; the healthy-rung shallow measurement was 0.97).
+4. No roster model at its SELECTED (top) rung falls below the reader line at the reference depth — the guarantee holds across the entire measured field; if any does, that is the finding (a KV/slope or SWA interaction worth its own addendum).
+5. The v2 re-selection changes at least two families' rungs vs Session 20 (the author's "opens the door" expectation, now on record as a falsifiable number).
+
+**Rerun commands (unchanged CLI, new protocol):**
+
+```
+python3 full_benchmark.py "microsoft/Phi-4-mini-instruct" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it" "meta-llama/Llama-3.2-3B-Instruct" ...
+python3 full_benchmark.py --no-thinking "Qwen/Qwen3.5-4B"
+python3 full_benchmark.py --thinking --state-file benchmark-state-thinking.json "Qwen/Qwen3.5-4B" "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
+```
+
+Then `--arc-only` rankings per category on the new selections; the McNemar restriction rule (Session 25 addendum 2) applies per category as before. Fresh dumps throughout (the v2 dump format adds blob_tokens/depth fields — old dumps are protocol-v1 data, kept, never reused by v2 resume; the mode-suffix rule from Session 25 is unchanged and still mandatory).
