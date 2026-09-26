@@ -274,7 +274,10 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
     depth-conditioned at the reference depth. Timing (like KV cost) is
-    content-independent; only the depth matters."""
+    content-independent; only the depth matters.
+    Returns (turn records, final history) - the history feeds the
+    same-depth noise samples, which must ride it: the slot cache
+    reuses only the longest common token prefix."""
     history = []
     results = []
     if blob:
@@ -344,18 +347,28 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "wall_s": wall_s,
             "reasoning_chars": len(reasoning),
             "thinking_tokens_est": len(reasoning) // 4,
-            "answer_empty": 1 if (thinking and not answer.strip()) else 0,
+            "answer_empty": 1 if not answer.strip() else 0,
         })
-    return results
+    return results, history
 
 
-def noise_sample(port, cap_tokens, ctx_tokens, thinking=False,
+def noise_sample(port, history, cap_tokens, ctx_tokens, thinking=False,
                  no_thinking=False, samples=2):
-    """Same-depth noise samples: identical tiny follow-up requests on
-    the slot the conversation just left (prompt cache retains the full
-    depth). Worst/mean across these is the machine's noise at depth -
-    cleanly separating noise from the KV trend (addendum 10)."""
-    msgs = [{"role": "user", "content": "Reply with the word: done."}]
+    """Same-depth noise samples: a tiny follow-up appended to the
+    conversation's own history. The follow-up MUST ride the history:
+    llama-server's slot cache reuses only the longest common token
+    PREFIX of the incoming prompt, so a bare tiny message shares only
+    the template prefix, re-prefills at ~zero depth, and measures
+    shallow decode - not noise at depth (caught on the first real
+    v2.1 run: the "noise" sat consistently ABOVE the conversation
+    turns, the fingerprint of a shallower decode). With the full
+    history + a tiny final turn, the common prefix covers the whole
+    cached conversation, only the tail prefills, and decode runs at
+    the conversation's depth. Worst/mean across these is the
+    machine's noise at depth - cleanly separated from the KV trend
+    (addendum 10)."""
+    msgs = list(history) + [
+        {"role": "user", "content": "Reply with the word: done."}]
     recs = []
     for i in range(1, samples + 1):
         payload = {
@@ -434,9 +447,9 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                     print(f"    conv {ci}: no blob budget left "
                           f"(conversation alone fills the context - run "
                           "at the shallower reference depth as-is)")
-                res = run_conversation(port, conv["user_turns"],
-                                       cap_tokens, ctx, thinking,
-                                       no_thinking, blob, blob_tokens)
+                res, conv_history = run_conversation(
+                    port, conv["user_turns"], cap_tokens, ctx, thinking,
+                    no_thinking, blob, blob_tokens)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
@@ -459,8 +472,15 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           + ", ".join(str(x) for x in tk)
                           + (f"   ({empt} empty answer(s))"
                              if empt else ""))
-                noise = noise_sample(port, cap_tokens, ctx, thinking,
-                                    no_thinking)
+                if (not thinking and res
+                        and not any(r.get("gen_words") for r in res)):
+                    print("      WARNING: every answer this conversation "
+                          "was EMPTY - words/s cannot be measured. A "
+                          "hybrid model in default mode thinks first; "
+                          "pass --no-thinking (non-thinking) or "
+                          "--thinking (thinking, with the 2048 allowance)")
+                noise = noise_sample(port, conv_history, cap_tokens,
+                                     ctx, thinking, no_thinking)
                 for r in noise:
                     noise_records.append({"model": label, "conv": ci, **r})
                 ntps = [r["tps"] for r in noise if r["tps"]]
