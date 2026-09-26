@@ -1808,3 +1808,19 @@ python3 depth_probe.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --depth 
 **Standing predictions now graded for qwen3.5-4b Q8_0 (the first family complete under v2.1):** reader guarantee PASS at depth (15.0-15.6 t/s = 10.2-10.6 w/s at 0.68 w/t, vs the 5.0 line: >2x); headroom below floor 20 (k=3) — honestly reported; words/token 0.680 measured (in the 0.65-0.75 band, HIT); noise-at-depth w/m 0.993-0.997 at two depths (band 0.90-1.00, HIT); KV tax second-order (addendum 16, refined here with a number); Session-27 prediction 1 (top-rung selection) on track for the family.
 
 **Remaining for the session:** the gate's own at-depth noise records (ride-history, fixed guard) — one `--force` rerun; the author's live session (prediction 5); then the full-roster rerun commands from Session 27 (all five families, both categories) on the v2/v2.1 protocol.
+
+---
+
+### Session 27, addendum 19 — standing conventions: Python 3.13 floor; git workflow (why the pulls wanted merges)
+
+**Python 3.13 floor (author ruling).** The target machine runs Python 3.13; the code may use any language feature through 3.13. README's environment section updated (was "3.10+"). The scripts stay pure-stdlib on the tool layer; the middle and top layers already use only stdlib. No retro-fit needed - the codebase is 3.13-clean today.
+
+**Git: why `git pull` kept asking for a merge.** Diagnosis from the repo's own history: a fast-forward requires the local branch to be a strict ancestor of the remote - every local commit must already be ON origin/main. The repo contains exactly the pattern that breaks this: commit `437c626` ("Merge branch 'main' of...") has two parents (`1b69722` + `4d2a8dd`) — the old agent worked on main, pushed, kept committing locally, and merged the remote in afterward, creating a second parent line. Once ANY local commit is not on the remote, `git pull` can no longer fast-forward: it must reconcile two diverged lines, hence "merge". The old workflow (work on main, merge remote in) permanently diverged main; every subsequent pull on a machine with unsynced local work inherits the problem. The merge commits (`437c626`, and the pre-refactor `d10ff1f`) are the fossil record of that workflow.
+
+**The current fix (ruling, from addendum 15's direct-to-main convention):** commits now land on main only via this agent, and always pushed immediately. The author's machine should run:
+
+```
+git pull --ff-only
+```
+
+which refuses to create merge commits (it errors rather than merge when divergence exists, making any divergence loud instead of silent). If it ever refuses, the right move is `git stash` (if local edits exist) then `git pull --ff-only`, and never `git pull` with its merge default. For a clean one-machine setup: `git config pull.ff only` makes the ff-only behavior the machine default. The merge-commit fossils stay in history (history is data); no history rewrite on a published branch.
