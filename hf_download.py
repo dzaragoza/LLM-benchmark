@@ -20,6 +20,7 @@ convert_quant.py.
 import glob
 import json
 import os
+import shutil
 import sys
 import time
 import urllib.parse
@@ -67,6 +68,103 @@ GUIDE = {
 
 
 # =========================================================== rung helpers
+
+def system_ram_gib():
+    """Total system RAM in GiB (best effort, cross-platform).
+    Linux: /proc/meminfo; macOS: sysctl; Windows: ctypes GlobalMemoryStatusEx.
+    Returns None when undetectable - the feasibility check then trusts
+    the caller instead of guessing."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) / (1024 * 1024)
+    except Exception:
+        pass
+    try:
+        import subprocess
+        out = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode == 0:
+            return int(out.stdout.strip()) / (1024 ** 3)
+    except Exception:
+        pass
+    try:
+        import ctypes
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        return stat.ullTotalPhys / (1024 ** 3)
+    except Exception:
+        return None
+
+
+def free_disk_gib(path="."):
+    """Free disk space at `path` in GiB (None if undetectable)."""
+    try:
+        return shutil.disk_usage(path).free / (1024 ** 3)
+    except Exception:
+        return None
+
+
+def remote_file_sizes(repo):
+    """{filename: size_in_bytes} for a repo, from the HF metadata API -
+    NO file content is downloaded. Returns {} when the hub client is
+    too old to expose tree listings (the caller then estimates from
+    quant ratios or skips the feasibility check)."""
+    try:
+        from huggingface_hub import HfApi
+        sizes = {}
+        for entry in HfApi().list_repo_tree(repo, recursive=True):
+            if getattr(entry, "size", None):
+                sizes[entry.path] = entry.size
+        return sizes
+    except Exception:
+        return {}
+
+
+# bits-per-weight of each ladder rung (llama.cpp quant formats) - the
+# conversion path scales linearly: rung_gib ~= fp16_gib * bits / 16
+RUNG_BITS = {"Q8_0": 8.5, "Q6_K": 6.6, "Q5_K_M": 5.7, "Q4_K_M": 4.8,
+             "Q4_0": 4.5, "Q3_K_M": 3.9, "Q2_K": 3.4}
+
+
+def estimate_rung_gib(rung, model_files, source_files, sizes):
+    """Estimated size in GiB of the rung file, WITHOUT downloading it
+    (addendum 35 - the memory shortcut). Exact when the repo ships the
+    rung GGUF (remote metadata); ratio-scaled from the fp16/safetensors
+    size when the rung is self-quantized. Returns None when no estimate
+    is possible (the caller then does not skip - never a false skip)."""
+    repo_file = find_rung_file(model_files, rung)
+    if repo_file and repo_file in sizes:
+        return sizes[repo_file] / (1024 ** 3)
+    bits = RUNG_BITS.get(rung)
+    if bits is None:
+        return None
+    f16s = [sizes[f] for f in find_f16_files(source_files) if f in sizes]
+    if f16s:
+        return sum(f16s) / (1024 ** 3) * bits / 16
+    sts = [s for f, s in sizes.items()
+           if f.lower().endswith(".safetensors")
+           and not f.lower().startswith("original/")]
+    if sts:
+        return sum(sts) / (1024 ** 3) * bits / 16
+    return None
+
+# system-RAM reserve for the OS + the KV cache at the 4096 reference
+# depth (addendum 35): a rung is feasible only if its file fits in
+# total RAM minus this reserve (the T14s: 32 - 4 = 28 GiB usable).
+RAM_RESERVE_GIB = 4.0
 
 def find_rung_file(names, rung):
     tok = rung.lower()
@@ -129,11 +227,36 @@ def local_rung(famdir, rung):
 def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
             source_files, dry_run):
     """Phase 1: make sure the rung file, or the data to create it,
-    is on disk. Returns (path_or_None, plan)."""
+    is on disk. Returns (path_or_None, plan).
+    Memory shortcut (addendum 35): rungs whose estimated size cannot
+    fit in system RAM (minus the OS/KV reserve) are skipped BEFORE any
+    download - no time spent on rungs the machine cannot run at all.
+    Disk is checked the same way (source files can be 2x the rung)."""
     require_hub()
     os.makedirs(famdir, exist_ok=True)
     if local_rung(famdir, rung):
         return local_rung(famdir, rung), "local file"
+
+    # feasibility shortcut, before any network traffic
+    sizes = remote_file_sizes(source_repo) or remote_file_sizes(model_repo)
+    rung_est = estimate_rung_gib(rung, model_files, source_files, sizes)
+    ram = system_ram_gib()
+    if rung_est is not None and ram is not None:
+        usable = ram - RAM_RESERVE_GIB
+        if rung_est > usable:
+            print(f"  [1] {rung}: estimated {rung_est:.1f} GiB exceeds "
+                  f"usable RAM {usable:.1f} GiB (total {ram:.1f} GiB - "
+                  f"{RAM_RESERVE_GIB:g} reserve) - CANNOT RUN on this "
+                  "machine, skipping before download (addendum 35)")
+            return None, "infeasible: exceeds system RAM"
+    disk = free_disk_gib(famdir)
+    if rung_est is not None and disk is not None:
+        need = rung_est * 2 if rung_est else 0
+        if disk < need:
+            print(f"  [1] {rung}: estimated {rung_est:.1f} GiB rung (worst "
+                  f"case {need:.1f} GiB with source) but only {disk:.1f} "
+                  "GiB free on disk - fix disk space; attempting anyway "
+                  "(local files may already exist)")
     repo_file = find_rung_file(model_files, rung)
     if repo_file:
         if dry_run:
@@ -172,8 +295,11 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
             return None, f"safetensors from {source_repo}, convert + quantize"
         try:
             print(f"  [1] downloading safetensors from {source_repo} "
-                  "(several GB, once per family)")
-            snapshot_download(source_repo, local_dir=st_dir)
+                  "(safetensors + configs only; once per family)")
+            snapshot_download(
+                source_repo, local_dir=st_dir,
+                allow_patterns=["*.safetensors", "*.json", "*.txt",
+                                "tokenizer.model", "tokenizer.model.v3"])
         except Exception as e:
             fail(1, rung, f"safetensors download from {source_repo} "
                  f"failed: {e}", GUIDE[1])

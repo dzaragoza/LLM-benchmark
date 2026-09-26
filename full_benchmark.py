@@ -88,7 +88,11 @@ CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
 MODELS_DIR_DEFAULT = "./models"
 STATE_FILE_DEFAULT = "./benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
-LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"]
+LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q4_0", "Q3_K_M", "Q2_K"]
+# Q4_0 (addendum 35): the first-party QAT rung - google ships QAT Q4_0
+# GGUF directly (quality ~ bf16 at Q4 size, addendum 33); it sits after
+# Q4_K_M so self-quantized K-quants are preferred, with the QAT file as
+# the first-party fallback at the same bit width.
 FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
@@ -175,6 +179,11 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             run["plan"] = plan
             run["phases_done"].append(1)
             save_state(state_path, state)
+            if plan.startswith("infeasible"):
+                run["verdict"] = "FAIL (infeasible: exceeds system RAM)"
+                run["rung"] = rung
+                save_state(state_path, state)
+                continue
             print(f"  [1] downloads ok  (plan: {plan})")
         if 2 not in run["phases_done"]:
             path = convert_quant.create(fam, famdir, rung,
