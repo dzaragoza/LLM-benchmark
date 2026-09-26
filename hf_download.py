@@ -26,6 +26,10 @@ import time
 import urllib.parse
 import urllib.request
 
+# Quiet downloads (author ruling, addendum 38): hub progress bars are
+# hidden; failures still surface through fail() with the full error.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
 try:
     from huggingface_hub import (hf_hub_download, list_repo_files,
                                  snapshot_download)
@@ -262,6 +266,8 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
         if dry_run:
             return None, f"download {model_repo}/{repo_file}"
         try:
+            print(f"  [1] downloading {model_repo}/{repo_file} "
+                  "(output hidden; shown on error)")
             hf_hub_download(model_repo, repo_file, local_dir=famdir)
         except Exception as e:
             fail(1, rung, f"download of {model_repo}/{repo_file} failed: {e}",
@@ -280,6 +286,8 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
                           f"({'+'.join(f16_names)}), quantize")
         try:
             for name in f16_names:
+                print(f"  [1] downloading {source_repo}/{name} "
+                      "(output hidden; shown on error)")
                 hf_hub_download(source_repo, name, local_dir=famdir)
         except Exception as e:
             fail(1, rung, f"f16 download from {source_repo} failed: {e}",
@@ -295,7 +303,8 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
             return None, f"safetensors from {source_repo}, convert + quantize"
         try:
             print(f"  [1] downloading safetensors from {source_repo} "
-                  "(safetensors + configs only; once per family)")
+                  "(safetensors + configs only; once per family; "
+                  "output hidden; shown on error)")
             snapshot_download(
                 source_repo, local_dir=st_dir,
                 allow_patterns=["*.safetensors", "*.json", "*.txt",

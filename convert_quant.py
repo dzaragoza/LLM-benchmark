@@ -49,6 +49,25 @@ def fail(phase, rung, what, causes):
     sys.exit(1)
 
 
+
+def run_quiet(cmd, log_path, phase, rung, what):
+    """Quiet tooling (author ruling, addendum 38): the converter's and
+    quantizer's stdout/stderr is captured to log_path and printed
+    only when the tool fails - success stays silent."""
+    with open(log_path, "w", encoding="utf-8") as log:
+        r = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT)
+    if r.returncode != 0:
+        print()
+        print(f"--- output of the failed {what} (full log: {log_path}) ---")
+        try:
+            with open(log_path, encoding="utf-8") as f:
+                tail = f.read()
+            print(tail if tail.strip() else "(no output captured)")
+        except OSError:
+            print("(log unreadable)")
+        print("--- end of tool output ---")
+    return r.returncode
+
 def create(fam, famdir, rung, plan="", dry_run=False):
     """Phase 2: ensure the rung file exists locally. Returns its path
     (None on dry run with nothing to do)."""
@@ -61,17 +80,23 @@ def create(fam, famdir, rung, plan="", dry_run=False):
     if not f16:
         st_dir = os.path.join(famdir, "safetensors-source")
         out_f16 = os.path.join(famdir, fam + "-f16.gguf")
-        print("  [2] converting safetensors -> f16 (pinned converter)")
-        r = subprocess.run([sys.executable, CONVERTER,
-                            st_dir, "--outfile", out_f16, "--outtype", "f16"])
-        if r.returncode != 0 or not os.path.isfile(out_f16):
+        print("  [2] converting safetensors -> f16 (pinned converter; "
+              "output hidden; shown on error)")
+        log = os.path.join(famdir, "convert-f16.log")
+        rc = run_quiet([sys.executable, CONVERTER,
+                        st_dir, "--outfile", out_f16, "--outtype", "f16"],
+                       log, 2, rung, "safetensors -> f16 conversion")
+        if rc != 0 or not os.path.isfile(out_f16):
             fail(2, rung, "f16 conversion failed "
-                 "(see the converter output above)", GUIDE[2])
+                 f"(full log: {log})", GUIDE[2])
         f16 = out_f16
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
-    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung}")
-    r = subprocess.run([QUANTIZE_BIN, f16, out, rung])
-    if r.returncode != 0 or not os.path.isfile(out):
+    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} "
+          "(output hidden; shown on error)")
+    log = os.path.join(famdir, f"quantize-{rung}.log")
+    rc = run_quiet([QUANTIZE_BIN, f16, out, rung],
+                   log, 2, rung, "llama-quantize run")
+    if rc != 0 or not os.path.isfile(out):
         fail(2, rung, "llama-quantize failed "
-             "(see the quantizer output above)", GUIDE[2])
+             f"(full log: {log})", GUIDE[2])
     return out

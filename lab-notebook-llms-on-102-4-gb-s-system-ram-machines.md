@@ -2213,3 +2213,17 @@ Ruled out under the Q6 filter: Llama-3.1-8B (Q4-only by measurement: Q4_K_M earl
 6. **Words/token minimums:** llama w/t_min lands in 0.15–0.49 (the 8B anchor 0.144 is the pessimistic bound; the 3B's terse-answer behavior unmeasured); qwen w/t_min 0.49 (measured); gemma w/t_min 0.43–0.49; mistral w/t_min 0.43–0.49.
 7. **Mode blindness (qwen3.5-4b non-thinking):** reasoning_chars 0 on every turn, no inline think tags (re-grade of addendum-20 data, standing flag).
 8. **No selection descends below Q5_K_M** (the Q6 filter's honest floor; the strict-verdict walk stops at the first PASS).
+
+### Session 29, addendum 38 — quiet tooling: HF download and converter/quantizer output hidden, shown only on error
+
+**The author's ruling:** "hide the output of the hf download and the quantizer and only show it if there's an error." The pipeline's console is the study log — multi-GB download progress bars and llama.cpp conversion chatter drowned the phase lines that matter.
+
+**Implementation (three sites, one rule — success is silent, failure is loud):**
+
+1. **HF downloads (hf_download.py):** `HF_HUB_DISABLE_PROGRESS_BARS=1` is set (before the hub import, `os.environ.setdefault` — an author-set env var wins) so hf_hub_download/snapshot_download print nothing on success; each download site now prints one phase line instead ("downloading X (output hidden; shown on error)"). Failures already surfaced through `fail()` with the full exception — unchanged, still loud.
+2. **Converter (convert_quant.py):** the safetensors→f16 conversion's stdout+stderr is captured to `models/<family>/convert-f16.log`; on success nothing prints beyond the phase line; on failure the full captured output prints under a "--- output of the failed conversion ---" banner plus the log path, before the existing PHASE 2 FAILED guidance box.
+3. **Quantizer (llama-quantize):** same treatment, per-rung log `models/<family>/quantize-<rung>.gguf.log`-style (`quantize-Q6_K.log`); failure prints the captured output + log path. The failure-guidance text updated accordingly ("(see the converter output above)" → the log path).
+
+**Design notes on record:** the logs live in the family folder (gitignored with models/) — they are build artifacts, not study data; `run_quiet` returns the return code and the existing `fail()` keeps its idempotent-rerun guidance; stderr is merged into the log (2>&1) so a dying tool's last words are never split from its progress output. The pinned tool versions are unchanged — this is presentation, not protocol. Phase lines and verdicts (the actual study log) are untouched.
+
+**Tested (mock tools, three cases):** (1) a failing converter — captured stdout AND stderr printed on failure, log path named, guidance box intact; (2) a succeeding converter+quantizer — zero tool chatter on the console, rung file created, log sidecar written; (3) a failing quantizer — captured stderr printed, PHASE 2 FAILED box with the log path. All pass; py_compile clean across the repo scripts.
