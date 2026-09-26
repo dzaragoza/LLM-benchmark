@@ -2100,3 +2100,26 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 6. **Words/token:** llama/mistral/gemma4 w/t land in 0.65–0.80; qwen3.5:9b w/t within ±10% of the measured 0.680 family value.
 7. **Mode blindness (gemma4):** with thinking disabled, reasoning_chars = 0 on every turn despite the empty `<|channel>thought` wrapper — wrapper tokens are parse artifacts, not reasoning.
 8. **No selection descends below Q4_K_M** (the quant-4 inclusion filter holds for every family).
+
+### Session 28, addendum 34 — the early-fail optimization: a sub-reader-line turn aborts the rung in flight
+
+**The author's ruling:** "In the speed gate, as soon as a conversation fails the check for the reader catching up with the output of the model, consider that quant fail. It is impossible to recover from that."
+
+**The logic, verified against the instrument:** the verdict is a MIN — worst turn within a conversation, worst conversation within a rung, worst rep within a bench. A min is monotone: once one turn measures below the reader line, no later turn, conversation, or rep can raise the worst. The 2-sigma lenient branch could previously rescue such a rung (a sub-line worst with large scatter across conversations still PASSED) — that rescue is exactly the "recovery" the author rules impossible, and it is hereby RETIRED. The verdict is now strict: **PASS (confident) only if EVERY conversation's worst turn is at or above the reader line; any sub-line conversation fails the rung outright.** Sigma stays in the output as a reported diagnostic (the spread of conversation worsts), no longer a verdict input.
+
+**The optimization (implemented in speed_gate.py, mock-tested end to end):**
+- `run_conversation` takes `reader_wps`; the first turn measured below the line is flagged `below_reader_line: 1` in the dump, prints the abort reason, and breaks — remaining turns of that conversation are not generated.
+- `bench_model` propagates the flag: remaining conversations and remaining reps are skipped ("early-fail - skipping the remaining N conversation(s) and any further reps"). The dump is still written and graded honestly — a partial dump with the flagged turn always FAILs the strict verdict.
+- `bench`/`full_benchmark.py` pass the reader line down from the CLI (`--reader-wps`), so the pipeline's ladder walk gets the same early abort; a doomed rung now costs one conversation instead of five.
+- Turn-level check (not conversation-level): the conversation's worst is itself a min over its turns, so the abort fires mid-conversation at the offending turn — the earliest possible point.
+- Honest scope note: the check applies to turns with a measured `server_wps` (v2.1 turns); empty answers have no w/s and cannot early-fail (they carry the existing empty-answer warning instead).
+
+**Mock-server verification (three cases):** (1) healthy 10 w/s run — no flag, all 9 turns, PASS (confident); (2) a dip to 4 w/s at conv 2 turn 2 — the turn is flagged, the conversation aborts at turn 2, conv 3 is skipped, verdict FAIL; (3) the retired rescue — a 4.5 w/s worst with large conversation scatter now FAILs (previously PASS within 2-sigma). The test caught one mock artifact worth recording: an instant-responding mock produces a negative generation span (wall < prompt_ms) and therefore no measurable w/s — the real server never does, and the check correctly skips unmeasurable turns rather than false-failing.
+
+**Consequences, recorded:**
+1. **Runtime:** a failing rung costs ~1 conversation (~2 minutes at 12B scale) instead of 5 — the ladder walk's dominant cost was the doomed rungs (the predicted-descending ladders of addendum 33: llama3.1-8b and gemma4-12b are expected to fail Q8_0 first, qwen3.5-9b likewise). Estimated saving per family: ~8-15 minutes of bench time per failed rung.
+2. **Strictness:** the ladder's first PASS is now the first rung whose EVERY conversation clears the line — the addendum-33 predicted-rung tables are unchanged (their bands assumed the strict reading), but borderline bands (llama3.1-8b Q8_0 at 5.5-6.8 w/s) may now select one rung lower than a lenient reading would have.
+3. **Prediction grading unaffected:** predictions are compared against the measured worst of the SELECTED rung; early-fail only shortens the path to it.
+4. The dumps of early-failed rungs are partial by design (flagged) — the per-rung dump record keeps the flag, so post-hoc analyses (lag_analyze, collision simulation) can distinguish "failed at conv 2 turn 2" from "ran all five and failed on the worst".
+
+**Pre-registered expectation for the study #3 run:** with the early-fail in place, each predicted-failing top rung (llama3.1-8b Q8_0, qwen3.5-9b Q8_0, gemma4-12b Q8_0/Q6_K) aborts within its first or second conversation; if any of them instead runs all five conversations, that itself is a graded surprise (the law's ±15% band is generous in the wrong direction).
