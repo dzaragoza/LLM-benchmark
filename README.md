@@ -429,6 +429,60 @@ python3 full_benchmark.py --thinking \
 
 (Pass `--thinking` on any `--arc-only` rerun too.)
 
+## Study #3 roster (protocol v2.1, T14s, pre-registered 2026-09-26)
+
+The k=1 reader guarantee (worst turn >= 5.0 w/s at depth 4096,
+addendum 33) opens the door to each family's **highest runnable
+member** on the 102.4 GB/s machine (32 GB RAM): size* at k=1 is
+~10.4 GiB vs ~2.8 GiB at the old floor-20 gate. The selection was
+re-run anew under the pre-registered rules:
+
+1. Ollama library popularity walk-down (snapshot 2026-09-26).
+2. One slot per **owner** (author ruling: llama3.1 and llama3.2 are
+   one Meta family).
+3. Non-thinking or hybrid; hybrids run with thinking disabled
+   (Gemma 4's off-switch is omitting the `<|think|>` system token;
+   the 12b still emits an empty thought-channel wrapper that must
+   parse as zero reasoning).
+4. Predicted to pass the gate at **quant 4** (Q4_K_M, the inclusion
+   filter; the ladder walk still starts at Q8_0).
+5. First-party weights only (no third-party quantizations).
+6. Published paper per family.
+7. Latest generation supersedes older (author ruling: "people want
+   the latest and greatest") - qwen3.5 over qwen2.5, gemma4 over
+   gemma3.
+8. Highest runnable member of the family (file + KV + OS in 32 GB).
+
+**Selected (popularity order of the winning rows):**
+
+| Family | Pick | Paper | Provenance |
+|---|---|---|---|
+| Meta (llama3.1, 119.9M) | Llama-3.1-8B-Instruct | The Llama 3 Herd of Models, arXiv 2407.21783 | safetensors (gated), self-quantize |
+| Qwen (qwen2.5 41M -> superseded by qwen3.5) | Qwen3.5-9B | Qwen3.5-Omni Technical Report, arXiv 2604.15804 | safetensors, self-quantize |
+| Google (gemma3 40.7M -> superseded by gemma4) | Gemma-4-12B-it | Gemma 4 Technical Report, arXiv 2607.02770 | QAT Q4_0 GGUF first-party; other rungs from safetensors |
+| Mistral (33.7M) | Mistral-7B-Instruct-v0.3 | Mistral 7B, arXiv 2310.06825 | safetensors (public), self-quantize |
+
+Walk-down exclusions: deepseek-r1 (thinking-only), nomic-embed-text
+(embedding), llama3.2 (same owner as llama3.1), qwen3 (superseded),
+gemma2 (superseded), gpt-oss (thinking-only). Full walk-down with
+quant-4 law estimates and per-pick ladder predictions: lab-notebook
+addendum 33.
+
+**Run it (T14s or any 102.4 GB/s / 32 GB machine):**
+
+```
+python3 full_benchmark.py --no-thinking \
+  "meta-llama/Llama-3.1-8B-Instruct" \
+  "Qwen/Qwen3.5-9B" \
+  "google/gemma-4-12B-it-qat-q4_0-gguf=google/gemma-4-12B-it" \
+  "mistralai/Mistral-7B-Instruct-v0.3"
+```
+
+All four are non-thinking or hybrid: the run uses `--no-thinking`.
+Meta is license-gated on Hugging Face (accept the Llama 3 family
+license and log in with `hf auth login`); Google's QAT repo is
+gated likewise.
+
 ## License
 
 - **Report and notebook:** CC BY 4.0
