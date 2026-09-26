@@ -272,6 +272,13 @@ def main():
                     choices=["ARC-Challenge", "ARC-Easy"])
     ap.add_argument("--arc-only", action="store_true",
                     help="skip selection; ARC + rank only")
+    ap.add_argument("--roster", default=None,
+                    help="restrict phases 5-6 and the ranking to these "
+                         "families (comma-separated, as named in the "
+                         "family specs); the state file accumulates "
+                         "across studies - without this flag the "
+                         "ranking includes every family ever selected "
+                         "in this state file (addendum 41)")
     ap.add_argument("--arc-models", default=None,
                     help="comma-separated .gguf files to ARC and rank "
                          "(with --arc-only); labels from filenames")
@@ -362,10 +369,21 @@ def main():
         return
 
     # ---- phases 5-6: full ARC on selected models, then the ranking
+    roster = ([f.strip() for f in args.roster.split(",")]
+              if args.roster else None)
     selections = {}
     for fam, fst in state["families"].items():
+        if roster is not None and fam not in roster:
+            continue
         if fst.get("selected") and fst["runs"][fst["selected"]].get("file"):
             selections[fam] = fst["runs"][fst["selected"]]
+    if roster is not None:
+        missing = [f for f in roster
+                   if f not in state.get("families", {})
+                   or not state["families"][f].get("selected")]
+        if missing:
+            print(f"  note: roster families without a selection "
+                  f"(excluded from the ranking): {', '.join(missing)}")
     if selections:
         print()
         print("=" * 60)
