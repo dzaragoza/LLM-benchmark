@@ -21,6 +21,7 @@ when live-bench was absorbed into speed_gate.py.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -59,16 +60,81 @@ def wait_healthy(port, timeout=300, proc=None):
 
 
 def start_server(model_path, port, extra_args=None, server_bin=None,
-                 health_timeout=1800):
-    """Launch llama-server on a model. Returns (proc, healthy_bool)."""
+                 health_timeout=1800, log_path=None):
+    """Launch llama-server on a model. Returns (proc, healthy_bool).
+    log_path (addendum 36): capture the server's stdout/stderr instead
+    of discarding them - llama.cpp's startup banner carries its own
+    memory accounting (model size, KV cache, compute buffers), which
+    the memory report parses. The log is truncated per launch (the
+    last launch's banner is the reported one)."""
     cmd = [server_bin or find_server(), "-m", model_path,
            "--port", str(port)]
     if extra_args:
         cmd += list(extra_args)
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL)
+    if log_path:
+        log_fh = open(log_path, "wb")
+        try:
+            proc = subprocess.Popen(cmd, stdout=log_fh,
+                                    stderr=subprocess.STDOUT)
+        finally:
+            log_fh.close()
+    else:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
     healthy = wait_healthy(port, health_timeout, proc)
     return proc, healthy
+
+
+def peak_rss_gib(proc):
+    """Peak resident set size (VmHWM) of the server process, in GiB -
+    the kernel's own accounting of everything the launch took: model
+    weights + KV cache + compute buffers + runtime overhead. This is
+    the honest "can it run here" number, and the quantity the memory
+    shortcut's estimates are validated against. Linux only
+    (/proc); returns None elsewhere or after the process is gone.
+    MUST be called before stop_server terminates the process."""
+    try:
+        with open(f"/proc/{proc.pid}/status") as f:
+            for line in f:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) / (1024 * 1024)
+    except Exception:
+        return None
+    return None
+
+
+def parse_memory_log(log_path):
+    """Best-effort parse of llama.cpp's own memory accounting from the
+    captured server log (addendum 36). The banner format moves between
+    builds, so this extracts structured keys where the wording is
+    recognizable AND keeps the raw memory-bearing lines verbatim;
+    the peak RSS (VmHWM) remains the authoritative total. Returns a
+    dict: {keys...: GiB, 'banner_lines': [raw lines with sizes]}."""
+    out = {"banner_lines": []}
+    pat = re.compile(r"([A-Za-z_0-9 .]*?)[:=]\s*([0-9]+(?:\.[0-9]+)?)"
+                     r"\s*(KiB|MiB|GiB)")
+    to_gib = {"KiB": 1 / (1024 * 1024), "MiB": 1 / 1024, "GiB": 1.0}
+    try:
+        with open(log_path, errors="replace") as f:
+            lines = f.readlines()
+    except Exception:
+        return out
+    for ln in lines:
+        low = ln.lower()
+        if ("mib" not in low and "gib" not in low and "kib" not in low):
+            continue
+        out["banner_lines"].append(ln.rstrip())
+        for label, val, unit in pat.findall(ln):
+            key = label.strip().lower().rstrip(" :=")
+            gib = float(val) * to_gib[unit]
+            if "kv" in key and "kv_cache_gib" not in out:
+                out["kv_cache_gib"] = round(gib, 3)
+            elif "cpu" in key and "cpu_buffers_gib" not in out:
+                out["cpu_buffers_gib"] = round(gib, 3)
+            elif "graph" in key and "graph_overhead_gib" not in out:
+                out["graph_overhead_gib"] = round(gib, 3)
+    out["banner_lines"] = out["banner_lines"][-40:]
+    return out
 
 
 def stop_server(proc, port, warn_after=60):

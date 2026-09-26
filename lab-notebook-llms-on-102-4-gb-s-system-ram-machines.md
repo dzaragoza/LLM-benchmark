@@ -2147,3 +2147,22 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 
     git pull --ff-only
     python3 full_benchmark.py --no-thinking "meta-llama/Llama-3.1-8B-Instruct" "Qwen/Qwen3.5-9B" "google/gemma-4-12B-it-qat-q4_0-gguf=google/gemma-4-12B-it" "mistralai/Mistral-7B-Instruct-v0.3"
+
+### Session 28, addendum 36 — the memory report: llama.cpp's own accounting + the kernel's peak RSS
+
+**The author's request:** "can we get information from llama-cpp about memory usage? that would be good to report too."
+
+**Two sources, one authoritative number.** llama.cpp reports its own startup accounting (model size, KV cache, compute/graph buffers) in the server banner - which the pipeline discarded to /dev/null until now. The banner's wording moves between builds, so the parser is best-effort (structured keys where recognizable: kv_cache_gib, cpu_buffers_gib, graph_overhead_gib; plus the raw size-bearing banner lines kept verbatim, last 40). The AUTHORITATIVE number is the kernel's peak resident set size (VmHWM, /proc/<pid>/status) read at server teardown - everything the launch took: weights + KV cache + compute buffers + runtime overhead. It is the honest "can it run here" quantity, and the validation target for addendum 35's size estimates (the estimate's usable-RAM reserve can now be graded against the measured peak per rung).
+
+**Implementation:**
+- `llama_server.start_server(log_path=...)`: the server's stdout/stderr is captured to `<model>.server.log` (truncated per launch) instead of /dev/null.
+- `llama_server.peak_rss_gib(proc)`: VmHWM in GiB, read BEFORE teardown terminates the process (Linux /proc only; None elsewhere - the report is skipped, never faked).
+- `llama_server.parse_memory_log(log_path)`: best-effort banner parse (structured keys + verbatim lines).
+- `speed_gate.bench_model`: reads peak RSS in the teardown finally-block, prints it per rep ("memory: peak RSS X GiB"), summarizes across reps ("MEMORY: peak RSS X GiB ... N GiB beyond the file (KV + buffers + runtime)"), and returns the reports; `speed_gate.bench` persists them to a sidecar `<dump>.mem.json` (the dump's turn-list format and the resume machinery untouched); on dump reuse the sidecar's peak is re-printed. `full_benchmark.py` phase 4 prints "memory: peak RSS X GiB" per rung from the sidecar.
+- `depth_probe.py`: reports peak RSS per depth (the KV term is IN the number at depth D - the depth-conditioned memory cost).
+
+**Tested with a mock server + a real sleeping process:** banner parse (512 MiB KV -> 0.5 GiB, missing file -> empty), VmHWM read on a live PID, end-to-end bench_model -> report -> sidecar write -> reuse print. The mock's ~0 GiB peaks are the sleep process's honest RSS, not a bug; a real launch reports real numbers.
+
+**The report's role in the study:** the machine's memory ceiling enters the data. Each rung's dump now carries the measured peak RSS alongside its worst w/s - so the study reports not just "passes the reader line at Q6_K" but "passes at Q6_K taking X GiB peak", and the 32 GB ceiling's actual headroom (28 GiB usable estimate vs measured peak) is a graded column, validating addendum 35's 4 GiB reserve assumption rung by rung.
+
+**Pre-registered expectation:** llama.cpp peak RSS ~ file size + 1.5-2.5 GiB (KV at 4096 + Vulkan compute buffers + runtime) for the 7-12B picks; if the measured "beyond the file" exceeds 3 GiB on any pick, the 4 GiB reserve in the memory shortcut was too tight and gets re-fitted from these very numbers.
