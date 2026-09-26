@@ -278,21 +278,29 @@ def main():
           f"{args.gen_tokens} tokens each, ctx {args.ctx}")
 
     extra = ["-ngl", "99", "-c", str(args.ctx)]
-    proc, healthy = llama_server.start_server(args.model, args.port, extra)
-    try:
-        if not healthy:
-            sys.exit("server did not become healthy")
-        results = []
-        for d in depths:
-            print(f"\n--- depth {d} ---")
+    results = []
+    for d in depths:
+        # fresh server per depth: the slot cache survives across depths
+        # on one server, and consecutive blobs share the corpus pool's
+        # opening text - the 2048-blob's tokens stay cached and the
+        # 4000-blob prefills only its tail (measured prompt_n 1959 on
+        # the first two-depth run: decode WAS at ~4000, but prompt_n
+        # under-reported depth). A restart per depth gives every depth
+        # a clean slot and an honest prompt_n (Session 27, addendum 18)
+        print(f"\n--- depth {d} ---")
+        proc, healthy = llama_server.start_server(args.model, args.port,
+                                                  extra)
+        try:
+            if not healthy:
+                sys.exit("server did not become healthy")
             blob, n_tok = build_blob(args.port, pool, d)
             print(f"  blob built: {n_tok} tokens "
                   f"(target {d}, tolerance {DEPTH_TOLERANCE})")
             recs = probe_depth(args.port, blob, args.gen_tokens,
                                args.samples)
             results.append(summarize(recs, d, args.reader_tp, args.floor))
-    finally:
-        llama_server.stop_server(proc, args.port)
+        finally:
+            llama_server.stop_server(proc, args.port)
 
     print("\n" + "=" * 72)
     print("DEPTH SUMMARY  (decode t/s at depth; the law's third term)")

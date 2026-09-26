@@ -572,8 +572,12 @@ def live_dump_name(path, thinking=False, no_thinking=False):
 
 def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
           port=PORT_DEFAULT, ctx=CTX_DEFAULT, repeats=REPEATS_DEFAULT,
-          dump_override=None):
-    """Phase 3: live-bench the model file; returns the dump path."""
+          dump_override=None, force=False):
+    """Phase 3: live-bench the model file; returns the dump path.
+    force: re-measure even if a valid newer dump exists (the resume
+    machinery is the pipeline default; --force is the re-measurement
+    path - e.g. after an instrument fix, when the existing dump
+    predates the fix and its noise records are missing/wrong)."""
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
 
@@ -588,8 +592,10 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
         return any(t.get("model") == label and t.get("server_tps")
                    for t in turns)
 
-    if dump_valid() and os.path.getmtime(dump) > os.path.getmtime(path):
-        print("  [3] reusing existing dump (newer than model file)")
+    if not force and dump_valid() and \
+            os.path.getmtime(dump) > os.path.getmtime(path):
+        print("  [3] reusing existing dump (newer than model file; "
+              "pass --force to re-measure)")
         return dump
     if dry_run:
         return dump
@@ -712,6 +718,9 @@ def main():
     ap.add_argument("--no-thinking", action="store_true",
                     help="hybrid model, non-thinking category (rule 8)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true",
+                    help="re-measure even if a valid newer dump exists "
+                         "(default: reuse it - the resume machinery)")
     # corpus-building steps (from the former live-bench.py)
     ap.add_argument("--make-sample", action="store_true",
                     help="step 0 (once): English extraction from Arena "
@@ -747,7 +756,7 @@ def main():
 
     dump = bench(args.model, args.corpus, args.dry_run, args.thinking,
                  args.no_thinking, args.port, args.ctx, args.repeats,
-                 args.dump)
+                 args.dump, args.force)
     if args.dry_run:
         print(f"[4] would analyze (reader line {args.reader_wps:g} w/s "
               f"- 2*sigma; floor {args.floor:g} t/s as headroom)")

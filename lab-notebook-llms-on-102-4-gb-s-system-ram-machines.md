@@ -1789,3 +1789,22 @@ python3 depth_probe.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --depth 
 ```
 
 (The first re-collects the noise samples with the fixed guard; the second is the two-depth linearity check — the addendum-11 prediction 4 grade, now with the KV tax known ≈ 0, so the check tests the noise story, not the tax.)
+
+---
+
+### Session 27, addendum 18 — the two-depth linearity grade: the KV tax is real but ~7x smaller than the arithmetic; tool fixes (dump reuse vs re-measurement, probe slot-cache)
+
+**The two-depth probe (2048 + 4000, 5 samples x 64 each):**
+
+- depth 2045: worst 15.32, mean 15.42, w/m 0.993
+- depth 4000 (probe reported prompt_n 1959 — see the catch below; true decode depth ≈ 2045 prefix-cached + 1959 prefilled = ~4004): worst 15.04, mean 15.10, w/m 0.996
+- **The linearity grade: mean 15.42 → 15.10 t/s across 2045 → 4004 depth = ~2.1% decay over ~1959 extra KV tokens.** The addendum-11 prediction 4 (the KV term halves from 2048 to 4000... implied third-term bandwidth) — the honest reading: the KV(D) tax the law's third term prices is REAL but tiny on this machine class. Converting: Δdepth = 1959 tokens ≈ KV 0.269 GiB (qwen3.5 fp16 KV); Δ(1/t) = 1/15.10 − 1/15.42 = 1.373 ms/token over 0.269 GiB ≈ **5.1 ms/GiB effective** vs the law's 13.07 ms/GiB size constant — the KV bytes ride the bus at ~39% efficiency of the model-file bytes, or (equivalently) the KV read largely coalesces with the model read already in flight. The addendum-10 arithmetic (+7.4 ms/token at D=4096 → 17.5-19.5 t/s) predicted ~3x the observed decay: measured ≈ +1.4 ms/token at 4096 depth, not +7.4. Addendum 10's box keeps its architecture arithmetic but its TIME prediction is graded MISS by ~5x, and addendum 16's "tax ≈ 0" is refined: tax ≈ 0.3-0.5 t/s across the protocol range — second-order, as ruled, but not zero. The size*(D) refinement of the law is retired for this machine class; if a depth term is ever needed, it prices at ~5 ms/GiB, not 13.
+- Noise at both depths: w/m 0.993/0.996 — machine-constant, the addendum-10 noise hypothesis now graded at TWO depths (HIT).
+
+**Catch (probe): the slot cache carried the 2048-blob into the 4000-depth measurement.** depth 4000 reported "measured prompt_n 1959": the server never restarted between depths, the 4000-blob opens with the same corpus text as the 2048-blob, so the slot reused the 2045-token prefix and prefilled only the 1959-token tail. Decode was at ~4004 (correct for the measurement) but the probe's depth accounting under-reported it — and the prefill-time saving made the second depth look cheaper than it is. Fixed: depth_probe restarts the server per depth (clean slot, honest prompt_n every depth).
+
+**Catch (gate): the resume machinery blocked the re-measurement.** The rerun printed "[3] reusing existing dump (newer than model file)" — correct resume behavior (the dump postdates the model), but the run's purpose was to re-collect the noise samples under the fixed room guard, and the reuse path skips bench_model entirely. Fixed: `--force` re-measures despite a valid newer dump (the pipeline default remains reuse; the flag is the re-measurement path after instrument fixes).
+
+**Standing predictions now graded for qwen3.5-4b Q8_0 (the first family complete under v2.1):** reader guarantee PASS at depth (15.0-15.6 t/s = 10.2-10.6 w/s at 0.68 w/t, vs the 5.0 line: >2x); headroom below floor 20 (k=3) — honestly reported; words/token 0.680 measured (in the 0.65-0.75 band, HIT); noise-at-depth w/m 0.993-0.997 at two depths (band 0.90-1.00, HIT); KV tax second-order (addendum 16, refined here with a number); Session-27 prediction 1 (top-rung selection) on track for the family.
+
+**Remaining for the session:** the gate's own at-depth noise records (ride-history, fixed guard) — one `--force` rerun; the author's live session (prediction 5); then the full-roster rerun commands from Session 27 (all five families, both categories) on the v2/v2.1 protocol.
