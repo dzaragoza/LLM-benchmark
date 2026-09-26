@@ -352,9 +352,20 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     return results, history
 
 
-def noise_sample(port, history, cap_tokens, ctx_tokens, thinking=False,
-                 no_thinking=False, samples=2):
-    """Same-depth noise samples: a tiny follow-up appended to the
+NOISE_PROMPT = ("Reply with a single paragraph about the weather "
+                 "(roughly sixty words).")
+NOISE_TOKENS = 128       # decode span per noise sample; small enough
+                         # to fit the worst-case-full history
+NOISE_MIN_ROOM = 24      # below this remaining budget, skip: the
+                         # history fills the context (Session 27,
+                         # addendum 16: 299 cap on a full history
+                         # -> prompt + n_predict over ctx -> 400,
+                         # which killed the whole run)
+
+
+def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
+                 thinking=False, no_thinking=False, samples=2):
+    """Same-depth noise samples: a short follow-up appended to the
     conversation's own history. The follow-up MUST ride the history:
     llama-server's slot cache reuses only the longest common token
     PREFIX of the incoming prompt, so a bare tiny message shares only
@@ -362,25 +373,45 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, thinking=False,
     shallow decode - not noise at depth (caught on the first real
     v2.1 run: the "noise" sat consistently ABOVE the conversation
     turns, the fingerprint of a shallower decode). With the full
-    history + a tiny final turn, the common prefix covers the whole
+    history + a final turn, the common prefix covers the whole
     cached conversation, only the tail prefills, and decode runs at
     the conversation's depth. Worst/mean across these is the
     machine's noise at depth - cleanly separated from the KV trend
-    (addendum 10)."""
-    msgs = list(history) + [
-        {"role": "user", "content": "Reply with the word: done."}]
+    (addendum 10).
+
+    Room guard: the blob budget is worst-case (every answer at the
+    cap), so after the last turn the history is at the budget - a
+    full-cap generation on top overflows ctx and the server rejects
+    the request with 400. The noise generation is therefore capped
+    small (NOISE_TOKENS) and skipped with a note when the remaining
+    room is gone. A failed request is recorded, never raised: the
+    noise measurement must not kill the run (the addendum-16 crash
+    lost three conversations of collected turns)."""
+    est = blob_tokens + sum(len(m["content"]) for m in history) // 4
+    room = ctx_tokens - est
+    if room < NOISE_MIN_ROOM:
+        print(f"      noise at depth: skipped (history fills the "
+              f"context: ~{est} of {ctx_tokens} tokens, room {room})")
+        return []
+    noise_cap = max(8, min(NOISE_TOKENS, room - 8))
+    msgs = list(history) + [{"role": "user", "content": NOISE_PROMPT}]
     recs = []
     for i in range(1, samples + 1):
         payload = {
             "messages": msgs,
-            "max_tokens": cap_tokens,
+            "max_tokens": noise_cap,
             "temperature": 0,
             "stream": False,
         }
         if no_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": False}
-        data = llama_server.post_json(port, "/v1/chat/completions",
-                                       payload)
+        try:
+            data = llama_server.post_json(port, "/v1/chat/completions",
+                                           payload)
+        except Exception as e:
+            print(f"      noise sample {i} failed: {e}")
+            recs.append({"sample": i, "error": str(e)})
+            continue
         t = data.get("timings", {})
         tps = t.get("predicted_per_second")
         pm = t.get("prompt_ms")
@@ -480,7 +511,8 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           "pass --no-thinking (non-thinking) or "
                           "--thinking (thinking, with the 2048 allowance)")
                 noise = noise_sample(port, conv_history, cap_tokens,
-                                     ctx, thinking, no_thinking)
+                                     ctx, blob_tokens, thinking,
+                                     no_thinking)
                 for r in noise:
                     noise_records.append({"model": label, "conv": ci, **r})
                 ntps = [r["tps"] for r in noise if r["tps"]]
