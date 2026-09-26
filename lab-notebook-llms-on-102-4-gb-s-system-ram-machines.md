@@ -2166,3 +2166,50 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 **The report's role in the study:** the machine's memory ceiling enters the data. Each rung's dump now carries the measured peak RSS alongside its worst w/s - so the study reports not just "passes the reader line at Q6_K" but "passes at Q6_K taking X GiB peak", and the 32 GB ceiling's actual headroom (28 GiB usable estimate vs measured peak) is a graded column, validating addendum 35's 4 GiB reserve assumption rung by rung.
 
 **Pre-registered expectation:** llama.cpp peak RSS ~ file size + 1.5-2.5 GiB (KV at 4096 + Vulkan compute buffers + runtime) for the 7-12B picks; if the measured "beyond the file" exceeds 3 GiB on any pick, the 4 GiB reserve in the memory shortcut was too tight and gets re-fitted from these very numbers.
+
+### Session 29, addendum 37 — grading the first v2.1-roster run: the law HIT, the w/s estimator missed; the words/token minimum replaces the mean; Q4_0 rung removed
+
+**The run (author machine, protocol v2.1, --no-thinking):** Llama-3.1-8B-Instruct Q4_K_M (4.56 GiB), 5 conversations depth-prefilled, early-fail at conv 4 turn 1 (2.09 w/s < 5.0 reader line, addendum 34). Noise at depth: worst 14.09, mean 14.38, w/m 0.980 (n=8). The rung FAILS the gate — llama passed NO rung (Q8_0 and Q6_K fail on law arithmetic before download, Q5_K_M and Q4_K_M both early-failed at the same joke turn).
+
+**The grade, split by side:**
+
+1. **The law HIT on the t/s side (+5–10%).** Predicted 13.7 t/s (band 11.6–15.7) from the Session-26 fit `1/t = size/76.5 + 1/74`; measured turn t/s 14.3–15.0 across 14 turns, noise-at-depth worst 14.09. The law's cross-family transfer to 8B holds — the speed side of the study needs no revision. This also grades addendum-33 prediction 5 (law transfer): HIT.
+2. **The w/s estimate MISSED, 3.6–6× optimistic.** Predicted worst 7.5–12.6 w/s (Q4_K_M point 9.1); the killer turn measured 2.09 w/s — below the reader line. The error is not timing, not the law, not the machine: it is the words/token ASSUMPTION (band 0.65–0.80, "measured 0.680 family value"). The killer turn's own words/token: 30 words / 208 tokens = **0.144** — a terse answer to "Knock, knock!" whose tokens are mostly non-whitespace structure (emoji, markdown, list markers, punctuation-words like "who's-there" split by the whitespace tokenizer).
+3. **The mechanism (on record as the study's central instrument lesson):** the verdict is a MIN over turns, and w/s = words/(wall−prefill) is a per-turn CONTENT-dependent ratio. Multiplying a MEAN words/token (0.65–0.80, or the pooled 0.680) into a min-verdict predicts the typical turn, not the worst. The min over turns punishes terse answers — the answer-shape sensitivity already flagged in addendum 20 (qwen's worst 7.48 w/s was the same short-answer effect at w/t 0.49) and now measured at its extreme in llama. **Corrected estimator (pre-registered for all future predictions): `w/s_pass = t/s(rung) × w/t_min(family)`, where w/t_min is the family's worst-turn words/token** (llama 0.144 measured; qwen 0.49 measured; unmeasured families carry the conservative 0.43–0.49 band until their first run grades it).
+4. **Reproduction check of the corrected estimator on both measured families:** qwen3.5-4b Q8_0 predicted 15.3×0.49 = 7.5 (measured 7.32/7.48/8.24 across three runs); llama-3.1-8b Q4_K_M predicted 13.7×0.144 = 2.0 (measured 2.09). Both land. The estimator is now anchored to two families at two sizes.
+5. **Early-fail's first live firing — validated.** The abort hit at the earliest possible point (turn 1 of the offending conversation), conv 5 skipped, exactly the addendum-34 design. The dump keeps the flagged turn for post-hoc analysis. The optimization saved ~2 bench minutes on this rung alone.
+
+**Author rulings recorded in the same session:**
+
+- **Q4_0 removed from the ladder** (addendum 35's own trigger is gone: gemma-4's QAT rung is unreachable under the Q6 criterion — see the walk-down below). `LADDER_DEFAULT = [Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, Q2_K]`; RUNG_BITS keeps the Q4_0 ratio for ad-hoc --ladder size estimates. "There's a q4_0 that's unnecessary since we have q4_k_m."
+- **Model selection re-run with the selection criterion targeting Q6:** the inclusion filter is now "estimated to pass the speed gate at **quant 6** (Q6_K)" — the author's catch that the quant-4 filter admitted models (llama-3.1-8b's 8B file at 14.3 t/s fails the w/s gate at every rung) that the study's own guarantee would reject.
+
+**The Q6 walk-down (popularity snapshot 2026-09-26, unchanged rules 1–8, quant-6 filter):** the w/s gate at Q6 needs `t/s(Q6_K) × w/t_min ≥ 5.0` → t/s needed ≥ 10.2 at w/t_min 0.49 → size(Q6_K) ≤ ~6.2 GiB (law, −15% margin) → fp16 ≤ ~15 GiB. Candidate members by family (rung sizes from RUNG_BITS × fp16; fp16 from first-party repos):
+
+| family | Q6-capable candidate | Q6_K GiB → t/s → w/s (w/t_min 0.49) | verdict |
+|---|---|---|---|
+| Meta | Llama-3.2-3B-Instruct | 2.60 → 21.1 → 10.3 | **SELECT** (llama3.2 84.4M; the 8B pick is quant-4-only, out under the Q6 filter) |
+| Qwen | Qwen3.5-4B | 3.46 → 17.6 → 8.6 | **SELECT** (qwen3.5 21.0M; the 9B pick fails Q6: 6.9 GiB → 9.6 t/s → 4.7 w/s) |
+| Google | Gemma-3-4B-it | 2.73 → 20.3 → 10.0 | **SELECT** (gemma3 40.7M; gemma4-12b fails Q6: 9.2 GiB → 7.5 t/s → 3.7 w/s) |
+| Mistral | Mistral-7B-v0.3 | 5.5 → 11.7 → 5.7 | **SELECT (barely, band-straddling)** — Q6_K 5.5 GiB → 11.7 t/s → 5.7 w/s at w/t_min 0.49; at the band's low end (0.43) it lands 5.0 exactly. The 7B is the family's highest member that can pass Q6; its t/s headroom (11.7 vs 10.2 needed) is the thinnest of the roster. Prediction: selects Q6_K, worst w/s 5.0–7.0, coin-flip vs early-fail at a terse-answer turn. |
+
+Ruled out under the Q6 filter: Llama-3.1-8B (Q4-only by measurement: Q4_K_M early-failed at 2.09 w/s; Q6_K 6.14 GiB → 10.7 t/s → 5.2 w/s at 0.49 band — but the family's Q6-capable member is the 3B), Qwen3.5-9B (Q6 4.7 w/s FAIL), Gemma-4-12B (Q6 3.7 w/s FAIL), all thinking-only families (unchanged), all 1.5b-class variants (unchanged). The roster is now three 3–4B models + one 7B — the same weight class as study #2's non-thinking roster, and the direct prediction-grading replication of it.
+
+**The roster consequence — study #3's roster is superseded before any further measurement:** the four picks of addendum 33 (Llama-3.1-8B, Qwen3.5-9B, Gemma-4-12B, Mistral-7B-v0.3) are retired with the quant-4 filter; the new roster is Llama-3.2-3B, Qwen3.5-4B, Gemma-3-4B, Mistral-7B-v0.3. Qwen3.5-4B Q8_0 and Llama-3.2-3B Q8_0 (study #2's measured configs) are already-complete data points in the state file; Gemma-3-4B and Mistral-7B-v0.3 are the new measurements. Note the two mode questions on the new roster: Qwen3.5-4B runs in non-thinking mode (rule 8, --no-thinking, verified in addendum 20); Gemma-3-4B is non-thinking by nature (no toggle needed); Mistral-7B-v0.3 and Llama-3.2-3B are non-thinking by nature.
+
+**The command (author machine, pull-first):**
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking "meta-llama/Llama-3.2-3B-Instruct" "Qwen/Qwen3.5-4B" "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it" "mistralai/Mistral-7B-Instruct-v0.3"
+
+**Pre-registered predictions (v2.2 roster, before any new measurement):**
+
+1. **Llama-3.2-3B:** selects **Q8_0** (study #2: Q8_0 3.36 GiB measured 20.6 t/s worst → w/s = 20.6×w/t_min; the study-#2 dump gives the family w/t_min — llama-3.1-8b's 0.144 is the family anchor at 8B, the 3B may be less terse; conservative band 0.15–0.49 → 3.1–10.1 w/s). Honest note: this is the roster's least-confident pick — if the 3B inherits the 8B's joke-answer terseness, Q8_0 fails and the walk descends to Q6_K/Q5_K_M; the early-fail catches it in one conversation. Prediction: Q8_0 PASS, worst 3.1–10.1 w/s, w/t_min 0.15–0.49.
+2. **Qwen3.5-4B:** selects **Q8_0** (already measured: worst 7.32–8.24 w/s, w/t_min 0.49, PASS confident; the selection is a re-grade of addendum-20 data, no new run needed if the state file has the rung marked complete).
+3. **Gemma-3-4B:** selects **Q8_0** (3.96 GiB → 15.3 t/s → 7.5 w/s at 0.49; study-#2 measured the QAT Q4_0 live worst 20.9 t/s → Q8_0 predicted from law+size; w/t_min unmeasured for the family — band 0.43–0.49 → worst 6.6–7.5 w/s). Gemma's SWA boundary: at ctx 4096 the KV tax is window-capped, favoring speed; the rung walk starts at Q8_0.
+4. **Mistral-7B-v0.3:** selects **Q6_K** (5.5 GiB → 11.7 t/s → 5.7 w/s at 0.49; at w/t_min 0.43 it is exactly 5.0 — the roster's only band-straddling pick). Q8_0 7.2 GiB → 9.3 t/s → 4.6 w/s FAILS by the corrected estimator. Prediction: Q6_K PASS, worst 5.0–7.0 w/s; the honest risk is an early-fail on a terse-answer turn (the addendum-37 mechanism) — if it fires, the walk descends to Q5_K_M.
+4b. **The Q6 inclusion filter itself is a prediction:** every family's pick must select at or above Q6_K. If any family selects below Q6_K (e.g. Mistral at Q5_K_M), the inclusion filter missed — grade it as a miss of the estimator, not the model.
+5. **Law transfer at the new sizes:** each pick's measured worst t/s within ±15% of `76.5/(size+t/74)`: llama-3.2-3b 20.6 (already measured, HIT), qwen3.5-4b 15.3 (measured, HIT), gemma-3-4b 15.3±2.3, mistral-7b 11.7±1.8.
+6. **Words/token minimums:** llama w/t_min lands in 0.15–0.49 (the 8B anchor 0.144 is the pessimistic bound; the 3B's terse-answer behavior unmeasured); qwen w/t_min 0.49 (measured); gemma w/t_min 0.43–0.49; mistral w/t_min 0.43–0.49.
+7. **Mode blindness (qwen3.5-4b non-thinking):** reasoning_chars 0 on every turn, no inline think tags (re-grade of addendum-20 data, standing flag).
+8. **No selection descends below Q5_K_M** (the Q6 filter's honest floor; the strict-verdict walk stops at the first PASS).

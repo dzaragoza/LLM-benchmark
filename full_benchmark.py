@@ -88,11 +88,10 @@ CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
 MODELS_DIR_DEFAULT = "./models"
 STATE_FILE_DEFAULT = "./benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
-LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q4_0", "Q3_K_M", "Q2_K"]
-# Q4_0 (addendum 35): the first-party QAT rung - google ships QAT Q4_0
-# GGUF directly (quality ~ bf16 at Q4 size, addendum 33); it sits after
-# Q4_K_M so self-quantized K-quants are preferred, with the QAT file as
-# the first-party fallback at the same bit width.
+# Q4_0 removed (author ruling, addendum 37): Q4_K_M is the single 4-bit
+# rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
+# RUNG_BITS keeps the Q4_0 ratio for ad-hoc --ladder size estimates.
+LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"]
 FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
