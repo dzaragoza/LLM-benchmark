@@ -172,6 +172,22 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
         print(f"  --force: re-benching the ladder "
               f"({cleared} stored verdict(s) cleared; files reused)")
 
+    # Stale-state guard (addendum 43): a stored rung file can vanish
+    # from disk (folder deleted/moved) while benchmark-state.json still
+    # marks phases 1-2 done. Trusting the state then crashes phase 3
+    # with a bare FileNotFoundError. Invalidate those phases so the
+    # walk re-acquires (re-download/re-quantize; both stages are
+    # idempotent) instead of benching a path that is not there.
+    for rung, run in fst["runs"].items():
+        f = run.get("file")
+        if f and not os.path.isfile(f):
+            run["phases_done"] = []
+            run.pop("file", None)
+            run.pop("plan", None)
+            save_state(state_path, state)
+            print(f"  stored rung file missing on disk ({f}) - "
+                  "phases 1-2 invalidated; will re-acquire")
+
     hf_download.require_hub()
     try:
         model_files = list_repo_files(model_repo)
