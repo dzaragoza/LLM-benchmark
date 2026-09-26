@@ -14,20 +14,40 @@ citable - the same philosophy as the cached ARC-Challenge question
 set. This script owns corpus/sample building too (the --make-sample /
 --make-corpus steps of the former live-bench.py).
 
-Protocol (fixed, pre-registered):
-  - N conversations from the corpus, played verbatim (user turns sent;
-    the model generates its own answers turn by turn)
+Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
+  - The guarantee, restated: the WORST turn AT THE REFERENCE DEPTH
+    (the 4096 protocol constant, addendum 9) must never fall below
+    the anchor reader - 6.5 t/s = 300 wpm at 0.75 words/token (k=1,
+    Brysbaert 2019; addenda 2-6) - so even a fast reader is never
+    made to wait. Floor 20 (k=3) is reported as headroom, not gated.
+  - Each conversation runs ON TOP of a depth prefill: a blob of
+    corpus text (content irrelevant - the KV cost is
+    content-independent, addendum 11) as a prepended user turn,
+    sized per conversation via /tokenize so the deepest turn lands
+    just under the reference depth. The blob rides inside the
+    history, so the chat template wraps it and the prompt cache
+    retains it turn-to-turn (cache_prompt, on by default).
+  - After each conversation: same-depth noise samples (identical
+    tiny follow-ups on the slot the conversation left) - worst/mean
+    across them is the machine's noise at depth, cleanly separated
+    from the KV trend (the addendum-10 attribution).
+  - Never exceeds ctx (context shift would silently discard the
+    blob; gemma-3 hard-errors on shift) - the blob budget is
+    ctx - headroom - the conversation's own worst-case accumulation.
+  - N conversations from the corpus, played verbatim on top of the
+    blob (user turns sent; the model generates its own answers)
   - Each answer capped at the corpus's own reply-length p75 (measured,
     not guessed)
-  - History accumulates turn-to-turn (KV depth grows, like real chat)
   - Temperature 0 (greedy): deterministic, repeatable
   - The server's own timing (timings.predicted_per_second) is the
     authoritative metric; an external wall-clock cross-check (generation
     span = wall time minus prompt processing) is computed per turn
-  - THE RESULT IS THE WORST TURN: each conversation reports its slowest
-    turn; the qualifying score is the global worst turn across all
-    conversations. Verdict: PASS if worst >= floor - 2*sigma (lenient
-    2-sigma ruling, 2026-09-23); first PASS = selected.
+  - THE RESULT IS THE WORST TURN across all depth-conditioned turns;
+    verdict: PASS if worst >= reader line - 2*sigma (the lenient
+    2-sigma ruling, now applied to the guarantee line); first PASS =
+    selected - which, at the reader line, walks the ladder to the
+    TOP rung that still guarantees the reader (the old floor-20 gate
+    was a headroom judgment and rejected rungs the guarantee admits).
   - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
 
 Thinking-model category (author ruling 2026-09-24): the SAME worst-turn
@@ -77,8 +97,14 @@ import llama_server
 
 CORPUS_DEFAULT = "./live-corpus.json"
 FLOOR_DEFAULT = 20.0
+READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
+                          # reader (Brysbaert 2019). Protocol v2.1:
+                          # the anchor is words, not tokens.
+WORDS_PER_TOKEN_DEFAULT = 0.75  # unanchored rule of thumb; replaced per
+                                # dump by the measured ratio (v2.1)
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
+DEPTH_HEADROOM = 64
 REPEATS_DEFAULT = 1
 ARENA_DIR = "./arena/data"
 SAMPLE_OUT = "./arena/english_sample.json"
@@ -213,10 +239,47 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
 
 # =========================================================== measurement
 
+def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
+    """Per-conversation blob budget: the deepest turn must land at the
+    reference depth without ever exceeding ctx (context shift would
+    silently discard the blob - and gemma-3 hard-errors on shift).
+    Estimates conversation-side tokens at 4 chars/token (the blob is
+    exact via /tokenize; the conversation estimate only sizes the blob,
+    it never decides the measurement). Thinking mode: generation can
+    reach cap + THINK_ALLOWANCE, and reasoning + answer both persist
+    in the history - budgeted at 4 chars/token chars-side."""
+    conv_side = 0
+    for q in user_turns:
+        conv_side += len(q) // 4
+        conv_side += (cap_tokens + THINK_ALLOWANCE) \
+            if thinking else cap_tokens
+    budget = ctx - DEPTH_HEADROOM - conv_side
+    return max(0, budget)
+
+
+def build_blob(port, pool, budget):
+    """Depth-prefill blob for one conversation: repeated corpus text
+    trimmed to the exact per-model token budget via /tokenize."""
+    if budget <= 0:
+        return None, 0
+    reps = budget * 8 // max(1, len(pool)) + 2
+    text = "\n\n".join([pool] * reps)
+    return llama_server.trim_to_tokens(port, text, budget)
+
+
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
-                     thinking=False, no_thinking=False):
+                     thinking=False, no_thinking=False, blob=None,
+                     blob_tokens=0):
+    """Protocol v2: the conversation runs ON TOP of the depth prefill.
+    The blob is a prepended user turn, so the chat template wraps it,
+    cache_prompt retains it turn-to-turn, and every generated turn is
+    depth-conditioned at the reference depth. Timing (like KV cost) is
+    content-independent; only the depth matters."""
     history = []
     results = []
+    if blob:
+        history.append({"role": "user", "content": blob})
+        history.append({"role": "assistant", "content": "Understood."})
     for i, question in enumerate(user_turns):
         history.append({"role": "user", "content": question})
         payload = {
@@ -247,14 +310,34 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         ext_gen_s = wall_s - (prompt_ms / 1000.0) if prompt_ms else wall_s
         ext_tps = (n_pred / ext_gen_s) if (n_pred and ext_gen_s > 0) else None
 
+        # depth estimate: the blob is already inside the history, so
+        # count its chars once (as the exact tokenized blob_tokens)
+        blob_chars = len(blob) if blob else 0
         history_chars = sum(len(m["content"]) for m in history[:-1])
-        depth_tokens = history_chars // 4
+        depth_tokens = blob_tokens + (history_chars - blob_chars) // 4
+
+        # Protocol v2.1: the guarantee is anchored in WORDS per second
+        # (300 wpm = 5.0 w/s, Brysbaert 2019). t/s was always a
+        # derivative via the 0.75 words/token rule of thumb - the
+        # honest instrument measures both, from the generated text
+        # itself: words = whitespace tokens of the answer, w/s =
+        # words / generation span (wall minus prefill - the same
+        # span the external cross-check uses).
+        answer_words = len(answer.split()) if answer.strip() else 0
+        gen_span_s = ext_gen_s if (ext_gen_s and ext_gen_s > 0) else None
+        words_per_sec = (answer_words / gen_span_s
+                         if (answer_words and gen_span_s) else None)
 
         results.append({
             "turn": i + 1,
             "depth_tokens_est": depth_tokens,
+            "blob_tokens": blob_tokens,
             "gen_tokens": n_pred,
+            "gen_words": answer_words,
             "server_tps": server_tps,
+            "server_wps": words_per_sec,
+            "words_per_token": ((answer_words / n_pred)
+                                if (answer_words and n_pred) else None),
             "ext_tps": ext_tps,
             "wall_tps": (n_pred / wall_s) if (n_pred and wall_s) else None,
             "prompt_ms": prompt_ms,
@@ -266,12 +349,57 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     return results
 
 
+def noise_sample(port, cap_tokens, ctx_tokens, thinking=False,
+                 no_thinking=False, samples=2):
+    """Same-depth noise samples: identical tiny follow-up requests on
+    the slot the conversation just left (prompt cache retains the full
+    depth). Worst/mean across these is the machine's noise at depth -
+    cleanly separating noise from the KV trend (addendum 10)."""
+    msgs = [{"role": "user", "content": "Reply with the word: done."}]
+    recs = []
+    for i in range(1, samples + 1):
+        payload = {
+            "messages": msgs,
+            "max_tokens": cap_tokens,
+            "temperature": 0,
+            "stream": False,
+        }
+        if no_thinking:
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
+        data = llama_server.post_json(port, "/v1/chat/completions",
+                                       payload)
+        t = data.get("timings", {})
+        tps = t.get("predicted_per_second")
+        pm = t.get("prompt_ms")
+        msg = data["choices"][0]["message"]
+        ans = (msg.get("content") or "").strip()
+        ans_words = len(ans.split()) if ans else 0
+        n_pred = t.get("predicted_n")
+        gen_span = ((data.get("timings", {}).get("predicted_ms") or 0)
+                    / 1000.0)
+        wps = (ans_words / gen_span
+               if (ans_words and gen_span > 0) else None)
+        recs.append({
+            "sample": i,
+            "prompt_n": t.get("prompt_n"),
+            "prompt_ms": pm,
+            "gen_tokens": n_pred,
+            "gen_words": ans_words,
+            "tps": tps,
+            "wps": wps,
+            "words_per_token": ((ans_words / n_pred)
+                                if (ans_words and n_pred) else None),
+        })
+    return recs
+
+
 def bench_model(model, corpus_file, port, ctx, repeats,
                thinking=False, no_thinking=False, server_bin=None,
                label=None):
     """Live-bench one model end to end (server launch included).
-    Returns (all_turns, summary) - the per-turn records and the
-    (label, worst, avg_worsts, verdict) summary line."""
+    Protocol v2: per-conversation depth prefill to the reference
+    depth, worst turn across all depth-conditioned turns, plus the
+    same-depth noise samples. Returns (all_turns, summary)."""
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
@@ -280,6 +408,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
 
     print(f"\n=== {label} ===")
     all_turns = []
+    noise_records = []
     repeat_worsts = []
     for rep in range(1, repeats + 1):
         print(f"  [rep {rep}/{repeats}] starting server...", flush=True)
@@ -295,21 +424,34 @@ def bench_model(model, corpus_file, port, ctx, repeats,
             if not healthy:
                 print("  ERROR: server did not become healthy; skipping")
                 continue
+            pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
             conv_worsts = []
             for ci, conv in enumerate(conversations, 1):
+                budget = depth_budget(conv["user_turns"], cap_tokens, ctx,
+                                      thinking)
+                blob, blob_tokens = build_blob(port, pool, budget)
+                if blob is None:
+                    print(f"    conv {ci}: no blob budget left "
+                          f"(conversation alone fills the context - run "
+                          "at the shallower reference depth as-is)")
                 res = run_conversation(port, conv["user_turns"],
-                                       cap_tokens, ctx,
-                                       thinking, no_thinking)
+                                       cap_tokens, ctx, thinking,
+                                       no_thinking, blob, blob_tokens)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
+                wps = [r["server_wps"] for r in res if r["server_wps"]]
                 cworst = min(tps) if tps else None
                 cmean = sum(tps) / len(tps) if tps else None
                 conv_worsts.append(cworst)
-                print(f"    conv {ci}: turns t/s: "
+                print(f"    conv {ci} (blob {blob_tokens} tok): turns t/s: "
                       + ", ".join(f"{x:.1f}" for x in tps)
                       + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
                          if cworst else ""))
+                if wps:
+                    print(f"      words/s: "
+                          + ", ".join(f"{x:.1f}" for x in wps)
+                          + f"   (reader line {READER_WPS_DEFAULT:g} w/s)")
                 if thinking:
                     tk = [r["thinking_tokens_est"] for r in res]
                     empt = sum(r["answer_empty"] for r in res)
@@ -317,6 +459,14 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           + ", ".join(str(x) for x in tk)
                           + (f"   ({empt} empty answer(s))"
                              if empt else ""))
+                noise = noise_sample(port, cap_tokens, ctx, thinking,
+                                    no_thinking)
+                for r in noise:
+                    noise_records.append({"model": label, "conv": ci, **r})
+                ntps = [r["tps"] for r in noise if r["tps"]]
+                if ntps:
+                    print(f"      noise at depth: "
+                          + ", ".join(f"{x:.1f}" for x in ntps))
         finally:
             llama_server.stop_server(proc, port)
         valid = [w for w in conv_worsts if w]
@@ -337,6 +487,13 @@ def bench_model(model, corpus_file, port, ctx, repeats,
               f"(min of {len(repeat_worsts)} reps; "
               f"avg-of-rep-worsts {avg_worsts:.1f})")
         summary = (label, worst, avg_worsts)
+    if noise_records:
+        ntps = [r["tps"] for r in noise_records if r.get("tps")]
+        if ntps:
+            nw = min(ntps)
+            nm = sum(ntps) / len(ntps)
+            print(f"  {label}: NOISE AT DEPTH: worst {nw:.2f}  mean {nm:.2f}"
+                  f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})")
     return all_turns, summary
 
 
@@ -389,8 +546,26 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
 
 
 def analyze(path, floor, thinking=False, no_thinking=False,
-            dump_override=None):
-    """Phase 4: worst-turn verdict from the dump."""
+            dump_override=None,
+            reader_wps=READER_WPS_DEFAULT,
+            words_per_token_default=WORDS_PER_TOKEN_DEFAULT):
+    """Phase 4: the guarantee verdict from the dump.
+
+    Protocol v2.1 (author catch, Session 27): t/s is not w/s. The
+    guarantee's anchor is a READER: 300 wpm = 5.0 words per second
+    (Brysbaert 2019) - words, not tokens. The verdict is computed in
+    WORDS per second, measured from the generated text itself
+    (whitespace words / generation span). The token-side line
+    (6.5 t/s = 5.0 w/s / 0.75 words-per-token) is printed for
+    continuity, but it is a derivative: a tokenizer with a lower
+    words/token ratio fails the READER while passing 6.5 t/s, and the
+    honest instrument must not let that pass. For dumps without
+    measured w/s (protocol-v1 data), the verdict converts via the
+    dump's own words/token when present, else the 0.75 default -
+    flagged as unanchored in the result.
+
+    Floor 20 t/s (k=3) stays a HEADROOM column, never the verdict.
+    """
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
     try:
@@ -402,12 +577,24 @@ def analyze(path, floor, thinking=False, no_thinking=False,
             if t.get("model") == label and t.get("server_tps")]
     if not mine:
         fail(4, label, "dump has no turns for this model", GUIDE[4])
+
+    # measured words/token across the dump (v2.1 turns carry it)
+    ratios = [t["words_per_token"] for t in mine
+              if t.get("words_per_token")]
+    wpt = (sum(ratios) / len(ratios)) if ratios else words_per_token_default
+    wpt_measured = bool(ratios)
+
+    def turn_wps(t):
+        if t.get("server_wps") is not None:
+            return t["server_wps"]
+        return t["server_tps"] * wpt
+
     convs = {}
     for t in mine:
-        convs.setdefault(t["conv"], []).append(t["server_tps"])
+        convs.setdefault(t["conv"], []).append(turn_wps(t))
     conv_worsts = [min(v) for v in convs.values()]
-    worst = min(conv_worsts)
-    mean = sum(t["server_tps"] for t in mine) / len(mine)
+    worst_wps = min(conv_worsts)
+    mean_wps = sum(turn_wps(t) for t in mine) / len(mine)
     if len(conv_worsts) > 1:
         mu = sum(conv_worsts) / len(conv_worsts)
         sd = math.sqrt(sum((w - mu) ** 2 for w in conv_worsts)
@@ -415,15 +602,24 @@ def analyze(path, floor, thinking=False, no_thinking=False,
         sigma = sd / math.sqrt(len(conv_worsts))
     else:
         sigma = 0.0
-    threshold = floor - 2 * sigma
-    if worst >= floor:
+    threshold = reader_wps - 2 * sigma
+    if worst_wps >= reader_wps:
         verdict = "PASS (confident)"
-    elif worst >= threshold:
+    elif worst_wps >= threshold:
         verdict = "PASS (within 2-sigma)"
     else:
         verdict = "FAIL"
-    return {"worst": worst, "mean": mean, "sigma": sigma,
+    # token-side view: continuity + the law's currency + headroom
+    worst_tps = min(t["server_tps"] for t in mine)
+    mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
+    headroom = "intact" if worst_tps >= floor else "below floor (k=3)"
+    return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
             "threshold": threshold, "verdict": verdict,
+            "reader_wps": reader_wps,
+            "words_per_token": wpt,
+            "words_per_token_measured": wpt_measured,
+            "worst_tps": worst_tps, "mean_tps": mean_tps,
+            "floor": floor, "headroom": headroom,
             "n_turns": len(mine), "n_convs": len(conv_worsts),
             "dump": dump}
 
@@ -438,7 +634,13 @@ def main():
     ap.add_argument("--model", help=".gguf file to bench")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
-                    help="worst-turn comfort floor (t/s)")
+                    help="the k=3 headroom line (t/s), reported not "
+                         "gated (protocol v2)")
+    ap.add_argument("--reader-wps", type=float, default=READER_WPS_DEFAULT,
+                    help=f"the k=1 guarantee line in WORDS per second "
+                         f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
+                         f"Brysbaert 2019 - match the fast reader; the "
+                         f"t/s line is this divided by words/token)")
     ap.add_argument("--dump", default=None,
                     help="live-dump path override (default: next to the "
                          "model file, mode-suffixed)")
@@ -489,14 +691,22 @@ def main():
                  args.no_thinking, args.port, args.ctx, args.repeats,
                  args.dump)
     if args.dry_run:
-        print(f"[4] would analyze (floor {args.floor:g} - 2*sigma)")
+        print(f"[4] would analyze (reader line {args.reader_wps:g} w/s "
+              f"- 2*sigma; floor {args.floor:g} t/s as headroom)")
         return
     res = analyze(args.model, args.floor, args.thinking, args.no_thinking,
-                  args.dump)
+                  args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
-    print(f"[4] worst {res['worst']:.1f} t/s "
-          f"(mean {res['mean']:.1f}, sigma {res['sigma']:.2f}, "
-          f"threshold {res['threshold']:.1f}) -> {res['verdict']}")
+    print(f"[4] worst {res['worst']:.2f} w/s "
+          f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}, "
+          f"guarantee threshold {res['threshold']:.2f} w/s) "
+          f"-> {res['verdict']}")
+    print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
+          f"(mean {res['mean_tps']:.1f}); words/token "
+          f"{res['words_per_token']:.3f}"
+          + (" (measured)" if res["words_per_token_measured"]
+             else " (0.75 default, unanchored)"))
+    print(f"    headroom vs floor {args.floor:g} t/s: {res['headroom']}")
 
 
 if __name__ == "__main__":
