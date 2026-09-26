@@ -2019,3 +2019,12 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
     python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking --interactive --reader-wps 7 --keep-server
 
 (the second run re-simulates at the author's faster pace; --keep-server avoids the relaunch. The .session.json deltas allow any post-hoc re-simulation.)
+
+### Session 27, addendum 31 — the reaction-time anchor: 0.5 s was a guess, 0.45 s is cited
+
+**The author's challenge: "find typical reaction times for humans, 0.5 s feels arbitrary."** Correct - the 0.5 s default was unanchored. The literature decomposition of the notice-and-start delay:
+
+- *Simple visual reaction time (detect the stimulus):* ~190-250 ms for adults (college-age visual ~190 ms; standard band 200-300 ms, large-dataset median ~250 ms).
+- *Saccade latency (orient the eyes to the new text):* ~200 ms typical (Carpenter 1988, via Scholarpedia's human saccadic eye movements entry); 200-250 ms after a target step (IOVS latency study); the reading-specific anchor is PubMed 6227700 ("Latency of sequential eye movements: implications for reading"): "the average minimum latency of saccadic eye movements (175-200 msec) approaches the mean duration of fixations in reading (200-250 msec)."
+
+**Anchored default: reaction_s = 0.45 s** (0.25 detect + 0.20 saccade), replacing the unanchored 0.50 s. The guess happened to land within 10-20% of the anchor - recorded as luck, not vindication. One case-specific refinement on record: in the interactive session the author is already attending the output area when she presses Enter - the saccade literature's gap paradigm (anticipated target cuts latency to ~150 ms) puts her effective delay nearer 0.35 s; the flag stays tunable and the deltas in the dump allow re-simulation at any value, so the constant is a default, not a commitment. Sensitivity note: the collision metrics' dependence on reaction_s is weak in the regime that matters - reaction shifts the reader's start line by +/-0.1 s, which changes waiting time only on turns whose stream pace is within reader_wps x 0.1 s ~ half a word of the collision boundary.
