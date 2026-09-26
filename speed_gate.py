@@ -253,7 +253,15 @@ def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
         conv_side += len(q) // 4
         conv_side += (cap_tokens + THINK_ALLOWANCE) \
             if thinking else cap_tokens
-    budget = ctx - DEPTH_HEADROOM - conv_side
+    # the noise measurement is protocol, not an afterthought: its
+    # request (message + template wrappers + decode span) rides the
+    # SAME worst-case-full history as the last turn, so its room is
+    # reserved in the blob budget - not hoped for afterward (conv 3
+    # of the addendum-22 run: max-length conversation, 64-token
+    # headroom, noise needs ~224 -> 400 twice, fence held, samples
+    # lost). Reserved = the full noise request's rendered size.
+    reserve = NOISE_OVERHEAD + NOISE_TOKENS
+    budget = ctx - DEPTH_HEADROOM - reserve - conv_side
     return max(0, budget)
 
 
@@ -425,15 +433,15 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
         if no_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": False}
         data = None
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             try:
                 data = llama_server.post_json(
                     port, "/v1/chat/completions", payload)
                 break
             except Exception as e:
-                if attempt == 1 and noise_cap > 16:
+                if attempt < 3 and noise_cap > 8:
                     # 400 with room to spare means the overhead
-                    # estimate was tight - halve and retry once
+                    # estimate was tight - halve and retry
                     noise_cap = max(8, noise_cap // 2)
                     payload["max_tokens"] = noise_cap
                     print(f"      noise sample {i}: retrying with "
