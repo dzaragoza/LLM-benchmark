@@ -87,7 +87,7 @@ STATE_FILE_DEFAULT = "./benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"]
 FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
-READER_TP_DEFAULT = speed_gate.READER_TPS_DEFAULT
+READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
 ARC_RESULTS_DIR_DEFAULT = arc_eval.ARC_RESULTS_DIR_DEFAULT
 ARC_PORT = arc_eval.ARC_PORT
@@ -127,7 +127,7 @@ def save_state(path, state):
 
 def process_family(spec, ladder, corpus, floor, models_dir, state,
                    state_path, dry_run, force, thinking=False,
-                   no_thinking=False, reader_tp=READER_TP_DEFAULT):
+                   no_thinking=False, reader_wps=READER_WPS_DEFAULT):
     model_repo, _, source_repo = spec.partition("=")
     if not source_repo:
         source_repo = model_repo
@@ -184,8 +184,8 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
         path = run.get("file") or local_rung(famdir, rung)
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
-            print(f"  [4] would analyze (reader line {reader_tp:g} "
-                  f"- 2*sigma; floor {floor:g} as headroom)")
+            print(f"  [4] would analyze (reader line {reader_wps:g} "
+                  f"w/s - 2*sigma; floor {floor:g} t/s as headroom)")
             continue
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(path, corpus, dry_run, thinking,
@@ -195,15 +195,20 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
         if 4 not in run["phases_done"]:
             res = speed_gate.analyze(path, floor, thinking, no_thinking,
-                                     reader_tp=reader_tp)
+                                     reader_wps=reader_wps)
             run.update(res)
             run["phases_done"].append(4)
             save_state(state_path, state)
-            print(f"  [4] worst {res['worst']:.1f} t/s "
-                  f"(mean {res['mean']:.1f}, sigma {res['sigma']:.2f}, "
-                  f"guarantee threshold {res['threshold']:.1f}) "
+            print(f"  [4] worst {res['worst']:.2f} w/s "
+                  f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}, "
+                  f"guarantee threshold {res['threshold']:.2f} w/s) "
                   f"-> {res['verdict']}")
-            print(f"      headroom vs floor {floor:g}: {res['headroom']}")
+            print(f"      token-side: worst {res['worst_tps']:.1f} t/s, "
+                  f"words/token {res['words_per_token']:.3f}"
+                  + (" (measured)" if res["words_per_token_measured"]
+                     else " (0.75 default, unanchored)"))
+            print(f"      headroom vs floor {floor:g} t/s: "
+                  f"{res['headroom']}")
         if str(run["verdict"]).startswith("PASS"):
             fst["selected"] = rung
             run["rung"] = rung
@@ -225,10 +230,12 @@ def main():
     ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
                     help="the k=3 headroom line (t/s), reported not "
                          "gated (protocol v2)")
-    ap.add_argument("--reader-tp", type=float, default=READER_TP_DEFAULT,
-                    help="the k=1 guarantee line: worst turn at the "
-                         "reference depth must never fall below this "
-                         "(default 6.5 = 300 wpm at 0.75 words/token)")
+    ap.add_argument("--reader-wps", type=float,
+                    default=READER_WPS_DEFAULT,
+                    help="the k=1 guarantee line in WORDS per second: "
+                         "worst turn at the reference depth must never "
+                         "fall below this (default 5.0 w/s = 300 wpm, "
+                         "Brysbaert 2019 - match the fast reader)")
     ap.add_argument("--ladder", default=",".join(LADDER_DEFAULT))
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -323,7 +330,7 @@ def main():
         process_family(spec, ladder, args.corpus, args.floor,
                        args.models_dir, state, args.state_file,
                        args.dry_run, args.force, args.thinking,
-                       args.no_thinking, args.reader_tp)
+                       args.no_thinking, args.reader_wps)
 
     if args.dry_run:
         print("\ndry run complete - no files were downloaded or tested")
