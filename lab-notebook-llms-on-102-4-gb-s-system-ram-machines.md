@@ -1884,3 +1884,21 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thin
 ```
 
 Expected: blob sizes ~224 smaller (conv 1: 2799 → ~2575), noise on ALL five conversations (n=10), no 400s, no retries; worst t/s ~15.4 (unchanged - the blob shrink is inside the KV-tax noise); w/m in 0.95-1.00. If n=10 lands and no error records appear, qwen Q8_0's card closes with the complete at-depth noise set and the instrument is done - the full-roster rerun (Session 27's commands, all five families) is then the only open measurement, plus the author's live session.
+
+---
+
+### Session 27, addendum 23 — the pause: experiment value, the stopping criterion, and what the two instruments taught
+
+**The value audit (author's challenge: "Aren't we just getting the same data?").** Honest answer: the measurement converged by run 3 of the six qwen Q8_0 runs (worst w/s 7.32-7.52, words/token 0.680, PASS on five consecutive verdicts). Runs 4-6 were instrument shakeout, not science - valuable shakeout (five real bugs, each findable only on real hardware, in the cheapest possible place), but shakeout. **The stopping criterion, now on record: when consecutive runs return identical verdicts and the only new information is error-path behavior, the instrument is done.** By that criterion the proposed "closing run" (n=8 -> n=10 noise samples) is skippable - it refines an already-graded quantity and cannot change a grade. Transferable rule: one shakeout model per protocol revision (2-3 runs), then the roster starts only after verdicts stabilize.
+
+**Value ranking going forward:** (1) the full-roster rerun - the study's dataset, grades the all-families-top-rung and >=2-families-change-rungs predictions across the field; (2) the author's live session - the one measurement the instrument cannot replace (the protocol pivoted on a felt-experience claim; Q8_0 at 7.5 w/s vs Q5_K_M at 21 t/s is exactly that question); (3) depth probes as a sidecar during the roster run (KV constant per family, minutes each); (4) more qwen Q8_0 - diminishing returns, card closed.
+
+**What the speed gate vs the depth probe taught (the author's question).**
+
+*Where they agree - the cross-validation is itself a result:* gate conversations at ~3.5-4k depth measured 14.9-15.6 t/s; the probe at exact 2045/4000 measured 14.94-15.27 t/s. Two independent code paths (chat completions with full history vs raw completion on a blob), the same physics within noise. This validates the addendum-11 premise end to end: the conversation machinery (template, multi-turn, real answers) costs nothing measurable in decode - the blob shortcut is physically legitimate, and the gate's numbers are the probe's numbers in context.
+
+*Only the probe could teach (physics):* the KV tax ~3-5 ms/GiB effective vs the 13.07 size constant (the addendum-10 arithmetic prediction missed ~5x; "depth eats size" is dead on unified memory - no conversation could isolate this, the probe's exact paired depths did); machine-constant noise at exact depth (w/m 0.995-0.997); the prefill regime (~434 tok/s -> ~8.5 s TTFT for a cold 4k query, the un-gated axis the report must note). Cost: minutes per depth.
+
+*Only the gate could teach (the reader):* words/token 0.680 (the 0.75 rule of thumb dead for qwen; the probe cannot measure this - ignore_eos garbage has no meaningful words); worst-turn w/s and its answer-shape sensitivity (the min-over-turns punishes short answers; worst w/s is not worst t/s x w/t); the hybrid empty-answer behavior (mode changes content, not timing); noise riding a real cached history (w/m 0.968-0.998). Cost: ~10x the probe.
+
+*The structural lesson:* each instrument falsified one unvalidated assumption and neither could have falsified the other's - the probe killed the KV arithmetic, the gate killed the w/t rule of thumb. The bug count tells the same story: the probe needed one fix (slot prefix carry), the gate needed five (prefix cache, room guard, double count, KeyError, noise budget) - every bug lived in the layer that touches realism (template, history, cache, room, content). The addendum-14 division of labor is validated by data, not just principle: probe = decode physics at exact depth; gate = the reader's experience; the guarantee needs both - physics to establish depth is nearly free, experience to establish what the reader actually receives.
