@@ -154,6 +154,23 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
               f"({s['verdict']}, worst {s['worst']:.1f} t/s) - skipping "
               "(--force to redo)")
         return
+    if force:
+        # --force re-benches: clear every rung's verdict and phases 3-4
+        # (phases 1-2 stay done - the rung files exist and are reused;
+        # the dumps are re-measured because speed_gate.bench gets force
+        # too). Without this, the ladder walk below would skip on the
+        # STORED verdicts and --force would silently do nothing past
+        # the family-level check (addendum 42).
+        cleared = 0
+        for run in fst["runs"].values():
+            run["phases_done"] = [p for p in run.get("phases_done", [])
+                                  if p in (1, 2)]
+            if run.pop("verdict", None) is not None:
+                cleared += 1
+        fst["selected"] = None
+        save_state(state_path, state)
+        print(f"  --force: re-benching the ladder "
+              f"({cleared} stored verdict(s) cleared; files reused)")
 
     hf_download.require_hub()
     try:
@@ -201,7 +218,8 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             continue
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(path, corpus, dry_run, thinking,
-                                    no_thinking, reader_wps=reader_wps)
+                                    no_thinking, force=force,
+                                    reader_wps=reader_wps)
             run["phases_done"].append(3)
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
