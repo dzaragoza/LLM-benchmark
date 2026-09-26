@@ -1666,3 +1666,35 @@ python3 full_benchmark.py --thinking --state-file benchmark-state-thinking.json 
 ```
 
 Then `--arc-only` rankings per category on the new selections; the McNemar restriction rule (Session 25 addendum 2) applies per category as before. Fresh dumps throughout (the v2 dump format adds blob_tokens/depth fields — old dumps are protocol-v1 data, kept, never reused by v2 resume; the mode-suffix rule from Session 25 is unchanged and still mandatory).
+
+---
+
+### Session 27, addendum 13 — protocol v2.1: the guarantee is anchored in words, not tokens (author's catch)
+
+**The catch.** The author spotted the unit error before any rerun ran: "6.5 t/s is not 6.5 w/s." The reader anchor was always **words** (300 wpm, Brysbaert 2019) = **5.0 words/s**; the 6.5 t/s line was a derivative — 5.0 w/s ÷ the 0.75 words/token rule of thumb, which addendum 3 flagged as unanchored and scheduled for measurement. The two lines coincide only at exactly 0.75. A tokenizer with a lower words/token ratio passes 6.5 t/s while failing the READER: the stream delivers fewer words per second than the reader consumes, and the reader waits. The honest instrument must anchor the verdict in w/s and measure the ratio, not assume it.
+
+**Protocol v2.1 changes (implementation, committed before any rerun):**
+
+1. Every turn record now carries `gen_words` (whitespace words of the answer), `server_wps` (words / generation span, where generation span = wall − prompt_ms/1000, the same span the external cross-check uses), and `words_per_token` (measured, per turn).
+2. The verdict is computed in **w/s**: worst conversation-worst (in w/s) vs the reader line 5.0 w/s − 2σ. `READER_WPS_DEFAULT = 5.0` replaces `READER_TPS_DEFAULT = 6.5`; CLI flag `--reader-tp` → `--reader-wps` (both `speed_gate.py` and `full_benchmark.py`).
+3. The **token-side view** is printed alongside (worst/mean t/s, words/token measured-vs-default flag, headroom vs floor 20) — continuity with the law's currency (the size→t/s law is in t/s; the guarantee is in w/s; the bridge is the measured words/token).
+4. Noise samples carry `wps` and `words_per_token` too.
+5. **v1 dumps** (no w/s fields) convert via the dump's own words/token when present, else the 0.75 default — flagged `unanchored` in the result. Session-20 v1 verdicts were computed in t/s against 6.5; their v2.1 re-reading may differ where words/token ≠ 0.75.
+
+**Why this matters (the mock made it concrete):** the verification mock's tokenizer produces 0.688 words/token. At the mock's worst depth turn (14.8 t/s) the 0.75 assumption reads 11.1 w/s; the measured value is 10.1 w/s — a 9% overestimate. The direction of the error matters: a tokenizer that is MORE verbose per token (lower w/t) makes the t/s line LOOK safer than it is. Qwen's tokenizers are more verbose than Llama's (addendum 3, prediction 3), so qwen models were the most exposed to the unanchored rule.
+
+**Tool state:** `speed_gate.py` w/s verdict with v1 fallback (mock-tested: measured path, unanchored-fallback path, strict-FAIL path); `full_benchmark.py` threads `reader_wps` and prints the w/s verdict + token-side view; README protocol notes updated. `lag_analyze.py` still gates at 6.5 t/s (`READER_TPS_DEFAULT`) — its reader line should gain the same w/s anchoring for consistency; queued as follow-up, author has not ruled.
+
+**Pre-registered predictions (v2.1, before the qwen Q8_0 run):**
+
+1. Qwen3.5-4B Q8_0 at depth clears the reader line in w/s: measured worst ≥ 5.0 w/s. Given 15.3 t/s shallow (Session 20) and the addendum-10 KV-tax band 12–15 t/s at depth, the w/s prediction follows from the ratio: at the predicted 0.7 words/token, 12–15 t/s → **8.4–10.5 w/s** — PASS with margin; the headroom column will read "below floor (k=3)" as before, honestly.
+2. Qwen3.5's measured words/token lands **0.65–0.75** (addendum 3's prediction 3: Qwen ≥ Llama-3.2's ratio is re-stated in measured form — bigger vocab 152k vs 128k, fewer tokens per word, so MORE words per token than Llama if the tokenizer is efficient... honest form: the direction is uncertain, the band is the prediction). Correction on record: addendum 3's prediction 3 stated Qwen ≥ Llama, which in words/token means Qwen's ratio should exceed Llama's — the qwen Q8_0 run grades this.
+3. At depth, the ratio does not shift (words/token is a tokenizer property, not a speed property): per-turn `words_per_token` variance across the 5 conversations < 0.02.
+4. The noise-at-depth w/m in w/s equals the t/s w/m (the ratio is constant across turns within a model): w/m(w/s) / w/m(t/s) ∈ [0.95, 1.05].
+5. The live session (author's hands) is the real test: if the guarantee holds and the headroom is below-floor, the felt experience should be "smooth but visibly slower than Q5_K_M" — the author's own perception is the calibration point the instrument cannot replace.
+
+**Grading:** pending the T14s run. The command (speed-gate only, no modes, default non-thinking dump):
+
+```
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf
+```

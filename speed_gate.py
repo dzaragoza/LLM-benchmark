@@ -97,7 +97,11 @@ import llama_server
 
 CORPUS_DEFAULT = "./live-corpus.json"
 FLOOR_DEFAULT = 20.0
-READER_TPS_DEFAULT = 6.5
+READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
+                          # reader (Brysbaert 2019). Protocol v2.1:
+                          # the anchor is words, not tokens.
+WORDS_PER_TOKEN_DEFAULT = 0.75  # unanchored rule of thumb; replaced per
+                                # dump by the measured ratio (v2.1)
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
 DEPTH_HEADROOM = 64
@@ -312,12 +316,28 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         history_chars = sum(len(m["content"]) for m in history[:-1])
         depth_tokens = blob_tokens + (history_chars - blob_chars) // 4
 
+        # Protocol v2.1: the guarantee is anchored in WORDS per second
+        # (300 wpm = 5.0 w/s, Brysbaert 2019). t/s was always a
+        # derivative via the 0.75 words/token rule of thumb - the
+        # honest instrument measures both, from the generated text
+        # itself: words = whitespace tokens of the answer, w/s =
+        # words / generation span (wall minus prefill - the same
+        # span the external cross-check uses).
+        answer_words = len(answer.split()) if answer.strip() else 0
+        gen_span_s = ext_gen_s if (ext_gen_s and ext_gen_s > 0) else None
+        words_per_sec = (answer_words / gen_span_s
+                         if (answer_words and gen_span_s) else None)
+
         results.append({
             "turn": i + 1,
             "depth_tokens_est": depth_tokens,
             "blob_tokens": blob_tokens,
             "gen_tokens": n_pred,
+            "gen_words": answer_words,
             "server_tps": server_tps,
+            "server_wps": words_per_sec,
+            "words_per_token": ((answer_words / n_pred)
+                                if (answer_words and n_pred) else None),
             "ext_tps": ext_tps,
             "wall_tps": (n_pred / wall_s) if (n_pred and wall_s) else None,
             "prompt_ms": prompt_ms,
@@ -351,12 +371,24 @@ def noise_sample(port, cap_tokens, ctx_tokens, thinking=False,
         t = data.get("timings", {})
         tps = t.get("predicted_per_second")
         pm = t.get("prompt_ms")
+        msg = data["choices"][0]["message"]
+        ans = (msg.get("content") or "").strip()
+        ans_words = len(ans.split()) if ans else 0
+        n_pred = t.get("predicted_n")
+        gen_span = ((data.get("timings", {}).get("predicted_ms") or 0)
+                    / 1000.0)
+        wps = (ans_words / gen_span
+               if (ans_words and gen_span > 0) else None)
         recs.append({
             "sample": i,
             "prompt_n": t.get("prompt_n"),
             "prompt_ms": pm,
-            "gen_tokens": t.get("predicted_n"),
+            "gen_tokens": n_pred,
+            "gen_words": ans_words,
             "tps": tps,
+            "wps": wps,
+            "words_per_token": ((ans_words / n_pred)
+                                if (ans_words and n_pred) else None),
         })
     return recs
 
@@ -408,6 +440,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
+                wps = [r["server_wps"] for r in res if r["server_wps"]]
                 cworst = min(tps) if tps else None
                 cmean = sum(tps) / len(tps) if tps else None
                 conv_worsts.append(cworst)
@@ -415,6 +448,10 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                       + ", ".join(f"{x:.1f}" for x in tps)
                       + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
                          if cworst else ""))
+                if wps:
+                    print(f"      words/s: "
+                          + ", ".join(f"{x:.1f}" for x in wps)
+                          + f"   (reader line {READER_WPS_DEFAULT:g} w/s)")
                 if thinking:
                     tk = [r["thinking_tokens_est"] for r in res]
                     empt = sum(r["answer_empty"] for r in res)
@@ -509,17 +546,25 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
 
 
 def analyze(path, floor, thinking=False, no_thinking=False,
-            dump_override=None, reader_tp=READER_TPS_DEFAULT):
+            dump_override=None,
+            reader_wps=READER_WPS_DEFAULT,
+            words_per_token_default=WORDS_PER_TOKEN_DEFAULT):
     """Phase 4: the guarantee verdict from the dump.
 
-    Protocol v2 (author ruling, Session 27): the pass line is the
-    reader guarantee - the worst turn at the reference depth must
-    never fall below the anchor reader (6.5 t/s = 300 wpm at 0.75
-    words/token, k=1) so even a fast reader is never made to wait.
-    The 2-sigma leniency applies to the reader line, not the floor.
-    Floor 20 (k=3) is reported as HEADROOM, not as the verdict: the
-    old gate rejected rungs on a headroom judgment; under the
-    guarantee the higher rungs pass, and comfort is a report column.
+    Protocol v2.1 (author catch, Session 27): t/s is not w/s. The
+    guarantee's anchor is a READER: 300 wpm = 5.0 words per second
+    (Brysbaert 2019) - words, not tokens. The verdict is computed in
+    WORDS per second, measured from the generated text itself
+    (whitespace words / generation span). The token-side line
+    (6.5 t/s = 5.0 w/s / 0.75 words-per-token) is printed for
+    continuity, but it is a derivative: a tokenizer with a lower
+    words/token ratio fails the READER while passing 6.5 t/s, and the
+    honest instrument must not let that pass. For dumps without
+    measured w/s (protocol-v1 data), the verdict converts via the
+    dump's own words/token when present, else the 0.75 default -
+    flagged as unanchored in the result.
+
+    Floor 20 t/s (k=3) stays a HEADROOM column, never the verdict.
     """
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
@@ -532,12 +577,24 @@ def analyze(path, floor, thinking=False, no_thinking=False,
             if t.get("model") == label and t.get("server_tps")]
     if not mine:
         fail(4, label, "dump has no turns for this model", GUIDE[4])
+
+    # measured words/token across the dump (v2.1 turns carry it)
+    ratios = [t["words_per_token"] for t in mine
+              if t.get("words_per_token")]
+    wpt = (sum(ratios) / len(ratios)) if ratios else words_per_token_default
+    wpt_measured = bool(ratios)
+
+    def turn_wps(t):
+        if t.get("server_wps") is not None:
+            return t["server_wps"]
+        return t["server_tps"] * wpt
+
     convs = {}
     for t in mine:
-        convs.setdefault(t["conv"], []).append(t["server_tps"])
+        convs.setdefault(t["conv"], []).append(turn_wps(t))
     conv_worsts = [min(v) for v in convs.values()]
-    worst = min(conv_worsts)
-    mean = sum(t["server_tps"] for t in mine) / len(mine)
+    worst_wps = min(conv_worsts)
+    mean_wps = sum(turn_wps(t) for t in mine) / len(mine)
     if len(conv_worsts) > 1:
         mu = sum(conv_worsts) / len(conv_worsts)
         sd = math.sqrt(sum((w - mu) ** 2 for w in conv_worsts)
@@ -545,18 +602,24 @@ def analyze(path, floor, thinking=False, no_thinking=False,
         sigma = sd / math.sqrt(len(conv_worsts))
     else:
         sigma = 0.0
-    threshold = reader_tp - 2 * sigma
-    if worst >= reader_tp:
+    threshold = reader_wps - 2 * sigma
+    if worst_wps >= reader_wps:
         verdict = "PASS (confident)"
-    elif worst >= threshold:
+    elif worst_wps >= threshold:
         verdict = "PASS (within 2-sigma)"
     else:
         verdict = "FAIL"
-    headroom = "intact" if worst >= floor else "below floor (k=3)"
-    return {"worst": worst, "mean": mean, "sigma": sigma,
+    # token-side view: continuity + the law's currency + headroom
+    worst_tps = min(t["server_tps"] for t in mine)
+    mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
+    headroom = "intact" if worst_tps >= floor else "below floor (k=3)"
+    return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
             "threshold": threshold, "verdict": verdict,
-            "reader_tp": reader_tp, "floor": floor,
-            "headroom": headroom,
+            "reader_wps": reader_wps,
+            "words_per_token": wpt,
+            "words_per_token_measured": wpt_measured,
+            "worst_tps": worst_tps, "mean_tps": mean_tps,
+            "floor": floor, "headroom": headroom,
             "n_turns": len(mine), "n_convs": len(conv_worsts),
             "dump": dump}
 
@@ -573,10 +636,11 @@ def main():
     ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
                     help="the k=3 headroom line (t/s), reported not "
                          "gated (protocol v2)")
-    ap.add_argument("--reader-tp", type=float, default=READER_TPS_DEFAULT,
-                    help=f"the k=1 guarantee line (t/s; default "
-                         f"{READER_TPS_DEFAULT} = 300 wpm at 0.75 "
-                         f"words/token - match the fast reader)")
+    ap.add_argument("--reader-wps", type=float, default=READER_WPS_DEFAULT,
+                    help=f"the k=1 guarantee line in WORDS per second "
+                         f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
+                         f"Brysbaert 2019 - match the fast reader; the "
+                         f"t/s line is this divided by words/token)")
     ap.add_argument("--dump", default=None,
                     help="live-dump path override (default: next to the "
                          "model file, mode-suffixed)")
@@ -627,16 +691,22 @@ def main():
                  args.no_thinking, args.port, args.ctx, args.repeats,
                  args.dump)
     if args.dry_run:
-        print(f"[4] would analyze (reader line {args.reader_tp:g} "
-              f"- 2*sigma; floor {args.floor:g} as headroom)")
+        print(f"[4] would analyze (reader line {args.reader_wps:g} w/s "
+              f"- 2*sigma; floor {args.floor:g} t/s as headroom)")
         return
     res = analyze(args.model, args.floor, args.thinking, args.no_thinking,
-                  args.dump, args.reader_tp)
+                  args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
-    print(f"[4] worst {res['worst']:.1f} t/s "
-          f"(mean {res['mean']:.1f}, sigma {res['sigma']:.2f}, "
-          f"guarantee threshold {res['threshold']:.1f}) -> {res['verdict']}")
-    print(f"    headroom vs floor {args.floor:g}: {res['headroom']}")
+    print(f"[4] worst {res['worst']:.2f} w/s "
+          f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}, "
+          f"guarantee threshold {res['threshold']:.2f} w/s) "
+          f"-> {res['verdict']}")
+    print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
+          f"(mean {res['mean_tps']:.1f}); words/token "
+          f"{res['words_per_token']:.3f}"
+          + (" (measured)" if res["words_per_token_measured"]
+             else " (0.75 default, unanchored)"))
+    print(f"    headroom vs floor {args.floor:g} t/s: {res['headroom']}")
 
 
 if __name__ == "__main__":
