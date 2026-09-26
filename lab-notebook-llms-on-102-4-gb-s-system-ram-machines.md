@@ -1984,3 +1984,18 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 
     git pull --ff-only
     python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking --interactive
+
+### Session 27, addendum 29 — the interactive session graded: the worst-turn metric validated by feel; the TTFT ruling
+
+**The author's report (verbatim):** (1) "i had to wait a bit mid answer on the last turn, but it wasn't bothersome." (2) "the wait before the response doesn't bother me, it feels like the time the model is thinking (it is not) or there's a delay in network communication." (3, 4) "yes." **Conclusion (a):** "the wait before first token doesn't matter, it feels natural."
+
+**The addendum-28 predictions, graded:**
+
+1. *Streaming smoothness — HIT with the study's most interesting deviation.* The one felt mid-answer wait landed on the LAST turn of conv 1 - the "Thanks" turn, the exact turn the instrument flagged as the run's worst (8.2 w/s, addendum 24). Across both live sessions the pattern reads: machine-paced session, no felt wait anywhere; interactive session, one small felt wait - on the instrument's min-w/s turn. **The gate's worst-turn metric and the human's felt-worst turn coincided: the instrument measures the right quantity.** Not bothersome at ~1.6x reader margin - the guarantee's worst case sits inside the comfort band, but the shape-sensitivity lesson now has feel evidence: the terse-answer turn is where a fast reader comes closest to outrunning the stream (and, per Andes, any sub-reading-pace moment is felt in full). Cause not separable without telemetry (a real stall would show in max_gap_ms; a reading sprint on a short answer would not) - pending the .session.json summary if still available; honestly recorded as felt-either-way.
+2. *First-send wait felt but reframed — HIT in structure, with a psychology finding.* The seconds-scale prefill wait is amortized into the "model is thinking" mental model (or read as network delay) and is QoE-neutral. The cold-start/warm-follow-up numeric grades (6-10 s first, <1.5 s follow-ups) remain pending the summary numbers; the feel grade stands: no follow-up wait was salient enough to mention, consistent with warm cache hits.
+3. *Streamed w/s above the reader line on every turn — HIT (author: yes).*
+4. *Verdict-feel match — HIT (author: yes), twice over: PASS at the 5.0 w/s line matched feel in both the machine-paced and the interactive session.*
+
+**The TTFT ruling (author conclusion a, adopted for the report):** the wait before first token is perceptually natural at this scale - "feels like thinking time" - so the operating note's tone changes from warning to observation: at the reference depth (4k, ~2600-token cold prefill at ~434 tok/s) the first send costs seconds and is absorbed by the thinking-time mental model; follow-up sends are near-instant (cache_prompt). The decode guarantee remains the axis that matters for bother - the two axes have different QoE weights: pre-token wait is amortized (thinking frame), mid-token pace is felt token-by-token (reading frame). The note stays quantified: the ruling is calibrated at ~seconds-scale waits and 4k depth, not extrapolated to 30 s prefills or deeper contexts.
+
+**Session 27's live-calibration arc closes: instrument (addendum 24), physics (addendum 16/18/23), feel machine-paced (27), feel interactive (29). Qwen3.5-4B Q8_0 is fully closed. The full-roster rerun is the one open measurement.**
