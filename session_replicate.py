@@ -81,20 +81,26 @@ def replay_turn(port, history, cap_tokens, thinking, no_thinking):
 
 def stream_turn(port, history, cap_tokens, thinking, no_thinking):
     """The live pass: stream the answer to the terminal as it arrives,
-    recording per-delta arrival times. Returns (answer, telemetry)."""
+    recording per-delta arrival times. Returns (answer, telemetry).
+    Per-delta word positions are recorded ("deltas": cumulative word
+    count at each arrival) - the raw input of the reader-collision
+    simulation, kept in the dump so the true measurement can be
+    re-run at any reader speed, reaction time, post-hoc."""
     payload = {"messages": list(history),
                "max_tokens": (cap_tokens + THINK_ALLOWANCE)
                              if thinking else cap_tokens,
                "temperature": 0, "stream": True}
     if no_thinking:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
-    pieces, times, t_first = [], [], None
+    pieces, times, words = [], [], []
+    t_first = None
     t0 = time.time()
     for text, t_arr in llama_server.stream_completion(port, payload):
         if t_first is None:
             t_first = t_arr - t0
         pieces.append(text)
         times.append(t_arr)
+        words.append(len("".join(pieces).split()))
         print(text, end="", flush=True)
     print()
     answer = "".join(pieces)
@@ -102,6 +108,8 @@ def stream_turn(port, history, cap_tokens, thinking, no_thinking):
     n_words = len(answer.split())
     span = (times[-1] - times[0]) if len(times) > 1 else 0.0
     wps = n_words / span if span > 0 else None
+    deltas = [{"t": round(t - t0, 4), "w": w}
+              for t, w in zip(times, words)]
     return answer, {"ttft_s": round(t_first, 3) if t_first is not None
                     else None,
                     "n_deltas": len(times),
@@ -111,9 +119,64 @@ def stream_turn(port, history, cap_tokens, thinking, no_thinking):
                     if gaps else None,
                     "max_gap_ms": round(1000 * max(gaps), 1)
                     if gaps else None,
-                    "streamed_wps": round(wps, 2) if wps else None}
+                    "streamed_wps": round(wps, 2) if wps else None,
+                    "deltas": deltas}
 
 
+def reader_collision(deltas, n_words, reader_wps, reaction_s):
+    """The true felt-lag measurement (author ruling, addendum 30):
+    simulate WHERE THE READER IS at every moment vs where printing
+    has reached. The reader starts reading reaction_s after the
+    first word appears and reads at reader_wps; a lag is FELT only
+    when the reader's position collides with the printed position
+    (the reader has consumed everything printed and waits) - a
+    stall inside an already-accumulated buffer is invisible.
+    reader_pos(t) = min(printed_pos(t), reader_wps * (t - t_read)):
+    waiting = intervals where the reader line has crossed the
+    printed staircase while the answer is incomplete. Returns
+    collision metrics; deltas = [{"t": arrival, "w": cumulative
+    words}] from stream_turn."""
+    if not deltas or n_words == 0:
+        return {"catchup_events": 0, "catchup_s": 0.0,
+                "first_catchup_word_frac": None}
+    t_read = deltas[0]["t"] + reaction_s
+    pos = 0.0            # words the reader has consumed
+    events, total, first_frac = 0, 0.0, None
+    waiting_prev = False
+    for i in range(len(deltas) - 1):
+        t_i, p = deltas[i]["t"], deltas[i]["w"]
+        t_next = deltas[i + 1]["t"]
+        s = max(t_i, t_read)      # the reader does not exist before t_read
+        if t_next <= s:
+            continue
+        if pos >= p - 1e-9:
+            # pinned at the printed frontier: the reader has consumed
+            # everything printed and waits for the next delta
+            total += t_next - s
+            if not waiting_prev:
+                events += 1
+                if first_frac is None:
+                    first_frac = p / n_words
+            waiting_prev = True
+        else:
+            advance = reader_wps * (t_next - s)
+            if pos + advance >= p:
+                # the reader catches the frontier mid-interval, then
+                # waits for the remainder
+                t_reach = s + (p - pos) / reader_wps
+                total += t_next - t_reach
+                if not waiting_prev:
+                    events += 1
+                    if first_frac is None:
+                        first_frac = p / n_words
+                waiting_prev = True
+            else:
+                waiting_prev = False   # behind and reading: no wait
+            pos = min(p, pos + advance)
+    return {"catchup_events": events,
+            "catchup_s": round(total, 2),
+            "first_catchup_word_frac": round(first_frac, 3)
+            if first_frac is not None else None}
 def main():
     ap = argparse.ArgumentParser(
         description="replay the gate's conversation live, streaming")
@@ -131,8 +194,14 @@ def main():
                     help="press Enter to send each user turn yourself "
                          "(real-chat feel; implies the live pass only; "
                          "per-turn TTFT recorded)")
+
+
     ap.add_argument("--reader-wps", type=float,
-                    default=READER_WPS_DEFAULT)
+                    default=READER_WPS_DEFAULT,
+                    help="reader speed (w/s) for the collision simulation")
+    ap.add_argument("--reaction-s", type=float, default=0.5,
+                    help="seconds from first word printed to the reader "
+                         "starting to read (the notice-and-start delay)")
     ap.add_argument("--keep-server", action="store_true",
                     help="leave the server running for further sessions")
     args = ap.parse_args()
@@ -213,6 +282,8 @@ def main():
                                       args.thinking, args.no_thinking)
             history.append({"role": "assistant", "content": answer})
             tel.update({"turn": i})
+            tel.update(reader_collision(tel["deltas"], tel["n_words"],
+                                        args.reader_wps, args.reaction_s))
             records.append({"turn": i, "pass": "stream",
                             "interactive": args.interactive, **tel})
             if not args.interactive:
@@ -227,6 +298,16 @@ def main():
                 print(f"    turn {r['turn']}: TTFT {r['ttft_s']}s, "
                       f"{r['streamed_wps']} w/s streamed, "
                       f"mean gap {r['mean_gap_ms']} ms")
+            print("\n--- reader-collision simulation (the true felt-lag "
+                  "measurement, addendum 30) ---")
+            print(f"    reader {args.reader_wps} w/s, reaction "
+                  f"{args.reaction_s} s: where the reader actually hits "
+                  "the stream.")
+            for r in (t for t in records if t.get("pass") == "stream"):
+                print(f"    turn {r['turn']}: catch-up events "
+                      f"{r['catchup_events']}, waiting "
+                      f"{r['catchup_s']}s, first at word "
+                      f"{r['first_catchup_word_frac']}")
             print()
 
         dump = os.path.join(os.path.dirname(args.model),
