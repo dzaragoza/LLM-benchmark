@@ -1865,3 +1865,22 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thin
 ```
 
 Expected: five conversations, noise attempted on all (exact guard + retry); possible "retrying with max_tokens N" lines on the tightest conversations; the summary NOISE AT DEPTH n up to 10; no skips unless a history truly fills ctx (exact numbers, not chars/4 phantoms).
+
+---
+
+### Session 27, addendum 22 — the fence holds, the run completes; noise room moves into the blob budget
+
+**The run (first full-length completion under the exact guard):** all five conversations, 22 turns, verdict worst 7.52 w/s → PASS (confident); words/token 0.680 (fifth consecutive stable run); token-side worst 15.4 t/s; NOISE AT DEPTH n=8, worst 14.87, mean 15.36, w/m 0.968. The addendum-21 fence held exactly as designed: conv 3's two noise samples 400'd (max_tokens 128 → retry 64 → retry 32, honest error records at every rung), and the run kept going - convs 4-5 completed, the dump was written, nothing was lost.
+
+**Grading:** the noise-at-depth w/m prediction (0.95-1.00) grades **HIT on the gate's own at-depth measurement at last** (0.968, n=8; the probe's 0.995-0.996 and the previous gate run's 0.998 bracket it). The conv-4 noise sample at 14.87 (the only sub-15 sample of the set) pulls w/m slightly below the probe's exact-depth values - plausibly one scheduling hiccup, honestly kept in the record. Verdict stable across five runs now: worst w/s 7.32-7.52, worst t/s 14.9-15.5, words/token 0.680 measured every time. The instrument is reproducible.
+
+**The design flaw conv 3 exposed (and its fix): noise room is protocol, so it must be budgeted.** The blob budget was worst-case for the CONVERSATION (every answer at the 299 cap) but the noise request - which rides the same worst-case-full history - was expected to fit in the 64-token DEPTH_HEADROOM left over. A noise sample needs ~224 rendered tokens (message + template wrappers + decode span). On a max-length conversation there is structurally no room, and no retry ladder can fix a negative budget. Fixed: depth_budget now reserves NOISE_OVERHEAD + NOISE_TOKENS (96 + 128 = 224) alongside the depth headroom, so the blob shrinks 224 tokens and the noise request always has its room. Retry ladder extended 2 → 3 rungs (halving 128 → 64 → 32 → 8 floor). Consequence, honestly noted: conversations run ~224 tokens shallower than before (deepest turn ~3.7k instead of ~3.9k) - the guarantee's reference depth moves from "just under 4096" to "4096 minus the noise reserve", and the depth-probe measurements (exact 4000) remain the precise-depth anchor; the gate's depth is now honest AND noise-complete.
+
+**The rerun (pull first):**
+
+```
+git pull --ff-only
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking --force
+```
+
+Expected: blob sizes ~224 smaller (conv 1: 2799 → ~2575), noise on ALL five conversations (n=10), no 400s, no retries; worst t/s ~15.4 (unchanged - the blob shrink is inside the KV-tax noise); w/m in 0.95-1.00. If n=10 lands and no error records appear, qwen Q8_0's card closes with the complete at-depth noise set and the instrument is done - the full-roster rerun (Session 27's commands, all five families) is then the only open measurement, plus the author's live session.
