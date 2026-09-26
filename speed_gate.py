@@ -363,9 +363,12 @@ NOISE_MIN_ROOM = 24      # below this remaining budget, skip: the
                          # addendum 16: 299 cap on a full history
                          # -> prompt + n_predict over ctx -> 400,
                          # which killed the whole run)
-NOISE_OVERHEAD = 32     # rendered noise message + template wrappers
+NOISE_OVERHEAD = 96     # rendered noise message + template wrappers
                          # + generation header, server-measured
                          # prompt_n + this = the exact next-prompt size
+                         # (32 was too tight: qwen3.5's template adds
+                         # ~60+ rendered tokens of wrappers; conv 3 of
+                         # the addendum-21 run 400'd both samples)
 
 
 def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
@@ -421,12 +424,25 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
         }
         if no_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": False}
-        try:
-            data = llama_server.post_json(port, "/v1/chat/completions",
-                                           payload)
-        except Exception as e:
-            print(f"      noise sample {i} failed: {e}")
-            recs.append({"sample": i, "error": str(e)})
+        data = None
+        for attempt in (1, 2):
+            try:
+                data = llama_server.post_json(
+                    port, "/v1/chat/completions", payload)
+                break
+            except Exception as e:
+                if attempt == 1 and noise_cap > 16:
+                    # 400 with room to spare means the overhead
+                    # estimate was tight - halve and retry once
+                    noise_cap = max(8, noise_cap // 2)
+                    payload["max_tokens"] = noise_cap
+                    print(f"      noise sample {i}: retrying with "
+                          f"max_tokens {noise_cap} ({e})")
+                    continue
+                print(f"      noise sample {i} failed: {e}")
+                recs.append({"sample": i, "error": str(e)})
+                break
+        if data is None:
             continue
         t = data.get("timings", {})
         tps = t.get("predicted_per_second")
@@ -526,14 +542,19 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           "hybrid model in default mode thinks first; "
                           "pass --no-thinking (non-thinking) or "
                           "--thinking (thinking, with the 2048 allowance)")
-                noise = noise_sample(port, conv_history, cap_tokens,
-                                     ctx, blob_tokens, thinking,
-                                     no_thinking,
-                                     last_prompt_n=res[-1].get("prompt_n"),
-                                     last_gen_tokens=res[-1].get("gen_tokens"))
+                try:
+                    noise = noise_sample(port, conv_history, cap_tokens,
+                                         ctx, blob_tokens, thinking,
+                                         no_thinking,
+                                         last_prompt_n=res[-1].get("prompt_n"),
+                                         last_gen_tokens=res[-1].get("gen_tokens"))
+                except Exception as e:
+                    print(f"      noise collection failed for conv {ci}: "
+                          f"{e} (recorded, conversation kept)")
+                    noise = [{"sample": 0, "error": str(e)}]
                 for r in noise:
                     noise_records.append({"model": label, "conv": ci, **r})
-                ntps = [r["tps"] for r in noise if r["tps"]]
+                ntps = [r["tps"] for r in noise if r.get("tps")]
                 if ntps:
                     print(f"      noise at depth: "
                           + ", ".join(f"{x:.1f}" for x in ntps))

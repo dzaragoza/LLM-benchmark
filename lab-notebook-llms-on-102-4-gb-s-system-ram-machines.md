@@ -1840,3 +1840,28 @@ which refuses to create merge commits (it errors rather than merge when divergen
 **The fourth instrument fix of the arc: the room guard goes exact.** The --force run skipped noise on convs 2/3/5 with estimates exceeding ctx (~4161/~4148/~4585 of 4096) while their turns ran fine at the cap - impossible numbers again, and this time the fingerprint was the CHARS/4 estimate itself: qwen3.5's tokenizer runs ~3.3 chars/token on this corpus, so chars/4 over-counts depth by up to ~500 tokens and the guard skipped conservatively. Fixed: the guard now uses the last turn's own server-measured `timings.prompt_n` (+ last gen + a small template overhead constant) as the exact next-prompt size - the same server-side authority the blob budget already trusts - with the chars/4 estimate kept only as a fallback (now conservative in BOTH readings: max of the two). Turn records also now carry `prompt_n` (exact rendered depth per turn) - the dump's depth accounting upgrades from estimate to measurement. All four guard paths regression-verified (exact-attempt, exact-skip, fallback-skip, fallback-attempt).
 
 **Qwen3.5-4B Q8_0's v2.1 card is complete:** guarantee PASS at depth (measured w/s, 2.3x the reader line at worst), words/token 0.680 measured, noise-at-depth w/m 0.998 riding history + 0.995-0.996 at exact depths, KV tax 3-5 ms/GiB effective, headroom below floor (k=3) honestly reported. Session-27 prediction 1 (top-rung selection) confirmed for the family; the full-roster rerun (all five families, both categories) remains the session's open measurement, plus the author's live session (prediction 5).
+
+---
+
+### Session 27, addendum 21 — the KeyError crash (fifth instrument bug): the error path was untested; fence + retry + honest overhead
+
+**The crash.** The exact-guard rerun died at conv 3: both noise samples 400'd (the NOISE_OVERHEAD=32 constant underestimated qwen3.5's rendered template wrappers - the noise message + history retokenization costs ~60+ more rendered tokens than accounted), the error records flowed correctly... into an untested consumer: `ntps = [r["tps"] for r in noise if r["tps"]]` assumed every record carries `tps`, the error records do not, and the KeyError killed the run at the summary line - losing convs 4-5 a second time. The lesson is structural, and it is the same lesson as addendum 16 in a new place: **the error path itself must be tested, not just the happy path.** The addendum-16 fix added error records but never exercised a run where an error record reached the summary; the mock always succeeded.
+
+**Fixes (all three verified):**
+
+1. `r.get("tps")` at both summary sites - error records are data, the summary must skip them without dying.
+2. Per-conversation error fence in `bench_model`: noise collection is wrapped; any exception is recorded and the conversation's collected turns survive. A measurement failure can no longer destroy the run - the fence exists at every level now (request, conversation, summary).
+3. Retry-once-with-halved-cap on a 400 with room to spare (the overhead estimate was tight, not the history full), and NOISE_OVERHEAD raised 32 -> 96 (qwen3.5's template wrappers measured the hard way).
+
+**The partial run's data (convs 1-3, before the crash):** turns worst 15.0/15.4/15.3 t/s, words/s 9.1-11.5 - the fourth consecutive reproducible run of this model (worst t/s 14.9-15.3 across four runs; words/token 0.680 stable). Convs 1-2 noise rode the history at 15.3-15.6 t/s (above the turns - consistent with the at-depth noise floor ~15.2 and the exact guard now letting near-full conversations attempt). The verdict numbers remain addendum-20's; the rerun completes the noise n=10.
+
+**Standing convention (author request):** every command list for the author's machine now begins with `git pull --ff-only` - the author missed a pull before the addendum-20 rerun and re-ran the pre-fix code (caught immediately: the output was byte-identical to the addendum-20 run, the skip fingerprints gave it away). From addendum 21 on, the run lists carry the pull.
+
+**The rerun (with the pull first):**
+
+```
+git pull --ff-only
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking --force
+```
+
+Expected: five conversations, noise attempted on all (exact guard + retry); possible "retrying with max_tokens N" lines on the tightest conversations; the summary NOISE AT DEPTH n up to 10; no skips unless a history truly fills ctx (exact numbers, not chars/4 phantoms).
