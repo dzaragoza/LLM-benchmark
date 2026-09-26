@@ -308,6 +308,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         n_pred = t.get("predicted_n",
                        data.get("usage", {}).get("completion_tokens"))
         prompt_ms = t.get("prompt_ms")
+        prompt_n = t.get("prompt_n")
 
         # External cross-check: generation span = wall time minus prefill
         ext_gen_s = wall_s - (prompt_ms / 1000.0) if prompt_ms else wall_s
@@ -334,6 +335,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         results.append({
             "turn": i + 1,
             "depth_tokens_est": depth_tokens,
+            "prompt_n": prompt_n,
             "blob_tokens": blob_tokens,
             "gen_tokens": n_pred,
             "gen_words": answer_words,
@@ -361,10 +363,14 @@ NOISE_MIN_ROOM = 24      # below this remaining budget, skip: the
                          # addendum 16: 299 cap on a full history
                          # -> prompt + n_predict over ctx -> 400,
                          # which killed the whole run)
+NOISE_OVERHEAD = 32     # rendered noise message + template wrappers
+                         # + generation header, server-measured
+                         # prompt_n + this = the exact next-prompt size
 
 
 def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
-                 thinking=False, no_thinking=False, samples=2):
+                 thinking=False, no_thinking=False, samples=2,
+                 last_prompt_n=None, last_gen_tokens=None):
     """Same-depth noise samples: a short follow-up appended to the
     conversation's own history. The follow-up MUST ride the history:
     llama-server's slot cache reuses only the longest common token
@@ -373,27 +379,31 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
     shallow decode - not noise at depth (caught on the first real
     v2.1 run: the "noise" sat consistently ABOVE the conversation
     turns, the fingerprint of a shallower decode). With the full
-    history + a final turn, the common prefix covers the whole
-    cached conversation, only the tail prefills, and decode runs at
-    the conversation's depth. Worst/mean across these is the
-    machine's noise at depth - cleanly separated from the KV trend
-    (addendum 10).
+    history + a final turn, the common prefix covers the whole cached
+    conversation, only the tail prefills, and decode runs at the
+    conversation's depth. Worst/mean across these is the machine's
+    noise at depth - cleanly separated from the KV trend (addendum 10).
 
-    Room guard: the blob budget is worst-case (every answer at the
-    cap), so after the last turn the history is at the budget - a
-    full-cap generation on top overflows ctx and the server rejects
-    the request with 400. The noise generation is therefore capped
-    small (NOISE_TOKENS) and skipped with a note when the remaining
-    room is gone. A failed request is recorded, never raised: the
-    noise measurement must not kill the run (the addendum-16 crash
-    lost three conversations of collected turns). Depth estimate
-    mirrors run_conversation: the blob IS history[0], so its chars
-    must not be counted twice (blob tokens exact + non-blob chars
-    at 4 chars/token - the addendum-17 double-count inflated every
-    estimate ~1.8x and skipped all noise samples on the rerun)."""
+    Room guard (exact): the next request's prompt is the last turn's
+    rendered prompt + its generated answer + the noise message and
+    template wrappers - all measured server-side, so the room is
+    known exactly from the last turn's own timings.prompt_n (the
+    chars/4 fallback estimate is kept only for dumps/servers that
+    report no prompt_n; it over-counted qwen3.5 by ~500 tokens and
+    skipped noise samples whose turns ran fine at the cap). A failed
+    request is recorded, never raised; the noise measurement must
+    not kill the run (the addendum-16 crash lost three
+    conversations of collected turns)."""
     blob_chars = len(history[0]["content"]) if (blob_tokens and history) else 0
-    est = blob_tokens + (sum(len(m["content"]) for m in history)
-                         - blob_chars) // 4
+    hist_chars = sum(len(m["content"]) for m in history)
+    if last_prompt_n is not None:
+        est = last_prompt_n + (last_gen_tokens or 0) + NOISE_OVERHEAD
+    else:
+        # conservative fallback: max of the two readings (the blob
+        # normally IS history[0]; if it is not, the plain chars/4
+        # sum is the honest depth estimate)
+        est = max(blob_tokens + (hist_chars - blob_chars) // 4,
+                  hist_chars // 4)
     room = ctx_tokens - est
     if room < NOISE_MIN_ROOM:
         print(f"      noise at depth: skipped (history fills the "
@@ -518,7 +528,9 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                           "--thinking (thinking, with the 2048 allowance)")
                 noise = noise_sample(port, conv_history, cap_tokens,
                                      ctx, blob_tokens, thinking,
-                                     no_thinking)
+                                     no_thinking,
+                                     last_prompt_n=res[-1].get("prompt_n"),
+                                     last_gen_tokens=res[-1].get("gen_tokens"))
                 for r in noise:
                     noise_records.append({"model": label, "conv": ci, **r})
                 ntps = [r["tps"] for r in noise if r["tps"]]
