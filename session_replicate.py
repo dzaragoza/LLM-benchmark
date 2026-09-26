@@ -177,10 +177,49 @@ def reader_collision(deltas, n_words, reader_wps, reaction_s):
             "catchup_s": round(total, 2),
             "first_catchup_word_frac": round(first_frac, 3)
             if first_frac is not None else None}
+def resim_mode(session_path, reader_wps, reaction_s):
+    """Post-hoc re-simulation (no server): read a .session.json and
+    re-run the reader-collision simulation at a new reader speed /
+    reaction time. The author's reading speed is variable run-to-run;
+    the deltas are the measurement, the simulation parameters are not.
+    Sweeps reader speed as a BAND (multiplicative steps around the
+    given value) and reports the collision table per turn, so the
+    variable-reader question is answered as a sensitivity, not a
+    constant."""
+    with open(session_path) as f:
+        session = json.load(f)
+    streams = [t for t in session["turns"] if t.get("pass") == "stream"]
+    band = [reader_wps * m for m in (0.6, 0.8, 1.0, 1.2, 1.5)]
+    print(f"=== re-simulation: {os.path.basename(session_path)} ===")
+    print(f"    reaction {reaction_s} s; reader-speed band "
+          f"{band[0]:.1f}-{band[-1]:.1f} w/s "
+          f"(your reading speed is variable - the band is the honest "
+          "reader)")
+    for w in band:
+        worst_ev, worst_s = 0, 0.0
+        rows = []
+        for t in streams:
+            r = reader_collision(t["deltas"], t["n_words"], w,
+                                 reaction_s)
+            rows.append(r)
+            worst_ev = max(worst_ev, r["catchup_events"])
+            worst_s = max(worst_s, r["catchup_s"])
+        cells = "  ".join(f"t{t['turn']}:{r['catchup_events']}"
+                           f"/{r['catchup_s']}s"
+                           for t, r in zip(streams, rows))
+        print(f"    {w:4.1f} w/s: {cells}")
+    print("    (events/waiting per turn; first catch-up position in "
+          "the .session.json per-turn records)")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="replay the gate's conversation live, streaming")
-    ap.add_argument("--model", required=True)
+    ap.add_argument("--resim", metavar="SESSION_JSON",
+                    help="post-hoc mode: re-simulate reader collisions "
+                         "at a band of reader speeds from an existing "
+                         ".session.json (no server needed)")
+    ap.add_argument("--model")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument("--conv", type=int, default=1,
                     help="conversation number in the corpus (1-based)")
@@ -210,6 +249,11 @@ def main():
     ap.add_argument("--keep-server", action="store_true",
                     help="leave the server running for further sessions")
     args = ap.parse_args()
+    if args.resim:
+        resim_mode(args.resim, args.reader_wps, args.reaction_s)
+        return
+    if not args.model:
+        sys.exit("--model is required unless --resim is used")
     if args.thinking and args.no_thinking:
         sys.exit("--thinking and --no-thinking are mutually exclusive")
 
