@@ -2123,3 +2123,27 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 4. The dumps of early-failed rungs are partial by design (flagged) — the per-rung dump record keeps the flag, so post-hoc analyses (lag_analyze, collision simulation) can distinguish "failed at conv 2 turn 2" from "ran all five and failed on the worst".
 
 **Pre-registered expectation for the study #3 run:** with the early-fail in place, each predicted-failing top rung (llama3.1-8b Q8_0, qwen3.5-9b Q8_0, gemma4-12b Q8_0/Q6_K) aborts within its first or second conversation; if any of them instead runs all five conversations, that itself is a graded surprise (the law's ±15% band is generous in the wrong direction).
+
+### Session 28, addendum 35 — the memory shortcut: rungs that cannot fit in RAM are skipped before download
+
+**The trigger (author's catch, from the crashed first study #3 run):** "We forgot to take into account the amount of memory available in the system, that's another shortcut." The first pipeline run also exposed a second bug: the Llama-3.1-8B safetensors phase downloaded **32.1 GB** where ~16 GB of safetensors suffices - `snapshot_download` pulled the whole repo, including Meta's `original/*.pth` duplicates - and the reconstruction died with a writer-channel error (SIGSEGV in fish) at 63%.
+
+**Two fixes, both verified with stubbed-hub tests:**
+
+1. **The memory shortcut (the author's ruling):** before any network traffic, `hf_download.acquire()` now estimates the rung's size and compares against usable system RAM.
+   - Size estimate, no download: exact when the repo ships the rung GGUF (HF tree metadata via `HfApi.list_repo_tree`); ratio-scaled from the fp16/safetensors total otherwise (RUNG_BITS: Q8_0 8.5, Q6_K 6.6, Q5_K_M 5.7, Q4_K_M 4.8, Q4_0 4.5, Q3_K_M 3.9, Q2_K 3.4 bits/weight; rung ≈ fp16_giB × bits/16; `original/` excluded from the source total).
+   - RAM: `/proc/meminfo` (Linux), `sysctl hw.memsize` (macOS), `GlobalMemoryStatusEx` (Windows). Usable = total − 4 GiB reserve (OS + KV at the 4096 reference depth; the T14s: 32 − 4 = 28 GiB).
+   - Infeasible rungs return plan `"infeasible: exceeds system RAM"`; the orchestrator marks the rung `FAIL (infeasible: exceeds system RAM)` and walks on down the ladder. No download, no conversion, no bench.
+   - Never a false skip: when either estimate is undetectable, the rung proceeds as before. A disk-space warning (rung × 2 worst case) prints but does not block.
+   - Tested: a 70B-class repo (150 GiB safetensors → Q8_0 est. 79.7 GiB) on a forced-32 GiB machine → skipped, zero download calls; an exact-size 40 GiB Q8_0 GGUF → skipped; a feasible 8 GiB-source repo → proceeds to download.
+
+2. **Scoped snapshot download (the crash's cause):** `snapshot_download` now passes `allow_patterns = ["*.safetensors", "*.json", "*.txt", "tokenizer.model", "tokenizer.model.v3"]` - the conversion path needs the safetensors and tokenizer/config files only. Meta's `original/*.pth` (an entire second copy of the weights in PyTorch format), vision-tower extras and anything else no longer download: the Llama-3.1-8B source phase drops from ~32 GB to ~15 GB, halving the download and removing the writer-channel crash trigger (the background writer was juggling 17 files including a 16 GB .pth).
+
+**One ladder consequence surfaced by the pending gemma-4 run (fixed in the same commit):** the default ladder had no Q4_0 rung, so the first-party QAT Q4_0 GGUF (addendum 33's stated gemma-4 path) would never have been reached - the pipeline would have self-quantized Q4_K_M from safetensors and skipped the QAT file entirely. The default ladder is now `[Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q4_0, Q3_K_M, Q2_K]`: self-quantized K-quants stay preferred, with the first-party QAT Q4_0 as the same-bit-width fallback (verified: `find_rung_file` matches `m-Q4_0.gguf` for rung Q4_0 and does not cross-match Q4_K_M/Q4_K_S; the gemma-4 QAT repo ships a single 6.98 GB file `gemma-4-12b-it-qat-q4_0.gguf`, not sharded, plus an mmproj that is correctly excluded).
+
+**Also recorded: the crashed run left no state damage** - the phase-1 failure is idempotent (the state file had already recorded the partial phases), so the rerun resumes cleanly. The author's download can be rerun as-is after `git pull --ff-only`.
+
+**The revised run command (unchanged for the author; the fixes are internal):**
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking "meta-llama/Llama-3.1-8B-Instruct" "Qwen/Qwen3.5-9B" "google/gemma-4-12B-it-qat-q4_0-gguf=google/gemma-4-12B-it" "mistralai/Mistral-7B-Instruct-v0.3"
