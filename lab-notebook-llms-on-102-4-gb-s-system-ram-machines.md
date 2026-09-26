@@ -1929,3 +1929,23 @@ Expected: blob sizes ~224 smaller (conv 1: 2799 → ~2575), noise on ALL five co
 *Cost accounting.* ~2 min per conversation per rung; five conversations ~ 10 min/rung; full roster at predicted top-rung selection ~ 1 hour, once. Going to one conversation saves under an hour across the whole study, bought with tail coverage and the confidence tier.
 
 **Proposal (author to rule):** keep 5 x 4-5 turns for the roster rerun (the dataset; comparability with the six qwen runs). Optional separate lever if interactive screening is ever wanted: a --conversations N flag on speed_gate.py, explicitly non-protocol (verdict stays n=5). No longer conversation to be found or drafted.
+
+### Session 27, addendum 26 — the live-session instrument (session_replicate.py) and the pre-registered feel predictions
+
+**The author's ruling: the live test happens now, on the conversation that produced the worst turn.** Conv 1 of live-corpus.json (the molten-chloride-reactor conversation) hosted the closing run's worst w/s turn (turn 4 "Thanks": 8.2 w/s at 15.4 t/s). The session must be gate-faithful, not hand-assembled: the felt experience must be produced by the exact mechanism the instrument measured, or the calibration is invalid.
+
+**The instrument.** `session_replicate.py` (standalone, the depth_probe.py pattern): launches the server with the gate's own flags (-ngl 99 -c 4096 --chat-template-kwargs enable_thinking false), builds the gate's own depth_budget blob for conv 1 (2571 tokens for the closing run), replays the conversation verbatim - and streams it. Pass 1 replays non-streaming exactly as the gate ran it (records land in the same shape as the dump); pass 2 runs the conversation again, streaming to the terminal, recording per-delta arrival times: TTFT, mean/max inter-token gap, streamed w/s. `llama_server.py` gains `stream_completion()` (SSE parsing over urllib, bottom-layer interface, import-only like the rest). Both passes write <model>.session.json. Mock-server E2E verified: streaming telemetry correct (TTFT 0.40 s, mean gap 200 ms at a simulated 15 t/s, streamed w/s within band), dump written, teardown clean.
+
+**Pre-registered feel predictions (recorded before the session, graded by the author afterward):**
+
+1. *Streaming smoothness:* at ~15 t/s (~10.2 w/s at the measured 0.68 w/t), token arrival is smooth while streaming - the author will not feel mid-answer lag at her 300-wpm reading pace (mean gap ~67 ms vs her ~154 ms/word; the Andes deviation model predicts zero reader-seconds of waiting mid-answer).
+2. *The felt wait is TTFT:* the prefill at ~4k depth (~8.5-9 s) is the wait the author WILL feel - before each answer, not during it. The un-gated axis (addendum 23) becomes felt experience; the session should confirm it as the dominant lag component.
+3. *Streamed w/s vs reading line:* per-turn streamed w/s will land in 8-13 (the gate's per-turn band, addendum 20) and stay above the 5.0 w/s reader line throughout; the worst streamed turn will NOT be the felt worst - the shape-sensitivity lesson says the terse "Thanks" turn posts the lowest w/s without being the slowest to read.
+4. *Verdict-feel match:* the instrument's PASS (confident) at worst 7.32-8.24 w/s will match the author's felt experience of a fast reader never waiting mid-answer - the guarantee calibrated by the only sensor that matters.
+
+**The session commands (author's machine, pull-first per convention):**
+
+    git pull --ff-only
+    python3 session_replicate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf --no-thinking
+
+(~2 min server launch + ~8.5 s prefill per turn x4 + reading time; --keep-server to go again without relaunching; --stream-only to skip the replay pass; --conv N to replay a different conversation.)

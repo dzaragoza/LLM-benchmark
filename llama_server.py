@@ -152,3 +152,36 @@ def trim_to_tokens(port, text, target, tolerance=8, max_iter=24):
     if best is None:
         raise ValueError(f"cannot trim text under {target} tokens")
     return best
+
+
+def stream_completion(port, payload, timeout=1800):
+    """POST a streaming /v1/chat/completions request and yield content
+    deltas as they arrive, with per-delta wall arrival times (the
+    felt-experience view the non-streaming gate cannot see: TTFT and
+    the inter-token gap distribution). Yields (delta_text, t_arrival)
+    pairs; the caller assembles the full answer and its timing."""
+    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    data = json.dumps({**payload, "stream": True}).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        buf = b""
+        for chunk in resp:
+            buf += chunk
+            while b"\n\n" in buf:
+                raw, buf = buf.split(b"\n\n", 1)
+                for line in raw.decode("utf-8", "replace").splitlines():
+                    if not line.startswith("data: "):
+                        continue
+                    body = line[len("data: "):].strip()
+                    if body == "":
+                        return
+                    try:
+                        obj = json.loads(body)
+                    except ValueError:
+                        continue
+                    choice = (obj.get("choices") or [{}])[0]
+                    delta = choice.get("delta") or {}
+                    text = delta.get("content")
+                    if text:
+                        yield text, time.time()

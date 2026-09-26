@@ -81,6 +81,15 @@ python3 speed_gate.py --make-sample
 python3 speed_gate.py --make-corpus
 ```
 
+Standalone instruments (outside the pipeline, one-shot experiments):
+
+| Script | Role |
+|---|---|
+| `depth_probe.py` | decode speed at exact context depth (prefill blobs; the KV-tax instrument) |
+| `lag_analyze.py` | post-hoc lag analysis over existing live dumps (Andes-style stall metrics) |
+| `law_fit.py` | the bandwidth law fit + KV arithmetic (T_token = size x ms/GiB + overhead + KV) |
+| `session_replicate.py` | replays the gate's conversation live, streaming, with per-token arrival telemetry (the felt-experience calibration instrument) |
+
 ---
 
 ## Roster selection (pre-registered, transparent)
