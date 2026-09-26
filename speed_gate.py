@@ -386,8 +386,14 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
     small (NOISE_TOKENS) and skipped with a note when the remaining
     room is gone. A failed request is recorded, never raised: the
     noise measurement must not kill the run (the addendum-16 crash
-    lost three conversations of collected turns)."""
-    est = blob_tokens + sum(len(m["content"]) for m in history) // 4
+    lost three conversations of collected turns). Depth estimate
+    mirrors run_conversation: the blob IS history[0], so its chars
+    must not be counted twice (blob tokens exact + non-blob chars
+    at 4 chars/token - the addendum-17 double-count inflated every
+    estimate ~1.8x and skipped all noise samples on the rerun)."""
+    blob_chars = len(history[0]["content"]) if (blob_tokens and history) else 0
+    est = blob_tokens + (sum(len(m["content"]) for m in history)
+                         - blob_chars) // 4
     room = ctx_tokens - est
     if room < NOISE_MIN_ROOM:
         print(f"      noise at depth: skipped (history fills the "
