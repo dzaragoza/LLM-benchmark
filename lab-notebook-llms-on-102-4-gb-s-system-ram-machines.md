@@ -2043,3 +2043,60 @@ Mock-verified before delivery: interactive E2E with an honest prefix-cache simul
 **The variable-reader ruling (author: "my reading speed is also variable").** Correct, and it changes the metric's honest form: a single reader speed is an approximation, so the collision question must be answered as a BAND, not a constant. Implemented: `--resim SESSION_JSON` post-hoc mode (no server) sweeps reader speed 0.6x-1.5x around the given value (multiplicative steps 0.6/0.8/1.0/1.2/1.5) and reports the per-turn collision table; the deltas in the dump are the measurement, the reader parameters are dials. Verified on synthetic adversarial deltas: a stalled 5-w/s stream shows zero collisions for readers at 3-5 w/s and a 1-event/0.38-1.02 s collision at 6-7.5 w/s - the band sweep answers "would a faster reader have felt it?" as a sensitivity, not a single verdict.
 
 **Consequence for the report's QoE section:** the guarantee line (5.0 w/s) is the anchor, but the collision table at the band is the felt-lag statement - and on this machine, at Q8_0 depth-conditioned, the band from 3.0 to 7.5 w/s shows zero collisions. The reader-collision metric (addendum 30) is now fully specified: per-delta word positions recorded, reader trajectory simulated at an anchored reaction time (0.45 s, addendum 31), swept as a band (this addendum), graded against feel twice.
+
+### Session 28, addendum 33 — protocol v2.1 roster: model selection anew (the k=1 gate opens the door to the family champions)
+
+**The author's request:** "Let's begin the model selection anew, this time: pick top popular 4 model families in the ollama list, where: (1) It is estimated the model will pass the speed gate in **quant 4** [corrected same-day from 'quants 4-8'], (2) is a non-thinking model or hybrid, so we can disable thinking for benchmark, (3) the model family has at least a peer reviewed paper, (4) pick the highest model in the family that can run." The author noted the new k=1 gate "might open the door to higher quant in the selected models or even bigger models" — confirmed below: at k=1 (5.0 w/s), size* ≈ 10.44 GiB (vs 2.79 GiB at floor 20), so every family's **highest runnable member** is now in reach, not just its smallest.
+
+**Author rulings (this session, recorded before any measurement):**
+- **Ruling A — one owner = one family.** llama3.1 and llama3.2 are ONE Meta family (reversing the study #1 precedent that treated them as separate rows). Only llama3.1:8b takes a slot; the llama3.2:3b row is absorbed.
+- **Ruling B — rule 7 applies: latest generation, always.** "People want the latest and greatest, so that's what we measure." qwen3.5 supersedes qwen2.5; gemma4 supersedes gemma3. Superseded measured data stays in the results file as superseded data points.
+- **Ruling C — borderline handling mooted.** The qwen2.5:14b / gemma3:12b quant-4 borderline-straddle question dissolved under rulings A+B: rule 7's replacements both pass quant 4 with margin.
+- Notification request: the author wants an audible/notification ping when an answer is ready — no such tool exists in the sandbox catalog (checked, 93 tools); the chat reply landing IS the ping.
+
+**Selection rules (v2.1 roster, pre-registered):** (1) Ollama library popularity walk-down (snapshot 2026-09-26); (2) distinct families — one slot per OWNER (ruling A); (3) non-thinking or hybrid (thinking disabled for the benchmark); (4) predicted to pass the speed gate at **quant 4** (Q4_K_M, the inclusion filter — the ladder walk itself still starts at Q8_0 and takes the first PASS); (5) first-party weights only — no third-party repos; (6) published paper (technical report / peer-reviewed); (7) latest generation supersedes older within family (ruling B); (8) highest runnable member within family ("can run" = file + KV + OS fits 32 GB RAM).
+
+**The fitted law (Session 26):** `1/t = size_GiB/76.5 + 1/74` (BW_eff = 76.5 GiB/s = 80% of theoretical 102.4; t_inf = 74 t/s; R² 0.9996 within-model on the Qwen3.5-4B ladder; cross-family error ±15%, pooled R² = 0.16). Words/token band 0.65–0.80 for estimates (Qwen3.5-4B measured 0.680, the family value for qwen3.5:9b); at k=1 size* ≈ 10.44 GiB.
+
+**Popularity walk-down (snapshot 2026-09-26), with quant-4 gate estimates** (Q4_K_M size; t/s = law ±15%; w/s band 0.65–0.80 w/t):
+
+| # | ollama row | pulls | verdict |
+|---|---|---|---|
+| 1 | llama3.1 | 119.9M | **SELECT (Meta family): Llama-3.1-8B-Instruct** — highest runnable (70b = 40.05 GiB can't run); Q4_K_M 4.56 GiB → 13.7 t/s (11.6–15.7) → 7.5–12.6 w/s: passes |
+| 2 | deepseek-r1 | 93.2M | excluded — thinking-only, no off switch (distills are always-reasoning) |
+| 3 | nomic-embed-text | 87.2M | excluded — embedding model |
+| 4 | llama3.2 | 84.4M | excluded — same owner as llama3.1 (ruling A); its 3b passes quant 4 easily but the Meta slot is taken by the more popular row, whose 8b is the higher model |
+| 5 | qwen2.5 | 41.0M | superseded by qwen3.5 (rule 7, ruling B); qwen2.5:14b itself was borderline at quant 4 (8.38 GiB → 8.1 t/s → 4.5–7.5 w/s, straddling 5.0) |
+| 6 | gemma3 | 40.7M | superseded by gemma4 (rule 7, ruling B); gemma3:12b itself was borderline (QAT Q4_0 7.54 GiB → 8.9 t/s → 4.9–8.2 w/s) |
+| 7 | qwen3 | 38.1M | superseded by qwen3.5 (same Qwen family) |
+| 8 | mistral | 33.7M | **SELECT (Mistral family): Mistral-7B-Instruct-v0.3** — the Mistral-brand family row (mistral-nemo 5.7M and ministral-3 1.5M are separate lower-ranked rows); Q4_K_M ~4.1 GiB → ~14.9 t/s → 9.7–11.9 w/s: passes |
+| — | gemma2 / llama3 / qwen2.5-coder | 33.4M / 25.3M / 21.8M | excluded — superseded or same family |
+| — | gemma4 | 25.8M | absorbed into the gemma3 slot by rule 7 (ruling B): **Gemma-4-12B** is the Google family's pick |
+| — | qwen3.5 | 21.0M | absorbed into the qwen2.5 slot by rule 7 (ruling B): **Qwen3.5-9B** is the Qwen family's pick |
+| — | phi3 / gpt-oss / smollm2 | 18.2M / 13.2M / 4.0M | not reached — slots full after four families |
+
+**Selected roster (pre-registered before any measurement):**
+
+| family | pick | HF source | paper | quant-4 estimate | predicted rung selection |
+|---|---|---|---|---|---|
+| Meta | Llama-3.1-8B-Instruct | safetensors, gated (license accepted) | The Llama 3 Herd of Models, arXiv 2407.21783 | 4.56 GiB → 13.7 t/s → 7.5–12.6 w/s | Q6_K (6.14 GiB → 10.7 t/s → 6.9–8.5 w/s); Q8_0 7.95 GiB → 8.5 t/s → 5.5–6.8 w/s borderline — walk may stop at Q8_0 or descend to Q6_K |
+| Qwen | Qwen3.5-9B | safetensors only, self-quantize path | Qwen3.5-Omni Technical Report arXiv 2604.15804 (family-level, ruled sufficient in the thinking roster v4) | 6.14 GiB → 10.7 t/s → 6.9–8.5 w/s (w/t 0.680 measured family value → ~7.2 point) | Q6_K (6.9 GiB → 9.6 t/s → 6.3–7.7 w/s); Q8_0 8.9 GiB → 7.7 t/s → 5.0–6.2 w/s borderline-fails confident |
+| Google | Gemma-4-12B-it | QAT Q4_0 GGUF first-party (google/gemma-4-12B-it-qat-q4_0-gguf, gated); other rungs convert from google/gemma-4-12B-it safetensors | Gemma 4 Technical Report, arXiv 2607.02770 | 7.08 GiB → 9.4 t/s → 6.1–7.5 w/s | Q5_K_M (8.1 GiB → 8.4 t/s → 5.4–6.7 w/s) or QAT Q4_0; Q6_K 9.2 GiB → 7.5 t/s → 4.9–6.0 w/s borderline; Q8_0 11.9 GiB → 5.9 t/s → 3.8–4.7 w/s fails |
+| Mistral | Mistral-7B-Instruct-v0.3 | safetensors, public | Mistral 7B, arXiv 2310.06825 | ~4.1 GiB → ~14.9 t/s → 9.7–11.9 w/s | Q8_0 (7.2 GiB → 9.3 t/s → 6.0–7.4 w/s) or Q6_K (5.5 GiB → 11.7 t/s → 7.6–9.4 w/s) |
+
+**Provenance paths (all verified this session):** Meta/Qwen3.5/Mistral take the safetensors → f16 → rung self-quantize path (pinned llama.cpp b10964); Meta gated (license accepted), Mistral public, Qwen3.5 public. Gemma-4: first-party QAT Q4_0 GGUF exists (gated); non-QAT rungs convert from safetensors. Note the Gemma-4 disabled-thinking behavior: with thinking off the 12b still emits the `<|channel>thought` wrapper with an EMPTY thought block (only E2B/E4B cannot disable) — the speed gate and ARC must handle the wrapper; first-turn dump check mandatory (the open `--chat-template-kwargs` server-flag issue #20409; per-request kwarg primary), as the standing flag requires for every hybrid.
+
+**The commands (author's machine, pull-first):**
+
+    git pull --ff-only
+    python3 full_benchmark.py --no-thinking "meta-llama/Llama-3.1-8B-Instruct" "Qwen/Qwen3.5-9B" "google/gemma-4-12B-it-qat-q4_0-gguf=google/gemma-4-12B-it" "mistralai/Mistral-7B-Instruct-v0.3"
+
+**Pre-registered predictions (recorded before any v2.1-roster measurement):**
+1. **Llama-3.1-8B:** Q8_0 (7.95 GiB → law 8.5 t/s → 5.5–6.8 w/s) borderline at k=1 — prediction: FAILS the confident verdict, Q6_K PASSES; selected rung Q6_K, worst 9.1–12.3 t/s. Llama-family w/t unknown — a first measurable (predicted in 0.65–0.80).
+2. **Qwen3.5-9B:** Q8_0 (8.9 GiB → 7.7 t/s → 5.0–6.2 w/s) borderline-fails confident; Q6_K PASSES at measured family w/t 0.680 → ~6.5 w/s point; selected rung Q6_K, worst 8.2–11.1 t/s.
+3. **Gemma-4-12B:** Q8_0 FAILS (3.8–4.7 w/s); Q6_K borderline (4.9–6.0); Q5_K_M PASSES at point estimate (5.4–6.7); the walk treats the first-party QAT Q4_0 as the Q4 rung. Prediction: selected rung Q5_K_M, or QAT Q4_0 if Q5_K_M misses confident; worst at Q5_K_M 7.1–9.7 t/s.
+4. **Mistral-7B-v0.3:** Q8_0 (6.0–7.4 w/s) passes at point but the band straddles 5.0; Q6_K passes with margin. Prediction: selected Q8_0 or Q6_K; worst at Q8_0 7.9–10.7 t/s.
+5. **Law transfer (the study's cross-family claim):** each pick's measured worst t/s lands within ±15% of the law's prediction at its selected rung's file size — grading the cross-family transfer at 8–12B scale (law fitted at 4B scale).
+6. **Words/token:** llama/mistral/gemma4 w/t land in 0.65–0.80; qwen3.5:9b w/t within ±10% of the measured 0.680 family value.
+7. **Mode blindness (gemma4):** with thinking disabled, reasoning_chars = 0 on every turn despite the empty `<|channel>thought` wrapper — wrapper tokens are parse artifacts, not reasoning.
+8. **No selection descends below Q4_K_M** (the quant-4 inclusion filter holds for every family).
