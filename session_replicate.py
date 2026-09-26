@@ -199,9 +199,14 @@ def main():
     ap.add_argument("--reader-wps", type=float,
                     default=READER_WPS_DEFAULT,
                     help="reader speed (w/s) for the collision simulation")
-    ap.add_argument("--reaction-s", type=float, default=0.5,
-                    help="seconds from first word printed to the reader "
-                         "starting to read (the notice-and-start delay)")
+    ap.add_argument("--reaction-s", type=float, default=0.45,
+                    help="notice-and-start delay: seconds from first "
+                         "word printed to reading start. Anchored "
+                         "(addendum 31): simple visual RT ~0.25 s + "
+                         "saccade latency to the text ~0.20 s (Carpenter "
+                         "1988; PubMed 6227700 for the reading case). "
+                         "Anticipated attention (already watching the "
+                         "output) pushes toward ~0.35 s.")
     ap.add_argument("--keep-server", action="store_true",
                     help="leave the server running for further sessions")
     args = ap.parse_args()
