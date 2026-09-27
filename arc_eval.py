@@ -29,16 +29,19 @@ import time
 
 import hf_download
 import llama_server
+import speed_gate
 from llama_server import start_server, stop_server
 
 ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 ARC_PORT = 8081
 ARC_THREADS = 8
-ARC_CTX = 2048           # inherited from the strict-arc era; PROMOTED to
-                         # [P] by the enforced precondition below
-                         # (addendum 44): every question's rendered
-                         # prompt must fit - checked, not assumed
+ARC_CTX = speed_gate.CTX_DEFAULT   # addendum 45 (author ruling): ARC
+                         # uses the study's promoted depth constant
+                         # 4096 (llama-server's own default) - one
+                         # depth for the whole study; the strict-arc-era
+                         # 2048 is deleted. The precondition below
+                         # still checks every prompt fits.
 ARC_NGPU = 99
 
 GUIDE = {
@@ -154,12 +157,11 @@ def arc_csv_valid(path, n):
 # =========================================================== run
 
 def arc_ctx_precondition(questions, label):
-    """Addendum 44: ARC_CTX 2048's exit plan, executed in code instead
-    of as a one-off check - every rendered prompt is verified against
-    the server's ctx before any run starts. A raw /v1/completions
-    prompt that overflowed ctx would either hard-error (a broken run)
-    or silently truncate (worse: a dropped answer choice). Fails
-    verbose with the offending question index."""
+    """The ctx precondition (addendum 44; ctx now 4096, addendum 45):
+    every rendered prompt is verified against the server's ctx before
+    any run starts. A raw /v1/completions prompt that overflowed ctx
+    would either hard-error (a broken run) or silently truncate
+    (worse: a dropped answer choice). Fails verbose with the size."""
     worst = max(len(build_prompt(q)) for q in questions)
     limit = ARC_CTX * 4            # chars-per-token floor, generous
     if worst > limit:
