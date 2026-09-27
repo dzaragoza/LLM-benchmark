@@ -316,8 +316,8 @@ def main():
           "decode)")
     if b <= 0:
         size_star = bw / floor
-        print(f"  overhead term vanished with this data; "
-              f"pure-BW approximation:")
+        print("  overhead term vanished with this data; "
+              "pure-BW approximation:")
     else:
         size_star = bw * (1000.0 / floor - overhead_ms) / 1000.0
         print(f"    comfort budget {1000 / floor:.0f} ms/token = read "

@@ -31,8 +31,7 @@ import urllib.request
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 
 try:
-    from huggingface_hub import (hf_hub_download, list_repo_files,
-                                 snapshot_download)
+    from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download
 except ImportError:
     hf_hub_download = list_repo_files = snapshot_download = None
 

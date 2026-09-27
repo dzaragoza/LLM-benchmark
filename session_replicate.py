@@ -48,8 +48,7 @@ import sys
 import time
 
 import llama_server
-from speed_gate import (CTX_DEFAULT, READER_WPS_DEFAULT,
-                        THINK_ALLOWANCE, build_blob, depth_budget)
+from speed_gate import CTX_DEFAULT, READER_WPS_DEFAULT, THINK_ALLOWANCE, build_blob, depth_budget
 
 CORPUS_DEFAULT = "./live-corpus.json"
 PORT_DEFAULT = 8079
@@ -290,7 +289,7 @@ def main():
             print("  interactive mode: press Enter to send each turn "
                   "yourself.")
         if not args.stream_only and not args.interactive:
-            print(f"\n--- pass 1: gate replay (non-streaming) ---")
+            print("\n--- pass 1: gate replay (non-streaming) ---")
             print(f"    blob: {blob_tokens} tokens (budget {budget})")
             history = [{"role": "user", "content": blob},
                        {"role": "assistant", "content": "Understood."}]
@@ -306,7 +305,7 @@ def main():
                       f"wall {rec['wall_s']:.1f}s)")
 
         # pass 2: the live streaming session
-        print(f"\n--- pass 2: LIVE session (streaming) ---")
+        print("\n--- pass 2: LIVE session (streaming) ---")
         if args.interactive:
             print("    the conversation is yours: each turn is shown, you "
                   "press Enter to send it,")

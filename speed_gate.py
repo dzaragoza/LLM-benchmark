@@ -563,7 +563,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 if wps:
                     line = reader_wps if reader_wps is not None \
                         else READER_WPS_DEFAULT
-                    print(f"      words/s: "
+                    print("      words/s: "
                           + ", ".join(f"{x:.1f}" for x in wps)
                           + f"   (reader line {line:g} w/s)")
                 if thinking:
@@ -594,7 +594,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                     noise_records.append({"model": label, "conv": ci, **r})
                 ntps = [r["tps"] for r in noise if r.get("tps")]
                 if ntps:
-                    print(f"      noise at depth: "
+                    print("      noise at depth: "
                           + ", ".join(f"{x:.1f}" for x in ntps))
                 if early_fail:
                     print(f"    conv {ci}: early-fail - skipping the "
