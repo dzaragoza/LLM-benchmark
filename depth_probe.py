@@ -336,7 +336,7 @@ def main():
             bw = (x2 - x1) / (y2 - y1)
             print(f"\n  third-term linearity: implied BW from the depth "
                   f"pair = {bw:.1f} GiB/s ({1000.0 / bw:.2f} ms/GiB)")
-            print(f"  (the law's T14s constant is ~13.07 ms/GiB; a "
+            print("  (the law's T14s constant is ~13.07 ms/GiB; a "
                   "matching number grades the KV-tax arithmetic and the "
                   "noise attribution together)")
         else:
