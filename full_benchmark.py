@@ -311,8 +311,8 @@ def main():
                          "families (comma-separated, as named in the "
                          "family specs); the state file accumulates "
                          "across studies - without this flag the "
-                         "ranking includes every family ever selected "
-                         "in this state file (addendum 41)")
+                         "ranking defaults to the families named in "
+                         "this run's command line (addendum 41/56)")
     ap.add_argument("--arc-models", default=None,
                     help="comma-separated .gguf files to ARC and rank "
                          "(with --arc-only); labels from filenames")
@@ -404,7 +404,9 @@ def main():
 
     # ---- phases 5-6: full ARC on selected models, then the ranking
     roster = ([f.strip() for f in args.roster.split(",")]
-              if args.roster else None)
+              if args.roster else
+              [os.path.basename(s.partition("=")[0].rstrip("/"))
+               for s in args.families])
     selections = {}
     for fam, fst in state["families"].items():
         if roster is not None and fam not in roster:
