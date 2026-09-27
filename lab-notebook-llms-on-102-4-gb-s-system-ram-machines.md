@@ -2528,3 +2528,19 @@ The 8B is the decisive row: its exclusion is MEASURED, not predicted — the add
 **What the protocol loses:** nothing measured. The floor never gated anything in v2+ (it was reported-only since protocol v2), and the headroom observation can be made post-hoc from any dump (worst_tps >= 20 is a one-line report table). The gate, the guarantee, the ladder, the law, and the estimator are untouched. The registry is smaller by two rows and one duplicate constant.
 
 **Protocol version is now v2.5** (v2.3 roster + v2.4 floored ladder + no floor line, no w/t band).
+
+### Session 29, addendum 51 — tokenizer_probe.py built (pre-registered instrument for the w/t first channel; built BEFORE any validation data, per the author's "simple over complex" guard)
+
+**Author ruling:** build it now, run it later, after the current run's results are in hand. "We need to be very careful not to overdo the predictor. Sometimes a simple predictor is better than a complex one."
+
+**The hypothesis, pre-registered before any validation run:** a family's measured words/token decomposes into two channels — (1) tokenizer efficiency (how many whitespace words the family's tokenizer packs per token on fixed text: knowable OFFLINE from the tokenizer files alone, a few MB, no weights, no server) and (2) sparseness at the worst turn (the model's content CHOICE — math/markdown/terse answers: unknowable before generation, measured by the gate's per-turn dumps). If channel 1 dominates healthy turns, the unknown-family selection filter needs only the sparseness channel from the family's first run: the gemma lesson (addendum 46: no family constant predicts content sparseness) is then refined, not overturned — the tokenizer constant may predict everything EXCEPT the sparse turns.
+
+**The instrument (one file, stdlib + transformers, no new dependency — transformers is already in requirements.txt for the pinned converter):**
+
+- `tokenizer_probe.py --repo <hf-repo>` — the tokenizer side: loads tokenizer files only (AutoTokenizer; HF cache; gated repos need hf auth login), computes whitespace words/token (the gate's exact word rule, `len(text.split())`) on the two REGISTERED text sets: the live corpus's 22 user prompts and the ARC-Challenge 1172-prompt set. No new text constants enter the protocol — the probe reads the ones the study already fixed.
+- `--dump '<glob>'` — the measured side: per-turn w/t distributions (n, min, p50, mean, and a count of turns below 0.30 — the sparse-turn flag) from the v2.1+ dumps the benchmark already writes. Legacy dumps (no per-turn gen_words/gen_tokens) are skipped and labeled.
+- Both sides in one invocation print side-by-side for the human comparison. The comparison itself stays a judgment — no verdict line, no magic threshold, per the author's simplicity ruling.
+
+**The pre-registered pass/fail for the validation run (AFTER the current benchmark lands, so the grading is honest):** PASS if the tokenizer term predicts each measured family's healthy-turn w/t (p50 band) within roughly the law's cross-family band (±15%), with deviations one-sided below (the sparseness channel) and concentrated in identifiable turns. FAIL (a real answer, not a crisis) if healthy turns also miss — channel 1 is then not sufficient and the predictor stays per-family measured. The free replication: qwen-4B vs qwen-9B share a tokenizer — coincident healthy-turn distributions confirm the tokenizer term is family-stable and size-invariant in one shot.
+
+**Complexity guard (author's, standing):** the predictor gains at most ONE term (tokenizer w/t, offline) — never a second (no sparseness model, no per-genre regression). If one term doesn't buy the prediction, we record that and keep the threshold-plus-first-run procedure.
