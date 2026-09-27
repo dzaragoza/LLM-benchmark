@@ -77,11 +77,28 @@ def csv_per_question(path, label, arc_num, arc_dir):
 # =========================================================== statistic
 
 def binom_two_sided(k, n, p=0.5):
-    def pmf(i):
-        return math.comb(n, i) * p ** i * (1 - p) ** (n - i)
-    pk = pmf(k)
-    return min(1.0, sum(pmf(i) for i in range(n + 1)
-                        if pmf(i) <= pk + 1e-12))
+    """Exact two-sided binomial p-value, computed in log space.
+
+    math.comb(n, i) * p**i * (1-p)**(n-i) overflows float conversion
+    once n ~ 1030 (math.comb returns an exact int too large for a
+    float), so the pmf is built from math.lgamma instead and summed
+    via exp() - exact in kind, stable at any n the pipeline can run.
+    """
+    if n == 0:
+        return 1.0
+    if not 0.0 < p < 1.0:
+        return 1.0 if k == (n if p >= 1.0 else 0) else 0.0
+    log_p, log_q = math.log(p), math.log(1.0 - p)
+
+    def log_pmf(i):
+        return (math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1)
+                + i * log_p + (n - i) * log_q)
+
+    shift = log_pmf(k) + math.log(n + 1)  # keep exp() in range
+    log_pk = log_pmf(k)
+    total = sum(math.exp(log_pmf(i) - shift) for i in range(n + 1)
+                if log_pmf(i) <= log_pk + 1e-9)
+    return min(1.0, math.exp(math.log(total) + shift))
 
 
 def mcnemar_exact(b, c):
