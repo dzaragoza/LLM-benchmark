@@ -55,13 +55,11 @@ import argparse
 import json
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-BPW_APPROX = {          # llama.cpp average bits-per-weight; varies per model
-    "Q4_K_M": 4.83,
-    "Q5_K_M": 5.69,
-    "Q6_K": 6.56,
-    "Q8_0": 8.5,
-}
+from hf_download import RUNG_BITS  # single source (addendum 44): the bpw
+                                    # table lives here once; law_fit's copy
+                                    # (BPW_APPROX) is deleted
 GIB_BYTES = 1 << 30
 GIB_TO_GB = 1.073741824
 
@@ -201,11 +199,12 @@ def main():
                     help="speed factor vs the reader anchor (default 1 = "
                          "MATCH the reader, the minimum that never "
                          "makes them wait; >1 buys buffering headroom)")
-    ap.add_argument("--words-per-token", type=float, default=0.75,
+    ap.add_argument("--words-per-token", type=float, default=None,
                     metavar="RATIO",
-                    help="words per token for --reader (default 0.75, the "
-                         "unanchored rule of thumb; replace with the "
-                         "measured per-model ratio once tokenized)")
+                    help="words per token for --reader (REQUIRED with "
+                         "--reader, addendum 44: the 0.75 rule-of-thumb "
+                         "default is deleted - unanchored; pass the "
+                         "family's measured w/t_min, e.g. 0.49 qwen)")
     ap.add_argument("--bw-theoretical", type=float, default=None,
                     help="theoretical bandwidth in GB/s, to report the "
                          "efficiency fraction")
@@ -283,6 +282,11 @@ def main():
     if args.latency_budget is not None:
         floor = 1000.0 / args.latency_budget
     elif args.reader is not None:
+        if args.words_per_token is None:
+            sys.exit("--reader requires --words-per-token (addendum 44: the "
+                     "0.75 default is deleted as unanchored; pass the "
+                     "family's measured w/t_min - 0.49 qwen, 0.37 mistral, "
+                     "0.144 llama-3.1)")
         wpm = READER_PROFILES[args.reader]
         budget_ms = (60000.0 * args.words_per_token / wpm) / args.reader_k
         floor = 1000.0 / budget_ms
@@ -323,7 +327,8 @@ def main():
           f"-{size_star * 1.1:.2f}, family factors +-10%)")
     print("  biggest model class that fits size* at plateau rungs "
           "(approx bpw):")
-    for rung, bpw in BPW_APPROX.items():
+    for rung in ("Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"):
+        bpw = RUNG_BITS[rung]
         print(f"    {rung:6} ({bpw:4.2f} bpw): "
               f"~{size_star * 8.59 / bpw:4.1f}B params")
     print("  rule: maximize parameters inside size*, never below Q4_K_M "

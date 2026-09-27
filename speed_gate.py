@@ -17,9 +17,10 @@ set. This script owns corpus/sample building too (the --make-sample /
 Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
   - The guarantee, restated: the WORST turn AT THE REFERENCE DEPTH
     (the 4096 protocol constant, addendum 9) must never fall below
-    the anchor reader - 6.5 t/s = 300 wpm at 0.75 words/token (k=1,
-    Brysbaert 2019; addenda 2-6) - so even a fast reader is never
-    made to wait. Floor 20 (k=3) is reported as headroom, not gated.
+    the anchor reader - 5.0 w/s = 300 wpm (k=1, Brysbaert 2019;
+    addenda 2-6, restated in words/s by protocol v2.1) - so even a
+    fast reader is never made to wait. Floor 20 (k=3) is reported as
+    headroom, not gated.
   - Each conversation runs ON TOP of a depth prefill: a blob of
     corpus text (content irrelevant - the KV cost is
     content-independent, addendum 11) as a prepended user turn,
@@ -104,8 +105,6 @@ FLOOR_DEFAULT = 20.0
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
                           # reader (Brysbaert 2019). Protocol v2.1:
                           # the anchor is words, not tokens.
-WORDS_PER_TOKEN_DEFAULT = 0.75  # unanchored rule of thumb; replaced per
-                                # dump by the measured ratio (v2.1)
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
 DEPTH_HEADROOM = 64
@@ -742,22 +741,23 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
 
 def analyze(path, floor, thinking=False, no_thinking=False,
             dump_override=None,
-            reader_wps=READER_WPS_DEFAULT,
-            words_per_token_default=WORDS_PER_TOKEN_DEFAULT):
+            reader_wps=READER_WPS_DEFAULT):
     """Phase 4: the guarantee verdict from the dump.
 
     Protocol v2.1 (author catch, Session 27): t/s is not w/s. The
     guarantee's anchor is a READER: 300 wpm = 5.0 words per second
     (Brysbaert 2019) - words, not tokens. The verdict is computed in
     WORDS per second, measured from the generated text itself
-    (whitespace words / generation span). The token-side line
-    (6.5 t/s = 5.0 w/s / 0.75 words-per-token) is printed for
-    continuity, but it is a derivative: a tokenizer with a lower
-    words/token ratio fails the READER while passing 6.5 t/s, and the
-    honest instrument must not let that pass. For dumps without
-    measured w/s (protocol-v1 data), the verdict converts via the
-    dump's own words/token when present, else the 0.75 default -
-    flagged as unanchored in the result.
+    (whitespace words / generation span). The token-side view
+    (worst t/s, mean words/token) is printed for continuity, but it
+    is a derivative: a tokenizer with a lower words/token ratio
+    fails the READER while passing a t/s line, and the honest
+    instrument must not let that pass.
+    Addendum 44 (author ruling): a dump with turns lacking measured
+    w/s (protocol-v1 data, pre-v2.1) can no longer be verdicted via
+    the 0.75 words/token rule of thumb - the fallback is DELETED;
+    analyze fails loudly so the rung is re-benched (--force) and every
+    verdict comes from measured words.
 
     Floor 20 t/s (k=3) stays a HEADROOM column, never the verdict.
     """
@@ -776,13 +776,22 @@ def analyze(path, floor, thinking=False, no_thinking=False,
     # measured words/token across the dump (v2.1 turns carry it)
     ratios = [t["words_per_token"] for t in mine
               if t.get("words_per_token")]
-    wpt = (sum(ratios) / len(ratios)) if ratios else words_per_token_default
+    wpt = (sum(ratios) / len(ratios)) if ratios else None
     wpt_measured = bool(ratios)
 
+    # addendum 44: the 0.75 fallback is deleted; a v1 dump (turns
+    # without measured w/s) cannot be verdicted - re-bench instead
+    legacy = [t for t in mine if t.get("server_wps") is None]
+    if legacy:
+        fail(4, label,
+             f"dump has {len(legacy)} turn(s) without measured w/s "
+             "(protocol-v1 data; the 0.75 words/token fallback is "
+             "deleted, addendum 44) - re-bench with --force to "
+             "measure words per second with the v2.1 instrument",
+             GUIDE[4])
+
     def turn_wps(t):
-        if t.get("server_wps") is not None:
-            return t["server_wps"]
-        return t["server_tps"] * wpt
+        return t["server_wps"]
 
     convs = {}
     for t in mine:
@@ -908,9 +917,7 @@ def main():
           f"-> {res['verdict']}")
     print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
           f"(mean {res['mean_tps']:.1f}); words/token "
-          f"{res['words_per_token']:.3f}"
-          + (" (measured)" if res["words_per_token_measured"]
-             else " (0.75 default, unanchored)"))
+          f"{res['words_per_token']:.3f} (measured)")
     print(f"    headroom vs floor {args.floor:g} t/s: {res['headroom']}")
 
 

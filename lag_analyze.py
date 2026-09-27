@@ -25,11 +25,11 @@ METRICS per rung (dump):
   worst/mean        the pure delivery-variance ratio (addendum-6
                     pre-registration: predicted 0.75-0.90)
   stall fraction    fraction of turns slower than each threshold:
-                    the reader line (default 6.5 t/s = 300 wpm at
-                    0.75 words/token) and the default line (20 t/s)
+                    the reader line (5.0 w/s, each turn's measured
+                    words/s; addendum 44) and the default line (20 t/s)
   S_delay           Andes-style lateness area, in reader-seconds per
                     conversation: sum over turns of
-                    (turn_wall_seconds - turn_tokens/reader_tps)
+                    (turn_wall_seconds - turn_words/reader_wps)
                     clipped at 0 - how many seconds the reader spent
                     waiting on text that had not arrived yet (only
                     turns slower than the reader generate lateness)
@@ -42,7 +42,7 @@ Usage (from the repo root, on the machine that ran the benchmark):
 
     python3 lag_analyze.py                                    # *.live-dump*.json
     python3 lag_analyze.py --dump q5.live-dump.json --dump q8.live-dump.think.json
-    python3 lag_analyze.py --reader-tp 6.5 --default-tp 20.0
+    python3 lag_analyze.py --reader-wps 5.0 --default-tp 20.0
     python3 lag_analyze.py --json lag-report.json
 
 One machine's dumps per invocation (same rule as law_fit.py).
@@ -53,9 +53,17 @@ import glob
 import json
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-READER_TPS_DEFAULT = 6.5      # 300 wpm at 0.75 words/token (k=1 line)
-DEFAULT_TPS_DEFAULT = 20.0    # floor 20 = k=3 recommended default
+from speed_gate import READER_WPS_DEFAULT, FLOOR_DEFAULT
+
+# addendum 44: the 6.5 t/s reader line (300 wpm at 0.75 w/t) is
+# DELETED - second-order magic inheriting the unanchored 0.75. The
+# stall metrics are re-anchored to the study's single anchor, 5.0
+# w/s, computed from each turn's MEASURED server_wps (v2.1 dumps).
+# The k=3 default line stays floor 20 t/s (registered [A]).
+READER_WPS = READER_WPS_DEFAULT
+DEFAULT_TPS_DEFAULT = FLOOR_DEFAULT
 
 
 def load_dumps(paths):
@@ -88,15 +96,22 @@ def percentile(sorted_vals, q):
     return sorted_vals[idx]
 
 
-def analyze_dump(dump, reader_tps, default_tps):
-    """All lag metrics for one dump."""
+def analyze_dump(dump, reader_wps, default_tps):
+    """All lag metrics for one dump. Reader-line metrics are in WORDS
+    per second (addendum 44): each turn's measured server_wps vs the
+    5.0 w/s anchor. The k=3 default line stays t/s (floor, headroom).
+    Turns without measured w/s (protocol-v1 dumps) are excluded from
+    the reader metrics and counted in `legacy_turns`."""
     turns = dump["turns"]
     tps = sorted(t["server_tps"] for t in turns)
     mean = sum(tps) / len(tps)
     worst = tps[0]
     ratio = worst / mean if mean else None
 
-    stall_reader = sum(1 for t in tps if t < reader_tps) / len(tps)
+    wps = [t["server_wps"] for t in turns if t.get("server_wps")]
+    legacy = len(turns) - len(wps)
+    stall_reader = ((sum(1 for w in wps if w < reader_wps) / len(wps))
+                    if wps else None)
     stall_default = sum(1 for t in tps if t < default_tps) / len(tps)
 
     s_delay = 0.0
@@ -106,11 +121,12 @@ def analyze_dump(dump, reader_tps, default_tps):
     for ci in sorted(convs):
         seq = convs[ci]
         for t in seq:
-            ntok = t.get("n_tokens") or 0
-            if not ntok:
+            words = t.get("gen_words") or 0
+            w = t.get("server_wps")
+            if not words or not w:
                 continue
-            wall = ntok / t["server_tps"]
-            ideal = ntok / reader_tps
+            wall = words / w
+            ideal = words / reader_wps
             s_delay += max(0.0, wall - ideal)
     # normalize: reader-seconds of lateness per conversation-second
     n_convs = len(convs) or 1
@@ -133,6 +149,7 @@ def analyze_dump(dump, reader_tps, default_tps):
         "worst_over_mean": ratio,
         "stall_frac_reader": stall_reader,
         "stall_frac_default": stall_default,
+        "legacy_turns": legacy,
         "s_delay_reader_sec": s_delay,
         "s_delay_per_conv": s_delay / n_convs,
         "kv_slope": kv_slope,
@@ -146,10 +163,11 @@ def main():
     ap.add_argument("--dump", action="append", default=[],
                     help="live dump file (repeatable); default: all "
                          "*.live-dump*.json in cwd")
-    ap.add_argument("--reader-tp", type=float, default=READER_TPS_DEFAULT,
-                    help=f"reader consumption speed in t/s (default "
-                         f"{READER_TPS_DEFAULT} = 300 wpm at 0.75 w/t; "
-                         f"the k=1 guarantee line)")
+    ap.add_argument("--reader-wps", type=float, default=READER_WPS,
+                    help=f"reader consumption speed in w/s (default "
+                         f"{READER_WPS:g} = 300 wpm, Brysbaert 2019 - the "
+                         f"study's single anchor; stall metrics use each "
+                         f"turn's MEASURED words/s, addendum 44)")
     ap.add_argument("--default-tp", type=float,
                     default=DEFAULT_TPS_DEFAULT,
                     help=f"recommended-default line in t/s (default "
@@ -168,13 +186,14 @@ def main():
         sys.exit("no usable dumps (files missing or no turn timings)")
 
     print("=" * 72)
-    print(f"LAG ANALYSIS  (reader line {args.reader_tp:g} t/s = k=1 "
-          f"guarantee; default line {args.default_tp:g} t/s = k=3)")
+    print(f"LAG ANALYSIS  (reader line {args.reader_wps:g} w/s = k=1 "
+          f"guarantee, measured words/s; default line "
+          f"{args.default_tp:g} t/s = k=3)")
     print("=" * 72)
 
     results = []
     for d in dumps:
-        results.append(analyze_dump(d, args.reader_tp, args.default_tp))
+        results.append(analyze_dump(d, args.reader_wps, args.default_tp))
 
     hdr = (f"  {'rung (dump)':28} {'turns':>5} {'mean':>5} {'min':>5} "
            f"{'p50':>5} {'p95':>5} {'w/m':>5} {'stlR':>5} {'stlD':>5} "
@@ -192,8 +211,8 @@ def main():
     print("  reading the table:")
     print("    w/m   = worst/mean turn t/s (addendum-6 pre-registration:")
     print("            predicted 0.75-0.90; < 0.75 needs a story)")
-    print("    stlR  = fraction of turns below the READER line (k=1 "
-          "guarantee: target ~0)")
+    print("    stlR  = fraction of turns below the READER line in "
+          "measured words/s (k=1 guarantee: target ~0; addendum 44)")
     print("    stlD  = fraction of turns below the DEFAULT line (k=3: "
           "headroom, not a failure)")
     print("    Sdel  = Andes-style lateness per conversation, in "
@@ -204,7 +223,7 @@ def main():
     if args.json:
         with open(args.json, "w") as f:
             json.dump({
-                "reader_tp": args.reader_tp,
+                "reader_wps": args.reader_wps,
                 "default_tp": args.default_tp,
                 "dumps": results,
             }, f, indent=1)

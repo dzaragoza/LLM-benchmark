@@ -250,9 +250,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
                   f"guarantee threshold {res['threshold']:.2f} w/s) "
                   f"-> {res['verdict']}")
             print(f"      token-side: worst {res['worst_tps']:.1f} t/s, "
-                  f"words/token {res['words_per_token']:.3f}"
-                  + (" (measured)" if res["words_per_token_measured"]
-                     else " (0.75 default, unanchored)"))
+                  f"words/token {res['words_per_token']:.3f} (measured)")
             print(f"      headroom vs floor {floor:g} t/s: "
                   f"{res['headroom']}")
             mem_sidecar = dump + ".mem.json"

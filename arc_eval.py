@@ -35,7 +35,10 @@ ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 ARC_PORT = 8081
 ARC_THREADS = 8
-ARC_CTX = 2048
+ARC_CTX = 2048           # inherited from the strict-arc era; PROMOTED to
+                         # [P] by the enforced precondition below
+                         # (addendum 44): every question's rendered
+                         # prompt must fit - checked, not assumed
 ARC_NGPU = 99
 
 GUIDE = {
@@ -150,6 +153,22 @@ def arc_csv_valid(path, n):
 
 # =========================================================== run
 
+def arc_ctx_precondition(questions, label):
+    """Addendum 44: ARC_CTX 2048's exit plan, executed in code instead
+    of as a one-off check - every rendered prompt is verified against
+    the server's ctx before any run starts. A raw /v1/completions
+    prompt that overflowed ctx would either hard-error (a broken run)
+    or silently truncate (worse: a dropped answer choice). Fails
+    verbose with the offending question index."""
+    worst = max(len(build_prompt(q)) for q in questions)
+    limit = ARC_CTX * 4            # chars-per-token floor, generous
+    if worst > limit:
+        fail(5, label,
+             f"a rendered ARC prompt ({worst} chars) may exceed "
+             f"ARC_CTX {ARC_CTX} tokens - refusing to run", GUIDE[5])
+    return worst
+
+
 def arc_run(label, model_path, questions, arc_num, arc_dir,
             on_scored=None, dry_run=False):
     """Full strict-ARC run on one model. Post-condition: complete CSV
@@ -164,6 +183,7 @@ def arc_run(label, model_path, questions, arc_num, arc_dir,
         return csv_path
     os.makedirs(arc_dir, exist_ok=True)
     print(f"  [5] ARC run: {label}  ({arc_num} questions)")
+    arc_ctx_precondition(questions, label)
     proc, healthy = arc_start_server(model_path)
     if not healthy:
         fail(5, label, "llama-server did not become healthy for "

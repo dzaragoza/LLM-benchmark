@@ -25,8 +25,10 @@ per second. No mode flags, no chat template.
 
 Verdict lines (Session 26 ruling): the guarantee is "decode speed at
 reference depth >= the reader line" - the worst sample at depth vs
-the anchor reader (6.5 t/s = 300 wpm at 0.75 words/token, k=1). The
-floor-20 line is reported as the headroom check, not the pass line.
+the anchor reader, in t/s form 5.0 w/s / w/t_min(family) via
+--reader-tp (addendum 44: the 6.5 default is deleted - unanchored
+0.75 inheritance). The floor-20 line is reported as the headroom
+check, not the pass line.
 
 Two-depth check (addendum 11 prediction 4): pass --depth twice
 (e.g. 2048 and 4000); with --kv architecture constants the depth
@@ -59,7 +61,6 @@ CTX_DEFAULT = 4096
 DEPTH_DEFAULT = 4000
 SAMPLES_DEFAULT = 5
 GEN_TOKENS_DEFAULT = 64
-READER_TPS_DEFAULT = 6.5
 FLOOR_DEFAULT = 20.0
 DEPTH_TOLERANCE = 8
 DEPTH_HEADROOM = 32
@@ -195,7 +196,11 @@ def summarize(recs, depth_target, reader_tp, floor):
     print(f"  depth target {depth_target} (measured prompt_n {prompt_n})")
     print(f"  decode at depth: worst {worst:.2f}  mean {mean:.2f}  "
           f"worst/mean {wm:.3f}  (n={len(tps)} samples)")
-    if worst >= reader_tp:
+    if reader_tp is None:
+        print("  reader line: not checked (pass --reader-tp = 5.0 / "
+              "w/t_min(family) - the 6.5 default is deleted, "
+              "addendum 44: unanchored 0.75 inheritance)")
+    elif worst >= reader_tp:
         print(f"  reader line {reader_tp:g} t/s: worst >= reader "
               f"-> guarantee HOLDS at depth")
     else:
@@ -243,9 +248,11 @@ def main():
                     help="blob source: the study corpus (default) or --text")
     ap.add_argument("--text", default=None,
                     help="plain-text blob source, overrides --corpus")
-    ap.add_argument("--reader-tp", type=float, default=READER_TPS_DEFAULT,
-                    help="the guarantee line (default 6.5 t/s = 300 wpm "
-                         "at 0.75 words/token, k=1)")
+    ap.add_argument("--reader-tp", type=float, default=None,
+                    help="the guarantee line in t/s - REQUIRED form: "
+                         "5.0 w/s / w/t_min(family) (addendum 44: the "
+                         "6.5 default is deleted, unanchored 0.75 "
+                         "inheritance; e.g. qwen w/t_min 0.49 -> 10.2)")
     ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
                     help="the headroom line (default 20 t/s)")
     ap.add_argument("--kv", default=None,
