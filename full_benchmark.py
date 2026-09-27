@@ -82,7 +82,6 @@ import llama_server
 import mcnemar
 import speed_gate
 
-
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
 CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
 MODELS_DIR_DEFAULT = "./models"
