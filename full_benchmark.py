@@ -90,7 +90,7 @@ RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # Q4_0 removed (author ruling, addendum 37): Q4_K_M is the single 4-bit
 # rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
 # RUNG_BITS keeps the Q4_0 ratio for ad-hoc --ladder size estimates.
-LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "Q3_K_M", "Q2_K"]
+LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"]
 FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT

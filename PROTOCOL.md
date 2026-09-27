@@ -62,7 +62,7 @@ a 300-wpm reader never waits on the model mid-answer.
 | Reader band (re-sim) | 0.6-1.5x reader speed | `session_replicate.py` | Author ruling: reading speed is variable run-to-run; the band sweep is post-hoc, no server. |
 | ARC sample | full test split, n=1172 | `arc_eval.py` ARC_NUM_DEFAULT | Author ruling 2026-09-23: no sampling - the whole split. |
 | Quant-5 inclusion filter | Q5_K_M predicted pass | study #3 selection | Author ruling (addendum 48, superseding the addendum-37 quant-6 filter): a pick must be estimated to pass the gate at quant 5 — "we are leaving brains on the table, for roughly the same performance". The estimate uses the corrected estimator (t/s × per-family w/t_min, measured or family-anchored; the 0.43–0.49 default band is retired for filter use per addendum 40/47). |
-| Ladder | Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, Q2_K | `full_benchmark.py` LADDER_DEFAULT | Ecosystem enumeration; Q7 dropped (no 7-bit rung exists in modern llama.cpp), Q4_0 dropped by author ruling (addendum 37: redundant with Q4_K_M). |
+| Ladder | Q8_0, Q6_K, Q5_K_M, Q4_K_M | `full_benchmark.py` LADDER_DEFAULT | Ecosystem enumeration; Q7 dropped (no 7-bit rung exists in modern llama.cpp), Q4_0 dropped by author ruling (addendum 37: redundant with Q4_K_M); Q3_K_M and Q2_K dropped by author ruling (addendum 49: below ~4.5 bpw the quality penalty is too steep for a q4–q8 study - gemma's Q2_K selection collapsed ARC 73.3% → 53.3%; a user is better served by a smaller model in the q4–q8 band). RUNG_BITS retains all rungs (used for size arithmetic). |
 
 ## [P] Practical limits
 

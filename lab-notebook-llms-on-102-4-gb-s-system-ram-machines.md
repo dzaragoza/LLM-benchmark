@@ -2495,3 +2495,17 @@ The `--force --roster` combination re-benches the ladder and re-ranks only the r
 | **Llama-3.2-3B** | 2.14 GiB | 24.12 (law) | ≥ 0.243 (own measured bound) | ≥ 5.86 | **PASS — the highest passing member** |
 
 The 8B is the decisive row: its exclusion is MEASURED, not predicted — the addendum-37 run walked its full ladder and failed every rung (worst 2.09 w/s at Q4_K_M, word-sparse turns at 0.144 w/t_min), and quant-5's larger files only make it slower. The 11B-Vision is excluded by prediction (3.19 w/s even on the generous 0.37 cross-family band — worse than every measured non-llama family) and is a vision model (rule 3's non-thinking/text-only spirit). The 70B is not runnable on a 32 GB machine. So the predictor DID try the larger models: the 3B is not a conservative fallback, it is the ceiling of what Meta offers that fits the machine and the gate. (Llama-3.1-8B measured w/t_min 0.144 is the structural cause: Meta's instruct answers are terse, so even a healthy-t/s 8B cannot clear a 5.0 w/s worst-turn gate above ~1.3 GiB files.)
+
+### Session 29, addendum 49 — ladder floored at Q4_K_M (Q3_K_M and Q2_K removed from the walk)
+
+**Author ruling:** "I'm thinking of removing q2 and q3 from the measurements. I think the user will benefit better from a smaller model with quants between 4 and 8." Approved after the analysis.
+
+**The evidence in-house:** the only selection the lower rungs ever produced is gemma's Q2_K — a quality-destroyed config (ARC 73.3% at Q6_K → 53.3% at Q2_K, a 20-point collapse, addendum 46). In brains currency the trade is terrible: Q2_K buys 2.4 B/GiB vs Q4_K_M's 1.67 (1.4x parameters) for that damage; below ~4.5 bpw the quantization penalty accelerates non-linearly. The author's rule — better a smaller model in the q4–q8 band — is what the numbers say.
+
+**Alignment argument:** the quant-5 inclusion filter admits families predicted to pass at Q5_K_M; a walk that then descends below Q4_K_M produces a selection the filter never sanctioned (gemma's Q2_K row is exactly that artifact in the current ranking). Under the floored ladder, a family that fails Q4_K_M records an honest "no passing rung" and the slot walks to the next owner.
+
+**Cost:** none for the pending v2.3 run — the walk takes the first PASS from Q8_0 down, and every v2.3 prediction lands at Q8_0–Q5_K_M. The law's ±5.6% validation across 7 rungs is banked history (addendum 46); future walks just don't extend below 4.8 bpw. The one case the floor forecloses: a family that legitimately passes only at Q3_K_M now records as failing — accepted as the true verdict for a q4–q8 study.
+
+**Changes:** `LADDER_DEFAULT` in full_benchmark.py is now ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"]; PROTOCOL.md ladder row updated. RUNG_BITS (hf_download.py) retains all seven rungs — it is size arithmetic, not the walk. Recorded history stands: gemma's banked Q2_K row keeps its addendum-46 meaning (selected under the rules as they were); under protocol v2.4 gemma's slot would empty and walk, consistent with addendum 47.
+
+**Protocol version is now v2.4** (v2.3 roster + floored ladder). The v2.3 run command is unchanged — no pick's prediction touches the removed rungs.
