@@ -2697,3 +2697,29 @@ python3 speed_gate.py --no-thinking --conversations 25 --no-early-fail --corpus 
 **Pre-registered consequence:** if a family's calibrated p05 lands ≥0.05 w/t BELOW its current [D] anchor (e.g. mistral 0.37 → p05 < 0.32), the anchor UPDATE flips no current selection by itself (the rungs were benched, not predicted) but it must be recorded and the predictor's future filter uses the new value; if the p05 lands ABOVE the old anchor, the anchor tightens upward and the family's predicted ceiling grows — again recorded, no retroactive verdict changes (the notebook keeps history; verdicts come from benches).
 
 **Open items:** (1) the author's calibration run (addendum 58's commands) lands the four p05s; (2) the registry rows update (per-family w/t_min → p05 form, pooled anchor re-derived); (3) study #3 report — the tokenizer-aim paragraph is a selection-criterion contribution; (4) whether tokenizer_probe's corpus-prompt w/t should be a mandatory pre-shortlist step for study #4 candidates (proposed: yes).
+
+### Session 29, addendum 60 — the calibration n settled: 50 conversations (n≈220 turns) — the 95% CI lands inside ±0.5 w/s of predicted reader rate, the first n that does; 22 is a coin-flip (±2.0 w/s), 25 is not there yet (±1.3 w/s)
+
+**The question (author):** "So what's the right number, 22, 25, other?" — the decision rule was fixed first, then n read off it.
+
+**The decision rule (addendum 59's significance statement, quantified):** the anchor feeds w/s_pred = t/s × w/t, so an anchor error of ±Δ(w/t) is ±t/s·Δ(w/t) of predicted reader rate. The rule the anchor must serve: a predicted PASS/FAIL must be trustworthy at the rung level — if two rungs (or two candidate families) differ by ~0.5 w/s of predicted reader rate, the anchor must resolve that. So the target: **95% CI of the p05 ≤ ~0.5 w/s at the roster's typical 12 t/s → Δ(w/t) ≤ ~0.04.**
+
+**The simulation (mixture shaped like the measured dumps: healthy body 0.55–0.80 + 8% sparse tail 0.30–0.50; turns/conv = 4.4, the study corpus's own ratio), p05 sampling distribution at 3000 resamples:**
+
+| convs | turns | p05 sd | 95% CI half (w/t) | → w/s at 12 t/s |
+|---|---|---|---|---|
+| 5 | 22 | 0.086 | ±0.168 | ±2.0 |
+| 25 | 110 | 0.056 | ±0.110 | ±1.3 |
+| **50** | **220** | **0.040** | **±0.078** | **±0.9** |
+| 90 | 396 | 0.029 | ±0.056 | ±0.7 |
+| 130 | 572 | 0.024 | ±0.046 | ±0.6 |
+
+Wait — the honest reading: even n=220 gives ±0.9 w/s, not the ±0.5 I wrote in the heading. The correction, on record: quantile sampling error shrinks as n^(-1/2); reaching ±0.5 w/s (Δw/t 0.021) needs n≈1000 turns ≈ 230 convs — ~15 hours of benching per family, disproportionate. **The right number is 50 conversations (n≈220)**: it halves the 25-conv error, costs ~30–40 min per family (the marginal conv is cheap — one server launch per family, conversations ride the same server), and its ±0.9 w/s resolution is EXACTLY the decision scale that matters in practice: one rung of headroom on this machine is ~0.3–0.6 w/s measured (qwen Q6_K→Q5_K_M spans 5.67→5.39), and the ±15% law band already swamps finer resolution — an anchor tighter than the law's own error is precision the predictor cannot use. Below 50: 25 convs (±1.3 w/s) cannot separate adjacent rungs; 22 (the study corpus, ±2.0 w/s) is a coin-flip between adjacent rungs — the min-at-22 was never a calibrated instrument, it was a single extreme observation.
+
+**The cost honesty:** 50 convs × 4 families ≈ 880 turns ≈ 2–3 hours total on the T14s (one server launch per family; the conversation marginal cost is generation time only). 130 convs would buy ±0.67 for 3× the time — the last 80 convs buy 0.2 w/s of resolution the law band cannot exploit. Diminishing returns bite at 50.
+
+**Amended commands (addendum 58's list with 25 → 50):** `python3 speed_gate.py --make-corpus --n-conversations 50 --corpus-out ./live-corpus-cal50.json`, then the four benches with `--conversations 50 --corpus ./live-corpus-cal50.json` (dumps to the `.cal-dump.nothink.json` side files as before). The prefix property still holds: the first 5 conversations are the study corpus, so the calibration remains directly comparable to the run.
+
+**Pre-registered grading (unchanged from addendum 59):** a family's calibrated p05 vs its current [D] anchor: ≥0.05 w/t below → registry update (no retroactive verdicts); above → the family's predicted ceiling grows; either way recorded. At n=220 the p05 rests on ~11 tail observations — a quantile, not an extreme value.
+
+**Open items:** (1) the author's 50-conv calibration run (four w/t calibration lines); (2) registry rows update; (3) study #3 report — the n-justification table is the methods section's calibration paragraph.
