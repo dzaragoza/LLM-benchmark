@@ -131,9 +131,11 @@ def main():
     ap.add_argument("--repo", default=None,
                     help="HF repo id - tokenizer files only, no weights")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument("--arc-config", default="arc-ARC-Challenge-test-1172.json",
-                    help="the cached ARC question file (hf_download "
-                         "resolves and fetches it)")
+    ap.add_argument("--arc-config", default="ARC-Challenge",
+                    help="ARC config name (hf_download.load_questions "
+                         "resolves the repo-root cache "
+                         "arc-<config>-test-<n>.json or fetches from "
+                         "the HF datasets-server)")
     ap.add_argument("--arc-num", type=int, default=1172,
                     help="number of ARC questions (the registered full "
                          "test split)")
@@ -170,7 +172,8 @@ def main():
         print("=" * 72)
         print("MEASURED SIDE  (per-turn w/t distributions from dumps)")
         print("=" * 72)
-        paths = sorted(set(p for g in args.dump for p in glob.glob(g)))
+        paths = sorted(set(p for g in args.dump for p in glob.glob(g)
+                           if not p.endswith(".mem.json")))
         if not paths:
             sys.exit("no dumps matched the --dump glob(s)")
         print(f"  {'dump':44} {'n':>4} {'min':>6} {'p50':>6} "
