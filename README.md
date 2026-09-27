@@ -105,7 +105,11 @@ fixed procedure with recorded numbers — anyone can audit or repeat it.
 1. Start from the [Ollama library](https://ollama.com/library?sort=popular)
    ranked by pull count (snapshot: 2026-09-23).
 2. **Distinct families only** — no two models from the same model
-   family/owner.
+   family/owner. A family is defined by its **publisher/author**
+   (the organization that ships the weights); a model from a distinct
+   publisher that inherits another family's architecture or tokenizer
+   (e.g. a llama-derived or qwen-derived model) is a *genetic caveat*
+   to be logged, not a conflict (addendum 64).
 3. **Non-thinking category: models must run in non-thinking mode.**
    Pure-reasoning models (no off switch) are excluded here - the
    strict letter-answer ARC protocol requires plain answers. Hybrid
