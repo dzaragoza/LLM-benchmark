@@ -2851,3 +2851,43 @@ python3 full_benchmark.py --no-thinking --roster "Llama-3.2-3B-Instruct,Qwen3.5-
 - **PRACTITIONER-GOALS.md** — the author's stated goals from the rulings: the MY-hardware question; the reader as final judge; the within-model ladder; right-sizing over flagships; class-exclusive benchmarking; the tokenizer aim; the general cheap predictor with the trust band; pre-registration/registry/simplicity; same rules for everyone.
 
 No constants changed: the rule uses the registered gate (reader line 5.0 w/s + 0.45 s reaction, addendum 55) and the registered law per tier (PROTOCOL rows 94–95); the class-exclusivity computation introduces NO new magic numbers (it is the existing predictor applied per tier). The 51.2 replication gains a second pre-registered purpose: it fixes the class boundary.
+
+### Session 29, addendum 66 — the calibration pass graded: the anchors land (qwen UPDATE, mistral VALIDATED, llama grows, phi hold) — and the headline the pass was designed to catch: qwen Q5_K_M and mistral Q5_K_M FAIL the reader-wall test at n=50; the 5-conv verdict is on record as anti-conservative
+
+**The run (author's machine, live-corpus-cal50.json, 50 convs / 267 turns per family, --no-early-fail, four families, same selected rungs as study #3).** The instrument worked as designed: `--no-early-fail` recorded every wall hit without aborting, and analyze() recomputed each verdict from the raw per-word deltas. The per-family `w/t calibration` lines:
+
+| family | rung | verdict at n=50 | wall-failing turns | worst wait | w/t calibration (n=267): min / p05 / mean |
+|---|---|---|---|---|---|
+| qwen 9B | Q5_K_M | **FAIL** (9 turns, 30 events) | 9 | 6.34 s | 0.189 / 0.412 / 0.658 |
+| phi-4-mini | Q8_0 | PASS (confident) | 0 | — | 0.304 / 0.418 / 0.714 |
+| mistral 7B | Q5_K_M | **FAIL** (17 turns, 41 events) | 17 | 6.59 s | 0.250 / 0.366 / 0.650 |
+| llama 3.2-3B | Q8_0 | PASS (confident) | 0 | — | 0.242 / 0.491 / 0.704 |
+
+**The headline (pre-registered as possible, now measured): two of the four study-#3 selections fail the reader-wall test at n=50.** Qwen Q5_K_M (PASSED on the 5-conv study corpus, addendum 56) hits the wall on 9 of 267 turns — worst waits 6.34 s / 5.62 s / 3.87 s, mid-stream catch-ups (conv 16 turn 1: 1.5 w/s span; conv 19 turns 2/4/6: 4.8/4.5/3.8 w/s spans). Mistral Q5_K_M (PASSED at 5 convs) fails 17 turns — worst 6.59 s. Phi and llama PASS at 0 wall events across all 267 turns each. Per the addendum-59 pre-registration, **no retroactive verdicts**: the 5-conv verdicts stand in the study-#3 record; the calibration is a NEW measurement, and its finding is that n=5 is anti-conservative for PASS — addendum 23's warning ("the verdict is a min, fewer samples = anti-conservative PASS") made concrete and quantified.
+
+**The anchor grading (pre-registered in addendum 59: p05 ≥0.05 below the anchor → registry update; above → ceiling grows):**
+- **qwen: UPDATE.** p05 0.412 vs anchor 0.49 → −0.078, beyond the 0.05 grading band. The 0.49 anchor was measured on 40+ turns of the 5-conv corpus; the 267-turn distribution has a fatter tail (min 0.189). Registry consequence: the qwen ceiling at Q5_K_M shrinks from 9.7B to **7.9B params (5.27 GiB)** — qwen 9B (6.19 GiB) is now predicted ABOVE its calibrated ceiling, exactly consistent with the measured FAIL. The anchor update and the verdict flip are two views of the same data, recorded once each.
+- **mistral: VALIDATED.** p05 0.366 vs anchor 0.37 → −0.004. The closest prediction of the four — the addendum-37 anchor survives a 12× sample increase intact.
+- **llama: grows.** p05 0.491 vs probe min 0.333 → +0.158. The 0.144 joke-turn row is SUPERSEDED (corpus-degenerate, addendum 54; no joke turn was sampled at n=50, min 0.242). The llama ceiling grows to **9.8B params (6.48 GiB)** — consistent with the addendum-57 finding (no larger llama passes: 8B overshoots on its content anchors, a measured failure), but the margin is wider than previously recorded.
+ ceiling is wider than the old record.
+- **phi: hold.** p05 0.418 vs probe min 0.445 → −0.027, within the band.
+
+**The pooled anchor recomputes to 0.366 (min of the four calibrated p05s; was 0.33 = min of probe-mins).** The min-based pooling rule is retired with this data: the min slides with n (addendum 59's extreme-value lesson — qwen's min moved 0.485 → 0.189 going from 22 to 267 turns), the p05 is the calibrated instrument. Effect on the pending study-#4 picks (addendum 64): granite 3.93 → **4.36 w/s**, OLMo 4.19 → **4.65 w/s** (both at Q5_K_M with the pooled anchor) — both still bench-zone straddlers, no decision change; the probe-first step (addendum 59) may still rescue either if their tokenizers probe above the pooled class.
+
+**What the flips mean for the study (the honest reading):**
+1. **The gate did not change; the sample did.** The 5-conv verdicts were real measurements — but n=5 samples ~22 turns, and a PASS there means "no wall hit in 22 turns," not "the reader never hits the wall." At n=50 the tail shows up: qwen 9/267, mistral 17/267 failure rates. The failure rates are 3.4% / 6.4% per turn — rare enough to hide in 22 turns, real enough for a reader to feel ("if the reader hits the wall, they feel the model is slow, so it fails").
+2. **The calibration did its job.** It exists precisely to catch this class of miss before publication; the verdicts that go in the study-#3 report must state the corpus scope (5 convs) and the n=50 finding side by side — the report gains a methods paragraph: the gate's verdict is corpus-size-dependent, the calibration quantifies the tail, and the published guarantee needs an n large enough that the p05 stabilizes (addendum 59/60's instrument).
+3. **Open ruling for the author:** do the study-#3 verdicts get re-issued at n=50 (the bench re-run at 50 convs for the four selected rungs — ~30–40 min/family), or does the study publish the 5-conv verdicts with the calibration tail as the honest scope statement? The pre-registration says no retroactive edits; the choice between "re-bench at n=50" vs "publish with scope statement" is the author's. A third option is on record: the class-exclusive rule (addendum 65) needs the 102.4-class boundary anyway, and the boundary rungs ARE the four selected rungs — one re-bench serves both purposes.
+
+**Registry updates (PROTOCOL.md, change log addendum 66):** qwen w/t anchor 0.49 → p05 0.412; mistral 0.37 → 0.366 (validated); phi probe-min 0.445 → 0.418; llama 0.144 (joke turn) SUPERSEDED → p05 0.491; pooled anchor 0.33 → 0.366 (p05-based pooling; the min-based rule retired).
+
+**Commands for the author (T14s, if the re-bench option is chosen):**
+
+```
+git pull --ff-only
+python3 speed_gate.py --no-thinking --conversations 50 --no-early-fail \
+  --corpus live-corpus-cal50.json ./models/Qwen3.5-9B/Qwen3.5-9B-Q5_K_M.gguf
+```
+(one invocation per family; the calibration corpus is the instrument, the verdict recomputes from deltas at analyze; the cal-dumps from this pass are already on disk — `Qwen3.5-9B-Q5_K_M.cal-dump.nothink.json` etc. — so NO re-bench is needed to read the n=50 verdicts; they are the same run.)
+
+**Open items:** (1) the author's ruling on re-bench vs scope statement (above); (2) the study-#4 picks recompute under the pooled anchor (no decision change — both still straddle); (3) the 51.2-class replication inherits the calibrated anchors; (4) qwen 9B's ranking row: ARC 92.4% stands (ARC is not wall-dependent), the class-exclusivity grade (addendum 65) gains the calibrated ceiling — qwen 9B is now predicted to fail on the 102.4 class itself at its ceiling edge, sharpening the boundary question.
