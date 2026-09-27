@@ -98,10 +98,16 @@ Standalone instruments (outside the pipeline, one-shot experiments):
 
 ## Roster selection (pre-registered, transparent)
 
-The four model families were chosen **before any measurement**, by a
-fixed procedure with recorded numbers — anyone can audit or repeat it.
-
-**Rules (fixed in advance):**
+The roster selection rules are fixed in advance and recorded in
+full in **[MODEL-SELECTION.md](MODEL-SELECTION.md)** (nine rules:
+popularity-sourced; distinct families with family =
+publisher/author and lineage logged as a genetic caveat;
+non-thinking mode; predictor + trust band; first-party weights;
+paper rule; latest generation; hybrid mode control; and the
+class-exclusive bandwidth rule). The study's practitioner goals
+are recorded in **[PRACTITIONER-GOALS.md](PRACTITIONER-GOALS.md)**.
+This section keeps the study-#1 walk-down for auditability — the
+popularity snapshot with each candidate's verdict:
 1. Start from the [Ollama library](https://ollama.com/library?sort=popular)
    ranked by pull count (snapshot: 2026-09-23).
 2. **Distinct families only** — no two models from the same model
