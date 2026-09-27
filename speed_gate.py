@@ -104,6 +104,13 @@ CORPUS_DEFAULT = "./live-corpus.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
                           # reader (Brysbaert 2019). Protocol v2.1:
                           # the anchor is words, not tokens.
+
+READER_REACTION_S = 0.45  # reader reaction time, s: 0.25 s simple visual RT
+                          # + 0.20 s saccade latency (Carpenter 1988;
+                          # addendum 31). Protocol v3.0: part of the
+                          # guarantee's verdict (the reader-wall test),
+                          # single-sourced here - session_replicate
+                          # imports it.
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
 DEPTH_HEADROOM = 64
@@ -277,6 +284,60 @@ def build_blob(port, pool, budget):
     return llama_server.trim_to_tokens(port, text, budget)
 
 
+def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
+                     reaction_s=READER_REACTION_S):
+    """The guarantee's verdict, protocol v3.0 (author ruling, addendum
+    55): simulate the reader on the per-word arrival stream - the
+    registered addendum-30 collision model, exact form. The reader
+    starts reading reaction_s after the first word arrives and reads
+    at reader_wps; the turn FAILS iff the reader EVER hits the wall
+    (catches up with printing mid-answer - any word arrives after
+    the reader is ready for it, not just the last). A stream the
+    reader finishes inside his reaction window can never fail: it
+    is read like a static message. deltas = [{"t": absolute arrival
+    time, "w": cumulative words}] - one entry per stream delta,
+    final entry = stream end. Returns the collision record
+    (catchup_events > 0 = FAIL)."""
+    if not deltas or n_words == 0:
+        return {"catchup_events": 0, "catchup_s": 0.0,
+                "first_catchup_word_frac": None}
+    t_first = deltas[0]["t"]
+    t_read = t_first + reaction_s
+    pos = 0.0
+    events, total, first_frac = 0, 0.0, None
+    waiting_prev = False
+    for i in range(len(deltas) - 1):
+        t_i, p = deltas[i]["t"], deltas[i]["w"]
+        t_next = deltas[i + 1]["t"]
+        s = max(t_i, t_read)
+        if t_next <= s:
+            continue
+        if pos >= p - 1e-9:
+            total += t_next - s
+            if not waiting_prev:
+                events += 1
+                if first_frac is None:
+                    first_frac = p / n_words
+            waiting_prev = True
+        else:
+            advance = reader_wps * (t_next - s)
+            if pos + advance >= p:
+                t_reach = s + (p - pos) / reader_wps
+                total += t_next - t_reach
+                if not waiting_prev:
+                    events += 1
+                    if first_frac is None:
+                        first_frac = p / n_words
+                waiting_prev = True
+            else:
+                waiting_prev = False
+            pos = min(p, pos + advance)
+    return {"catchup_events": events,
+            "catchup_s": round(total, 2),
+            "first_catchup_word_frac": round(first_frac, 3)
+            if first_frac is not None else None}
+
+
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
                      thinking=False, no_thinking=False, blob=None,
                      blob_tokens=0, reader_wps=None):
@@ -288,11 +349,17 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     Returns (turn records, final history) - the history feeds the
     same-depth noise samples, which must ride it: the slot cache
     reuses only the longest common token prefix.
-    Early-fail (addendum 34): with reader_wps set, a turn measured
-    below the reader line aborts the conversation immediately - the
-    rung's worst is a min over turns and conversations, so nothing
-    after it can recover the verdict. The failing turn is flagged
-    `below_reader_line` in its record."""
+    Early-fail (addendum 34, protocol v3.0 form): the verdict is a
+    min, so the first wall-failing turn aborts the conversation.
+    Protocol v3.0: turns run STREAMING and the verdict is the
+    reader-wall test (addendum 55) - the registered addendum-30
+    collision simulation on the per-word arrival stream: the turn
+    fails iff the reader EVER hits the wall (any word late, not
+    just the last). The old span-based w/s stays as a diagnostic;
+    it is no longer the verdict (the addendum-54 tiny-answer
+    degeneracy: a 5-token answer's span is overhead, not reading
+    experience). Failing turns are flagged `reader_wall_fail` and
+    carry their collision record in the dump."""
     history = []
     results = []
     if blob:
@@ -305,23 +372,30 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "max_tokens": (cap_tokens + THINK_ALLOWANCE)
                            if thinking else cap_tokens,
             "temperature": 0,
-            "stream": False,
+            "stream": True,
         }
         if no_thinking:
             payload["chat_template_kwargs"] = {"enable_thinking": False}
-        wall_start = time.time()
-        data = llama_server.post_json(port, "/v1/chat/completions", payload)
-        wall_s = time.time() - wall_start
 
-        message = data["choices"][0]["message"]
-        answer = message.get("content") or ""
-        reasoning = message.get("reasoning_content") or ""
+        # Protocol v3.0: stream the answer, recording per-word
+        # arrivals - the raw input of the reader-wall test (the
+        # non-streaming span could not see a mid-stream wall at all)
+        meta = {}
+        pieces, times, words = [], [], []
+        wall_start = time.time()
+        for text, t_arr in llama_server.stream_completion(port, payload,
+                                                          meta=meta):
+            pieces.append(text)
+            times.append(t_arr)
+            words.append(len("".join(pieces).split()))
+        wall_s = time.time() - wall_start
+        answer = "".join(pieces)
         history.append({"role": "assistant", "content": answer})
 
-        t = data.get("timings", {})
+        t = meta.get("timings", {})
         server_tps = t.get("predicted_per_second")
         n_pred = t.get("predicted_n",
-                       data.get("usage", {}).get("completion_tokens"))
+                       meta.get("usage", {}).get("completion_tokens"))
         prompt_ms = t.get("prompt_ms")
         prompt_n = t.get("prompt_n")
 
@@ -335,19 +409,39 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         history_chars = sum(len(m["content"]) for m in history[:-1])
         depth_tokens = blob_tokens + (history_chars - blob_chars) // 4
 
-        # Protocol v2.1: the guarantee is anchored in WORDS per second
-        # (300 wpm = 5.0 w/s, Brysbaert 2019). t/s was always a
-        # derivative via the 0.75 words/token rule of thumb - the
-        # honest instrument measures both, from the generated text
-        # itself: words = whitespace tokens of the answer, w/s =
-        # words / generation span (wall minus prefill - the same
-        # span the external cross-check uses).
+        # Diagnostics (v2.1 fields, kept): words = whitespace tokens
+        # of the answer; span w/s = words / generation span. NOT the
+        # verdict since v3.0 - see the addendum-54 degeneracy note.
         answer_words = len(answer.split()) if answer.strip() else 0
         gen_span_s = ext_gen_s if (ext_gen_s and ext_gen_s > 0) else None
         words_per_sec = (answer_words / gen_span_s
                          if (answer_words and gen_span_s) else None)
 
-        results.append({
+        # The verdict (protocol v3.0): simulate the reader on the
+        # arrival stream - the registered addendum-30 collision
+        # model. deltas carry cumulative words at each word-arrival
+        # (token deltas that complete no word are collapsed); waits
+        # count only BETWEEN arrivals: once the last word has
+        # landed the reader finishes from the buffer, so a reader
+        # still behind at stream end is NOT a fail (the answer is
+        # complete - this is exactly session_replicate's model). A
+        # late LAST word still fails: its lateness is a wait in the
+        # interval before it lands, which the loop sees.
+        if times:
+            deltas = [{"t": 0.0, "w": words[0]}]
+            for t_arr, w in zip(times[1:], words[1:], strict=True):
+                if w != deltas[-1]["w"]:
+                    deltas.append({"t": round(t_arr - times[0], 4), "w": w})
+            collision = reader_wall_test(deltas, answer_words,
+                                          reader_wps or READER_WPS_DEFAULT,
+                                          READER_REACTION_S)
+        else:
+            deltas = []
+            collision = {"catchup_events": 0, "catchup_s": 0.0,
+                         "first_catchup_word_frac": None}
+
+        reasoning = meta.get("reasoning") or ""
+        rec = {
             "turn": i + 1,
             "depth_tokens_est": depth_tokens,
             "prompt_n": prompt_n,
@@ -365,14 +459,20 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "reasoning_chars": len(reasoning),
             "thinking_tokens_est": len(reasoning) // 4,
             "answer_empty": 1 if not answer.strip() else 0,
-        })
-        if (reader_wps is not None and words_per_sec is not None
-                and words_per_sec < reader_wps):
-            results[-1]["below_reader_line"] = 1
-            print(f"      turn {i + 1} measured {words_per_sec:.2f} w/s < "
-                  f"reader line {reader_wps:g} w/s - the rung is "
-                  "unrecoverable (worst is a min); aborting the "
-                  "conversation early (addendum 34)", flush=True)
+            "ttft_s": ((times[0] - wall_start) if times else None),
+            "catchup_events": collision["catchup_events"],
+            "catchup_s": collision["catchup_s"],
+            "first_catchup_word_frac": collision["first_catchup_word_frac"],
+            "reader_wall_fail": (1 if collision["catchup_events"] else 0),
+            "deltas": deltas,
+        }
+        results.append(rec)
+        if reader_wps is not None and rec["reader_wall_fail"]:
+            print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
+                  f"hit the stream {collision['catchup_events']}x "
+                  f"(waited {collision['catchup_s']:.2f}s) - the rung is "
+                  "unrecoverable (the verdict is a min); aborting the "
+                  "conversation early (addendum 34/55)", flush=True)
             break
     return results, history
 
@@ -549,9 +649,11 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                     reader_wps=reader_wps)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
-                early_fail = any(r.get("below_reader_line") for r in res)
+                early_fail = any(r.get("reader_wall_fail") for r in res)
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
                 wps = [r["server_wps"] for r in res if r["server_wps"]]
+                evts = [r.get("catchup_events") or 0 for r in res]
+                cwait = [r.get("catchup_s") or 0.0 for r in res]
                 cworst = min(tps) if tps else None
                 cmean = sum(tps) / len(tps) if tps else None
                 conv_worsts.append(cworst)
@@ -559,10 +661,15 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                       + ", ".join(f"{x:.1f}" for x in tps)
                       + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
                          if cworst else ""))
+                print("      reader wall (catch-up events): "
+                      + ", ".join(str(e) for e in evts)
+                      + (f"   [reader waited "
+                         f"{max(cwait):.2f}s on the worst turn]"
+                         if max(cwait) > 0 else "   [reader never waited]"))
                 if wps:
                     line = reader_wps if reader_wps is not None \
                         else READER_WPS_DEFAULT
-                    print("      words/s: "
+                    print("      words/s (diagnostic): "
                           + ", ".join(f"{x:.1f}" for x in wps)
                           + f"   (reader line {line:g} w/s)")
                 if thinking:
@@ -779,7 +886,7 @@ def analyze(path, thinking=False, no_thinking=False,
     wpt_measured = bool(ratios)
 
     # addendum 44: the 0.75 fallback is deleted; a v1 dump (turns
-    # without measured w/s) cannot be verdicted - re-bench instead
+    # without measured w/s) cannot be verdicted - re-bench instead.
     legacy = [t for t in mine if t.get("server_wps") is None]
     if legacy:
         fail(4, label,
@@ -788,6 +895,45 @@ def analyze(path, thinking=False, no_thinking=False,
              "deleted, addendum 44) - re-bench with --force to "
              "measure words per second with the v2.1 instrument",
              GUIDE[4])
+    # Protocol v3.0 (addendum 55): the verdict is the reader-wall
+    # test, which needs the per-word arrival stream - a dump whose
+    # turns carry no deltas (pre-v3.0) cannot be verdicted; re-bench.
+    no_stream = [t for t in mine if "deltas" not in t]
+    if no_stream:
+        fail(4, label,
+             f"dump has {len(no_stream)} turn(s) without per-word "
+             "arrival deltas (pre-v3.0 data; the verdict is the "
+             "reader-wall test, addendum 55) - re-bench with "
+             "--force to record the arrival stream",
+             GUIDE[4])
+
+    # Protocol v3.0 (addendum 55): the verdict is the reader-wall
+    # test - the registered addendum-30 collision simulation on
+    # each turn's arrival stream, RECOMPUTED HERE from the dump's
+    # raw deltas (so a dump can be re-graded post-hoc at any reader
+    # speed, like session_replicate's resim mode; the bench-time
+    # flags were computed with the same defaults). A turn fails iff
+    # the reader EVER hit the wall (any catch-up event); the rung
+    # passes iff no turn failed. The flat w/s comparison stays a
+    # diagnostic only: it manufactured fails on tiny answers (the
+    # addendum-54 degeneracy - the span of a 5-token answer is
+    # pipeline overhead, not reading experience).
+    wall_fails = []
+    total_catchup_events = 0
+    worst_catchup_s = 0.0
+    for t in mine:
+        col = reader_wall_test(t.get("deltas") or [],
+                               t.get("gen_words") or 0,
+                               reader_wps, READER_REACTION_S)
+        t["catchup_events"], t["catchup_s"] = (
+            col["catchup_events"], col["catchup_s"])
+        t["first_catchup_word_frac"] = col["first_catchup_word_frac"]
+        t["reader_wall_fail"] = 1 if col["catchup_events"] else 0
+        if col["catchup_events"]:
+            wall_fails.append(t)
+        total_catchup_events += col["catchup_events"]
+        worst_catchup_s = max(worst_catchup_s, col["catchup_s"] or 0.0)
+    verdict = "FAIL" if wall_fails else "PASS (confident)"
 
     def turn_wps(t):
         return t["server_wps"]
@@ -806,22 +952,16 @@ def analyze(path, thinking=False, no_thinking=False,
     else:
         sigma = 0.0
     threshold = reader_wps - 2 * sigma
-    # Protocol v2.1 early-fail ruling (addendum 34): the verdict is a
-    # MIN over conversation worsts, so a single conversation below
-    # the reader line is unrecoverable - it is impossible for later
-    # turns or conversations to repair the worst. Any sub-line
-    # conversation therefore FAILS the rung outright; the lenient
-    # 2-sigma rescue is retired (sigma stays a reported diagnostic:
-    # the spread of conversation worsts), and the bench aborts
-    # in-flight the moment such a turn is measured.
-    if all(w >= reader_wps for w in conv_worsts):
-        verdict = "PASS (confident)"
-    else:
-        verdict = "FAIL"
+    # Protocol v3.0: the flat-w/s numbers below stay DIAGNOSTICS
+    # (the spread of conversation worsts; sigma as before). The
+    # verdict is settled above by the reader-wall test.
     worst_tps = min(t["server_tps"] for t in mine)
     mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
     return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
             "threshold": threshold, "verdict": verdict,
+            "wall_fail_turns": len(wall_fails),
+            "catchup_events": total_catchup_events,
+            "worst_catchup_s": worst_catchup_s,
             "reader_wps": reader_wps,
             "words_per_token": wpt,
             "words_per_token_measured": wpt_measured,
@@ -897,16 +1037,24 @@ def main():
                  args.no_thinking, args.port, args.ctx, args.repeats,
                  args.dump, args.force, args.reader_wps)
     if args.dry_run:
-        print(f"[4] would analyze (every conversation's worst turn at "
-              f"or above the reader line {args.reader_wps:g} w/s)")
+        print(f"[4] would analyze (the reader-wall test: a turn "
+              f"fails iff the reader EVER hits the stream - reader "
+              f"{args.reader_wps:g} w/s, reaction "
+              f"{READER_REACTION_S}s, addendum 55)")
         return
     res = analyze(args.model, args.thinking, args.no_thinking,
                   args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
-    print(f"[4] worst {res['worst']:.2f} w/s "
-          f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}, "
-          f"guarantee threshold {res['threshold']:.2f} w/s) "
-          f"-> {res['verdict']}")
+    print(f"[4] {res['verdict']} — the reader-wall test: "
+          f"{res['wall_fail_turns']} wall-failing turn(s), "
+          f"{res['catchup_events']} catch-up event(s), "
+          f"worst wait {res['worst_catchup_s']:.2f}s "
+          f"(reader {args.reader_wps:g} w/s, reaction "
+          f"{READER_REACTION_S}s; addendum 55)")
+    print(f"    span diagnostics: worst {res['worst']:.2f} w/s "
+          f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}) - "
+          "NOT the verdict (addendum 54: spans of tiny answers "
+          "are overhead, not reading experience)")
     print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
           f"(mean {res['mean_tps']:.1f}); words/token "
           f"{res['words_per_token']:.3f} (measured)")

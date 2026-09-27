@@ -33,14 +33,16 @@ That single command runs the **entire study** for the four families:
      each running ON TOP of a depth prefill — a corpus-text blob sized
      per conversation via `/tokenize` so the deepest turn lands just
      under the 4096 reference depth; worst-turn metric at depth).
-  4. **Analyze**: PASS only if EVERY conversation's worst turn is at
-     or above the reader line (protocol v2.1 + addendum 34: a single
-     sub-line conversation is unrecoverable — the worst is a min —
-     so it fails the rung and the bench aborts in flight; the anchor
-     is the k=1 reader guarantee in WORDS per second — 5.0 w/s = 300
-     wpm, Brysbaert 2019 — so even a fast reader is never made to
-     wait; t/s is printed as the token-side view via the measured
-     words/token ratio). First PASS wins.
+  4. **Analyze** (protocol v3.0, addendum 55): the verdict is the
+     READER-WALL TEST — the gate streams every turn and simulates the
+     registered reader (5.0 w/s = 300 wpm, Brysbaert 2019; 0.45 s
+     reaction) on the per-word arrival stream. PASS only if the
+     reader NEVER hits the wall on any turn (fails iff ANY word
+     arrives after the reader is ready for it — a wall hit is
+     unrecoverable, so the bench aborts in flight, addendum 34).
+     The flat worst-turn w/s is printed as a diagnostic only (the
+     addendum-54 lesson: the span of a tiny answer is pipeline
+     overhead, not reading experience). First PASS wins.
 - **Stage B — accuracy**: full strict **ARC-Challenge** (1,172 questions,
   logprob letter scoring, temperature 0) on each selected model.
 - **Stage C — ranking**: exact **McNemar** pairwise tests; the final
@@ -315,24 +317,25 @@ rungs are self-quantized from google/gemma-3-1b-it safetensors (the
 
 ## Protocol notes (pre-registered, fixed)
 
-- **Speed metric:** worst turn across 5 fixed Arena conversations
-  (corpus committed at `live-corpus.json`, seed 1024, reply-length
-  p75 answer cap), each conversation depth-prefilled to the 4096
+- **Speed metric (protocol v3.0, addendum 55):** 5 fixed Arena
+  conversations (corpus committed at `live-corpus.json`, seed 1024,
+  reply-length p75 answer cap), each depth-prefilled to the 4096
   reference depth via a `/tokenize`-sized corpus-text blob (the KV
   cost is content-independent, so the blob guarantees the measurement
-  happens at depth). Verdict: every conversation's worst turn at or
-  above the reader line, in WORDS per second (reader line 5.0 w/s =
-  300 wpm, k=1 guarantee, Brysbaert 2019; a single sub-line
-  conversation is unrecoverable - the worst is a min - so it fails
-  the rung and the bench aborts in flight, addendum 34; sigma is
-  reported as a diagnostic of the spread of conversation worsts;
-  each turn's w/s is measured from the generated text itself —
-  whitespace words / generation span — and the words/token ratio is
-  reported per dump, replacing the 0.75 rule of thumb; the t/s view
-  is printed alongside). After
-  each conversation the gate also takes same-depth noise samples
-  (identical follow-ups on the warm slot) — the machine's noise at
-  depth, cleanly separated from the KV trend.
+  happens at depth). The gate STREAMS every turn and records the
+  per-word arrival stream; the verdict is the READER-WALL TEST: the
+  registered reader (5.0 w/s = 300 wpm, Brysbaert 2019; 0.45 s
+  reaction) is simulated on each turn's arrivals - a turn fails iff
+  the reader EVER hits the wall (any catch-up event; a hit is
+  unrecoverable - the verdict is a min - so the bench aborts in
+  flight, addendum 34). The flat worst-turn w/s, sigma, the
+  words/token ratio and the t/s view are printed as diagnostics
+  (the flat test is retired from the verdict: the addendum-54
+  degeneracy - a tiny answer's span is pipeline overhead, not
+  reading experience). After each conversation the gate also takes
+  same-depth noise samples (identical follow-ups on the warm slot)
+  — the machine's noise at depth, cleanly separated from the KV
+  trend.
 - **Accuracy metric:** strict ARC-Challenge letter-answer protocol —
   raw completion prompt, max_tokens=1, temperature 0, logprob scoring;
   no chain-of-thought. Full test split, 1,172 questions, cached in

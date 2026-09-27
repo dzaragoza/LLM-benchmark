@@ -14,7 +14,10 @@ file 2026-09-24; same protocol, same state, byte-identical behavior):
                   conversion tooling - safetensors -> f16, f16 -> rung.
   speed_gate.py   STAGE A phases 3-4: the worst-turn speed gate - the
                   llama-server bench interface, mode-suffixed dumps,
-                  verdict.
+                  verdict (protocol v3.0: the reader-wall test - the
+                  streaming gate simulates the reader on each turn's
+                  per-word arrival stream; a turn fails iff the reader
+                  ever hits the wall, addendum 55).
   arc_eval.py     STAGE B (phase 5): strict ARC-Challenge on every
                   selected model (raw protocol, logprob letter scoring).
   mcnemar.py      STAGE C (phase 6): pairwise exact McNemar; the final
@@ -24,11 +27,13 @@ file 2026-09-24; same protocol, same state, byte-identical behavior):
     1. DOWNLOAD - premade rung file or the data to create it later.
     2. CREATE   - convert safetensors -> f16, quantize f16 -> rung.
     3. BENCH    - speed_gate.py, 1 rep, worst-turn metric.
-    4. ANALYZE  - verdict: PASS only if EVERY conversation's worst
-                  turn is at or above the reader line (addendum 34:
-                  a sub-line conversation is unrecoverable - the worst
-                  is a min; the bench aborts early); first PASS =
-                  selected.
+    4. ANALYZE  - verdict (protocol v3.0, addendum 55): the
+                  reader-wall test - the gate streams every turn and
+                  simulates the reader (reader_wps after REACTION_S);
+                  PASS only if the reader NEVER hits the wall on any
+                  turn (a wall hit is unrecoverable - the verdict is
+                  a min; the bench aborts early, addendum 34); first
+                  PASS = selected.
   STAGE B (phase 5): strict ARC-Challenge on every selected model
     (FULL test split, 1172 questions; logprob letter scoring,
     temperature 0; per-question CSVs in --arc-results-dir).
@@ -226,8 +231,10 @@ def process_family(spec, ladder, corpus, models_dir, state,
         path = run.get("file") or local_rung(famdir, rung)
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
-            print(f"  [4] would analyze (every conversation's worst turn "
-                  f"at or above the reader line {reader_wps:g} w/s)")
+            print(f"  [4] would analyze (the reader-wall test: a turn "
+                  f"fails iff the reader EVER hits the stream - reader "
+                  f"{reader_wps:g} w/s, reaction "
+                  f"{speed_gate.READER_REACTION_S}s, addendum 55)")
             continue
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(path, corpus, dry_run, thinking,
@@ -242,10 +249,13 @@ def process_family(spec, ladder, corpus, models_dir, state,
             run.update(res)
             run["phases_done"].append(4)
             save_state(state_path, state)
-            print(f"  [4] worst {res['worst']:.2f} w/s "
-                  f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}, "
-                  f"guarantee threshold {res['threshold']:.2f} w/s) "
-                  f"-> {res['verdict']}")
+            print(f"  [4] {res['verdict']} — reader-wall test: "
+                  f"{res['wall_fail_turns']} wall-failing turn(s), "
+                  f"{res['catchup_events']} catch-up event(s), "
+                  f"worst wait {res['worst_catchup_s']:.2f}s "
+                  f"(addendum 55; the span diagnostics: worst "
+                  f"{res['worst']:.2f} w/s, mean {res['mean']:.2f}, "
+                  f"sigma {res['sigma']:.2f})")
             print(f"      token-side: worst {res['worst_tps']:.1f} t/s, "
                   f"words/token {res['words_per_token']:.3f} (measured)")
             mem_sidecar = dump + ".mem.json"
