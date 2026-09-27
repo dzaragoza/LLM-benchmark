@@ -81,7 +81,7 @@ def arc_texts(arc_config, arc_num):
     """The ARC prompt set - the second registered text set."""
     import hf_download
     questions = hf_download.load_questions(arc_config, arc_num)
-    return [q["prompt"] if isinstance(q, dict) else str(q)
+    return [q["q"] if isinstance(q, dict) else str(q)
             for q in questions]
 
 
