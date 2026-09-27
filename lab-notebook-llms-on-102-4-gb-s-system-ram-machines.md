@@ -2368,3 +2368,13 @@ Expected per addendum-37 predictions: qwen3.5-4b re-walks Q8_0 (4.29 GiB → 15.
 **Verified by test (10 cases):** v1 dump refused / mixed dump refused / clean v2.1 dump verdicts from measured w/s only; law_fit refuses --reader without --words-per-token and derives floor 10.2041 t/s at 0.49; ARC precondition passes normal prompts and refuses an oversized one; lag_analyze computes reader stalls in measured w/s vs 5.0 (33.3% on a synthetic 1-of-3-stalled dump) and reports legacy_turns on a v1 dump; depth_probe summarize skips the reader line when --reader-tp is absent. py_compile clean across all scripts.
 
 **Consequence:** every remaining number in the code is now either [A], [P], [D], or single-sourced; no unanchored default survives in any verdict or metric path. The 5.0 w/s anchor chain is the only reader line in the study.
+
+### Session 29, addendum 45 — ARC_CTX 2048 -> the study's depth constant 4096 (author ruling: "ARC does not need a smaller context, it can use the default")
+
+**The author's catch, one message after the addendum-44 promotion:** the 2048 I registered as [P] was still an inherited number wearing a badge. llama-server's own default n_ctx is 4096 - the study's already-promoted depth constant (addendum 9) - and ARC's one-shot letter-answer prompts need nothing smaller. Two depth constants for one study is one too many.
+
+**Change:** `ARC_CTX = speed_gate.CTX_DEFAULT` (4096), single-sourced from the gate's constant - the strict-arc-era 2048 is deleted outright. The addendum-44 precondition (every rendered prompt checked against ctx before any run) stays and now guards the 4096 value. Cost: a slightly larger KV allocation per ARC server launch (~0.1-0.5 GiB on these models; irrelevant at this tier). Benefit: one depth constant for the entire study - the guarantee's depth and the quality measurement's depth are the same number, with one registry row.
+
+**Note on comparability:** the existing ARC CSVs were measured at ctx 2048. Prompts never approached the limit (the precondition now checks this at 4096, and 9000-char synthetic prompts pass with room), so scores are ctx-insensitive; no rerun needed. Any future rerun happens at 4096.
+
+**Verified:** ARC_CTX == 4096 through the import chain (arc_eval and full_benchmark), precondition passes a 9035-char synthetic prompt (limit 16384), py_compile clean.
