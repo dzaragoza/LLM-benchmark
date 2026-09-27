@@ -38,9 +38,10 @@ Chain of derivation from the anchor:
 ```
 5.0 w/s  --/w/t_min-->  t/s needed per model/rung  --law-->  size*(rung)
     |                                        (per-family w/t_min, [D])
-    --k-->  floor 20 t/s = k=3 x (5.0 w/s / 0.75 w/t), reported not gated
 ```
-
+    (the k=3 floor line is deleted, addendum 50 - an observation
+     for the report, not a protocol constant)
+```
 The guarantee: **the worst turn at depth 4096, measured in words per
 second on the reference corpus, is at or above the reader line** -
 a 300-wpm reader never waits on the model mid-answer.
@@ -53,7 +54,7 @@ a 300-wpm reader never waits on the model mid-answer.
 |---|---|---|---|
 | Reader line (k=1 guarantee) | 5.0 w/s | `speed_gate.py` READER_WPS_DEFAULT | Match the FAST reader: 300 wpm / 60. The canonical anchor. |
 | Fast-reader anchor | 300 wpm | `law_fit.py` READER_PROFILES | Cited: Brysbaert 2019 meta-analysis, silent reading, English non-fiction, adult mean. |
-| Floor (k=3 headroom) | 20 t/s | `speed_gate.py` FLOOR_DEFAULT | Legacy default, demoted in protocol v2: REPORTED, never gated. The practitioner headroom line, cited to the absorption literature, not derived. |
+| Floor (k=3 headroom) | (deleted, addendum 50) | - | Author ruling: "obsolete. We use w/s >= 5. Remove it if possible. It is an observation, not needed for the protocol. We can mention in the report, but it doesn't play any role in the benchmark." FLOOR_DEFAULT deleted from speed_gate/depth_probe; the --floor flags, the headroom verdict line, the stlD stall metric, and law_fit's floor-20 default all removed with it. The gate is the reader line alone. |
 | Corpus shape | 5 conversations, 4-8 user turns | `live-corpus.json` | Corpus construction (Session 10); re-ruled vs n=1 in addendum 23: the verdict is a min, fewer samples = anti-conservative PASS. |
 | Repeats | 1 qualifying / 3 podium | `speed_gate.py` REPEATS_DEFAULT | Author ruling: "simplify, accept the worst with confidence"; 3 reps only for final published numbers. |
 | Thinking allowance | 2048 tokens | `speed_gate.py` THINK_ALLOWANCE | Author ruling after 82% answer_empty at 1024 - thinking tokens are the user's informed choice, measured descriptively, never gated. |
@@ -87,7 +88,7 @@ a 300-wpm reader never waits on the model mid-answer.
 | Bits-per-weight table | Q8_0 8.5 ... Q2_K 3.4 | `hf_download.py` RUNG_BITS | llama.cpp average bits-per-weight; used for size estimates before download. Exit plan for [M]-status duplicate: law_fit's BPW_APPROX is the same table - single-source it (see [M] rows). |
 | words/token minimum, qwen family | 0.49 | addendum 37 | Measured worst-turn words/token (three runs, 40+ turns, stable). |
 | words/token minimum, llama family | 0.144 | addendum 37 | The joke-answer turn (30 words / 208 tokens). |
-| words/token band (unmeasured families) | 0.43-0.49 | addendum 37 | Conservative band until the family's first run grades it; exits to [D] per family as the roster runs. |
+| words/token band (unmeasured families) | (deleted, addendum 50) | - | Retired: every roster family is now measured or content-evidenced (llama 0.144, mistral 0.37, qwen 0.49, gemma sparse), and phi-4-mini was selected by threshold (passes iff w/t_min >= 0.245), not by band. No code references it; per the addendum-44 ruling, unused constants are deleted. The notebook keeps the history. |
 | ms per GiB | 13.07 | notebook | Inverse of the fitted effective bandwidth. |
 | Reader profiles (mean / 2-sigma-fast) | 238 / 340 wpm | `law_fit.py` READER_PROFILES | Brysbaert 2019: mean adults; 2-sigma above the fast anchor. |
 | Selection estimator | w/s_pass = t/s(rung) x w/t_min(family) | addendum 37 | Pre-registered after the llama miss; retro-predicts both measured families (7.5 pred vs 7.32-8.24 meas; 2.0 pred vs 2.09 meas). |

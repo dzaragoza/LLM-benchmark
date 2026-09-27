@@ -40,8 +40,7 @@ That single command runs the **entire study** for the four families:
      is the k=1 reader guarantee in WORDS per second — 5.0 w/s = 300
      wpm, Brysbaert 2019 — so even a fast reader is never made to
      wait; t/s is printed as the token-side view via the measured
-     words/token ratio; floor 20 is reported as headroom, not gated).
-     First PASS wins.
+     words/token ratio). First PASS wins.
 - **Stage B — accuracy**: full strict **ARC-Challenge** (1,172 questions,
   logprob letter scoring, temperature 0) on each selected model.
 - **Stage C — ranking**: exact **McNemar** pairwise tests; the final
@@ -278,14 +277,14 @@ Every phase prints its progress; on failure it stops with **possible
 causes and fixes** — address the cause and rerun the same command to
 resume.
 
-**The speed floor is tier-specific.** The default `--floor 20` (worst
-turn, tokens/s) is the comfort line calibrated on a **51.2 GB/s**
-system-RAM machine (DDR4-3200 dual channel — the study #1 machine
-class; live t/s ≈ 26 ÷ model size in GiB). This roster of ~1–2B models
-is sized for that tier. On other tiers scale the floor with bandwidth
-(102.4 GB/s → `--floor 40`, 25.6 GB/s → `--floor 10`) and expect the
-ladder to land on different rungs. Pick the floor **before** the run
-and keep it fixed: it is part of the protocol.
+**The speed line is tier-specific.** The gate's reader line is
+5.0 w/s (the k=1 guarantee); the law that predicts it is calibrated
+per machine tier (51.2 GB/s: live t/s ≈ 26 ÷ model size in GiB;
+102.4 GB/s: the study #3 machine class). This roster of ~1–2B models
+is sized for the 51.2 GB/s tier. On other tiers the same w/s gate
+holds — the law refits per tier and the ladder lands on different
+rungs. (The k=3 floor-20 comfort line is deleted, addendum 50: an
+observation for the report, not a protocol constant.)
 
 ### Step 7 — outputs
 
@@ -330,8 +329,7 @@ rungs are self-quantized from google/gemma-3-1b-it safetensors (the
   each turn's w/s is measured from the generated text itself —
   whitespace words / generation span — and the words/token ratio is
   reported per dump, replacing the 0.75 rule of thumb; the t/s view
-  is printed alongside). Floor 20 (k=3) is reported as headroom, not
-  gated. After
+  is printed alongside). After
   each conversation the gate also takes same-depth noise samples
   (identical follow-ups on the warm slot) — the machine's noise at
   depth, cleanly separated from the KV trend.

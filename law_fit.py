@@ -20,9 +20,10 @@ one-parameter special case t_inf = infinity - Session 18q proved that
 special case wrong (family-specific "constants" that were really the
 missing second parameter).
 
-THE GATE, REINTERPRETED: the worst-turn floor plus the ladder walk is
-an empirical binary search for the law's zero: the largest file that
-still meets the floor,
+THE GATE, REINTERPRETED (addendum 50: the k=3 floor-20 default is
+deleted with the floor; the canonical form derives the boundary from
+the reader anchor): the ladder walk is an empirical binary search for
+the law's zero: the largest file that still meets the line,
 
     size*(floor) = BW_eff * (1/floor - 1/t_inf)
 
@@ -42,7 +43,7 @@ Usage (from the repo root, on the machine that ran the benchmark):
     python3 law_fit.py                          # ./benchmark-state.json
     python3 law_fit.py --state-file a.json --state-file b.json
     python3 law_fit.py --reader fast --bw-theoretical 102.4
-    python3 law_fit.py --floor 20 --bw-theoretical 102.4
+    python3 law_fit.py --reader fast --words-per-token 0.49 --bw-theoretical 102.4
     python3 law_fit.py --point "session18q Qwen Q8_0,3.36,21.5"
     python3 law_fit.py --predict-size 5.0        # t/s at 5 GiB from the fit
 
@@ -182,9 +183,6 @@ def main():
     ap.add_argument("--point", action="append", default=[],
                     metavar="'label,size_gib,worst[,mean]'",
                     help="manual archive point (repeatable)")
-    ap.add_argument("--floor", type=float, default=20.0,
-                    help="comfort floor in t/s (default 20; or pass "
-                         "--latency-budget for the time-based form)")
     ap.add_argument("--latency-budget", type=float, default=None,
                     metavar="MS",
                     help="comfort budget in ms per generated token; "
@@ -282,9 +280,7 @@ def main():
                 continue
             print_fit(m, f[0], f[1], f[2], f[3])
 
-    if args.latency_budget is not None:
-        floor = 1000.0 / args.latency_budget
-    elif args.reader is not None:
+    if args.reader is not None:
         if args.words_per_token is None:
             sys.exit("--reader requires --words-per-token (addendum 44: the "
                      "0.75 default is deleted as unanchored; pass the "
@@ -293,8 +289,13 @@ def main():
         wpm = READER_PROFILES[args.reader]
         budget_ms = (60000.0 * args.words_per_token / wpm) / args.reader_k
         floor = 1000.0 / budget_ms
+    elif args.latency_budget is not None:
+        floor = 1000.0 / args.latency_budget
     else:
-        floor = args.floor
+        sys.exit("pass --reader (canonical: --reader fast "
+                 "--words-per-token <family w/t_min>) or "
+                 "--latency-budget; the floor-20 default is deleted "
+                 "(addendum 50)")
 
     print()
     print("=" * 72)

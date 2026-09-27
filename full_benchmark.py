@@ -91,7 +91,6 @@ RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
 # RUNG_BITS keeps the Q4_0 ratio for ad-hoc --ladder size estimates.
 LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"]
-FLOOR_DEFAULT = speed_gate.FLOOR_DEFAULT
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
 ARC_RESULTS_DIR_DEFAULT = arc_eval.ARC_RESULTS_DIR_DEFAULT
@@ -130,7 +129,7 @@ def save_state(path, state):
 
 # =========================================================== selection
 
-def process_family(spec, ladder, corpus, floor, models_dir, state,
+def process_family(spec, ladder, corpus, models_dir, state,
                    state_path, dry_run, force, thinking=False,
                    no_thinking=False, reader_wps=READER_WPS_DEFAULT):
     model_repo, _, source_repo = spec.partition("=")
@@ -228,8 +227,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
             print(f"  [4] would analyze (every conversation's worst turn "
-                  f"at or above the reader line {reader_wps:g} w/s; "
-                  f"floor {floor:g} t/s as headroom)")
+                  f"at or above the reader line {reader_wps:g} w/s)")
             continue
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(path, corpus, dry_run, thinking,
@@ -239,7 +237,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
         if 4 not in run["phases_done"]:
-            res = speed_gate.analyze(path, floor, thinking, no_thinking,
+            res = speed_gate.analyze(path, thinking, no_thinking,
                                      reader_wps=reader_wps)
             run.update(res)
             run["phases_done"].append(4)
@@ -250,8 +248,6 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
                   f"-> {res['verdict']}")
             print(f"      token-side: worst {res['worst_tps']:.1f} t/s, "
                   f"words/token {res['words_per_token']:.3f} (measured)")
-            print(f"      headroom vs floor {floor:g} t/s: "
-                  f"{res['headroom']}")
             mem_sidecar = dump + ".mem.json"
             if os.path.isfile(mem_sidecar):
                 try:
@@ -283,9 +279,6 @@ def main():
                     help='family specs: "model_repo" or '
                          '"model_repo=source_repo" (skip for --arc-only)')
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
-                    help="the k=3 headroom line (t/s), reported not "
-                         "gated (protocol v2)")
     ap.add_argument("--reader-wps", type=float,
                     default=READER_WPS_DEFAULT,
                     help="the k=1 guarantee line in WORDS per second: "
@@ -390,7 +383,7 @@ def main():
         ap.error("no family specs given (or use --arc-only)")
 
     for spec in args.families:
-        process_family(spec, ladder, args.corpus, args.floor,
+        process_family(spec, ladder, args.corpus,
                        args.models_dir, state, args.state_file,
                        args.dry_run, args.force, args.thinking,
                        args.no_thinking, args.reader_wps)

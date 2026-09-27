@@ -2509,3 +2509,22 @@ The 8B is the decisive row: its exclusion is MEASURED, not predicted — the add
 **Changes:** `LADDER_DEFAULT` in full_benchmark.py is now ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"]; PROTOCOL.md ladder row updated. RUNG_BITS (hf_download.py) retains all seven rungs — it is size arithmetic, not the walk. Recorded history stands: gemma's banked Q2_K row keeps its addendum-46 meaning (selected under the rules as they were); under protocol v2.4 gemma's slot would empty and walk, consistent with addendum 47.
 
 **Protocol version is now v2.4** (v2.3 roster + floored ladder). The v2.3 run command is unchanged — no pick's prediction touches the removed rungs.
+
+### Session 29, addendum 50 — two deletions: the k=3 floor-20 line (obsolete; the gate is w/s >= 5 alone) and the 0.43–0.49 unmeasured-family band (exit plan fully fired)
+
+**Ruling 1 (author):** "Floor default 20 is obsolete. We use w/s >= 5. Remove it if possible. It is an observation, not needed for the protocol. We can mention in the report, but it doesn't play any role in the benchmark." Applied fully:
+
+- `FLOOR_DEFAULT` deleted from speed_gate.py and depth_probe.py (it was also a single-sourcing violation: defined in both, plus a bare magic 20.0 as law_fit's --floor default).
+- speed_gate: the --floor flag, the "headroom vs floor" verdict line, and the floor/headroom fields in the analyze result are removed. The verdict is the reader line alone (worst turn w/s >= 5.0).
+- depth_probe: the --floor flag and the "floor: BELOW at depth" line are removed. The depth guarantee check is --reader-tp only.
+- lag_analyze: the k=3 default line (stlD) is retired; stlR (below the READER line in measured w/s) is the only stall metric. --default-tp deleted.
+- law_fit: the --floor 20 default is deleted; the boundary must be derived from the anchor (--reader fast --words-per-token <family w/t_min>, the canonical author-ruling form) or given explicitly as --latency-budget. Fail-verbose otherwise.
+- full_benchmark: the --floor flag and the headroom printout are removed; process_family drops the floor parameter.
+- PROTOCOL.md: the floor row moves to deleted-history; the anchor-chain diagram drops the k->floor branch. The report may still cite floor 20 as an observation (the absorption-literature headroom judgment), but no code path carries it.
+- Historical rows that reference floor 20 (the study #1/#2 walk-downs in README, the notebook) stand as recorded: those selections were pre-registered under the rules as they were.
+
+**Ruling 2 (author, confirming my audit):** the 0.43–0.49 words/token band for unmeasured families is retired — "Then it should be updated, right?" Its exit plan ("retires as each family's first run grades it") fired for every family: llama 0.144, mistral 0.37, qwen 0.49 (all measured), gemma content-sparse (no band ever predicted it, addendum 46). Phi-4-mini was then selected by THRESHOLD (passes iff w/t_min >= 0.245), not by band — the band has no remaining job and no code references it. Deleted from PROTOCOL.md per the addendum-44 standard ("if it is not used anywhere, delete it"); the notebook keeps the history.
+
+**What the protocol loses:** nothing measured. The floor never gated anything in v2+ (it was reported-only since protocol v2), and the headroom observation can be made post-hoc from any dump (worst_tps >= 20 is a one-line report table). The gate, the guarantee, the ladder, the law, and the estimator are untouched. The registry is smaller by two rows and one duplicate constant.
+
+**Protocol version is now v2.5** (v2.3 roster + v2.4 floored ladder + no floor line, no w/t band).

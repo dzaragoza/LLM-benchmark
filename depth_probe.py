@@ -27,8 +27,8 @@ Verdict lines (Session 26 ruling): the guarantee is "decode speed at
 reference depth >= the reader line" - the worst sample at depth vs
 the anchor reader, in t/s form 5.0 w/s / w/t_min(family) via
 --reader-tp (addendum 44: the 6.5 default is deleted - unanchored
-0.75 inheritance). The floor-20 line is reported as the headroom
-check, not the pass line.
+0.75 inheritance). (The floor-20 headroom line is deleted,
+addendum 50.)
 
 Two-depth check (addendum 11 prediction 4): pass --depth twice
 (e.g. 2048 and 4000); with --kv architecture constants the depth
@@ -61,7 +61,6 @@ CTX_DEFAULT = 4096
 DEPTH_DEFAULT = 4000
 SAMPLES_DEFAULT = 5
 GEN_TOKENS_DEFAULT = 64
-FLOOR_DEFAULT = 20.0
 DEPTH_TOLERANCE = 8
 DEPTH_HEADROOM = 32
 
@@ -184,7 +183,7 @@ def probe_depth(port, blob, gen_tokens, samples):
     return recs
 
 
-def summarize(recs, depth_target, reader_tp, floor):
+def summarize(recs, depth_target, reader_tp):
     tps = [r["tps"] for r in recs if r["tps"]]
     if not tps:
         fail("completion", "no predicted_per_second in any sample",
@@ -206,11 +205,6 @@ def summarize(recs, depth_target, reader_tp, floor):
     else:
         print(f"  reader line {reader_tp:g} t/s: worst < reader "
               f"-> guarantee BROKEN at depth")
-    if worst >= floor:
-        print(f"  floor {floor:g} t/s: headroom intact at depth")
-    else:
-        print(f"  floor {floor:g} t/s: BELOW floor at depth "
-              f"(the headroom flag, addendum 10)")
     return {"depth_target": depth_target, "prompt_n": prompt_n,
             "samples": recs, "worst": worst, "mean": mean, "wm": wm}
 
@@ -253,8 +247,6 @@ def main():
                          "5.0 w/s / w/t_min(family) (addendum 44: the "
                          "6.5 default is deleted, unanchored 0.75 "
                          "inheritance; e.g. qwen w/t_min 0.49 -> 10.2)")
-    ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
-                    help="the headroom line (default 20 t/s)")
     ap.add_argument("--kv", default=None,
                     metavar="'layers,kv_heads,head_dim[,bytes_per_elem]'",
                     help="architecture constants: enables the KV(D) tax "
@@ -306,7 +298,7 @@ def main():
                   f"(target {d}, tolerance {DEPTH_TOLERANCE})")
             recs = probe_depth(args.port, blob, args.gen_tokens,
                                args.samples)
-            results.append(summarize(recs, d, args.reader_tp, args.floor))
+            results.append(summarize(recs, d, args.reader_tp))
         finally:
             peak = llama_server.peak_rss_gib(proc)
             llama_server.stop_server(proc, args.port)
@@ -358,7 +350,6 @@ def main():
         "gen_tokens": args.gen_tokens,
         "kv_spec": args.kv,
         "reader_tp": args.reader_tp,
-        "floor": args.floor,
         "depths": results,
     }
     with open(dump, "w") as f:
