@@ -19,8 +19,8 @@ Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
     (the 4096 protocol constant, addendum 9) must never fall below
     the anchor reader - 5.0 w/s = 300 wpm (k=1, Brysbaert 2019;
     addenda 2-6, restated in words/s by protocol v2.1) - so even a
-    fast reader is never made to wait. Floor 20 (k=3) is reported as
-    headroom, not gated.
+    fast reader is never made to wait. (The k=3 floor-20 headroom
+    line is deleted, addendum 50.)
   - Each conversation runs ON TOP of a depth prefill: a blob of
     corpus text (content irrelevant - the KV cost is
     content-independent, addendum 11) as a prepended user turn,
@@ -80,7 +80,7 @@ The server itself is managed by llama_server.py (the bottom-layer
 interface); nothing here touches the process directly.
 
 CLI (standalone use, from the repo root):
-    python3 speed_gate.py --model ./models/A/A-Q6_K.gguf --floor 20
+    python3 speed_gate.py --model ./models/A/A-Q6_K.gguf
     python3 speed_gate.py --model <file> --thinking
     python3 speed_gate.py --model <file> --no-thinking
     python3 speed_gate.py --make-sample     # step 0 (once)
@@ -101,7 +101,6 @@ import time
 import llama_server
 
 CORPUS_DEFAULT = "./live-corpus.json"
-FLOOR_DEFAULT = 20.0
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
                           # reader (Brysbaert 2019). Protocol v2.1:
                           # the anchor is words, not tokens.
@@ -739,7 +738,7 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
     return dump
 
 
-def analyze(path, floor, thinking=False, no_thinking=False,
+def analyze(path, thinking=False, no_thinking=False,
             dump_override=None,
             reader_wps=READER_WPS_DEFAULT):
     """Phase 4: the guarantee verdict from the dump.
@@ -819,17 +818,14 @@ def analyze(path, floor, thinking=False, no_thinking=False,
         verdict = "PASS (confident)"
     else:
         verdict = "FAIL"
-    # token-side view: continuity + the law's currency + headroom
     worst_tps = min(t["server_tps"] for t in mine)
     mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
-    headroom = "intact" if worst_tps >= floor else "below floor (k=3)"
     return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
             "threshold": threshold, "verdict": verdict,
             "reader_wps": reader_wps,
             "words_per_token": wpt,
             "words_per_token_measured": wpt_measured,
             "worst_tps": worst_tps, "mean_tps": mean_tps,
-            "floor": floor, "headroom": headroom,
             "n_turns": len(mine), "n_convs": len(conv_worsts),
             "dump": dump}
 
@@ -839,13 +835,10 @@ def analyze(path, floor, thinking=False, no_thinking=False,
 def main():
     ap = argparse.ArgumentParser(
         description="speed gate: live-bench a model and grade the worst "
-                    "turn against the floor (absorbs the former "
+                    "turn against the reader line (absorbs the former "
                     "live-bench.py)")
     ap.add_argument("--model", help=".gguf file to bench")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument("--floor", type=float, default=FLOOR_DEFAULT,
-                    help="the k=3 headroom line (t/s), reported not "
-                         "gated (protocol v2)")
     ap.add_argument("--reader-wps", type=float, default=READER_WPS_DEFAULT,
                     help=f"the k=1 guarantee line in WORDS per second "
                          f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
@@ -905,10 +898,9 @@ def main():
                  args.dump, args.force, args.reader_wps)
     if args.dry_run:
         print(f"[4] would analyze (every conversation's worst turn at "
-              f"or above the reader line {args.reader_wps:g} w/s; "
-              f"floor {args.floor:g} t/s as headroom)")
+              f"or above the reader line {args.reader_wps:g} w/s)")
         return
-    res = analyze(args.model, args.floor, args.thinking, args.no_thinking,
+    res = analyze(args.model, args.thinking, args.no_thinking,
                   args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
     print(f"[4] worst {res['worst']:.2f} w/s "
@@ -918,7 +910,6 @@ def main():
     print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
           f"(mean {res['mean_tps']:.1f}); words/token "
           f"{res['words_per_token']:.3f} (measured)")
-    print(f"    headroom vs floor {args.floor:g} t/s: {res['headroom']}")
 
 
 if __name__ == "__main__":
