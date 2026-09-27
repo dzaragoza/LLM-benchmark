@@ -97,7 +97,7 @@ def arc_score_one(q, port):
     try:
         top = r["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
         for entry in top:
-            tok = entry["token"].strip().rstrip(").,.")
+            tok = entry["token"].strip().rstrip(").,")  # noqa: B005 - char set
             if tok in labels:
                 logps[tok] = max(logps.get(tok, -999), entry["logprob"])
     except (KeyError, IndexError, TypeError):

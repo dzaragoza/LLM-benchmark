@@ -55,9 +55,11 @@ import argparse
 import json
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from hf_download import RUNG_BITS  # single source (addendum 44): the bpw
+
                                     # table lives here once; law_fit's copy
                                     # (BPW_APPROX) is deleted
 GIB_BYTES = 1 << 30
@@ -134,11 +136,12 @@ def ols(points, tkey="worst"):
     sxx = sum((x - mx) ** 2 for x in xs)
     if sxx == 0:
         return None
-    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True))
     a = sxy / sxx
     b = my - a * mx
     ss_tot = sum((y - my) ** 2 for y in ys)
-    ss_res = sum((y - (a * x + b)) ** 2 for x, y in zip(xs, ys))
+    ss_res = sum((y - (a * x + b)) ** 2
+                 for x, y in zip(xs, ys, strict=True))
     r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 1.0
     return a, b, r2, n
 

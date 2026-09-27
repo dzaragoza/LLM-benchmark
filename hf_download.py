@@ -359,7 +359,8 @@ def load_questions(config, n):
             item = row["row"]
             qs.append({"q": item["question"],
                        "choices": list(zip(item["choices"]["label"],
-                                           item["choices"]["text"])),
+                                           item["choices"]["text"],
+                                           strict=True)),
                        "ans": item["answerKey"]})
     with open(cache_file, "w") as f:
         json.dump(qs, f)
