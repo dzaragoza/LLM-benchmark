@@ -2405,3 +2405,30 @@ Expected per addendum-37 predictions: qwen3.5-4b re-walks Q8_0 (4.29 GiB → 15.
 Addendum 42's "three-way tie for second" is superseded: mistral separates above llama at p=0.0296 (just under the 0.05 convention), and gemma's collapse removes it from the tie entirely. NOTE: the gemma row is now the Q2_K quality-destroyed measurement - not comparable to its earlier 73.3% (that was Q6_K, which the v2.1 w/s gate fails on the word-sparse turn).
 
 **OPEN RULING (put to the author, pending):** the pipeline followed the pre-registered protocol exactly and selected a quality-destroyed rung. Options: (a) record as-is - the protocol is honest, gemma simply loses the ranking; (b) add a quality floor to selection (protocol change, needs a pre-registered form); (c) first instrument the answer text (dump truncated answers) to distinguish word-sparse-legitimate from degenerate output - the gate cannot currently show WHAT failed. Also pending: llama-3.2-3b w/t_min extraction from the existing dump.
+
+### Session 29, addendum 47 — two rulings: gemma out of scope (no model debugging; the rules are the same for everyone); the quant-6 filter re-audited with corrected knowledge
+
+**Ruling 1 (author):** gemma's failure is OUT OF SCOPE for investigation. "I don't want to debug the model, it failed the test, it is out of scope why. The rules are the same for everyone." The addendum-46 open ruling is thereby CLOSED with option (a) - record as-is. The word-sparse mechanism stays in the notebook as the measurement's honest description, but the study does not instrument answers, does not add a word-sparse rule, does not add a quality floor. Gemma's row stands: Q2_K, 53.3%, last place, selected by the pre-registered protocol under the same gate every family faced. The instrument lesson stands (w/s is content-dependent at the min; the estimator cannot predict it), and that is where it ends.
+
+**Ruling question (author): knowing what we know now, would the quant-6 filter have changed the selection?**
+
+**The re-audit with measured constants** (w/s at Q6_K = t/s x w/t_min(family), the corrected estimator):
+
+| family | Q6_K size | t/s | w/t_min | predicted w/s | verdict |
+|---|---|---|---|---|---|
+| Qwen3.5-4B | ~3.31 GiB | 17.6 (law) | 0.49 measured | **8.63** | ADMITTED |
+| Mistral-7B | 5.54 GiB | 11.9 measured | 0.37 measured | **4.40** | EXCLUDED |
+| Llama-3.2-3B | ~2.59 GiB | 21.1 measured | 0.144 family anchor | **3.04** | EXCLUDED (if 3B inherits 8B terseness) |
+| Llama-3.1-8B | ~6.55 GiB | 10.1 (law) | 0.144 measured | **1.45** | EXCLUDED |
+| Qwen3.5-9B | ~7.50 GiB | 9.0 (law) | 0.49 measured | **4.39** | EXCLUDED |
+| gemma-3-4b | 2.97 GiB | 19.4 measured | no constant predicts content sparseness | measured FAIL at every rung above Q2_K | EXCLUDED by evidence |
+
+**Answer: YES - the roster would have changed, drastically.** With corrected knowledge the quant-6 filter admits exactly ONE family: Qwen3.5-4B. The v2.2 roster's other three members would never have been admitted: mistral's exclusion is confirmed by its own measured Q6_K fail (4.44 w/s, addendum 40 - the filter's arithmetic and the run agree); llama-3.2-3b is excluded IF it inherits the family's 0.144 terseness (its admission threshold is w/t_min >= 0.237 - its own dump's extraction is the one measurement that would settle it); llama-3.1-8b and qwen3.5-9b were already excluded in the v2.2 re-selection, and the corrected arithmetic agrees with steeper margins.
+
+**The structural reading:** the quant-6 filter is doing its job - it is a HIGH-QUANT filter, and with honest per-family w/t_min values it is brutally selective. The 102.4 GB/s tier with the 5.0 w/s reader guarantee has room for exactly one top-4 family at quant 6. The four-model roster existed because the 0.43-0.49 default band (retired in addendum 40, now formally retired by this audit) was optimistic about words/token. The honest study framing: the roster is the measurement of WHICH families survive; the corrected filter predicts the survivors, and the run confirms the prediction (qwen passed at the top rung; every other family needed descent or failed).
+
+**Consequence for the ranking's meaning:** the four-family ranking is not "the four best local LLMs" - it is "the four most popular families, ranked after each took its honest walk under the gate." The corrected filter says a one-model roster (qwen) is the quant-6-honest selection; the four-family run measures what the OTHER three look like after descent. Both framings are legitimate; the report should state which one the study claims. Standing question for the author: does the study's claim become "who passes at quant 6" (one-model roster) or "who is best after honest selection" (four-model roster, current)?
+
+**PROTOCOL.md updated:** the quant-6 inclusion filter row now requires per-family w/t_min (measured or family-anchored) - the 0.43-0.49 default band is formally retired for filter use.
+
+**Remaining open measurement (the only one):** llama-3.2-3b's own w/t_min from its existing Q8_0 dump - it decides whether llama-3.2-3b's row rests on a valid selection (w/t_min > 0.237 and Q8_0 PASS) or on the family-anchor exclusion (w/t_min < 0.237, predicted Q8_0 FAIL, row unvalidated). One command on the author machine.
