@@ -2786,3 +2786,52 @@ python3 full_benchmark.py --no-thinking --roster "Llama-3.2-3B-Instruct,Qwen3.5-
 (the existing four are already selected — the pipeline skips them without --force; the roster's six families make the final ranking the study-#3+/#4 combined table; run WITHOUT --force so no rung is re-benched).
 
 **Open items:** (1) the calibration run's four w/t lines (running now) tighten the anchors BEFORE these two candidates bench — if mistral's calibrated p05 moves, Ministral-8B's prediction re-computes mechanically; (2) the probe runs before the bench per addendum 59; (3) the ranking will mix study-#3 selections with the two new candidates — flag: the four study-#3 selections' ARC CSVs are complete, the two new families get fresh ARC runs.
+
+### Session 29, addendum 64 — the author's rule-invoke lands: BOTH addendum-63 picks violated roster rule 2 (family diversity); the rule sharpened to family = publisher/author with lineage logged as a genetic caveat; the picks REVISED to granite-3.3-8b-instruct and OLMo-2-1124-7B-Instruct (both straddlers, both family-clean)
+
+**The question (author):** "Isn't there a rule of avoiding the same family? Maybe we can make it sharper by specifying same lineage? Qwen is already in the benchmark group. Is ministral the same lineage as the mistral in our benchmark group?"
+
+**The rule was already on record — and both my addendum-63 picks violated it.** Roster rule 2 ("distinct families only — no two models from the same family/owner") has been pre-registered since the Session-22 revision, which was triggered by the EXACT same shape: "Qwen2.5 + Qwen3 = both Alibaba/Qwen" was ruled out then, and Qwen2.5-7B-Instruct is the same publisher (Alibaba/Qwen) as the roster's Qwen3.5-9B. Ministral-8B-Instruct-2410 is Mistral AI's own first-party model — same publisher AND same `MistralForCausalLM` architecture AND the same tekken tokenizer family as Mistral-7B-Instruct-v0.3: same lineage under ANY sharpening of the rule. This was my miss: I applied the quant-5 filter (addendum 48) and the general rule (addendum 57) to the window scan but did not check the roster rules before proposing. Addendum 63 stands as written (pre-registered picks, now falsified by the rule-invoke); the correction is this addendum, not a retroactive edit.
+
+**The sharpened rule (author's "same lineage" question, answered and recorded):**
+- **Family = publisher/author** (the organization that ships the weights). This is the Session-24 precedent already on record: deepseek-r1:1.5b counts as a distinct family — its Qwen-2.5 base is logged as a *genetic caveat*, not a conflict.
+- **Lineage = architecture + tokenizer inheritance**, sharpened as follows: when a DISTINCT publisher ships a llama-derived or qwen-derived model (e.g. Falcon3's `LlamaForCausalLM`, InternLM3's qwen-class tokenizer), the inheritance is logged as a **genetic caveat**, not a conflict. The conflict is publisher-identity only.
+- Consequence for the two falsified picks: Qwen2.5-7B is out (publisher-identity with the roster's qwen slot); Ministral-8B is out (publisher-identity with the roster's mistral slot — and it is also architecture/tokenizer-identical, so no sharpening could rescue it).
+
+**The family-clean re-scan (the window is 4–9B, non-thinking, paper rule, popularity-sourced, open weights with llama.cpp support). The structural finding first: the window's only trusted-pass class is family-blocked.** Every in-window model with the word-efficient qwen-class tokenizer (w/t ~0.49) is qwen-family (Qwen2.5-7B) — blocked by rule 2. So NO candidate in this window can be trusted-PASS-certified by the predictor; the picks are straddlers by necessity, and the bench decides. That is a finding about the 4–9B window's tokenizer landscape, not a failure of the scan.
+
+**The candidates verified from HF metadata (params, license, gating, downloads):**
+
+| candidate | params | license | Q5_K_M GiB | law t/s | anchor class | predicted w/s | trust band verdict |
+|---|---|---|---|---|---|---|---|
+| ibm-granite/granite-3.3-8b-instruct | 8.17B | apache-2.0, ungated | 5.42 | 11.9 | pooled 0.33 | 3.93 | FAIL-leaning straddler (bench) |
+| allenai/OLMo-2-1124-7B-Instruct | 7.30B | apache-2.0, ungated | 4.85 | 12.7 | pooled 0.33 | 4.19 | straddler (bench) |
+| tiiuae/Falcon3-7B-Instruct | 7.46B | falcon-llm-license, ungated | 4.95 | 12.8 | llama-class 0.33 (genetic caveat: `LlamaForCausalLM`) | 4.22 | straddler (bench) |
+| google/gemma-2-9b-it | 9.24B | gemma license, GATED manual | 6.14 | 10.5 | ~0.445 gemma-class (study-2 Q2_K row only — no probe data, class uncertain) | ~4.7 | straddler; 9.24B is 0.24B OVER the >phi <qwen window edge |
+
+Computations: Q5_K_M GiB = fp16_GiB × 5.7/16 (RUNG_BITS, hf_download); law t/s = 1/(size/76.5 + 1/74); w/s = t/s × anchor. granite fp16 ≈ 16.34 GB storage → 15.22 GiB → ×0.35625 = 5.42 GiB; OLMo fp16 ≈ 10.72 GB → 9.98 GiB → 4.85 GiB (note: OLMo-2-1124-7B-Instruct's HF `usedStorage` reads 107 GB — that is a 3-safetensors × repeated-uploads artifact; the index shows 3 shards × ~3.3 GB ≈ 10.7 GB ≈ 7.3B × 2 bytes; the parameter count 7,298,617,344 is authoritative).
+
+**The revised picks (replacing both addendum-63 picks, same pre-registration discipline):**
+
+1. **ibm-granite/granite-3.3-8b-instruct** — 8.17B, apache-2.0, ungated, 69k downloads, `GraniteForCausalLM` (granite's own tokenizer, llama-class vocabulary by construction — a genetic caveat to log, not a conflict; IBM is a distinct publisher). Q5_K_M 5.42 GiB → law 11.9 t/s → pooled anchor 0.33 = **3.93 w/s, band [3.0, 4.9] → FAIL-leaning straddler, the bench decides**. Paper rule: the Granite 3.0 technical report (arXiv 2412.04463 / granite-3.0-language-models repo) covers the lineage in the LFM2-precedent sense; the 3.3 models are covered by the family's published line (the 3.0 report is the family paper). ARC expectation: ~60–70% (leaderboard deltas vs mistral-7b-v0.3).
+
+2. **allenai/OLMo-2-1124-7B-Instruct** — 7.30B, apache-2.0, ungated, 35k downloads, `Olmo2ForCausalLM` (fully open weights + data + code; the OLMo 2 paper arXiv 2501.00656 is the family paper). Q5_K_M 4.85 GiB → law 12.7 t/s → pooled anchor 0.33 = **4.19 w/s, band [3.3, 5.1] → straddler, the bench decides**. ARC expectation: ~55–65% (OLMo-2 7B is an older, fully-open training line; ARC-C is not its strongest suite).
+
+Rejected/logged: gemma-2-9b-it (0.24B over the window edge AND gated AND the class anchor uncertain — three independent strikes), Falcon3-7B (kept as first reserve: the strongest of the remaining straddlers at 4.22, lineage-clean, but its 11k downloads are the weakest popularity signal in the pool — rule 1 popularity-sourcing prefers granite/OLMo's organic HF counts), InternLM3-8B (trusted FAIL 3.7 at the pooled anchor, custom_code converter risk — unchanged from addendum 63), Yi-1.5-9B-Chat (the HF API 403s on metadata fetch — ungated status unverifiable this session; logged for a future scan).
+
+**Why both picks are straddlers and that is the honest answer.** The trust band (addendum 62) sends anything in [4.1, 5.9] to the bench. Both picks sit in it. The structural reason is on record above: the window's only trusted-pass class (qwen tokenizer) is family-blocked. A scanner that promised a trusted-pass pick would have to violate rule 2 to get one. The bench is the judge of straddlers by design — that is the protocol working, not the protocol failing.
+
+**The probe-first discipline (addendum 59) applies before the bench:** `tokenizer_probe.py --repo ibm-granite/granite-3.3-8b-instruct` and `--repo allenai/OLMo-2-1124-7B-Instruct` — zero model cost, and if either probes above the pooled 0.33 (e.g. granite's tokenizer is closer to the gemma class), the prediction recomputes mechanically and the bench may be skipped only if the probed w/s lands ≥ 5.9 (trusted PASS).
+
+**The run commands (T14s, after the calibration finishes; same state file — the ranking defaults to this run's families, so no leak):**
+
+```
+git pull --ff-only
+python3 tokenizer_probe.py --repo ibm-granite/granite-3.3-8b-instruct
+python3 tokenizer_probe.py --repo allenai/OLMo-2-1124-7B-Instruct
+python3 full_benchmark.py --no-thinking --roster "Llama-3.2-3B-Instruct,Qwen3.5-9B,Phi-4-mini-instruct,Mistral-7B-Instruct-v0.3,granite-3.3-8b-instruct,OLMo-2-1124-7B-Instruct" "ibm-granite/granite-3.3-8b-instruct" "allenai/OLMo-2-1124-7B-Instruct"
+```
+
+(the existing four are already selected — the pipeline skips them without --force; the roster's six families make the final ranking the study-#3+/#4 combined table; run WITHOUT --force so no rung is re-benched.)
+
+**Open items:** (1) the calibration run's four w/t lines (running) tighten the anchors BEFORE these two candidates bench — if the pooled anchor moves, the predictions re-compute mechanically; (2) granite's tokenizer class is the one genuine unknown — the probe decides whether it is llama-class 0.33 or better; (3) the ranking will mix study-#3 selections with the two new candidates — the four study-#3 selections' ARC CSVs are complete, the two new families get fresh ARC runs.
