@@ -91,6 +91,23 @@ README's "Roster selection" section is a summary that points here.
   on the 102.4 GB/s tier: w/t 0.33 → 6.1B params, 0.37 → 7.0B,
   0.445 → 8.7B, 0.49 → 9.7B (addendum 58).
 
+10. **The sentinel certificate (Q8_0-only study; addendum 67).** For a
+tokenizer class and machine class, S = {models of the class at or
+below the sentinel's size, well-behaved} at the fixed rung. The
+sentinel self-selects: the largest class member under the predicted
+trusted-PASS ceiling (rule 4's arithmetic at the fixed rung). A
+sentinel measured at W with the n=50 instrument (2sigma) certifies
+S iff W - 2sigma >= 5.0 AND eps <= 2sigma, where eps = Delta x
+ t/s(sentinel) + law residual and Delta = 0.05 w/t (PROTOCOL [M]
+row; exit plan = the qwen sentinel run). Class assignment: strong
+form = tokenizer identity (hash); weak form = probe w/t within
+Delta/2 = 0.025 of a measured class center (tokenizer_probe.py).
+An empty cone is a valid negative certificate. Every certificate
+carries the well-behaved conditional (gemma excluded by
+measurement, addendum 46; ruled out of scope, addendum 67).
+
+---
+
 ## Pre-registered selection predictions (current)
 
 Per the pre-registration discipline, the active picks and their
