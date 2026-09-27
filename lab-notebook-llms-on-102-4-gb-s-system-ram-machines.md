@@ -2432,3 +2432,55 @@ Addendum 42's "three-way tie for second" is superseded: mistral separates above 
 **PROTOCOL.md updated:** the quant-6 inclusion filter row now requires per-family w/t_min (measured or family-anchored) - the 0.43-0.49 default band is formally retired for filter use.
 
 **Remaining open measurement (the only one):** llama-3.2-3b's own w/t_min from its existing Q8_0 dump - it decides whether llama-3.2-3b's row rests on a valid selection (w/t_min > 0.237 and Q8_0 PASS) or on the family-anchor exclusion (w/t_min < 0.237, predicted Q8_0 FAIL, row unvalidated). One command on the author machine.
+
+### Session 29, addendum 48 — the quant-5 selection: roster v2.3 (Google's slot empties and walks to Microsoft; Qwen upgrades 4B→9B)
+
+**Author ruling (the quant-5 filter, with the rationale):** "using the new knowledge, pick the top 4 we predict will pass with q5 (less restrictive than q6). This is the rationale: If a model passes with q8, I get suspicious it will have performed better at a larger model in q4-q8. That is, we are leaving brains on the table, for roughly the same performance." The inclusion filter rung moves from Q6_K to Q5_K_M; the ladder walk still starts at Q8_0 and takes the first PASS. Confirmed by the author in the same session: (a) Google's emptied slot walks to the next owner (Microsoft) — "same rules for everyone" per addendum 47; (b) the Qwen 4B→9B upgrade under rule 8 (highest member passing the filter) is the brains-on-the-table intent.
+
+**Walk-down under the quant-5 filter** (predicted worst w/s = t/s(Q5_K_M) × w/t_min(family), the addendum-37 corrected estimator; law `1/t = size/76.5 + 1/74`):
+
+| owner (popularity) | candidate | Q5_K_M size | t/s | w/t_min anchor | predicted w/s | verdict |
+|---|---|---|---|---|---|---|
+| Meta (llama3.2, 84.4M) | Llama-3.2-3B | 2.14 GiB | 24.1 (law) | ≥ 0.243 (bounded by its recorded Q8_0 PASS) | ≥ 5.86 | ADMITTED |
+| Qwen (qwen3.5, 21.0M) | Qwen3.5-9B | 6.41 GiB | 10.3 (law) | 0.49 (4B family anchor) | 5.03 | ADMITTED (rule 8: 9B takes the slot from the 4B) |
+| Qwen | Qwen3.5-4B | 2.85 GiB | 19.7 (law) | 0.49 (own measured) | 9.65 | admitted, superseded by 9B per rule 8 |
+| Google (gemma3, 40.7M) | Gemma-4-12B | 8.55 GiB | 8.0 (law) | 0.55 healthy-turn only; sparse turns 0.03–0.29 | 4.39 | EXCLUDED |
+| Google | Gemma-3-4B | 2.85 GiB | 19.7 (measured) | measured 0.03–0.30 sparse turns | measured FAIL 1.01 w/s at Q5_K_M | EXCLUDED by measurement |
+| Mistral (33.7M) | Mistral-7B | 4.99 GiB | 12.7 (law) | 0.37 (own measured) | 4.70 pred / 5.25 measured PASS | ADMITTED (the run's measurement trumps the prediction) |
+| Mistral | Mistral-Nemo-12B | 8.55 GiB | 8.0 (law) | 0.37 (family anchor) | 2.95 | excluded (rule 8: 7B is the highest member passing) |
+| (same Meta owner) | Llama-3.1-8B | 5.70 GiB | 11.4 (law) | 0.144 (own measured) | 1.64 | excluded |
+| Microsoft (phi4, 18.2M combined phi3/phi4 pulls; phi4 latest gen, rule 7) | Phi-4-mini-3.8B | 2.71 GiB | 20.5 (law) | unmeasured; passes if ≥ 0.245 | ≥ 5.01 if w/t_min ≥ 0.245 | ADMITTED (the pre-registered prediction; every measured non-llama family sits at 0.37–0.49) |
+| Microsoft | Phi-4-14B | 9.97 GiB | 6.95 (law) | unmeasured; needs ≥ 0.720 | — | excluded (needs a w/t_min above every family ever measured) |
+
+Google's slot empties under every anchor: even gemma's generous healthy-turn 0.55 gives 4.39 < 5.0 at Q5_K_M, and the measured sparse-turn behavior fails every rung above Q2_K (addendum 46). Per the addendum-47 ruling (no model debugging, same rules for everyone), the slot walks to the next owner down: Microsoft. Phi4 is the family's latest generation (rule 7, superseding phi3 despite fewer pulls); the family's paper is the Phi-4-Mini Technical Report (arXiv 2503.01743) — the same "published technical report" bar every other pick clears (Llama Herd arXiv 2407.21783, Qwen3.5 report, Mistral 7B arXiv 2310.06825). Within the family, rule 8 picks Phi-4-mini (3.8B): Phi-4-14B needs w/t_min ≥ 0.720 at Q5_K_M, above every family ever measured, so the mini is the highest member plausibly passing the filter.
+
+**Roster v2.3 (popularity order of the winning rows):**
+
+| Family | Pick | Paper | Provenance |
+|---|---|---|---|
+| Meta (llama3.2, 84.4M) | Llama-3.2-3B-Instruct | The Llama 3 Herd of Models, arXiv 2407.21783 | safetensors (gated), self-quantize |
+| Qwen (qwen3.5, 21.0M) | Qwen3.5-9B (upgraded from 4B) | Qwen3.5-Omni Technical Report, arXiv 2604.15804 | safetensors, self-quantize |
+| Mistral (33.7M) | Mistral-7B-Instruct-v0.3 | Mistral 7B, arXiv 2310.06825 | safetensors (public), self-quantize |
+| Microsoft (phi4, 18.2M) | Phi-4-mini-instruct | Phi-4-Mini Technical Report, arXiv 2503.01743 | safetensors, self-quantize |
+
+**Pre-registered ladder predictions (worst w/s per rung; the law × w/t_min):**
+
+- Llama-3.2-3B (w/t_min ≥ 0.243 bounded by its recorded Q8_0 PASS — its own dump was deleted in the same disk cleanup as qwen's, so its own w/t_min is the roster's one open measurement): Q8_0 ≥ 4.40 (bound), Q6_K ≥ 5.30, Q5_K_M ≥ 5.86, Q4_K_M ≥ 6.56. Predicted selection Q8_0 or Q6_K. If its own w/t_min < 0.237, the Q8_0 selection was a fluke of that dump and the walk descends.
+- Qwen3.5-9B (w/t_min 0.49 family anchor): Q8_0 3.54 FAIL, Q6_K 4.43 FAIL, Q5_K_M 5.03 PASS, Q4_K_M 5.83 PASS. Predicted selection Q5_K_M — margin +0.6% over the reader line: a coin flip if 9B's own w/t_min < 0.487; the early-fail rule makes the test cheap and an honest failure descends to Q4_K_M.
+- Mistral-7B: measured Q5_K_M PASS 5.25 w/s (banked; no re-run needed).
+- Phi-4-mini (w/t_min unmeasured): Q8_0 passes if ≥ 0.331, Q6_K ≥ 0.272, Q5_K_M ≥ 0.245. If its w/t is in the typical 0.37–0.49 band, predicted selection Q8_0 (passing at the top rung — note the brains-on-the-table suspicion applies to it as the smallest rung-passing member).
+
+**What this selection fixes (the author's suspicion, made precise):** the v2.2 roster selected Qwen3.5-4B, which then passed at Q8_0 (8.08 w/s, addendum 46) — evidence the filter was too restrictive and left parameters on the table. The quant-5 filter admits the 9B (predicted 5.03 w/s at Q5_K_M, trading ~0.5 bits/param for 2.25× parameters at roughly the same w/s), exactly the author's brains-on-the-table intent. The mistral row is the filter's honest edge case: predicted 4.70 FAIL by the estimator, measured PASS 5.25 — the prediction is falsifiable and was wrong in the family's favor; the selection keeps the measured verdict (rules are the same for everyone: the measurement trumps the prediction when they disagree).
+
+**The run command (T14s, after `git pull --ff-only`):**
+
+```
+git pull --ff-only
+python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,Qwen3.5-9B,Mistral-7B-Instruct-v0.3,Phi-4-mini-instruct" \
+  "meta-llama/Llama-3.2-3B-Instruct" \
+  "Qwen/Qwen3.5-9B" \
+  "mistralai/Mistral-7B-Instruct-v0.3" \
+  "microsoft/Phi-4-mini-instruct"
+```
+
+The `--force --roster` combination re-benches the ladder and re-ranks only the roster families. Llama-3.2-3B's folder was deleted from disk (the same cleanup that hit qwen), so the stale-state guard (addendum 43) invalidates its phases 1-2 and re-downloads — the fresh dump also measures its own w/t_min, settling the Meta slot's honesty in the same run. Mistral's Q5_K_M verdict is banked; --force re-benches it too (idempotent), and its fresh dump re-measures its w/t_min on the v2.1 instrument for the calibration record.

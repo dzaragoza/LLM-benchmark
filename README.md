@@ -435,7 +435,7 @@ python3 full_benchmark.py --thinking \
 
 (Pass `--thinking` on any `--arc-only` rerun too.)
 
-## Study #3 roster (protocol v2.2, T14s, pre-registered 2026-09-26)
+## Study #3 roster (protocol v2.3, T14s, pre-registered 2026-09-26)
 
 The k=1 reader guarantee (worst turn >= 5.0 w/s at depth 4096,
 addendum 33) opened the door to each family's highest runnable
@@ -445,25 +445,31 @@ landed on target (+5-10%), yet the rung failed the w/s gate at its
 worst turn - a terse answer whose words/token (0.144) was far
 below the assumed 0.65-0.80 band. The verdict is a min over turns,
 so the estimator now uses the family's worst-turn words/token, not
-the mean. The selection was re-run under the corrected estimator
-and the author's quant-6 criterion (addendum 37):
+the mean. The v2.2 quant-6 filter then proved too restrictive with
+measured constants (addendum 47 re-audit: exactly one family
+admitted) - and the v2.2 run showed the cost of that: Qwen3.5-4B
+passed at Q8_0, i.e. the filter had left a larger family member
+on the table. The author's quant-5 ruling (addendum 48): "If a
+model passes with q8, I get suspicious it will have performed
+better at a larger model in q4-q8. That is, we are leaving brains
+on the table, for roughly the same performance."
+
+**Rules (v2.3):**
 
 1. Ollama library popularity walk-down (snapshot 2026-09-26).
 2. One slot per **owner** (author ruling: llama3.1 and llama3.2 are
    one Meta family).
-3. Non-thinking or hybrid; hybrids run with thinking disabled
-   (Qwen3.5-4B runs with `enable_thinking=false`; Gemma-3-4B is
-   non-thinking by nature).
-4. Predicted to pass the gate at **quant 6** (Q6_K, the inclusion
-   filter per the author's 2026-09-26 ruling; the ladder walk
-   still starts at Q8_0 and takes the first PASS).
+3. Non-thinking or hybrid; hybrids run with thinking disabled.
+4. Predicted to pass the gate at **quant 5** (Q5_K_M, the inclusion
+   filter per the author's addendum-48 ruling; the estimate is
+   t/s × per-family w/t_min, measured or family-anchored; the
+   ladder walk still starts at Q8_0 and takes the first PASS).
 5. First-party weights only (no third-party quantizations).
 6. Published paper per family.
 7. Latest generation supersedes older (author ruling: "people want
-   the latest and greatest") - Qwen3.5 supersedes Qwen2.5; the 9B
-   member fails the quant-6 filter, so the family's quant-6-capable
-   4B takes the slot.
-8. Highest runnable member of the family that passes the quant-6
+   the latest and greatest") - Qwen3.5 supersedes Qwen2.5; phi4
+   supersedes phi3.
+8. Highest runnable member of the family that passes the quant-5
    filter (file + KV + OS in 32 GB).
 
 **Selected (popularity order of the winning rows):**
@@ -471,33 +477,38 @@ and the author's quant-6 criterion (addendum 37):
 | Family | Pick | Paper | Provenance |
 |---|---|---|---|
 | Meta (llama3.2, 84.4M) | Llama-3.2-3B-Instruct | The Llama 3 Herd of Models, arXiv 2407.21783 | safetensors (gated), self-quantize |
-| Qwen (qwen3.5, 21.0M) | Qwen3.5-4B | Qwen3.5-Omni Technical Report, arXiv 2604.15804 | safetensors, self-quantize |
-| Google (gemma3, 40.7M) | Gemma-3-4B-it | Gemma 3 Technical Report, arXiv 2503.19711 | QAT Q4_0 GGUF first-party; other rungs from safetensors |
+| Qwen (qwen3.5, 21.0M) | Qwen3.5-9B | Qwen3.5-Omni Technical Report, arXiv 2604.15804 | safetensors, self-quantize |
 | Mistral (33.7M) | Mistral-7B-Instruct-v0.3 | Mistral 7B, arXiv 2310.06825 | safetensors (public), self-quantize |
+| Microsoft (phi4, 18.2M) | Phi-4-mini-instruct | Phi-4-Mini Technical Report, arXiv 2503.01743 | safetensors, self-quantize |
 
-The v2.1 picks (Llama-3.1-8B, Qwen3.5-9B, Gemma-4-12B) are
-superseded by the quant-6 filter: each fails the corrected w/s
-gate at Q6_K (addendum 37 walk-down). Walk-down exclusions:
-deepseek-r1 (thinking-only), nomic-embed-text (embedding), qwen3
-(superseded), gemma2 (superseded), gpt-oss (thinking-only),
-Llama-3.1-8B / Qwen3.5-9B / Gemma-4-12B (fail the quant-6 filter).
-Full walk-down with law estimates and per-pick ladder predictions:
-lab-notebook addendum 37.
+Google's slot empties under the quant-5 filter: gemma-3-4b is
+excluded by measurement (word-sparse turns fail every rung above
+Q2_K, addendum 46; no model debugging per the addendum-47 ruling)
+and gemma-4-12b is excluded by prediction (4.39 w/s at Q5_K_M even
+on the generous healthy-turn anchor). The slot walks to the next
+owner: Microsoft (phi4). Other walk-down exclusions: deepseek-r1
+(thinking-only), nomic-embed-text (embedding), qwen3 (superseded),
+gemma2 (superseded), gpt-oss (thinking-only), Llama-3.1-8B
+(quant-5 fail at 1.64 w/s, own measured w/t_min), Mistral-Nemo-12B
+(quant-5 fail at 2.95 w/s), Phi-4-14B (needs w/t_min >= 0.720 at
+Q5_K_M, above every family ever measured). Full walk-down with
+law estimates and per-pick ladder predictions: lab-notebook
+addendum 48.
 
 **Run it (T14s or any 102.4 GB/s / 32 GB machine):**
 
 ```
-python3 full_benchmark.py --no-thinking \
+python3 full_benchmark.py --no-thinking --force --roster \
+  "Llama-3.2-3B-Instruct,Qwen3.5-9B,Mistral-7B-Instruct-v0.3,Phi-4-mini-instruct" \
   "meta-llama/Llama-3.2-3B-Instruct" \
-  "Qwen/Qwen3.5-4B" \
-  "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it" \
-  "mistralai/Mistral-7B-Instruct-v0.3"
+  "Qwen/Qwen3.5-9B" \
+  "mistralai/Mistral-7B-Instruct-v0.3" \
+  "microsoft/Phi-4-mini-instruct"
 ```
 
 All four are non-thinking or hybrid: the run uses `--no-thinking`.
 Meta is license-gated on Hugging Face (accept the Llama 3 family
-license and log in with `hf auth login`); Google's QAT repo is
-gated likewise.
+license and log in with `hf auth login`).
 
 ## Protocol (constants registry)
 
