@@ -42,9 +42,16 @@ Chain of derivation from the anchor:
     (the k=3 floor line is deleted, addendum 50 - an observation
      for the report, not a protocol constant)
 ```
-The guarantee: **the worst turn at depth 4096, measured in words per
-second on the reference corpus, is at or above the reader line** -
-a 300-wpm reader never waits on the model mid-answer.
+The guarantee (protocol v3.0, addendum 55): **the reader never hits
+the wall** - on every turn, simulating the registered reader (5.0 w/s,
+0.45 s reaction) on the turn's per-word arrival stream, the reader
+never catches up with printing while the answer is incomplete. The
+verdict is the addendum-30 collision simulation, exact form: a turn
+fails iff ANY word arrives after the reader is ready for it (any
+catch-up event, not just the last word). The old flat worst-turn w/s
+test is retired to a diagnostic - it manufactured fails on tiny
+answers (the addendum-54 degeneracy: the span of a 5-token answer is
+pipeline overhead, not reading experience).
 
 ---
 
@@ -53,6 +60,7 @@ a 300-wpm reader never waits on the model mid-answer.
 | Constant | Value | Where | Ruling / derivation |
 |---|---|---|---|
 | Reader line (k=1 guarantee) | 5.0 w/s | `speed_gate.py` READER_WPS_DEFAULT | Match the FAST reader: 300 wpm / 60. The canonical anchor. |
+| Reader reaction time | 0.45 s | `speed_gate.py` READER_REACTION_S | Part of the guarantee since protocol v3.0 (addendum 55): the simulated reader starts reading 0.45 s after the first word arrives. Single-sourced here (session_replicate imports it); previously session_replicate's CLI default only. |
 | Fast-reader anchor | 300 wpm | `law_fit.py` READER_PROFILES | Cited: Brysbaert 2019 meta-analysis, silent reading, English non-fiction, adult mean. |
 | Floor (k=3 headroom) | (deleted, addendum 50) | - | Author ruling: "obsolete. We use w/s >= 5. Remove it if possible. It is an observation, not needed for the protocol. We can mention in the report, but it doesn't play any role in the benchmark." FLOOR_DEFAULT deleted from speed_gate/depth_probe; the --floor flags, the headroom verdict line, the stlD stall metric, and law_fit's floor-20 default all removed with it. The gate is the reader line alone. |
 | Corpus shape | 5 conversations, 4-8 user turns | `live-corpus.json` | Corpus construction (Session 10); re-ruled vs n=1 in addendum 23: the verdict is a min, fewer samples = anti-conservative PASS. |
@@ -114,3 +122,4 @@ a 300-wpm reader never waits on the model mid-answer.
 | 2026-09-26 | Registry created from the full-code sweep; anchor chain stated; categories A/P/D/M assigned; exit plans registered for every [M]. | 39 |
 | 2026-09-27 | Deprecation executed per the author's ruling (used-in-code stays a parameter; removable-and-unused deleted): BPW_APPROX deleted (single-sourced to RUNG_BITS); the 0.75 w/t fallback deleted from the verdict path (fail-verbose on v1 dumps); the 6.5 t/s line deleted (lag_analyze re-anchored to measured w/s at 5.0; depth_probe --reader-tp explicit); ARC_CTX promoted to [P] via an enforced in-code precondition. | 44 |
 | 2026-09-27 | ARC_CTX unified with the study's depth constant: 2048 deleted, ARC uses ctx 4096 (llama-server's own default, addendum 9) - one depth for the whole study, single-sourced from speed_gate.CTX_DEFAULT. | 45 |
+| 2026-09-28 | Protocol v3.0 (addendum 55): the verdict is the reader-wall test - the addendum-30 collision simulation on each turn's per-word arrival stream (fail = ANY catch-up event; flat worst-turn w/s retired to diagnostic after the addendum-54 tiny-answer degeneracy). The gate streams; dumps carry per-word deltas. Reaction time 0.45 s promoted to a guarantee constant (READER_REACTION_S, single-sourced in speed_gate). Pre-v3.0 dumps fail-verbose (no deltas). | 55 |

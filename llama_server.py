@@ -247,12 +247,16 @@ def trim_to_tokens(port, text, target, tolerance=8, max_iter=24):
     return best
 
 
-def stream_completion(port, payload, timeout=1800):
+def stream_completion(port, payload, timeout=1800, meta=None):
     """POST a streaming /v1/chat/completions request and yield content
     deltas as they arrive, with per-delta wall arrival times (the
     felt-experience view the non-streaming gate cannot see: TTFT and
     the inter-token gap distribution). Yields (delta_text, t_arrival)
-    pairs; the caller assembles the full answer and its timing."""
+    pairs; the caller assembles the full answer and its timing.
+    meta (protocol v3.0): an optional dict the caller passes in; the
+    server's final-chunk "timings"/"usage" objects are written into
+    it before the generator ends, so a streaming caller keeps the
+    law's server-side t/s and the exact token counts."""
     url = f"http://127.0.0.1:{port}/v1/chat/completions"
     data = json.dumps({**payload, "stream": True}).encode("utf-8")
     req = urllib.request.Request(
@@ -273,8 +277,16 @@ def stream_completion(port, payload, timeout=1800):
                         obj = json.loads(body)
                     except ValueError:
                         continue
+                    if meta is not None:
+                        if obj.get("timings"):
+                            meta["timings"] = obj["timings"]
+                        if obj.get("usage"):
+                            meta["usage"] = obj["usage"]
                     choice = (obj.get("choices") or [{}])[0]
                     delta = choice.get("delta") or {}
                     text = delta.get("content")
+                    rtext = delta.get("reasoning_content")
+                    if meta is not None and rtext:
+                        meta["reasoning"] = meta.get("reasoning", "") + rtext
                     if text:
                         yield text, time.time()

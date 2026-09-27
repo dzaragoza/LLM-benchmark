@@ -48,7 +48,14 @@ import sys
 import time
 
 import llama_server
-from speed_gate import CTX_DEFAULT, READER_WPS_DEFAULT, THINK_ALLOWANCE, build_blob, depth_budget
+from speed_gate import (
+    CTX_DEFAULT,
+    READER_REACTION_S,
+    READER_WPS_DEFAULT,
+    THINK_ALLOWANCE,
+    build_blob,
+    depth_budget,
+)
 
 CORPUS_DEFAULT = "./live-corpus.json"
 PORT_DEFAULT = 8079
@@ -123,8 +130,12 @@ def stream_turn(port, history, cap_tokens, thinking, no_thinking):
 
 
 def reader_collision(deltas, n_words, reader_wps, reaction_s):
-    """The true felt-lag measurement (author ruling, addendum 30):
-    simulate WHERE THE READER IS at every moment vs where printing
+    """The true felt-lag measurement (author ruling, addendum 30) -
+    PROTOCOL v3.0 (addendum 55): this simulation IS the speed gate's
+    verdict now (speed_gate.reader_wall_test, single-sourced there);
+    this wrapper keeps the tool's own output shape and is the same
+    arithmetic, verbatim, as the gate's. Simulate
+    WHERE THE READER IS at every moment vs where printing
     has reached. The reader starts reading reaction_s after the
     first word appears and reads at reader_wps; a lag is FELT only
     when the reader's position collides with the printed position
@@ -237,7 +248,7 @@ def main():
     ap.add_argument("--reader-wps", type=float,
                     default=READER_WPS_DEFAULT,
                     help="reader speed (w/s) for the collision simulation")
-    ap.add_argument("--reaction-s", type=float, default=0.45,
+    ap.add_argument("--reaction-s", type=float, default=READER_REACTION_S,
                     help="notice-and-start delay: seconds from first "
                          "word printed to reading start. Anchored "
                          "(addendum 31): simple visual RT ~0.25 s + "
