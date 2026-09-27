@@ -53,9 +53,10 @@ import glob
 import json
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from speed_gate import READER_WPS_DEFAULT, FLOOR_DEFAULT
+from speed_gate import FLOOR_DEFAULT, READER_WPS_DEFAULT
 
 # addendum 44: the 6.5 t/s reader line (300 wpm at 0.75 w/t) is
 # DELETED - second-order magic inheriting the unanchored 0.75. The
@@ -134,7 +135,7 @@ def analyze_dump(dump, reader_wps, default_tps):
     kv_pairs = []
     for ci in sorted(convs):
         seq = sorted(convs[ci], key=lambda t: t.get("turn", 0))
-        for a, b in zip(seq, seq[1:]):
+        for a, b in zip(seq, seq[1:], strict=False):
             if a.get("server_tps") and b.get("server_tps"):
                 kv_pairs.append(b["server_tps"] / a["server_tps"])
     kv_slope = (sum(kv_pairs) / len(kv_pairs)) if kv_pairs else None

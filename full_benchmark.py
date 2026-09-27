@@ -177,7 +177,7 @@ def process_family(spec, ladder, corpus, floor, models_dir, state,
     # with a bare FileNotFoundError. Invalidate those phases so the
     # walk re-acquires (re-download/re-quantize; both stages are
     # idempotent) instead of benching a path that is not there.
-    for rung, run in fst["runs"].items():
+    for run in fst["runs"].values():
         f = run.get("file")
         if f and not os.path.isfile(f):
             run["phases_done"] = []
@@ -379,7 +379,7 @@ def main():
                              args.dry_run)
         if not args.dry_run:
             ranking, scores, pairs = mcnemar.rank(
-                [l for l, _ in jobs], args.arc_num, args.arc_results_dir)
+                [lbl for lbl, _ in jobs], args.arc_num, args.arc_results_dir)
             state["ranking"] = {"arc_num": args.arc_num,
                                 "scores": {m: scores[m] for m in ranking},
                                 "order": ranking, "pairs": pairs}

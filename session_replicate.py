@@ -108,7 +108,7 @@ def stream_turn(port, history, cap_tokens, thinking, no_thinking):
     span = (times[-1] - times[0]) if len(times) > 1 else 0.0
     wps = n_words / span if span > 0 else None
     deltas = [{"t": round(t - t0, 4), "w": w}
-              for t, w in zip(times, words)]
+              for t, w in zip(times, words, strict=True)]
     return answer, {"ttft_s": round(t_first, 3) if t_first is not None
                     else None,
                     "n_deltas": len(times),
@@ -205,7 +205,7 @@ def resim_mode(session_path, reader_wps, reaction_s):
             worst_s = max(worst_s, r["catchup_s"])
         cells = "  ".join(f"t{t['turn']}:{r['catchup_events']}"
                            f"/{r['catchup_s']}s"
-                           for t, r in zip(streams, rows))
+                           for t, r in zip(streams, rows, strict=True))
         print(f"    {w:4.1f} w/s: {cells}")
     print("    (events/waiting per turn; first catch-up position in "
           "the .session.json per-turn records)")
