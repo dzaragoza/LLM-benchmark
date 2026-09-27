@@ -2934,3 +2934,21 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf \
 (the corpus is the calibration instrument, already on disk from addendum 60 — deterministic seed 1024, so a rebuild with `--make-corpus --n-conversations 50 --corpus-out ./live-corpus-cal50.json` is byte-identical if ever needed; `--no-thinking` per rule 8 matches the cal-pass mode; `--no-early-fail` records the full 267-turn tail — the whole point of the audit, the verdict recomputes from deltas; `--force` + a fresh dump name because the 4B carries 5-conv-era no-think dumps and the resume cache keys on mtime only — the Session-25-addendum-3 lesson.)
 
 **Registry updates (PROTOCOL.md, change log addendum 67):** Δ = 0.05 w/t registered [M] (borrowed from the addendum-59 grading band; exit plan = this run); MODEL-SELECTION.md gains rule 10 (the S membership rule + the certificate form, single-sourced). **Open items:** (1) the author's sentinel run — grades Δ, audits member transfer, issues-or-fails the qwen cone; (2) if Δ falsifies, the sweep fallback (the kept suggestion) becomes the design of record for Q8; (3) gemma debug, low priority, instrument-the-answer first; (4) the 51.2-class cold start now has the recipe (phase A one ladder, phase B one cal pass per class, then cones — the replication inherits it whole); (5) study #4 picks unchanged (Q5_K_M straddlers — a different cone, unaffected by the Q8 ruling).
+
+**Session 30, addendum 67 correction (same day, from the author's run): the sentinel command assumed the 4B Q8_0 rung file on disk — it had been deleted for space.** Standing assumption now on record: rung files are deleted from time to time; NEVER assume a model is on disk (the pipeline's addendum-43 stale-state guard already handles re-acquisition — a missing file invalidates phases 1-2 and re-downloads). The acquisition goes through the pipeline's own phases 1-2 in the SAME invocation as the bench: `full_benchmark.py --ladder Q8_0` (safetensors download -> pinned-converter f16 -> quantize; idempotent, resumable). Structural note: full_benchmark has no --conversations flag and does not need one — it benches the WHOLE corpus file, so `--corpus live-corpus-cal50.json` IS the n=50 run (267 turns); the --conversations slice exists only in speed_gate's CLI. Corrected commands:
+
+```
+git pull --ff-only
+
+python3 full_benchmark.py \
+  --ladder Q8_0 --corpus ./live-corpus-cal50.json --no-thinking \
+  --state-file benchmark-state-sentinel.json \
+  --results-file benchmark-results-sentinel.json \
+  --arc-num 32 --arc-results-dir arc-results-sentinel \
+  "Qwen/Qwen3.5-4B"
+
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf \
+  --corpus ./live-corpus-cal50.json --no-thinking
+```
+
+Three notes. (1) Disk: phases 1-2 need ~20 GiB transient (8 GiB safetensors + 8 GiB f16 + 4.2 GiB Q8_0); after the run the f16 and the HF-cache snapshot are deletable per the author's space practices — the guard re-acquires if a future run needs them. (2) The second invocation is ZERO-COST and required for the Delta grade: full_benchmark's phase-4 print shows the verdict but not the p05; speed_gate WITHOUT --force reuses the fresh dump (mtime newer than the new rung file) and its analyze prints the w/t calibration line (n, min, p05, mean) — the 4B's p05 vs the 9B's 0.412 is the Delta grade, pre-registered above. (3) ARC is not part of the sentinel measurement (wall-independent): it runs at smoke size (32 questions, ~2 min) in sentinel-scoped state/results files so nothing pollutes the study-#3/#4 records. Predictions and grading unchanged — the run only gains phases 1-2 (~15-20 min) before the same 50-conv bench.
