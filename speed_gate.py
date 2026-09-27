@@ -340,7 +340,7 @@ def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
 
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
                      thinking=False, no_thinking=False, blob=None,
-                     blob_tokens=0, reader_wps=None):
+                     blob_tokens=0, reader_wps=None, early_abort=True):
     """Protocol v2: the conversation runs ON TOP of the depth prefill.
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
@@ -468,12 +468,18 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         }
         results.append(rec)
         if reader_wps is not None and rec["reader_wall_fail"]:
+            if early_abort:
+                print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
+                      f"hit the stream {collision['catchup_events']}x "
+                      f"(waited {collision['catchup_s']:.2f}s) - the rung is "
+                      "unrecoverable (the verdict is a min); aborting the "
+                      "conversation early (addendum 34/55)", flush=True)
+                break
             print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
                   f"hit the stream {collision['catchup_events']}x "
-                  f"(waited {collision['catchup_s']:.2f}s) - the rung is "
-                  "unrecoverable (the verdict is a min); aborting the "
-                  "conversation early (addendum 34/55)", flush=True)
-            break
+                  f"(waited {collision['catchup_s']:.2f}s) - continuing "
+                  "(--no-early-fail, the calibration pass samples the "
+                  "full turn distribution; addendum 58)", flush=True)
     return results, history
 
 
@@ -594,7 +600,8 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
 
 def bench_model(model, corpus_file, port, ctx, repeats,
                thinking=False, no_thinking=False, server_bin=None,
-               label=None, reader_wps=None):
+               label=None, reader_wps=None, n_conversations=None,
+               early_abort=True):
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
@@ -607,6 +614,8 @@ def bench_model(model, corpus_file, port, ctx, repeats,
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
+    if n_conversations is not None:
+        conversations = conversations[:n_conversations]
     cap_tokens = corpus["answer_cap_tokens"]
     label = label or model.split("/")[-1]
 
@@ -646,10 +655,12 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 res, conv_history = run_conversation(
                     port, conv["user_turns"], cap_tokens, ctx, thinking,
                     no_thinking, blob, blob_tokens,
-                    reader_wps=reader_wps)
+                    reader_wps=reader_wps,
+                    early_abort=early_abort)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
-                early_fail = any(r.get("reader_wall_fail") for r in res)
+                early_fail = (early_abort and
+                              any(r.get("reader_wall_fail") for r in res))
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
                 wps = [r["server_wps"] for r in res if r["server_wps"]]
                 evts = [r.get("catchup_events") or 0 for r in res]
@@ -731,6 +742,13 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                       flush=True)
         if early_fail:
             break
+        if early_fail is False and not early_abort:
+            wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
+            if wall_hits:
+                print(f"  note: {wall_hits} wall-failing turn(s) recorded "
+                      "without abort (--no-early-fail, addendum 58) - "
+                      "the verdict comes from analyze (recomputed from "
+                      "deltas; expect FAIL)", flush=True)
         valid = [w for w in conv_worsts if w]
         if valid:
             rep_worst = min(valid)
@@ -783,14 +801,17 @@ def live_dump_name(path, thinking=False, no_thinking=False):
 
 def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
           port=PORT_DEFAULT, ctx=CTX_DEFAULT, repeats=REPEATS_DEFAULT,
-          dump_override=None, force=False, reader_wps=None):
+          dump_override=None, force=False, reader_wps=None,
+          conversations=None, early_abort=True):
     """Phase 3: live-bench the model file; returns the dump path.
     force: re-measure even if a valid newer dump exists (the resume
     machinery is the pipeline default; --force is the re-measurement
     path - e.g. after an instrument fix, when the existing dump
     predates the fix and its noise records are missing/wrong).
     reader_wps (addendum 34): enables the in-flight early-fail - the
-    bench aborts as soon as a turn measures below the reader line."""
+    bench aborts as soon as a turn measures below the reader line.
+    conversations (addendum 58, the w/t calibration pass): bench only
+    the first N conversations of the corpus (None = all)."""
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
     if not dry_run and not os.path.isfile(path):
@@ -833,7 +854,9 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
         return dump
     turns, _, mem_reports = bench_model(path, corpus, port, ctx, repeats,
                                        thinking, no_thinking, label=label,
-                                       reader_wps=reader_wps)
+                                       reader_wps=reader_wps,
+                                       n_conversations=conversations,
+                                       early_abort=early_abort)
     with open(dump, "w") as f:
         json.dump(turns, f, indent=1)
     if mem_reports:
@@ -884,6 +907,14 @@ def analyze(path, thinking=False, no_thinking=False,
               if t.get("words_per_token")]
     wpt = (sum(ratios) / len(ratios)) if ratios else None
     wpt_measured = bool(ratios)
+    # the w/t calibration view (addendum 58): per-turn w/t sorted,
+    # the min and the 5th percentile are the family anchor candidates
+    sorted_ratios = sorted(ratios)
+    if sorted_ratios:
+        k = max(0, math.ceil(0.05 * len(sorted_ratios)) - 1)
+        wpt_p05 = sorted_ratios[k]
+    else:
+        wpt_p05 = None
 
     # addendum 44: the 0.75 fallback is deleted; a v1 dump (turns
     # without measured w/s) cannot be verdicted - re-bench instead.
@@ -966,6 +997,8 @@ def analyze(path, thinking=False, no_thinking=False,
             "words_per_token": wpt,
             "words_per_token_measured": wpt_measured,
             "worst_tps": worst_tps, "mean_tps": mean_tps,
+            "words_per_token_min": (min(ratios) if ratios else None),
+            "words_per_token_p05": wpt_p05,
             "n_turns": len(mine), "n_convs": len(conv_worsts),
             "dump": dump}
 
@@ -992,6 +1025,16 @@ def main():
     ap.add_argument("--repeats", type=int, default=REPEATS_DEFAULT,
                     help="qualifying tier default: 1 rep; use 3 for final "
                          "podium numbers")
+    ap.add_argument("--conversations", type=int, default=None,
+                    help="bench only the first N conversations of the "
+                         "corpus (the w/t calibration pass, addendum "
+                         "58: more turns -> a registered per-family w/t "
+                         "anchor; the default None = all)")
+    ap.add_argument("--no-early-fail", action="store_true",
+                    help="keep benching through reader-wall fails "
+                         "(the calibration pass samples the full turn "
+                         "distribution; the verdict is recomputed from "
+                         "deltas at analyze time and stays honest)")
     ap.add_argument("--thinking", action="store_true",
                     help="thinking mode (category protocol, rule 8)")
     ap.add_argument("--no-thinking", action="store_true",
@@ -1035,7 +1078,9 @@ def main():
 
     dump = bench(args.model, args.corpus, args.dry_run, args.thinking,
                  args.no_thinking, args.port, args.ctx, args.repeats,
-                 args.dump, args.force, args.reader_wps)
+                 args.dump, args.force, args.reader_wps,
+                 conversations=args.conversations,
+                 early_abort=not args.no_early_fail)
     if args.dry_run:
         print(f"[4] would analyze (the reader-wall test: a turn "
               f"fails iff the reader EVER hits the stream - reader "
@@ -1058,6 +1103,11 @@ def main():
     print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
           f"(mean {res['mean_tps']:.1f}); words/token "
           f"{res['words_per_token']:.3f} (measured)")
+    print(f"    w/t calibration (addendum 58): n={res['n_turns']} turns, "
+          f"min {res['words_per_token_min']:.3f}, "
+          f"p05 {res['words_per_token_p05']:.3f}, "
+          f"mean {res['words_per_token']:.3f} - the family anchor "
+          "candidates (min/p05)")
 
 
 if __name__ == "__main__":
