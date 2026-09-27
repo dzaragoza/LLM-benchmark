@@ -2723,3 +2723,26 @@ Wait — the honest reading: even n=220 gives ±0.9 w/s, not the ±0.5 I wrote i
 **Pre-registered grading (unchanged from addendum 59):** a family's calibrated p05 vs its current [D] anchor: ≥0.05 w/t below → registry update (no retroactive verdicts); above → the family's predicted ceiling grows; either way recorded. At n=220 the p05 rests on ~11 tail observations — a quantile, not an extreme value.
 
 **Open items:** (1) the author's 50-conv calibration run (four w/t calibration lines); (2) registry rows update; (3) study #3 report — the n-justification table is the methods section's calibration paragraph.
+
+### Session 29, addendum 61 — the exact n*: per-family rung-separation sample sizes computed (llama 195, phi 245, qwen 380, mistral 620 convs; one uniform n = 620) — but n* cannot be known before data; the sequential design is the exact answer: run 50 convs, measure kappa, recompute n*, extend only if a decision hangs
+
+**The question (author):** "can you make n exactly the needed value to separate rungs?" Yes — with the criterion fixed first.
+
+**The criterion (rung separation, stated exactly):** a family's adjacent-rung spacing in predicted reader rate is Δ = (t_B − t_A) × w/t (the two rungs' law t/s times the family anchor). The anchor's 95% CI half-width is h(n) = 1.96·κ/√n · t. Rungs are separated with 95% confidence iff **h(n) ≤ Δ/2** — the CIs of the two rung verdicts do not overlap even when the reader line falls exactly midway between them. Solve: **n* = (2·1.96·κ·t/Δ)² turns.** κ (the p05 sampling constant, calibrated on the dump-shaped mixture) ≈ 0.58; turns/conv = 4.4.
+
+**The per-family table (v3.0-measured spacings; phi's Q6_K and llama's Q6_K are law/v2.3-derived, flagged):**
+
+| family | adjacent rungs | spacing Δ (w/s) | t/s | n* turns | n* convs |
+|---|---|---|---|---|---|
+| llama 3B | Q8_0–Q6_K | 1.60 | 20.6 | 857 | **195** |
+| phi-4-mini | Q8_0–Q6_K (law est) | 1.20 | 17.4 | 1078 | **245** |
+| qwen 9B | Q6_K–Q5_K_M | 0.64 | 11.4 | 1670 | **380** |
+| mistral 7B | Q6_K–Q5_K_M | 0.55 | 12.8 | 2728 | **620** |
+
+One uniform n covering all four: **620 convs ≈ 2,730 turns per family ≈ 3–4 h per family, 12–16 h total** (one-time). Mistral binds (its spacing 0.55 w/s is the finest).
+
+**The structural honesty (why n* is not the whole story):** (1) the anchor is a COMMON multiplier — pred_A = t_A·(w+d), pred_B = t_B·(w+d) — so the anchor error in the rung DIFFERENCE is (t_B−t_A)·d ≈ 0.07–0.22 w/s, an order of magnitude below the spacings: the anchor essentially never reorders rungs, it shifts ABSOLUTE verdicts near the reader line. (2) The walk MEASURES rungs (binary search); the anchor only pre-filters which rungs to try. (3) n* is exact only given κ, and κ is a property of the family's true w/t tail — which is unknowable before calibration data exists. So the exact n cannot be specified in advance; it is MEASURED.
+
+**The sequential design (the pre-registered answer):** run the 50-conv pass (addendum 60). From its ~220 turns compute the family's EMPIRICAL κ (the p05's bootstrap sd) — then n* is exact for that family, and the extension decision is mechanical: extend to n* convs only if (a) a future decision will hang on a predicted rung verdict AND (b) the measured κ actually yields n* > 50. The corpus prefix property (sha256 sort then slice) makes extension seamless: the first 50 convs of a 620-conv corpus are exactly the 50-conv corpus, so no bench time is wasted. The commands scale by changing the two numbers (`--make-corpus --n-conversations <n>`, `--conversations <n>`).
+
+**Open items:** (1) the author's 50-conv run lands four empirical κ's; (2) if any decision then hangs at rung level, extend that family to its exact n*; (3) registry + report as before.
