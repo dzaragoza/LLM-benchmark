@@ -2952,3 +2952,38 @@ python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf \
 ```
 
 Three notes. (1) Disk: phases 1-2 need ~20 GiB transient (8 GiB safetensors + 8 GiB f16 + 4.2 GiB Q8_0); after the run the f16 and the HF-cache snapshot are deletable per the author's space practices — the guard re-acquires if a future run needs them. (2) The second invocation is ZERO-COST and required for the Delta grade: full_benchmark's phase-4 print shows the verdict but not the p05; speed_gate WITHOUT --force reuses the fresh dump (mtime newer than the new rung file) and its analyze prints the w/t calibration line (n, min, p05, mean) — the 4B's p05 vs the 9B's 0.412 is the Delta grade, pre-registered above. (3) ARC is not part of the sentinel measurement (wall-independent): it runs at smoke size (32 questions, ~2 min) in sentinel-scoped state/results files so nothing pollutes the study-#3/#4 records. Predictions and grading unchanged — the run only gains phases 1-2 (~15-20 min) before the same 50-conv bench.
+
+### Session 30, addendum 68 — the qwen Q8 sentinel run graded (PARTIAL — the full-tail protocol did not run; Vibe's command error owned below): verdict FAIL is FINAL (1 catch-up event), the qwen-class Q8 cone does NOT issue (the pre-registered coin-flip branch; the sweep fallback inherits); t/s HIT on a freshly re-acquired file; both addendum-54/55 degeneracy directions validated live in one run; the measured file lands 0.02 GiB under the class ceiling
+
+**The run that executed (author, T14s).** The addendum-67-correction command (full_benchmark.py --ladder Q8_0, chosen to re-acquire the space-deleted rung file) completed phases 1-2 cleanly — safetensors -> f16 -> Q8_0, end-to-end re-acquisition validated — and benched convs 1-19 before the addendum-34 early-fail aborted at conv 19 turn 4's wall event: n=89 of 267 turns. **Vibe's error, on record:** full_benchmark.py does NOT expose --no-early-fail (its bench call defaults early_abort=True); the pre-registered protocol (addendum 67) demanded the full 267-turn tail. The trade was made for acquisition convenience when the file was missing — the correct shape was acquisition (full_benchmark, aborting after phase 2 is fine) THEN the pre-registered speed_gate command once the file exists. The verdict is UNAFFECTED — it is a min and monotone in data; FAIL at n=89 is FAIL at n=267 — but the Delta grade and the full event count need the tail. The addendum-67 command is now viable as written (the rung file is on disk).
+
+**The verdict (FINAL): FAIL — reader-wall test, 1 wall-failing turn, 1 catch-up event, worst wait 0.46 s.** The event: conv 19, turn 4 — span diagnostic 6.3 w/s, ABOVE the 5.0 line, one mid-stream catch-up. The qwen-class Q8 cone therefore does NOT issue: a sentinel that fails the strict gate cannot certify a set of passes. This is the coin-flip branch pre-registered in addendum 67 ("predicted margins ±0.1 on both sides... if the cone fails, it fails honestly") — and the fallback rule fires as pre-registered: the kept Q8 sweep suggestion inherits the qwen-class question. No retroactive anything: the cone was pending, it is now failed.
+
+**The one-run, two-direction validation of the exact form (report-grade).** The worst-SPAN turn of the run (1.58 w/s, conv 4 turn 1, a tiny answer) PASSED — its whole span rides inside the 0.45 s reaction window (the addendum-54 degeneracy, handled by construction). The wall-FAILING turn's span (6.3) is ABOVE the flat 5.0 line. The retired flat worst-turn instrument would have failed the WRONG turn — the tiny answer — and passed the mid-stream stall v3.0 exists to catch. Both directions of the addendum-54/55 design, each correcting the flat instrument's error, live in a single run.
+
+**Grades so far (pre-registered bands, addendum 67):**
+
+| prediction | band | measured | grade |
+|---|---|---|---|
+| worst t/s | 15.3 ± 5% = [14.5, 16.1] | 15.2-16.0 across convs; run worst 15.2 | **HIT** — and the freshly self-quantized file streams exactly at law speed: the re-acquisition chain is validated end-to-end |
+| wall events | 0-12 of 267 (≤4.5%) | 1 of 89 (1.1%) so far | in band (pending the full count) |
+| worst wait | 1-5 s if events occur | 0.46 s | **MISS low** — too pessimistic, good direction |
+| w/s p05 | 6.3, band [5.1, 7.5] | pending the tail (span mean 10.55, sigma 0.56 at n=89) | pending |
+| w/t p05 (the Delta grade) | [0.35, 0.49], central 0.412 | pending the tail (mean w/t 0.665 at n=89; the printed low-tail spans cluster ~0.41-0.44 w/t — Delta-compatible but NOT the grade: at n=89 the p05 CI is ~±0.12 w/t, too coarse to resolve the 0.05 band) | pending |
+
+**The file-size measurement (the razor edge, confirmed by data).** The memory line measures the file at **4.29 GiB** vs the addendum-67 bpw-derived estimate 3.97 (8% low — the estimate, not the law, was wrong) and vs the class ceiling 4.31 GiB. The sentinel sits 0.02 GiB under its class ceiling: the cone boundary was not merely predicted thin, it IS thin by measurement. Law at 4.29 GiB -> 14.4 t/s; measured 15.5-15.6 (+8%, inside the ±15% band). Registry note: where a measured size exists it supersedes the bpw estimate (the addendum-26 committed protocol — ls -l sizes before publication). Memory: peak RSS 5.43 GiB (1.13 beyond the file), machine cost 8.61 GiB.
+
+**The completion run (the addendum-67 command, now viable; ~35-50 min; determinism check free — at temperature 0 / seed 1024 convs 1-19 should reproduce identically, including the conv-19 event):**
+
+```
+git pull --ff-only
+
+python3 speed_gate.py --model ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf \
+  --corpus ./live-corpus-cal50.json --conversations 50 \
+  --no-thinking --no-early-fail --force \
+  --dump ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf.sentinel.nothink.json
+```
+
+It grades the three pending rows: the Delta exit plan fires (4B p05 vs the 9B's 0.412 at the pre-registered n=267), the full event count (the failure-rate row for the report), and the w/s p05 (the predictor grade — the author's stated goal for this run: study the prediction power). The cone record does not reopen: FAIL is final either way.
+
+**Open items:** (1) the tail run above — grades Delta, event count, w/s p05; (2) if Delta falsifies, the sweep fallback becomes the Q8 design of record; (3) the sentinel study continues predictor-side regardless (the point is the prediction power, and the t/s term just HIT within band on a fresh file).
