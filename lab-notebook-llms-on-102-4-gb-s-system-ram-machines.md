@@ -2484,3 +2484,14 @@ python3 full_benchmark.py --no-thinking --force --roster "Llama-3.2-3B-Instruct,
 ```
 
 The `--force --roster` combination re-benches the ladder and re-ranks only the roster families. Llama-3.2-3B's folder was deleted from disk (the same cleanup that hit qwen), so the stale-state guard (addendum 43) invalidates its phases 1-2 and re-downloads — the fresh dump reproduces the Q8_0 PASS deterministically and measures its own w/t_min as a bonus constant for the registry. Mistral's Q5_K_M verdict is banked; --force re-benches it too (idempotent), and its fresh dump re-measures its w/t_min on the v2.1 instrument for the calibration record.
+
+**Addendum 48, footnote — the Meta intra-family walk (author question: "why select Llama-3.2-3B again? surely the predictor can find a larger model").** Rule 8 walks the family's members high-to-low and takes the highest that is runnable AND passes the quant-5 filter. The Meta walk, top down:
+
+| member | Q5_K_M size | t/s | w/t_min anchor | predicted w/s | verdict |
+|---|---|---|---|---|---|
+| Llama-3.3-70B | 49.9 GiB | — | — | — | NOT RUNNABLE (file alone exceeds 32 GB RAM) |
+| Llama-3.2-11B-Vision | 7.84 GiB | 8.62 (law) | 0.37 (generous cross-family band) | 3.19 | FAIL (also a vision model) |
+| Llama-3.1-8B | 5.70 GiB | 11.36 (law) | 0.144 (own measured) | 1.64 | FAIL (measured: the addendum-37 run failed every rung) |
+| **Llama-3.2-3B** | 2.14 GiB | 24.12 (law) | ≥ 0.243 (own measured bound) | ≥ 5.86 | **PASS — the highest passing member** |
+
+The 8B is the decisive row: its exclusion is MEASURED, not predicted — the addendum-37 run walked its full ladder and failed every rung (worst 2.09 w/s at Q4_K_M, word-sparse turns at 0.144 w/t_min), and quant-5's larger files only make it slower. The 11B-Vision is excluded by prediction (3.19 w/s even on the generous 0.37 cross-family band — worse than every measured non-llama family) and is a vision model (rule 3's non-thinking/text-only spirit). The 70B is not runnable on a 32 GB machine. So the predictor DID try the larger models: the 3B is not a conservative fallback, it is the ceiling of what Meta offers that fits the machine and the gate. (Llama-3.1-8B measured w/t_min 0.144 is the structural cause: Meta's instruct answers are terse, so even a healthy-t/s 8B cannot clear a 5.0 w/s worst-turn gate above ~1.3 GiB files.)
