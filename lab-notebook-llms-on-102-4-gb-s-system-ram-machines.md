@@ -3564,3 +3564,18 @@ The author's ruling: "let's audit all tables." Method: each row's constant, valu
 ### Session 33, addendum 105 - the redundancy pass: restatements out, the one-anchor rule enforced
 
 The author approved the proposal. DELETED: ms per GiB 13.07 (verified = 1000/76.5, a unit restatement of BW_eff that appears nowhere in the instrument code); the fast-reader anchor 300 wpm as a separate row (it is 5.0 x 60 - the registry's own constitution names 5.0 w/s THE anchor; the Brysbaert citation folded into the reader-line row); the reader profiles 238/340 wpm (law_fit-era settings - that instrument's reading-speed sensitivity duty moved to session_replicate's 0.6-1.5x band sweep; if law_fit is ever re-run as an instrument they re-register then). MERGED: the bandwidth-class row and the law-parameters row into one (the class is where the law lives). KEPT despite being derivable: the roster ceiling 5.27 GiB / 4.92B params - derived, but operative (the roster was built from it; a checked-against-candidates number must be readable at a glance, not recomputed). [D] is now 10 rows, each an independent measurement or an operative value - no unit restatements, no dead-instrument settings.
+
+### Session 33, addendum 106 - the Floor marker removed and the registry tables fixed for GitHub
+
+Author ruling: "remove the floor" - the historical Floor (k=3 headroom)
+deletion-marker row, the last pre-cleanup-convention marker in [A], is
+deleted outright (addendum 103 convention: current values only; history
+lives here). The anchor-chain aside referencing it removed with the row.
+[A] is now 14 rows, all live values.
+
+Also fixed: the PROTOCOL.md tables did not render on GitHub ("the ones in
+readme do") - every one of the seven tables was missing the blank line
+between the preceding paragraph/heading and the header row, which
+GitHub's GFM parser requires to open a table. The README tables rendered
+because they had the blank line. Blank lines added; tables verified by
+column-count and header-position check.
