@@ -3754,3 +3754,42 @@ the pages' est. w/s column should scale per-model by v2 rather
 than by the flat 0.50-class ratio. Same form, all classes:
 t/s = 1/((file+KV)/(0.73 x spec_BW) + 1/t_inf) - BW_eff tracks
 the class, everything else is model-side config arithmetic.
+
+### Session 33, addendum 115 - the w/t anchor decomposition: what is knowable offline
+
+Author question: define or approximate the w/t anchor from model
+data alone. THE REGISTERED HYPOTHESIS (addendum 51, instrument
+already exists): measured w/t = TWO CHANNELS:
+  channel 1 - TOKENIZER EFFICIENCY: whitespace-words per token on
+  fixed text. Knowable OFFLINE from the tokenizer files (a few MB,
+  no weights, no server, no bench) via tokenizer_probe.py.
+  channel 2 - CONTENT SPARSENESS at the p05 turn: what the model
+  CHOOSES to say (math/markdown/terse). Unknowable before
+  generation; measured by the gate's per-turn dumps.
+EVIDENCE ON RECORD: gemma - healthy tokenizer (probe 0.55-0.70)
+with word-sparse content failure (worst turns 0.03-0.29) - the
+decomposition is REAL, the channels are independent (addendum 46).
+The qwen line: probes hover 0.55-0.70 while measured p05 anchors
+run 0.36-0.45 - the gap IS channel 2 (content sparseness), and it
+is family-stable (the 4B/9B transfer gap 0.000 validated it).
+THE PROPOSAL (testable tomorrow): anchor_p05 ~= tokenizer_probe -
+family_sparseness, where family_sparseness is calibrated ONCE per
+family (one bench run) and expected to TRANSFER across sizes within
+the family (the addendum-69 validation is direct evidence it does,
+for qwen at least). Predictions for the new lineages (probe values
+from tokenizer files; sparseness lands with the bench):
+  granite: probe expected ~0.6 (53K vocab); anchor = probe - s_g
+  phi: probe expected ~0.65 (32K/100K vocab); anchor = probe - s_p
+  minicpm: probe expected ~0.55-0.65 (HF-tokenizer dependent)
+TEST: tomorrow's 26 runs give 3 families x multiple sizes; if
+anchor is stable within family across sizes (like qwen's gap
+0.000), the predictor needs ONE sparseness constant per family -
+and an unbenched family costs one tokenizer probe + a sparseness
+PRIOR (the family's published generation style) instead of a
+bench. FAILURE MODE: if anchors vary WITHIN a family across
+sizes, channel 2 is size-dependent, and the offline predictor
+degrades to a family band instead of a value.
+ALSO REGISTERED: the probe needs the tokenizer FILES, which land
+with tonight's run for all three new families (the converter
+downloads them). Tomorrow: probe all three, compare to measured
+p05s, grade the two-channel model.
