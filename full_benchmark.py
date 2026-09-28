@@ -4,8 +4,8 @@
 One command, four stages, one final output: the RANKING of the selected
 models by strict ARC-Challenge score, with exact McNemar separation
 tests on every consecutive rank gap. This script owns the orchestration
-only - state/resume, the per-family ladder walk, and the final results
-file. Each stage lives in its own dedicated script (split from this
+only - state/resume, the fixed Q8_0 rung (addendum 86: the rung walk is
+removed), and the final results file. Each stage lives in its own dedicated script (split from this
 file 2026-09-24; same protocol, same state, byte-identical behavior):
 
   hf_download.py  STAGE A phase 1: every Hugging Face interaction -
@@ -20,11 +20,11 @@ file 2026-09-24; same protocol, same state, byte-identical behavior):
                   stalls iff the reader ever hits the wall; PASS
                   iff <= 5% of turns stall, addendum 73).
   arc_eval.py     STAGE B (phase 5): strict ARC-Challenge on every
-                  selected model (raw protocol, logprob letter scoring).
+                  benched model (raw protocol, logprob letter scoring).
   mcnemar.py      STAGE C (phase 6): pairwise exact McNemar; the final
                   ranking with separation verdicts.
 
-  STAGE A (phases 1-4, per family, downward quant ladder):
+  STAGE A (phases 1-4, per family, fixed Q8_0 rung - addendum 86):
     1. DOWNLOAD - premade rung file or the data to create it later.
     2. CREATE   - convert safetensors -> f16, quantize f16 -> rung.
     3. BENCH    - speed_gate.py, 1 rep, worst-turn metric.
@@ -33,11 +33,13 @@ file 2026-09-24; same protocol, same state, byte-identical behavior):
                   turn and simulates the reader (reader_wps after
                   REACTION_S); PASS iff at most 5% of turns stall
                   the reader (a stall is counted, never aborted
-                  for - the rate needs its denominator); first
-                  PASS = selected.
-  STAGE B (phase 5): strict ARC-Challenge on every selected model
-    (FULL test split, 1172 questions; logprob letter scoring,
-    temperature 0; per-question CSVs in --arc-results-dir).
+                  for - the rate needs its denominator); PASS =
+                  selected.
+  STAGE B (phase 5): strict ARC-Challenge on EVERY BENCHED model -
+    PASS or FAIL verdict, selected or not (addendum 86: ARC always,
+    the only skip is an already-complete CSV). FULL test split, 1172
+    questions; logprob letter scoring, temperature 0; per-question
+    CSVs in --arc-results-dir; the RANKING uses the selected models.
   STAGE C (phase 6): pairwise exact McNemar; final output = ranking.
 
 Everything is IDEMPOTENT and RESUMABLE: ./benchmark-state.json is
@@ -56,10 +58,6 @@ separately with --thinking (the SAME worst-turn gate and ARC protocol;
 reasoning tokens are measured descriptively - latency spent thinking
 is the user's informed choice and is NOT gated). Keep the category in
 its own --state-file/--results-file so rankings stay separate.
-
-Ad-hoc use (no selection stage): rank arbitrary model files directly:
-    python3 full_benchmark.py --arc-only \\
-        --arc-models "./models/A/q8.gguf,./models/B/q6.gguf"
 
 Usage (from the repo root):
     python3 full_benchmark.py --dry-run "Qwen/Qwen2.5-3B-Instruct-GGUF" ...
@@ -98,8 +96,10 @@ STATE_FILE_DEFAULT = "./benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # Q4_0 removed (author ruling, addendum 37): Q4_K_M is the single 4-bit
 # rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
-# RUNG_BITS keeps the Q4_0 ratio for ad-hoc --ladder size estimates.
-LADDER_DEFAULT = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"]
+# RUNG_BITS keeps the Q4_0 ratio for ad-hoc size estimates.
+# Addendum 86: the rung walk is removed - the study is Q8_0 only
+# (quant out of scope, MODEL-SELECTION.md note). One fixed rung.
+RUNG = "Q8_0"
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
 ARC_RESULTS_DIR_DEFAULT = arc_eval.ARC_RESULTS_DIR_DEFAULT
@@ -161,7 +161,7 @@ def save_state(path, state):
 
 # =========================================================== selection
 
-def process_family(spec, ladder, corpus, models_dir, state,
+def process_family(spec, corpus, models_dir, state,
                    state_path, dry_run, force, thinking=False,
                    no_thinking=False, reader_wps=READER_WPS_DEFAULT):
     model_repo, _, source_repo = spec.partition("=")
@@ -188,7 +188,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
         # --force re-benches: clear every rung's verdict and phases 3-4
         # (phases 1-2 stay done - the rung files exist and are reused;
         # the dumps are re-measured because speed_gate.bench gets force
-        # too). Without this, the ladder walk below would skip on the
+        # too). Without this, the fixed-rung pass below would skip on the
         # STORED verdicts and --force would silently do nothing past
         # the family-level check (addendum 42).
         cleared = 0
@@ -199,7 +199,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
                 cleared += 1
         fst["selected"] = None
         save_state(state_path, state)
-        print(f"  --force: re-benching the ladder "
+        print(f"  --force: re-benching {RUNG} "
               f"({cleared} stored verdict(s) cleared; files reused)")
 
     # Stale-state guard (addendum 43): a stored rung file can vanish
@@ -226,7 +226,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
     except Exception as e:
         fail(1, "-", f"cannot list repo files for {model_repo}: {e}", GUIDE[1])
 
-    for rung in ladder:
+    for rung in [RUNG]:
         run = fst["runs"].get(rung, {"phases_done": []})
         fst["runs"][rung] = run
         if str(run.get("verdict", "")).startswith("PASS"):
@@ -318,9 +318,9 @@ def main():
     ap = argparse.ArgumentParser(
         description="end-to-end benchmark: quant selection, strict full "
                     "ARC, exact-McNemar ranking - one final output")
-    ap.add_argument("families", nargs="*",
+    ap.add_argument("families", nargs="+",
                     help='family specs: "model_repo" or '
-                         '"model_repo=source_repo" (skip for --arc-only)')
+                         '"model_repo=source_repo"')
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument("--reader-wps", type=float,
                     default=READER_WPS_DEFAULT,
@@ -328,7 +328,6 @@ def main():
                          "worst turn at the reference depth must never "
                          "fall below this (default 5.0 w/s = 300 wpm, "
                          "Brysbaert 2019 - match the fast reader)")
-    ap.add_argument("--ladder", default=",".join(LADDER_DEFAULT))
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
@@ -337,8 +336,6 @@ def main():
     ap.add_argument("--arc-results-dir", default=ARC_RESULTS_DIR_DEFAULT)
     ap.add_argument("--arc-config", default="ARC-Challenge",
                     choices=["ARC-Challenge", "ARC-Easy"])
-    ap.add_argument("--arc-only", action="store_true",
-                    help="skip selection; ARC + rank only")
     ap.add_argument("--roster", default=None,
                     help="restrict phases 5-6 and the ranking to these "
                          "families (comma-separated, as named in the "
@@ -346,9 +343,6 @@ def main():
                          "across studies - without this flag the "
                          "ranking defaults to the families named in "
                          "this run's command line (addendum 41/56)")
-    ap.add_argument("--arc-models", default=None,
-                    help="comma-separated .gguf files to ARC and rank "
-                         "(with --arc-only); labels from filenames")
     ap.add_argument("--dry-run", action="store_true",
                     help="READ-ONLY pre-flight (addendum 79): lists "
                          "every repo, verifies tooling, runs the "
@@ -382,8 +376,6 @@ def main():
     if args.thinking and args.no_thinking:
         ap.error("--thinking and --no-thinking are mutually exclusive")
 
-    ladder = [x.strip() for x in args.ladder.split(",") if x.strip()]
-
     if not args.dry_run:
         for path, msg in [
             (args.corpus, f"corpus not found at {args.corpus} - build it: "
@@ -401,44 +393,8 @@ def main():
 
     state = load_state(args.state_file)
 
-    if args.arc_only:
-        if args.arc_models:
-            jobs = []
-            for p in args.arc_models.split(","):
-                p = p.strip()
-                if not os.path.isfile(p):
-                    sys.exit(f"model file not found: {p}")
-                jobs.append((safe_label(os.path.basename(p)), p))
-        else:
-            jobs = []
-            for fam, fst in state["families"].items():
-                if fst.get("selected"):
-                    run = fst["runs"][fst["selected"]]
-                    jobs.append((f"{fam} {fst['selected']}", run["file"]))
-            if not jobs:
-                sys.exit("no selections in state - run the full pipeline "
-                         "first, or pass --arc-models")
-        questions = load_questions(args.arc_config, args.arc_num)
-        for label, path in jobs:
-            def on_scored(lbl, score, _state=state, _sp=args.state_file):
-                _state.setdefault("arc", {})[lbl] = {
-                    "csv": arc_csv_path(args.arc_results_dir, lbl),
-                    "score": score}
-                save_state(_sp, _state)
-            arc_eval.arc_run(label, path, questions, args.arc_num,
-                             args.arc_results_dir, on_scored,
-                             args.dry_run)
-        if not args.dry_run:
-            ranking, scores, pairs = mcnemar.rank(
-                [lbl for lbl, _ in jobs], args.arc_num, args.arc_results_dir)
-            state["ranking"] = {"arc_num": args.arc_num,
-                                "scores": {m: scores[m] for m in ranking},
-                                "order": ranking, "pairs": pairs}
-            save_state(args.state_file, state)
-        return
-
     if not args.families:
-        ap.error("no family specs given (or use --arc-only)")
+        ap.error("no family specs given")
 
     # Addendum 78, item 4: per-family isolation IN THE TOOL - a family
     # that dies (conversion OOM, unsupported architecture, a bad repo)
@@ -447,7 +403,7 @@ def main():
     failed_families = []
     for spec in args.families:
         try:
-            process_family(spec, ladder, args.corpus,
+            process_family(spec, args.corpus,
                            args.models_dir, state, args.state_file,
                            args.dry_run, args.force, args.thinking,
                            args.no_thinking, args.reader_wps)
@@ -465,7 +421,8 @@ def main():
         print("=" * 60)
         stamp("DRY RUN COMPLETE - READ-ONLY PRE-FLIGHT REPORT")
         print(f"  families checked : {len(args.families)}")
-        print(f"  rung (ladder)    : {', '.join(ladder)}")
+        print(f"  rung             : {RUNG} (fixed; the rung walk is "
+              "removed - addendum 86)")
         # Addendum 83: the run-time estimate. Per-cell costs from the
         # run-1 measurement (the qwen overnight sweep, ~8.5 h for 7
         # cells, acquisition-dominated), split by acquisition-plan
@@ -536,11 +493,21 @@ def main():
               [os.path.basename(s.partition("=")[0].rstrip("/"))
                for s in args.families])
     selections = {}
+    arc_jobs = []
     for fam, fst in state["families"].items():
         if roster is not None and fam not in roster:
             continue
         if fst.get("selected") and fst["runs"][fst["selected"]].get("file"):
             selections[fam] = fst["runs"][fst["selected"]]
+        # Addendum 86: ARC runs on EVERY benched family - PASS or FAIL
+        # verdict alike; the only skip is an already-complete CSV
+        # (arc_csv_valid, inside arc_eval.arc_run). Infeasible and
+        # not-yet-benched families have no file and are excluded.
+        for rung, run in fst.get("runs", {}).items():
+            if (run.get("file") and run.get("verdict")
+                    and not str(run["verdict"]).startswith(
+                        "FAIL (infeasible")):
+                arc_jobs.append((fam, rung, run))
     if roster is not None:
         missing = [f for f in roster
                    if f not in state.get("families", {})
@@ -553,16 +520,16 @@ def main():
         stamp("families failed this run (isolated; state preserved):")
         for spec, err in failed_families:
             print(f"  {spec}: {err}")
-    if selections:
+    if arc_jobs:
         print()
         print("=" * 60)
-        stamp(f"PHASES 5-6: full {args.arc_config} on selected models "
-              f"({args.arc_num} questions each)")
+        stamp(f"PHASE 5: full {args.arc_config} on every benched model "
+              f"({len(arc_jobs)} family rung(s), {args.arc_num} "
+              "questions each - addendum 86: ARC always, the only skip "
+              "is an already-complete CSV)")
         questions = load_questions(args.arc_config, args.arc_num)
-        labels = []
-        for fam, sel in selections.items():
-            label = f"{fam} {state['families'][fam]['selected']}"
-            labels.append(label)
+        for fam, rung, run in arc_jobs:
+            label = f"{fam} {rung}"
 
             def on_scored(lbl, score, _state=state, _sp=args.state_file):
                 _state.setdefault("arc", {})[lbl] = {
@@ -570,7 +537,7 @@ def main():
                     "score": score}
                 save_state(_sp, _state)
             try:
-                arc_eval.arc_run(label, sel["file"], questions, args.arc_num,
+                arc_eval.arc_run(label, run["file"], questions, args.arc_num,
                                  args.arc_results_dir, on_scored, False)
                 stamp(f"ARC done: {label}")
             except SystemExit as e:
@@ -579,9 +546,19 @@ def main():
             except Exception as e:
                 stamp(f"ARC FAILED: {label} - {e!r} (recorded; the sweep "
                       "continues - addendum 78)")
+    else:
+        print("\nno benched family rungs yet - skipping ARC phase")
+
+    # ---- phase 6: the McNemar ranking over the SELECTED models
+    rank_labels = [f"{fam} {state['families'][fam]['selected']}"
+                   for fam in selections]
+    if rank_labels:
+        print()
+        stamp(f"PHASE 6: exact-McNemar ranking of the selected models "
+              f"({len(rank_labels)})")
         try:
             ranking, scores, pairs = mcnemar.rank(
-                labels, args.arc_num, args.arc_results_dir)
+                rank_labels, args.arc_num, args.arc_results_dir)
             state["ranking"] = {"arc_num": args.arc_num,
                                 "scores": {m: scores[m] for m in ranking},
                                 "order": ranking, "pairs": pairs}
@@ -591,14 +568,13 @@ def main():
         except Exception as e:
             stamp(f"RANKING FAILED - {e!r} (recorded; the sweep continues)")
     else:
-        print("\nno family has a selection yet - skipping ARC phases")
+        print("\nno family has a selection yet - skipping the ranking")
 
     # ---- results file: everything for later analysis
     results = []
     for fam, fst in state["families"].items():
         history = [dict(r, rung=rung) for rung, r in fst["runs"].items()]
-        history.sort(key=lambda r: ladder.index(r["rung"])
-                     if r["rung"] in ladder else 99)
+        history.sort(key=lambda r: r["rung"])
         sel = fst["selected"]
         results.append({"family": fam, "spec": fst["spec"],
                         "history": history,
