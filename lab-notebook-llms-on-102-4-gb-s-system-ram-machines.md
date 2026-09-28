@@ -3464,3 +3464,25 @@ The author's ruling: "let's do the refactoring. I know is risky at this point of
 - Dry-run parity: `--dry-run` output byte-identical to the pre-refactor baseline (modulo the timestamped stamp lines), rc 0, NO state file created (the addendum-79 guard intact).
 
 **What was deliberately NOT done (the addendum-86/87 rulings stand):** structured plans (dataclass) for the acquisition plan, `state_io.py`, and type annotations - deferred until after the sweep; the state file's single consumer means the extraction trigger has not fired.
+
+### Session 33, addendum 91 - typing + ty: the annotations land, the type checker joins the chain
+
+The author's ruling: "add typing and ty as pre commit hook." The addendum-90 deferral ("structured plans, state_io.py, and type annotations - deferred until after the sweep") is now executed for the annotations half: all 12 instrument scripts carry `from __future__ import annotations` + full signatures (parameters and returns), ~115 functions annotated.
+
+**The hook.** `ty` (astral-sh, 0.0.84) is a LOCAL pre-commit hook (`python3 -m ty check`, `language: system` like pytest - the venv's ty, not an isolated install) between ruff-format and pytest: lint -> format -> TYPE CHECK -> tests on every commit and push. `ty` added to requirements.txt. Third-party imports (huggingface_hub, pyarrow, transformers, pytest) resolve against the project environment - on the author's machine the repo `.venv`, which ty auto-discovers.
+
+**The fail() family typed NoReturn (6 files).** The single highest-leverage annotation: `fail()` always sys.exits, and telling ty that kills the whole "function can implicitly return None after a fail() call" false-positive class at the root - hf_download.acquire's "implicit return None" and every other fail()-terminated branch stopped being errors without a single code change.
+
+**Real bugs ty forced out (the annotations earning their keep):**
+1. `hf_download._http_get_json`: `raise last_err` could raise `None` (the retries-exhausted path when every attempt failed) - now `RuntimeError(...) from last_err`, the URL in the message.
+2. `hf_download.remote_file_sizes`: `entry.size` on the `RepoFile | RepoFolder` union - RepoFolder has no size; the getattr guard existed but the second access bypassed it. Narrowed through a local.
+3. `arc_eval`: `max(logps, key=logps.get)` - `.get` returns Optional, and the overload was unsatisfiable; lambda-narrowed.
+4. `speed_gate`: the noise `peaks` list could carry None (a walrus-guarded isinstance narrows it now); `**parse_memory_log(...)` could double-splat None (or-guarded).
+5. `llama_server.start_server`: `cmd` could contain None (`find_server()` returns None on the Windows/no-binary path) - asserted, with the caller (check_tooling) contract noted.
+6. `full_benchmark.check_tooling`: `SERVER_BIN=None` handled (`or ""` - isfile("") is False, the exit message fires).
+7. The Windows `ctypes.windll` branch platform-guarded (hasattr) - it was silently caught by the except before, but is now structural.
+8. Several of MY OWN first-pass annotations were wrong and ty caught them all: `depth_budget` takes a list (not int), `build_blob` returns a tuple and takes a str pool, `depth_probe.load_pool` returns a str, `fail(step)` is a str there, `bench_model` returns a 3-tuple, `pairs_from_csvs` a 3-tuple, `run_quiet` an int, `print_fit` a tuple, `ols`/`percentile` Optional - exactly the "the annotation IS the documentation, and the checker verifies the documentation" loop the refactor was for.
+
+**Verified (the full chain, twice - commit and push hooks):** ruff check + format clean repo-wide; 32 tests pass; `ty check` 0 diagnostics with the requirements installed; the runtime exercise passes; dry-run output byte-identical to the addendum-90 baseline; NO state file created. The registered sweep commands unchanged (no CLI surface touched - signatures only).
+
+**Still deferred:** structured plans and `state_io.py` (the addendum-86 triggers).
