@@ -3498,3 +3498,7 @@ The author's ruling: "Remove all memory configs that will not run any model." A 
 **Kept deliberately:** the "custom..." escape hatch is appended after the filter loop - a practitioner with a non-JEDEC config below the floor can still enter it and see for themselves that nothing fits; the filter is for the curated list, not a prohibition. A footnote under the filter input states the rule and shows the live threshold (populated from the same computed value, so it can never drift from the filter).
 
 **Verified:** the page's script executed headless (node) against the real CANDIDATES - MIN_RUN_BW = 19.8, 52 machines listed, first entry DDR4-2666 single 21.3 GB/s, default key "51.2|2" present. The full pre-commit chain (ruff -> format -> ty -> pytest) is unaffected by an HTML-only change; 32 tests pass.
+
+### Session 33, addendum 93 - octa channel joins the picker
+
+The author's ruling: "add octa channel to ddr4 and ddr5." The channel loop goes [1, 2, 4, 8] with a per-generation `octa` flag (true only for DDR4/DDR5 - the modern workstation/server tier, 512-bit bus; DDR3 octa boards are exotic and stay out, same reasoning as DDR/DDR2 quad in addendum 92's comment). 15 new entries, all 102.4-409.6 GB/s - every one clears the 19.8 GB/s floor. Verified headless: 67 machines listed, default "51.2|2" present.
