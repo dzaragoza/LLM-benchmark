@@ -3502,3 +3502,7 @@ The author's ruling: "Remove all memory configs that will not run any model." A 
 ### Session 33, addendum 93 - octa channel joins the picker
 
 The author's ruling: "add octa channel to ddr4 and ddr5." The channel loop goes [1, 2, 4, 8] with a per-generation `octa` flag (true only for DDR4/DDR5 - the modern workstation/server tier, 512-bit bus; DDR3 octa boards are exotic and stay out, same reasoning as DDR/DDR2 quad in addendum 92's comment). 15 new entries, all 102.4-409.6 GB/s - every one clears the 19.8 GB/s floor. Verified headless: 67 machines listed, default "51.2|2" present.
+
+### Session 33, addendum 94 - the picker tops out at the 102.4 class
+
+The author's ruling: "The maximum option will be 102.4 GB/s. Put a note in bold above the selector that any machine with higher specs will run the same models as the default." A `MAX_BW = 102.4` cap joins the MIN_RUN_BW floor in the build loop, and the bold note sits above the filter input. The reasoning is the study's own scope: nothing in the measured pool needs more than the top class to clear the reader line, so a higher-bandwidth machine is an option without consequences - the honest answer for its owner is "same models as the default." Four configs land exactly on 102.4 (DDR5-6400 dual, DDR4-3200 quad, DDR5-3200 quad, DDR4-1600 octa). The list: 46 entries, 21.3-102.4 GB/s; default "51.2|2" present. Verified headless.
