@@ -42,30 +42,17 @@
 study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172.</div>
 
 <div class="panel">
-  <label for="perch">Per-channel memory bandwidth (GB/s)</label>
-  <select id="preset" onchange="applyPreset()">
-    <option value="25.6">DDR4-3200 &mdash; 25.6</option>
-    <option value="38.4">DDR5-4800 &mdash; 38.4</option>
-    <option value="44.8">DDR5-5600 &mdash; 44.8</option>
-    <option value="51.2">DDR5-6400 &mdash; 51.2</option>
-    <option value="60.0">LPDDR5X-7500 &mdash; 60.0</option>
-    <option value="68.3">LPDDR5X-8533 &mdash; 68.3</option>
-    <option value="custom" selected>custom&hellip;</option>
-  </select>
-  <input type="number" id="perch" min="1" max="200" step="0.1" value="25.6" oninput="pick()">
-
-  <label>Channels</label>
-  <div class="radios">
-    <label><input type="radio" name="ch" value="1" oninput="pick()"> single</label>
-    <label><input type="radio" name="ch" value="2" checked oninput="pick()"> double</label>
-    <label><input type="radio" name="ch" value="4" oninput="pick()"> quad</label>
-  </div>
-
+  <label for="machine">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
+  <select id="machine" onchange="applyMachine()"></select>
+  <label for="perch" id="perchLabel" style="display:none">Custom per-channel memory bandwidth (GB/s)</label>
+  <input type="number" id="perch" min="1" max="200" step="0.1" value="25.6" style="display:none" oninput="pick()">
+  <label for="chcustom" id="chLabel" style="display:none">Custom channel count</label>
+  <input type="number" id="chcustom" min="1" max="8" step="1" value="1" style="display:none" oninput="pick()">
   <label for="ram">System memory (GiB)</label>
   <input type="number" id="ram" min="1" max="512" step="0.5" value="32" oninput="pick()">
-
   <div class="readout" id="bwout"></div>
   <div class="readout" id="classout"></div>
+</div>
 </div>
 
 <div id="result"></div>
@@ -115,10 +102,56 @@ var REF_BW = 102.4, READER = 5.0;
 
 function $(id) { return document.getElementById(id); }
 
-function applyPreset() {
-  var v = $("preset").value;
-  if (v !== "custom") { $("perch").value = v; }
+function applyMachine() {
+  var v = $("machine").value;
+  var isCustom = v === "custom";
+  $("perch").style.display = isCustom ? "" : "none";
+  $("chcustom").style.display = isCustom ? "" : "none";
+  $("perchLabel").style.display = isCustom ? "" : "none";
+  $("chLabel").style.display = isCustom ? "" : "none";
   pick();
+}
+
+// Addendum 84: the machine dropdown. One option per (generation, JEDEC
+// speed, channel count) - the channel choice is part of the option, no
+// separate radio row. per-channel GB/s = MT/s x 8 bytes / 1000. Bus
+// width: 64 bits per channel (single 64, dual 128, quad 256).
+// Channel variants offered where they make sense: single/dual for
+// every generation, quad from DDR3 on (the server/HEDT tier; DDR and
+// DDR2 quad boards were exotic and are omitted).
+var GENERATIONS = [
+  { gen: "DDR",  mts: [200, 266, 333, 400],                       quad: false },
+  { gen: "DDR2", mts: [400, 533, 667, 800, 1066],                 quad: false },
+  { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133],        quad: true  },
+  { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200],  quad: true  },
+  { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true }
+];
+
+function buildMachineMenu() {
+  var sel = $("machine");
+  [1, 2, 4].forEach(function (ch) {
+    GENERATIONS.forEach(function (g) {
+      if (ch === 4 && !g.quad) return;
+      var og = document.createElement("optgroup");
+      og.label = g.gen + " " + (ch === 1 ? "single channel (64-bit)"
+        : ch === 2 ? "dual channel (128-bit)" : "quad channel (256-bit)");
+      g.mts.forEach(function (mt) {
+        var perch = mt * 8 / 1000;
+        var bw = perch * ch;
+        var o = document.createElement("option");
+        o.value = perch + "|" + ch;
+        o.textContent = g.gen + "-" + mt + " \u2014 " + bw.toFixed(1) + " GB/s";
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  });
+  var custom = document.createElement("option");
+  custom.value = "custom";
+  custom.textContent = "custom\u2026";
+  sel.appendChild(custom);
+  // default: the study's measured class (DDR5-6400 dual = 102.4 GB/s)
+  sel.value = "51.2|2";
 }
 
 function bandOf(w) {
@@ -129,12 +162,24 @@ function bandOf(w) {
 }
 
 function pick() {
-  var perch = parseFloat($("perch").value);
-  var ch = parseFloat(document.querySelector("input[name=ch]:checked").value);
+  var perch, ch, chLabel;
+  var v = $("machine").value;
+  if (v === "custom") {
+    perch = parseFloat($("perch").value);
+    ch = parseFloat($("chcustom").value);
+    chLabel = ch + " channel" + (ch > 1 ? "s" : "") + ", custom \u2014 " +
+      (64 * ch) + "-bit bus";
+  } else {
+    var parts = v.split("|");
+    perch = parseFloat(parts[0]);
+    ch = parseFloat(parts[1]);
+    var chName = ch === 1 ? "single channel" : ch === 2 ? "dual channel" : "quad channel";
+    chLabel = $("machine").selectedOptions[0].textContent + " \u2014 " + chName +
+      " (" + (64 * ch) + "-bit bus)";
+  }
   var ram = parseFloat($("ram").value);
-  if (!(perch > 0) || !(ram > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
+  if (!(perch > 0) || !(ram > 0) || !(ch > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
   var bw = perch * ch;
-
   var nearest = CLASSES.reduce(function (a, b) { return Math.abs(b - bw) < Math.abs(a - bw) ? b : a; });
   var extrap;
   if (Math.abs(bw - nearest) / nearest < 0.05) extrap = "the registered " + nearest.toFixed(1) + " class" +
@@ -142,7 +187,7 @@ function pick() {
   else if (bw > 102.4) extrap = "above the measured class \u2014 extrapolated up linearly (conservative: compute headroom only helps)";
   else extrap = "between/below the registered classes \u2014 extrapolated by the pre-registered halving form (unvalidated)";
 
-  $("bwout").innerHTML = "Total memory bandwidth: <strong>" + bw.toFixed(1) + " GB/s</strong>";
+  $("bwout").innerHTML = "<strong>" + chLabel + "</strong> &rarr; total memory bandwidth: <strong>" + bw.toFixed(1) + " GB/s</strong>";
   $("classout").innerHTML = "Nearest registered class: <strong>" + nearest.toFixed(1) +
     " GB/s</strong> &mdash; " + extrap + ".";
 
@@ -190,6 +235,8 @@ function pick() {
   t += "</table>";
   $("tables").innerHTML = t;
 }
+buildMachineMenu();
+applyMachine();
 pick();
 </script>
 </body>
