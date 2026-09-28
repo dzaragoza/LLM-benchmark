@@ -3697,3 +3697,27 @@ the law predicts t/s, the anchor converts, pass/fail machinery is
 untouched. The ceiling, re-derived under v2 at w/t 0.412 and
 qwen-4B-class KV (0.56 GiB): 5.53 GiB file (old: 5.27) - now
 per-architecture, because each model subtracts its OWN KV.
+
+### Session 33, addendum 113 - the three-way grading on the qwen set (and what it exposed)
+
+Grading the predictor stack against the seven v3.1 measured qwen
+files/t/s (law@P = registered law with (P) files; law@C = registered
+law with (C) config files; v2 = explicit-KV refit):
+  mean |file error|: (P) 4.8%   (C) 2.7%          - config arithmetic wins
+  mean |t/s error| : law@P 23.4%  law@C 23.7%  v2 4.4%
+FINDING (exposed by the grading, not visible in the refit alone):
+the registered law constants (76.5, t_inf 74) CANNOT fit the small
+end of the v3.1 set - t_inf 74 caps the asymptote below the 0.5B's
+measured 100.1 t/s (predicted 48.9). The registered constants come
+from the law_fit era (old instrument, large models); they predict
+the 4B band well (14.4 vs 15.7) but the small end badly. The v2
+constants (75.0, 891) fit the current instrument's whole range -
+BUT in-sample (fit on these same 7 points). The honest comparison:
+  - registered law: out-of-date fit, predicts the 4B ceiling band
+  - v2: in-sample 4.4%, cross-family validation is tomorrow's data
+DISCUSSION POINT for tomorrow: v2's t_inf 891 vs 74 is a huge
+constant shift - 891 t/s is far above anything measured, meaning
+the fit's intercept is weakly constrained by the data (the 7 points
+crowd the 15-100 t/s range; the asymptote is extrapolation). The
+cross-family refit (26 more points, wider size range) should pin
+it - or show v2's functional form is missing a term.
