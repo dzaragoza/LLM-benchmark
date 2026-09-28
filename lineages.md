@@ -145,3 +145,94 @@ assumption across generations: the cross-generation Δ test came back
 the 2.5-0.5B (gap 0.162) and Qwen3-1.7B (gap 0.081) outside. The
 generation-split question (is the qwen class one class or two?) is
 logged open in addendum 74's completion.
+
+---
+
+## Phi (Microsoft — the measured-anchor lineage, six cells)
+
+The lineage with a second measured class anchor: the phi-class p05 0.418
+is registry-calibrated [D] (addendum 66), so this is the only new
+lineage whose predictions do not lean on the pooled anchor. The 3.8B
+trio is also the study's first within-lineage tokenizer-class boundary
+(phi-3/3.5 vocab 32,064 vs phi-4-mini vocab 200K). All rows
+non-thinking; phi-1/1.5/2 benched as base models (no instruct shipped).
+All values PRE-REGISTERED (addendum 76) — none measured yet.
+
+| name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
+|---|---|---|---|---|---|---|
+| phi-4-mini | 3.8B | 4.07 (P) | pending | — | predicted 6.27 (measured cone W 6.7; anchor 0.418) | — |
+| phi-3.5-mini | 3.8B | 4.07 (P) | pending | — | predicted 6.27 | — |
+| phi-3-mini | 3.8B | 4.07 (P) | pending | — | predicted 6.27 | — |
+| phi-2 | 2.7B | 2.89 (P) | pending | — | predicted 8.15 | — |
+| phi-1.5 | 1.3B | 1.39 (P) | pending | predicted 13.19 | — | — |
+| phi-1 | 1.3B | 1.39 (P) | pending | predicted 13.19 | — | — |
+| phi-3-medium (14B, line endpoint) | 14B | 15.0 (P) | — | — | FAIL (1.7) | — |
+
+**The pre-registered questions this lineage answers:** (1) does the
+phi-class anchor 0.418 hold ACROSS GENERATIONS (the exact question the
+qwen Δ misses raised) — the 3.8B trio's per-generation p05s vs 0.418 is
+the within-lineage Δ test; (2) the strong-form class boundary: phi-4's
+200K vocab vs the 32K trio — if the 4-mini's p05 departs the trio's by
+more than Δ, the tokenizer class split INSIDE one lineage is measured;
+(3) base-vs-instruct: phi-1/1.5/2 are base models — their rows test
+whether content sparseness (the w/t bottom) is instruct-owned or
+tokenizer-owned.
+
+---
+
+## Granite (IBM — the size-fixed quartet, seven cells)
+
+The H1-vs-H2 discriminator: FOUR models at IDENTICAL size (2B, four
+generations — 3.0, 3.1, 3.2, 3.3). With size held fixed, any p05
+scatter across the quartet is generation-owned by construction — the
+sharpest test of the generation-split hypothesis the study can run.
+granite-4.2-3b carries a thinking toggle (run non-thinking, rule 8);
+granite-4.0-h-micro is a hybrid Mamba-2/transformer (llama.cpp support
+to be verified before acquisition; the dense granite-4.0-micro is the
+same-size fallback, and the hybrid-vs-dense pair is its own datum). All
+values PRE-REGISTERED (addendum 76) under the pooled anchor 0.366 —
+none measured yet; the probe-first step may re-anchor per family
+before any weights download.
+
+| name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
+|---|---|---|---|---|---|---|
+| granite-4.2-3b | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
+| granite-4.0-h-micro | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
+| granite-3.3-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
+| granite-3.2-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
+| granite-3.1-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
+| granite-3.0-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
+| granite-4.0-h-small (32B/A9B, line endpoint) | 32B | 34.2 (P) | — | — | FAIL (0.9) | — |
+
+**The pre-registered question this lineage answers:** the four 2B
+p05s. If their scatter exceeds Δ = 0.05, generation-owned w/t bottoms
+are MEASURED (H1 confirmed on a second lineage, size-fixed); if they
+agree within Δ, the class is one and the qwen Δ misses were
+family-specific structure. Either result closes an open question.
+
+---
+
+## MiniCPM (OpenBMB — the unmeasured-family ladder, four cells)
+
+The best size spread of the three new lineages: a 0.5 → 4B ladder
+spanning all three bands in one family — the qwen shape, in a family
+with NO measured anchor. This is the pooled anchor 0.366's first
+multi-size test: if the family's p05s land far from 0.366, the pooled
+anchor needs the per-family calibration the four study-3 families got.
+All non-thinking instruct versions. All values PRE-REGISTERED
+(addendum 76) — none measured yet.
+
+| name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
+|---|---|---|---|---|---|---|
+| MiniCPM3-4B | 4B | 4.28 (P) | pending | — | predicted 5.27 — SHARP EDGE (band [3.0, 7.5]) | — |
+| MiniCPM-2.4B | 2.4B | 2.57 (P) | pending | — | predicted 7.77 | — |
+| MiniCPM-1.2B | 1.2B | 1.28 (P) | pending | predicted 12.08 | — | — |
+| MiniCPM4-0.5B | 0.5B | 0.54 (P) | pending | predicted 17.85 — small-end law caveat (the qwen 0.5B measured +25% over prediction) | — | — |
+| MiniCPM4-8B (line endpoint) | 8B | 8.6 (P) | — | — | FAIL (2.9) | — |
+
+**The pre-registered questions this lineage answers:** (1) the pooled
+anchor's first real test across a size ladder — the per-size p05s vs
+0.366 grade whether the min-of-calibrated-p05s pooling rule survives
+contact with an unmeasured family; (2) the law's cross-family ±15%
+band at a fourth family; (3) the small-end t_inf caveat on a second
+0.5B model.

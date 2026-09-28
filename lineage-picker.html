@@ -72,40 +72,40 @@ study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). 
 <div id="tables"></div>
 
 <div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the nine Q8_0
-  configurations the study measured passing the reader wall &mdash; the seven qwen lineage
-  members of the overnight sweep (stall rates 0.0&ndash;2.6%, all v3.1 PASS) plus the two
-  cross-family Q8_0 selections with 0/267 wall events at n=50 (Phi-4-mini, Llama-3.2-3B).
-  A candidate is eligible iff (a) its <em>measured machine cost</em> (weights + KV + buffers +
-  runtime, MemAvailable-delta instrument) fits your RAM, and (b) its predicted w/s at your
-  bandwidth clears the 5.0 reader line. Bandwidth scaling is the pre-registered halving form:
+  <p><strong>How the recommendation is computed.</strong> Candidates are the seven qwen lineage
+  members of the overnight sweep, each measured with the <strong>v3.1 instrument</strong>
+  (stall-rate verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates
+  0.0&ndash;2.6%, all PASS, 50 conversations / 267 turns each) &mdash; the only models the
+  study has graded under the current protocol. A candidate is eligible iff (a) its
+  <em>measured machine cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
+  instrument) fits your RAM, and (b) its predicted w/s at your bandwidth clears the 5.0 reader
+  line. Bandwidth scaling is the pre-registered halving form:
   w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4 &mdash; linear because at these sizes decode is
   bandwidth-dominated; for the smallest members (whose compute headroom makes the true loss
   smaller) it is conservative. The recommendation is the highest-ARC eligible candidate.</p>
-  <p><strong>Excluded, on measurement:</strong> Mistral-7B has no passing Q8_0 configuration
-  (measured wall FAIL; its selection lives at Q5_K_M, out of scope here), and Qwen3.5-9B Q8_0
-  is a measured wall FAIL (its 92.4% ARC lives at Q5_K_M, also out of scope). Quant is out of
-  scope for this study: this tool answers the Q8_0 question only.</p>
+  <p><strong>Excluded on instrument grounds, not on measurement:</strong> Phi-4-mini Q8_0 and
+  Llama-3.2-3B Q8_0 passed the reader wall at n=50 (0/267 wall events each) but under the
+  v3.0-era instrument (the addendum-66 calibration pass, before protocol v3.1 existed) &mdash;
+  they are pending a v3.1 re-bench and are therefore not in the pool. Mistral-7B has no passing
+  Q8_0 configuration (measured wall FAIL), and Qwen3.5-9B Q8_0 is a measured wall FAIL; their
+  selections live at Q5_K_M, out of scope here. Quant is out of scope for this study: this
+  tool answers the Q8_0 question only.</p>
   <p class="footnote">Caveats: w/s figures are the corpus p05 for this reader (300 wpm, 0.45 s
   reaction) on the study corpus (50 conversations, 267 turns, temp 0) &mdash; a different
-  workload can move them. Memory costs marked (est) are file size plus the largest overhead
-  ever measured on this instrument (8.7 GiB); they have not been individually benched. The
-  halving factor 0.50 is pre-registered, not yet validated by the 51.2-class replication.
+  workload can move them. The halving factor 0.50 is pre-registered, not yet validated by the 51.2-class replication.
   Machine-cost values are run-shaped: treat the fit boundary as soft within ~1 GiB.</p>
 </div>
 
 <script>
 "use strict";
 // Measured records (Q8_0, v3.1-passing). wps = words/s at the corpus p05, measured on
-// the T14s (102.4 GB/s class). cost = machine cost GiB (MemAvailable delta), measured
-// except where marked est (file + 8.7, the max overhead ever observed).
+// the T14s (102.4 GB/s class) with the v3.1 instrument. cost = machine cost GiB
+// (MemAvailable delta), measured. costEst is vestigial (no candidate is estimated).
 var CANDIDATES = [
   { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99, costEst: false, wps: 6.32,  arc: 90.4, family: "Qwen3.5" },
   { name: "Qwen3-4B",             size: 3.99, cost: 12.30, costEst: false, wps: 7.10,  arc: 85.0, family: "Qwen3" },
-  { name: "Phi-4-mini (3.8B)",    size: 3.80, cost: 12.50, costEst: true,  wps: 6.69,  arc: 81.1, family: "Phi" },
   { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  costEst: false, wps: 9.72,  arc: 76.1, family: "Qwen2.5" },
   { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  costEst: false, wps: 14.86, arc: 73.5, family: "Qwen2.5" },
-  { name: "Llama-3.2-3B-Instruct",size: 3.19, cost: 11.89, costEst: true,  wps: 9.13,  arc: 72.6, family: "Llama" },
   { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  costEst: false, wps: 10.66, arc: 68.0, family: "Qwen3" },
   { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  costEst: false, wps: 25.86, arc: 61.3, family: "Qwen3.5" },
   { name: "Qwen2.5-0.5B-Instruct",size: 0.63, cost: 1.06,  costEst: false, wps: 25.03, arc: 45.8, family: "Qwen2.5" }
