@@ -119,13 +119,14 @@ var selKey = "51.2|2";   // default: DDR5-6400 dual (128-bit) - the measured cla
 // 64 bits per channel (single 64, dual 128, quad 256). Channel variants
 // offered where they make sense: single/dual for every generation, quad
 // from DDR3 on (the server/HEDT tier; DDR and DDR2 quad boards were
-// exotic and are omitted).
+// exotic and are omitted), octa for DDR4/DDR5 (the modern workstation/
+// server tier, 512-bit bus).
 var GENERATIONS = [
-  { gen: "DDR",  mts: [200, 266, 333, 400],                       quad: false },
-  { gen: "DDR2", mts: [400, 533, 667, 800, 1066],                 quad: false },
-  { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133],        quad: true  },
-  { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200],  quad: true  },
-  { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true }
+  { gen: "DDR",  mts: [200, 266, 333, 400],                       quad: false, octa: false },
+  { gen: "DDR2", mts: [400, 533, 667, 800, 1066],                 quad: false, octa: false },
+  { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133],        quad: true,  octa: false },
+  { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200],  quad: true,  octa: true  },
+  { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true, octa: true }
 ];
 
 // A machine config is listed only if it can honestly run SOME measured
@@ -136,14 +137,15 @@ var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.wps); 
 MIN_RUN_BW = READER * REF_BW / MIN_RUN_BW;   // ~19.8 GB/s with the current pool
 
 function buildMachineMenu() {
-  [1, 2, 4].forEach(function (ch) {
+  [1, 2, 4, 8].forEach(function (ch) {
     GENERATIONS.forEach(function (g) {
       if (ch === 4 && !g.quad) return;
+      if (ch === 8 && !g.octa) return;
       g.mts.forEach(function (mt) {
         var perch = mt * 8 / 1000;
         var bw = perch * ch;
         if (bw < MIN_RUN_BW) return;   // cannot run any measured model - not listed
-        var chName = ch === 1 ? "single" : ch === 2 ? "dual" : "quad";
+        var chName = ch === 1 ? "single" : ch === 2 ? "dual" : ch === 4 ? "quad" : "octa";
         MACHINES.push({
           gen: g.gen, mt: mt, ch: ch, perch: perch, bw: bw,
           key: perch + "|" + ch,
