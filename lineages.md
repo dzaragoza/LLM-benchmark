@@ -1,5 +1,17 @@
 # Lineages — the wps bands (T14s, predicted and measured)
 
+**Scope note (author ruling, addendum 75): quant is OUT OF SCOPE for
+this study.** The lineages view is **Q8_0-only** — the one fixed rung
+— and the planned multi-quant extension is deferred to a later study.
+The quant column is removed; the rung stays stated here once. Size
+stays a column: params do not determine size well enough (the
+measured spread is 1.00–1.26 GiB/B across the seven benched
+members; the 0.5B packs 1.26 — embedding-heavy small models — and
+that +18% size error alone flipped its band call, addendum 74), and
+size is the law's input: the through-origin fit size ≈ 1.05 ×
+params (R² 0.99) carries ±17% residuals at the small end (addendum
+75).
+
 One section per family lineage, the study's right-sizing view turned
 into a table: every member of the line, at the fixed rung **Q8_0**,
 with its predicted T14s words-per-second and the **band** it lands
@@ -52,7 +64,11 @@ Bands above 10 carry no wall risk at n=50 by prediction (their
 corpus-min turns sit ≥ 5.07 w/s).
 
 **Provenance markers:** (M) = measured file size on the T14s;
-(P) = bpw-derived estimate.
+(P) = bpw-derived estimate. **ARC column:** ARC-Challenge test,
+n=1172, measured at Q8_0 on the T14s (the overnight run, addendum
+74); higher is better. The cross-family Q8_0 records for comparison:
+Phi-4-mini 81.1% and Llama-3.2-3B 72.6% (both 0/267 stalls at n=50,
+addendum 66) — mistral has no passing Q8_0 member (measured FAIL).
 
 ---
 
@@ -65,21 +81,21 @@ predictor (addenda 67–69). The overnight validation run
 (addendum 71, pre-registered) benches every predicted-pass cell —
 the seven members at or above 5 w/s.
 
-| name | parameters | quant | Q8_0 size (GiB) | [10–20) wps | [5–10] wps | [20–40) wps |
+| name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
-| Qwen-110B (old series, line endpoint) | ~110B | Q8_0 | 117.7 (P) | — | FAIL (0.3) | — |
-| Qwen2.5-72B (line endpoint) | ~72B | Q8_0 | 77.0 (P) | — | FAIL (0.4) | — |
-| Qwen3-Coder-30B | ~30B | Q8_0 | 32.1 (P) | — | FAIL (1.0) | — |
-| Qwen3.6-27B | ~27B | Q8_0 | 28.9 (P) | — | FAIL (1.1) | — |
-| Qwen3.5-9B | ~8.7B | Q8_0 | 9.3 (P, from measured Q5 6.19) | — | FAIL (3.1) | — |
-| Qwen2.5-7B-Instruct | 7.62B | Q8_0 | 8.2 (P) | — | FAIL (3.4) | — |
-| Qwen3.5-4B | 4.0B | Q8_0 | 4.29 (M) | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — |
-| Qwen3-4B | 4.0B | Q8_0 | 3.99 (M) | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — |
-| Qwen2.5-3B-Instruct | 3.1B | Q8_0 | 3.37 (M) | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — |
-| Qwen3-1.7B | 1.7B | Q8_0 | 1.71 (M) | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — |
-| Qwen2.5-1.5B-Instruct | 1.5B | Q8_0 | 1.76 (M) | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — |
-| Qwen3.5-0.8B | 0.8B | Q8_0 | 0.86 (M) | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) |
-| Qwen2.5-0.5B-Instruct | 0.5B | Q8_0 | 0.63 (M) | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) |
+| Qwen-110B (old series, line endpoint) | ~110B | 117.7 (P) | — | — | FAIL (0.3) | — |
+| Qwen2.5-72B (line endpoint) | ~72B | 77.0 (P) | — | — | FAIL (0.4) | — |
+| Qwen3-Coder-30B | ~30B | 32.1 (P) | — | — | FAIL (1.0) | — |
+| Qwen3.6-27B | ~27B | 28.9 (P) | — | — | FAIL (1.1) | — |
+| Qwen3.5-9B | ~8.7B | 9.3 (P, from measured Q5 6.19) | 92.4 (at Q5_K_M, quant out of scope) | — | FAIL (3.1) | — |
+| Qwen2.5-7B-Instruct | 7.62B | 8.2 (P) | — | — | FAIL (3.4) | — |
+| Qwen3.5-4B | 4.0B | 4.29 (M) | **90.4** | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — |
+| Qwen3-4B | 4.0B | 3.99 (M) | **85.0** | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — |
+| Qwen2.5-3B-Instruct | 3.1B | 3.37 (M) | **76.1** | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — |
+| Qwen3-1.7B | 1.7B | 1.71 (M) | **68.0** | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — |
+| Qwen2.5-1.5B-Instruct | 1.5B | 1.76 (M) | **73.5** | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — |
+| Qwen3.5-0.8B | 0.8B | 0.86 (M) | **61.3** | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) |
+| Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) |
 
 † **The sentinel row, honestly stated (addenda 69/73):** the 4B is
 the predicted in-band member (5.92, dead in [5–10]) whose measured
