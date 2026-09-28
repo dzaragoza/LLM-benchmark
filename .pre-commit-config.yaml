@@ -5,6 +5,7 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
   - repo: local
     hooks:
       - id: ty
@@ -12,8 +13,15 @@ repos:
         entry: python3 -m ty check
         language: system
         pass_filenames: false
+        files: \.py$
       - id: pytest
         name: pytest
         entry: python3 -m pytest tests/ -q
         language: system
         pass_filenames: false
+        files: \.py$
+      - id: md-tables
+        name: markdown table check (GFM)
+        entry: python3 md_table_check.py
+        language: system
+        types: [markdown]
