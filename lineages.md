@@ -77,9 +77,13 @@ corpus-min turns sit ≥ 5.07 w/s).
 
 **Provenance markers:** (M) = measured file size on the T14s;
 (P) = params x 1.07 GiB/B (the addendum-68 calibrated rate;
-NOT the raw 8.5-bpw arithmetic - the converter keeps embedding
-tensors at higher precision, so measured files run 1.006-1.26 GiB/B,
-and the calibrated rate beats the arithmetic on the measured set).
+NOT the raw 8.5-bpw arithmetic - the converter keeps the output
+tensor at F16, so measured files run 1.006-1.26 GiB/B, and the
+calibrated rate beats the naive arithmetic on the measured set);
+(C) = config.json arithmetic (size_predict.py, addendum 110 - exact
+per-tensor params, body @ 8.5 bpw + output tensor @ F16; -2.7% to
++3.1% on the measured set). The granite/Phi/MiniCPM (P) rows
+upgrade to (C) or (M) once tonight's run lands their configs/files.
 **ARC column:** ARC-Challenge test,
 n=1172, measured at Q8_0 on the T14s (the overnight run, addendum
 74); higher is better. The cross-family Q8_0 records for comparison:
@@ -100,11 +104,11 @@ the seven members at or above 5 w/s.
 | name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
 | Qwen-110B (old series, line endpoint) | ~110B | 117.7 (P) | — | — | FAIL (0.3) | — |
-| Qwen2.5-72B (line endpoint) | ~72B | 77.0 (P) | — | — | FAIL (0.4) | — |
+| Qwen2.5-72B (line endpoint) | 72.7B | 73.0 (C) | — | — | FAIL (0.4) | — |
 | Qwen3-Coder-30B | ~30B | 32.1 (P) | — | — | FAIL (1.0) | — |
 | Qwen3.6-27B | ~27B | 28.9 (P) | — | — | FAIL (1.1) | — |
 | Qwen3.5-9B | ~8.7B | 9.3 (P, from measured Q5 6.19) | 92.4 (at Q5_K_M, quant out of scope) | — | FAIL (3.1) | — |
-| Qwen2.5-7B-Instruct | 7.62B | 8.2 (P) | — | — | FAIL (3.4) | — |
+| Qwen2.5-7B-Instruct | 7.62B | 8.01 (C) | — | — | FAIL (3.4) | — |
 | Qwen3.5-4B | 4.0B | 4.29 (M) | **90.4** | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — |
 | Qwen3-4B | 4.0B | 3.99 (M) | **85.0** | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — |
 | Qwen2.5-3B-Instruct | 3.1B | 3.37 (M) | **76.1** | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — |
@@ -152,8 +156,11 @@ needs ~2× 102.4's bandwidth — the next machine up).
 mapping) is pre-registered, not yet validated (addendum 69; its
 validation instrument, the 51.2 replication, is FUTURE WORK — out of
 this study's execution plan per addendum 86 — so the caveat stands
-indefinitely). Sizes marked (P) are bpw-derived
-estimates (±8% observed, addendum 68). The anchor 0.412 is
+indefinitely). Sizes marked (P) are params x 1.07 GiB/B
+estimates (the addendum-68 calibrated rate); sizes marked (C)
+are config.json arithmetic (size_predict.py, addendum 110:
+exact per-tensor params, body @ 8.5 bpw + output tensor F16,
+±3% on the measured set). The anchor 0.412 is
 corpus-conditional (the w/t tail is substantially corpus-owned,
 addendum 69) — these bands are for this reader and corpus class;
 generation-side well-behavedness is assumed per the qwen line's

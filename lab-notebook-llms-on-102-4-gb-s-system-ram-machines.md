@@ -3653,3 +3653,22 @@ answered from the code: the speed gate DOES prefill the KV cache -
 each conversation runs on a corpus blob sized via /tokenize so the
 deepest turn lands just under ctx 4096 (speed_gate.py "depth
 prefill"), retained by cache_prompt turn-to-turn.
+
+### Session 33, addendum 111 - the lineages table adopts config arithmetic where computable
+
+Author ruling: update lineages.md to the new calculations. Scope
+honesty: the config arithmetic needs each family's config.json,
+HF blocks the agent sandbox, and the granite/Phi/MiniCPM configs
+arrive with tonight's run - so those (P) rows upgrade tomorrow
+(to (C) or straight to measured (M), whichever the run lands).
+Updated now, with configs validated against published params
+(exact reproduction: 7.62B, 72.70B):
+- Qwen2.5-7B-Instruct: 8.2 (P) -> 8.01 (C) - UNTIED (the 7B+
+  series unties; the config params reproduce the published 7.62B
+  exactly, confirming the tie flag)
+- Qwen2.5-72B: 77.0 (P) -> 73.0 (C)
+New provenance marker (C) registered in both legend passages.
+Note for tomorrow: the 7B's Q4_0 teaser cell moves with the new
+size: 8.01 x 4.5/8.5 = 4.24 GiB - comfortably under the 5.27
+ceiling now (was 4.34); the 9B row stays (P) until its config
+lands (the 9B is not in tonight's roster).
