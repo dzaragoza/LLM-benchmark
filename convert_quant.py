@@ -19,9 +19,9 @@ import sys
 
 import hf_download
 
-QUANTIZE_BIN = os.path.join(".", "llama-b10964-gpu",
-                            "llama-quantize.exe" if os.name == "nt"
-                            else "llama-quantize")
+QUANTIZE_BIN = os.path.join(
+    ".", "llama-b10964-gpu", "llama-quantize.exe" if os.name == "nt" else "llama-quantize"
+)
 CONVERTER = "./llama.cpp/convert_hf_to_gguf.py"
 
 GUIDE = {
@@ -49,7 +49,6 @@ def fail(phase, rung, what, causes):
     sys.exit(1)
 
 
-
 def run_quiet(cmd, log_path, phase, rung, what):
     """Quiet tooling (author ruling, addendum 38): the converter's and
     quantizer's stdout/stderr is captured to log_path and printed
@@ -68,6 +67,7 @@ def run_quiet(cmd, log_path, phase, rung, what):
         print("--- end of tool output ---")
     return r.returncode
 
+
 def create(fam, famdir, rung, plan="", dry_run=False):
     """Phase 2: ensure the rung file exists locally. Returns its path
     (None on dry run with nothing to do)."""
@@ -80,23 +80,24 @@ def create(fam, famdir, rung, plan="", dry_run=False):
     if not f16:
         st_dir = os.path.join(famdir, "safetensors-source")
         out_f16 = os.path.join(famdir, fam + "-f16.gguf")
-        print("  [2] converting safetensors -> f16 (pinned converter; "
-              "output hidden; shown on error)")
+        print(
+            "  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)"
+        )
         log = os.path.join(famdir, "convert-f16.log")
-        rc = run_quiet([sys.executable, CONVERTER,
-                        st_dir, "--outfile", out_f16, "--outtype", "f16"],
-                       log, 2, rung, "safetensors -> f16 conversion")
+        rc = run_quiet(
+            [sys.executable, CONVERTER, st_dir, "--outfile", out_f16, "--outtype", "f16"],
+            log,
+            2,
+            rung,
+            "safetensors -> f16 conversion",
+        )
         if rc != 0 or not os.path.isfile(out_f16):
-            fail(2, rung, "f16 conversion failed "
-                 f"(full log: {log})", GUIDE[2])
+            fail(2, rung, f"f16 conversion failed (full log: {log})", GUIDE[2])
         f16 = out_f16
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
-    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} "
-          "(output hidden; shown on error)")
+    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")
-    rc = run_quiet([QUANTIZE_BIN, f16, out, rung],
-                   log, 2, rung, "llama-quantize run")
+    rc = run_quiet([QUANTIZE_BIN, f16, out, rung], log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
-        fail(2, rung, "llama-quantize failed "
-             f"(full log: {log})", GUIDE[2])
+        fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
     return out

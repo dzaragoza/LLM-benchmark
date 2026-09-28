@@ -32,16 +32,16 @@ import llama_server
 import speed_gate
 from llama_server import start_server, stop_server
 
-ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-23)
+ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 ARC_PORT = 8081
 ARC_THREADS = 8
-ARC_CTX = speed_gate.CTX_DEFAULT   # addendum 45 (author ruling): ARC
-                         # uses the study's promoted depth constant
-                         # 4096 (llama-server's own default) - one
-                         # depth for the whole study; the strict-arc-era
-                         # 2048 is deleted. The precondition below
-                         # still checks every prompt fits.
+ARC_CTX = speed_gate.CTX_DEFAULT  # addendum 45 (author ruling): ARC
+# uses the study's promoted depth constant
+# 4096 (llama-server's own default) - one
+# depth for the whole study; the strict-arc-era
+# 2048 is deleted. The precondition below
+# still checks every prompt fits.
 ARC_NGPU = 99
 
 GUIDE = {
@@ -73,6 +73,7 @@ SERVER_BIN = llama_server.find_server()
 
 # =========================================================== questions
 
+
 def build_prompt(q):
     prompt = f"Question: {q['q']}\n"
     for label, text in q["choices"]:
@@ -83,14 +84,17 @@ def build_prompt(q):
 
 # =========================================================== scoring
 
+
 def arc_score_one(q, port):
     """One question: compare logprobs of answer letters."""
     prompt = build_prompt(q)
     t0 = time.perf_counter()
-    r = llama_server.post_json(port, "/v1/completions",
-                               {"prompt": prompt, "max_tokens": 1,
-                                "temperature": 0, "logprobs": 20},
-                               timeout=120)
+    r = llama_server.post_json(
+        port,
+        "/v1/completions",
+        {"prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20},
+        timeout=120,
+    )
     elapsed = time.perf_counter() - t0
     labels = {label for label, _ in q["choices"]}
     logps = {}
@@ -116,11 +120,11 @@ def arc_score_one(q, port):
 
 # =========================================================== server
 
+
 def arc_start_server(model_path):
     """Launch llama-server for ARC (llama_server.py does the lifecycle).
     Returns (proc, healthy)."""
-    extra = ["-t", str(ARC_THREADS), "-c", str(ARC_CTX),
-             "-ngl", str(ARC_NGPU)]
+    extra = ["-t", str(ARC_THREADS), "-c", str(ARC_CTX), "-ngl", str(ARC_NGPU)]
     return start_server(model_path, ARC_PORT, extra, SERVER_BIN)
 
 
@@ -131,9 +135,9 @@ def arc_stop_server(proc):
 
 # =========================================================== csv
 
+
 def safe_label(label):
-    return "".join(ch if ch.isalnum() or ch in "-_." else "_"
-                   for ch in label)
+    return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in label)
 
 
 def arc_csv_path(arc_dir, label):
@@ -156,6 +160,7 @@ def arc_csv_valid(path, n):
 
 # =========================================================== run
 
+
 def arc_ctx_precondition(questions, label):
     """The ctx precondition (addendum 44; ctx now 4096, addendum 45):
     every rendered prompt is verified against the server's ctx before
@@ -163,16 +168,19 @@ def arc_ctx_precondition(questions, label):
     would either hard-error (a broken run) or silently truncate
     (worse: a dropped answer choice). Fails verbose with the size."""
     worst = max(len(build_prompt(q)) for q in questions)
-    limit = ARC_CTX * 4            # chars-per-token floor, generous
+    limit = ARC_CTX * 4  # chars-per-token floor, generous
     if worst > limit:
-        fail(5, label,
-             f"a rendered ARC prompt ({worst} chars) may exceed "
-             f"ARC_CTX {ARC_CTX} tokens - refusing to run", GUIDE[5])
+        fail(
+            5,
+            label,
+            f"a rendered ARC prompt ({worst} chars) may exceed "
+            f"ARC_CTX {ARC_CTX} tokens - refusing to run",
+            GUIDE[5],
+        )
     return worst
 
 
-def arc_run(label, model_path, questions, arc_num, arc_dir,
-            on_scored=None, dry_run=False):
+def arc_run(label, model_path, questions, arc_num, arc_dir, on_scored=None, dry_run=False):
     """Full strict-ARC run on one model. Post-condition: complete CSV
     (or a dry-run report). on_scored(label, score) fires once per
     completed model - the caller uses it to persist resume state."""
@@ -188,14 +196,17 @@ def arc_run(label, model_path, questions, arc_num, arc_dir,
     arc_ctx_precondition(questions, label)
     proc, healthy = arc_start_server(model_path)
     if not healthy:
-        fail(5, label, "llama-server did not become healthy for "
-             f"{os.path.basename(model_path)}", GUIDE[5])
+        fail(
+            5,
+            label,
+            f"llama-server did not become healthy for {os.path.basename(model_path)}",
+            GUIDE[5],
+        )
     correct, done = 0, 0
     try:
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             w = _csv.writer(f)
-            w.writerow(["model", "question", "correct", "seconds",
-                        "prompt_chars"])
+            w.writerow(["model", "question", "correct", "seconds", "prompt_chars"])
             for i, q in enumerate(questions):
                 try:
                     ok, secs, pchars = arc_score_one(q, ARC_PORT)
@@ -208,30 +219,38 @@ def arc_run(label, model_path, questions, arc_num, arc_dir,
     finally:
         arc_stop_server(proc)
     if not arc_csv_valid(csv_path, arc_num):
-        fail(5, label, f"ARC run incomplete ({done}/{arc_num} questions "
-             "answered - transient errors); rerun the same command",
-             GUIDE[5])
+        fail(
+            5,
+            label,
+            f"ARC run incomplete ({done}/{arc_num} questions "
+            "answered - transient errors); rerun the same command",
+            GUIDE[5],
+        )
     if on_scored is not None:
         on_scored(label, correct)
-    print(f"  [5] {label}: {correct}/{arc_num} = "
-          f"{100 * correct / arc_num:.1f}%")
+    print(f"  [5] {label}: {correct}/{arc_num} = {100 * correct / arc_num:.1f}%")
     return csv_path
 
 
 # =========================================================== main
 
+
 def main():
     ap = argparse.ArgumentParser(
         description="strict ARC-Challenge evaluation on a list of models "
-                    "(raw completions, logprob letter scoring)")
-    ap.add_argument("--models", required=True,
-                    help="comma-separated .gguf files; labels from "
-                         "filenames")
-    ap.add_argument("--arc-num", type=int, default=ARC_NUM_DEFAULT,
-                    help="ARC-Challenge questions (default: full 1172)")
+        "(raw completions, logprob letter scoring)"
+    )
+    ap.add_argument(
+        "--models", required=True, help="comma-separated .gguf files; labels from filenames"
+    )
+    ap.add_argument(
+        "--arc-num",
+        type=int,
+        default=ARC_NUM_DEFAULT,
+        help="ARC-Challenge questions (default: full 1172)",
+    )
     ap.add_argument("--arc-results-dir", default=ARC_RESULTS_DIR_DEFAULT)
-    ap.add_argument("--arc-config", default="ARC-Challenge",
-                    choices=["ARC-Challenge", "ARC-Easy"])
+    ap.add_argument("--arc-config", default="ARC-Challenge", choices=["ARC-Challenge", "ARC-Easy"])
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -247,8 +266,7 @@ def main():
         sys.exit("no model files given")
     questions = hf_download.load_questions(args.arc_config, args.arc_num)
     for label, path in jobs:
-        arc_run(label, path, questions, args.arc_num,
-                args.arc_results_dir, dry_run=args.dry_run)
+        arc_run(label, path, questions, args.arc_num, args.arc_results_dir, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

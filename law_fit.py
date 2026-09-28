@@ -61,15 +61,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from hf_download import RUNG_BITS  # single source (addendum 44): the bpw
 
-                                    # table lives here once; law_fit's copy
-                                    # (BPW_APPROX) is deleted
+# table lives here once; law_fit's copy
+# (BPW_APPROX) is deleted
 GIB_BYTES = 1 << 30
 GIB_TO_GB = 1.073741824
 
-READER_PROFILES = {          # Brysbaert 2019, silent English non-fiction,
-    "fast": 300.0,           # adults; the canonical anchor (author
-    "mean": 238.0,           # ruling): MATCH the fast reader - tokens
-    "2sigma-fast": 340.0,    # arrive at reading pace, never slower
+READER_PROFILES = {  # Brysbaert 2019, silent English non-fiction,
+    "fast": 300.0,  # adults; the canonical anchor (author
+    "mean": 238.0,  # ruling): MATCH the fast reader - tokens
+    "2sigma-fast": 340.0,  # arrive at reading pace, never slower
 }
 
 
@@ -78,8 +78,7 @@ def harvest_state(state_files):
     pts = []
     for sf in state_files:
         if not os.path.isfile(sf):
-            print(f"  warning: state file not found, skipped: {sf}",
-                  file=sys.stderr)
+            print(f"  warning: state file not found, skipped: {sf}", file=sys.stderr)
             continue
         with open(sf) as f:
             st = json.load(f)
@@ -90,19 +89,22 @@ def harvest_state(state_files):
                     continue
                 path = run["file"]
                 if not os.path.isfile(path):
-                    print(f"  warning: model file missing, skipped: "
-                          f"{fam} {rung} ({path})", file=sys.stderr)
+                    print(
+                        f"  warning: model file missing, skipped: {fam} {rung} ({path})",
+                        file=sys.stderr,
+                    )
                     continue
-                pts.append({
-                    "label": f"{fam} {rung}",
-                    "model": fam,
-                    "size": os.path.getsize(path) / GIB_BYTES,
-                    "worst": float(run["worst"]),
-                    "mean": (float(run["mean"]) if run.get("mean") is not None
-                             else None),
-                    "verdict": run.get("verdict", "?"),
-                    "source": tag,
-                })
+                pts.append(
+                    {
+                        "label": f"{fam} {rung}",
+                        "model": fam,
+                        "size": os.path.getsize(path) / GIB_BYTES,
+                        "worst": float(run["worst"]),
+                        "mean": (float(run["mean"]) if run.get("mean") is not None else None),
+                        "verdict": run.get("verdict", "?"),
+                        "source": tag,
+                    }
+                )
     return pts
 
 
@@ -113,15 +115,17 @@ def parse_points(specs):
         parts = [p.strip() for p in s.split(",")]
         if len(parts) < 3:
             sys.exit(f"bad --point (need label,size_gib,worst): {s}")
-        pts.append({
-            "label": parts[0],
-            "model": parts[0],
-            "size": float(parts[1]),
-            "worst": float(parts[2]),
-            "mean": float(parts[3]) if len(parts) > 3 else None,
-            "verdict": "archive",
-            "source": "--point",
-        })
+        pts.append(
+            {
+                "label": parts[0],
+                "model": parts[0],
+                "size": float(parts[1]),
+                "worst": float(parts[2]),
+                "mean": float(parts[3]) if len(parts) > 3 else None,
+                "verdict": "archive",
+                "source": "--point",
+            }
+        )
     return pts
 
 
@@ -141,8 +145,7 @@ def ols(points, tkey="worst"):
     a = sxy / sxx
     b = my - a * mx
     ss_tot = sum((y - my) ** 2 for y in ys)
-    ss_res = sum((y - (a * x + b)) ** 2
-                 for x, y in zip(xs, ys, strict=True))
+    ss_res = sum((y - (a * x + b)) ** 2 for x, y in zip(xs, ys, strict=True))
     r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 1.0
     return a, b, r2, n
 
@@ -166,85 +169,123 @@ def kv_gib(layers, kv_heads, head_dim, depth, bpe=2.0):
 def print_fit(name, a, b, r2, n):
     bw = 1.0 / a if a > 0 else float("inf")
     tinf = 1.0 / b if b > 0 else float("inf")
-    print(f"  {name}: n={n}  BW_eff={bw:.1f} GiB/s "
-          f"({bw * GIB_TO_GB:.1f} GB/s)  "
-          f"t_inf={'inf' if tinf == float('inf') else f'{tinf:.0f}'} t/s  "
-          f"R2={r2:.4f}")
+    print(
+        f"  {name}: n={n}  BW_eff={bw:.1f} GiB/s "
+        f"({bw * GIB_TO_GB:.1f} GB/s)  "
+        f"t_inf={'inf' if tinf == float('inf') else f'{tinf:.0f}'} t/s  "
+        f"R2={r2:.4f}"
+    )
     return bw, tinf
 
 
 def main():
     ap = argparse.ArgumentParser(
         description="harvest the ladder data, fit the bandwidth->size law, "
-                    "print the right-sizing boundary size*(floor)")
-    ap.add_argument("--state-file", action="append", default=[],
-                    help="pipeline state file (repeatable); "
-                         "default ./benchmark-state.json")
-    ap.add_argument("--point", action="append", default=[],
-                    metavar="'label,size_gib,worst[,mean]'",
-                    help="manual archive point (repeatable)")
-    ap.add_argument("--latency-budget", type=float, default=None,
-                    metavar="MS",
-                    help="comfort budget in ms per generated token; "
-                         "replaces --floor (floor = 1000/budget); the "
-                         "floor-free form of the boundary")
-    ap.add_argument("--reader", choices=sorted(READER_PROFILES),
-                    default=None,
-                    help="derive the comfort budget from a Brysbaert-2019 "
-                         "reader anchor instead of a floor: T_max = "
-                         "(60000 x words_per_token / wpm) / reader_k. "
-                         "Canonical form (author ruling): "
-                         "--reader fast = 150 ms = floor 6.7 (MATCH the "
-                         "300-wpm reader)")
-    ap.add_argument("--reader-k", type=float, default=1.0, metavar="K",
-                    help="speed factor vs the reader anchor (default 1 = "
-                         "MATCH the reader, the minimum that never "
-                         "makes them wait; >1 buys buffering headroom)")
-    ap.add_argument("--words-per-token", type=float, default=None,
-                    metavar="RATIO",
-                    help="words per token for --reader (REQUIRED with "
-                         "--reader, addendum 44: the 0.75 rule-of-thumb "
-                         "default is deleted - unanchored; pass the "
-                         "family's measured w/t_min, e.g. 0.49 qwen)")
-    ap.add_argument("--bw-theoretical", type=float, default=None,
-                    help="theoretical bandwidth in GB/s, to report the "
-                         "efficiency fraction")
-    ap.add_argument("--predict-size", type=float, default=None,
-                    help="also print the law's worst t/s at this size (GiB)")
-    ap.add_argument("--kv", action="append", default=[],
-                    metavar="'label,layers,kv_heads,head_dim[,bytes_per_elem]'",
-                    help="KV depth tax: architecture spec (repeatable; fp16 "
-                         "KV unless bytes_per_elem given). Prints the KV GiB "
-                         "at --kv-depth and the depth-adjusted boundary "
-                         "size*(D) = size*(0) - KV(D). Sliding-window "
-                         "models: pass window-capped constants yourself")
-    ap.add_argument("--kv-depth", type=int, default=4096,
-                    help="context depth for the --kv tax (default 4096, "
-                         "the study's protocol constant)")
-    ap.add_argument("--json", default=None,
-                    help="write the fit to this JSON file")
+        "print the right-sizing boundary size*(floor)"
+    )
+    ap.add_argument(
+        "--state-file",
+        action="append",
+        default=[],
+        help="pipeline state file (repeatable); default ./benchmark-state.json",
+    )
+    ap.add_argument(
+        "--point",
+        action="append",
+        default=[],
+        metavar="'label,size_gib,worst[,mean]'",
+        help="manual archive point (repeatable)",
+    )
+    ap.add_argument(
+        "--latency-budget",
+        type=float,
+        default=None,
+        metavar="MS",
+        help="comfort budget in ms per generated token; "
+        "replaces --floor (floor = 1000/budget); the "
+        "floor-free form of the boundary",
+    )
+    ap.add_argument(
+        "--reader",
+        choices=sorted(READER_PROFILES),
+        default=None,
+        help="derive the comfort budget from a Brysbaert-2019 "
+        "reader anchor instead of a floor: T_max = "
+        "(60000 x words_per_token / wpm) / reader_k. "
+        "Canonical form (author ruling): "
+        "--reader fast = 150 ms = floor 6.7 (MATCH the "
+        "300-wpm reader)",
+    )
+    ap.add_argument(
+        "--reader-k",
+        type=float,
+        default=1.0,
+        metavar="K",
+        help="speed factor vs the reader anchor (default 1 = "
+        "MATCH the reader, the minimum that never "
+        "makes them wait; >1 buys buffering headroom)",
+    )
+    ap.add_argument(
+        "--words-per-token",
+        type=float,
+        default=None,
+        metavar="RATIO",
+        help="words per token for --reader (REQUIRED with "
+        "--reader, addendum 44: the 0.75 rule-of-thumb "
+        "default is deleted - unanchored; pass the "
+        "family's measured w/t_min, e.g. 0.49 qwen)",
+    )
+    ap.add_argument(
+        "--bw-theoretical",
+        type=float,
+        default=None,
+        help="theoretical bandwidth in GB/s, to report the efficiency fraction",
+    )
+    ap.add_argument(
+        "--predict-size",
+        type=float,
+        default=None,
+        help="also print the law's worst t/s at this size (GiB)",
+    )
+    ap.add_argument(
+        "--kv",
+        action="append",
+        default=[],
+        metavar="'label,layers,kv_heads,head_dim[,bytes_per_elem]'",
+        help="KV depth tax: architecture spec (repeatable; fp16 "
+        "KV unless bytes_per_elem given). Prints the KV GiB "
+        "at --kv-depth and the depth-adjusted boundary "
+        "size*(D) = size*(0) - KV(D). Sliding-window "
+        "models: pass window-capped constants yourself",
+    )
+    ap.add_argument(
+        "--kv-depth",
+        type=int,
+        default=4096,
+        help="context depth for the --kv tax (default 4096, the study's protocol constant)",
+    )
+    ap.add_argument("--json", default=None, help="write the fit to this JSON file")
     args = ap.parse_args()
 
     state_files = args.state_file or ["./benchmark-state.json"]
     pts = harvest_state(state_files) + parse_points(args.point)
     if len(pts) < 2:
-        sys.exit("need at least 2 measured points to fit "
-                 "(pass state files and/or --point entries)")
+        sys.exit("need at least 2 measured points to fit (pass state files and/or --point entries)")
 
     print("=" * 72)
     print("HARVESTED POINTS (size = actual file on disk)")
     print("=" * 72)
-    print(f"  {'label':40} {'size GiB':>8} {'worst':>6} {'mean':>6}"
-          f" {'verdict':<20} source")
+    print(f"  {'label':40} {'size GiB':>8} {'worst':>6} {'mean':>6} {'verdict':<20} source")
     for p in sorted(pts, key=lambda q: (q["model"], q["size"])):
         mean = f"{p['mean']:.1f}" if p["mean"] is not None else "-"
-        print(f"  {p['label']:40} {p['size']:8.2f} {p['worst']:6.1f} "
-              f"{mean:>6} {p['verdict']:<20} {p['source']}")
+        print(
+            f"  {p['label']:40} {p['size']:8.2f} {p['worst']:6.1f} "
+            f"{mean:>6} {p['verdict']:<20} {p['source']}"
+        )
 
     pooled = ols(pts)
     if pooled is None or pooled[0] <= 0:
-        sys.exit("cannot fit: points do not span sizes "
-                 "(need >= 2 distinct file sizes)")
+        sys.exit("cannot fit: points do not span sizes (need >= 2 distinct file sizes)")
 
     print()
     print("=" * 72)
@@ -254,8 +295,7 @@ def main():
     bw, tinf = print_fit("pooled (all points)", a, b, r2, n)
     if args.bw_theoretical:
         eff = bw * GIB_TO_GB / args.bw_theoretical
-        print(f"  efficiency vs theoretical {args.bw_theoretical} GB/s: "
-              f"{100 * eff:.0f}%")
+        print(f"  efficiency vs theoretical {args.bw_theoretical} GB/s: {100 * eff:.0f}%")
 
     print()
     print("  per-point residuals (family efficiency = measured/predicted;")
@@ -263,8 +303,10 @@ def main():
     print(f"  {'label':40} {'size':>5} {'meas':>5} {'pred':>5} {'ratio':>6}")
     for p in sorted(pts, key=lambda q: (q["model"], q["size"])):
         pred = law_worst(p["size"], a, b)
-        print(f"  {p['label']:40} {p['size']:5.2f} {p['worst']:5.1f} "
-              f"{pred:5.1f} {p['worst'] / pred:6.2f}")
+        print(
+            f"  {p['label']:40} {p['size']:5.2f} {p['worst']:5.1f} "
+            f"{pred:5.1f} {p['worst'] / pred:6.2f}"
+        )
 
     models = {}
     for p in pts:
@@ -282,100 +324,119 @@ def main():
 
     if args.reader is not None:
         if args.words_per_token is None:
-            sys.exit("--reader requires --words-per-token (addendum 44: the "
-                     "0.75 default is deleted as unanchored; pass the "
-                     "family's measured w/t_min - 0.49 qwen, 0.37 mistral, "
-                     "0.144 llama-3.1)")
+            sys.exit(
+                "--reader requires --words-per-token (addendum 44: the "
+                "0.75 default is deleted as unanchored; pass the "
+                "family's measured w/t_min - 0.49 qwen, 0.37 mistral, "
+                "0.144 llama-3.1)"
+            )
         wpm = READER_PROFILES[args.reader]
         budget_ms = (60000.0 * args.words_per_token / wpm) / args.reader_k
         floor = 1000.0 / budget_ms
     elif args.latency_budget is not None:
         floor = 1000.0 / args.latency_budget
     else:
-        sys.exit("pass --reader (canonical: --reader fast "
-                 "--words-per-token <family w/t_min>) or "
-                 "--latency-budget; the floor-20 default is deleted "
-                 "(addendum 50)")
+        sys.exit(
+            "pass --reader (canonical: --reader fast "
+            "--words-per-token <family w/t_min>) or "
+            "--latency-budget; the floor-20 default is deleted "
+            "(addendum 50)"
+        )
 
     print()
     print("=" * 72)
-    print(f"RIGHT-SIZING  (comfort boundary: floor {floor:g} t/s worst "
-          f"turn = {1000 / floor:.0f} ms per generated token)")
+    print(
+        f"RIGHT-SIZING  (comfort boundary: floor {floor:g} t/s worst "
+        f"turn = {1000 / floor:.0f} ms per generated token)"
+    )
     print("=" * 72)
     if args.reader is not None:
         wpm = READER_PROFILES[args.reader]
-        print(f"  reader anchor: {args.reader} = {wpm:.0f} wpm (Brysbaert "
-              f"2019), {'matched' if args.reader_k == 1 else f'{args.reader_k:g}x'} "
-              f"at {args.words_per_token:g} words/token")
-        print(f"  -> T_max = {1000 / floor:.0f} ms/token (the canonical "
-              "author-ruling form: match the reader)")
-    print("  the boundary in time language (no floor needed): a token "
-          "costs")
+        print(
+            f"  reader anchor: {args.reader} = {wpm:.0f} wpm (Brysbaert "
+            f"2019), {'matched' if args.reader_k == 1 else f'{args.reader_k:g}x'} "
+            f"at {args.words_per_token:g} words/token"
+        )
+        print(
+            f"  -> T_max = {1000 / floor:.0f} ms/token (the canonical "
+            "author-ruling form: match the reader)"
+        )
+    print("  the boundary in time language (no floor needed): a token costs")
     overhead_ms = 1000.0 / tinf if tinf != float("inf") else 0.0
-    print(f"    T_token = size/GW_eff + T_overhead = size x "
-          f"{1000.0 / bw:.2f} ms/GiB + {overhead_ms:.1f} ms")
-    print("    (GW_eff = effective GiB read per second; the whole model "
-          "is")
-    print("     read once per token - that is the cost of autoregressive "
-          "decode)")
+    print(
+        f"    T_token = size/GW_eff + T_overhead = size x "
+        f"{1000.0 / bw:.2f} ms/GiB + {overhead_ms:.1f} ms"
+    )
+    print("    (GW_eff = effective GiB read per second; the whole model is")
+    print("     read once per token - that is the cost of autoregressive decode)")
     if b <= 0:
         size_star = bw / floor
-        print("  overhead term vanished with this data; "
-              "pure-BW approximation:")
+        print("  overhead term vanished with this data; pure-BW approximation:")
     else:
         size_star = bw * (1000.0 / floor - overhead_ms) / 1000.0
-        print(f"    comfort budget {1000 / floor:.0f} ms/token = read "
-              f"budget {1000 / floor - overhead_ms:.1f} ms -> "
-              f"size* = GW_eff x read budget")
-    print(f"  size* = {size_star:.2f} GiB  (band {size_star * 0.9:.2f}"
-          f"-{size_star * 1.1:.2f}, family factors +-10%)")
-    print("  biggest model class that fits size* at plateau rungs "
-          "(approx bpw):")
+        print(
+            f"    comfort budget {1000 / floor:.0f} ms/token = read "
+            f"budget {1000 / floor - overhead_ms:.1f} ms -> "
+            f"size* = GW_eff x read budget"
+        )
+    print(
+        f"  size* = {size_star:.2f} GiB  (band {size_star * 0.9:.2f}"
+        f"-{size_star * 1.1:.2f}, family factors +-10%)"
+    )
+    print("  biggest model class that fits size* at plateau rungs (approx bpw):")
     for rung in ("Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M"):
         bpw = RUNG_BITS[rung]
-        print(f"    {rung:6} ({bpw:4.2f} bpw): "
-              f"~{size_star * 8.59 / bpw:4.1f}B params")
-    print("  rule: maximize parameters inside size*, never below Q4_K_M "
-          "(the quality cliff); the rung is a free variable on the plateau")
+        print(f"    {rung:6} ({bpw:4.2f} bpw): ~{size_star * 8.59 / bpw:4.1f}B params")
+    print(
+        "  rule: maximize parameters inside size*, never below Q4_K_M "
+        "(the quality cliff); the rung is a free variable on the plateau"
+    )
     if args.predict_size is not None:
         t = law_worst(args.predict_size, a, b)
-        print(f"  law prediction at {args.predict_size:.2f} GiB: "
-              f"worst {t:.1f} t/s = {1000.0 / t:.0f} ms/token "
-              f"({'meets' if t >= floor else 'exceeds'} the "
-              f"{1000.0 / floor:.0f} ms comfort budget)")
+        print(
+            f"  law prediction at {args.predict_size:.2f} GiB: "
+            f"worst {t:.1f} t/s = {1000.0 / t:.0f} ms/token "
+            f"({'meets' if t >= floor else 'exceeds'} the "
+            f"{1000.0 / floor:.0f} ms comfort budget)"
+        )
 
     if args.kv:
         print()
-        print("  KV DEPTH TAX (the law's third term, from architecture "
-              "constants)")
+        print("  KV DEPTH TAX (the law's third term, from architecture constants)")
         print("    the KV cache is read once per token, like the model:")
         print("    T_token(D) = (size + KV(D)) x ms/GiB + overhead")
-        print(f"    so context depth EATS boundary size: size*({args.kv_depth})"
-              " = size* - KV(D)")
+        print(f"    so context depth EATS boundary size: size*({args.kv_depth}) = size* - KV(D)")
         for spec in args.kv:
             parts = [p.strip() for p in spec.split(",")]
             if len(parts) < 4:
-                sys.exit(f"bad --kv spec (need label,layers,kv_heads,"
-                         f"head_dim): {spec}")
+                sys.exit(f"bad --kv spec (need label,layers,kv_heads,head_dim): {spec}")
             label = parts[0]
             layers, kvh, hd = int(parts[1]), int(parts[2]), int(parts[3])
             bpe = float(parts[4]) if len(parts) > 4 else 2.0
             kvg = kv_gib(layers, kvh, hd, args.kv_depth, bpe)
             adj = size_star - kvg
             tax_ms = kvg * 1000.0 / bw
-            print(f"      {label:24} {kvg:5.2f} GiB at depth "
-                  f"{args.kv_depth} (+{tax_ms:.1f} ms/token)"
-                  f"  -> size* at depth = {adj:.2f} GiB")
+            print(
+                f"      {label:24} {kvg:5.2f} GiB at depth "
+                f"{args.kv_depth} (+{tax_ms:.1f} ms/token)"
+                f"  -> size* at depth = {adj:.2f} GiB"
+            )
 
     if args.json:
         out = {
             "points": pts,
-            "fit": {"bw_eff_gib_s": 1.0 / a, "t_inf": (None if b <= 0
-                    else 1.0 / b), "r2": r2, "n": n},
-            "size_star": {"floor": floor,
-                          "latency_budget_ms": 1000.0 / floor,
-                          "gib": size_star,
-                          "band": [size_star * 0.9, size_star * 1.1]},
+            "fit": {
+                "bw_eff_gib_s": 1.0 / a,
+                "t_inf": (None if b <= 0 else 1.0 / b),
+                "r2": r2,
+                "n": n,
+            },
+            "size_star": {
+                "floor": floor,
+                "latency_budget_ms": 1000.0 / floor,
+                "gib": size_star,
+                "band": [size_star * 0.9, size_star * 1.1],
+            },
         }
         with open(args.json, "w") as f:
             json.dump(out, f, indent=1)

@@ -13,28 +13,28 @@ import full_benchmark as fb
 
 @pytest.fixture
 def state():
-    return {"families": {
-        # PASS with a file -> ARC
-        "A": {"runs": {"Q8_0": {"file": "a.gguf",
-                                "verdict": "PASS (confident)"}},
-              "selected": "Q8_0"},
-        # FAIL with a file -> ARC (the standing ruling, made structural)
-        "B": {"runs": {"Q8_0": {"file": "b.gguf",
-                                "verdict": "FAIL — reader-wall"}}},
-        # infeasible -> no file, no bench happened -> skip
-        "C": {"runs": {"Q8_0": {
-            "verdict": "FAIL (infeasible: exceeds system RAM)"}}},
-        # benched? no verdict yet -> skip
-        "D": {"runs": {"Q8_0": {"file": None, "verdict": None}}},
-        # file but no verdict (phase 4 not reached) -> skip
-        "E": {"runs": {"Q8_0": {"file": "e.gguf"}}},
-    }}
+    return {
+        "families": {
+            # PASS with a file -> ARC
+            "A": {
+                "runs": {"Q8_0": {"file": "a.gguf", "verdict": "PASS (confident)"}},
+                "selected": "Q8_0",
+            },
+            # FAIL with a file -> ARC (the standing ruling, made structural)
+            "B": {"runs": {"Q8_0": {"file": "b.gguf", "verdict": "FAIL — reader-wall"}}},
+            # infeasible -> no file, no bench happened -> skip
+            "C": {"runs": {"Q8_0": {"verdict": "FAIL (infeasible: exceeds system RAM)"}}},
+            # benched? no verdict yet -> skip
+            "D": {"runs": {"Q8_0": {"file": None, "verdict": None}}},
+            # file but no verdict (phase 4 not reached) -> skip
+            "E": {"runs": {"Q8_0": {"file": "e.gguf"}}},
+        }
+    }
 
 
 def test_pass_and_fail_both_arc(state):
     jobs = fb.collect_arc_jobs(state)
-    assert [(f, r) for f, r, _ in jobs] == \
-        [("A", "Q8_0"), ("B", "Q8_0")]
+    assert [(f, r) for f, r, _ in jobs] == [("A", "Q8_0"), ("B", "Q8_0")]
 
 
 def test_infeasible_and_unbenched_skipped(state):
