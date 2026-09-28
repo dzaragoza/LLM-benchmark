@@ -103,6 +103,16 @@ README's "Roster selection" section is a summary that points here.
     the report, then the SAME command without the flag. The pre-flight
     is the risk mitigation: a bad repo, a missing converter or an
     infeasible size is caught in minutes, not mid-sweep.
+13. **The way of working: git pull first; commands given verbatim
+    (addendum 82).** Every session on the author's machine starts with
+    `git pull` (the sandbox and the T14s both write to main — a stale
+    checkout silently runs old tooling or old specs; the addendum-81
+    .bin branch is exactly the kind of change a stale checkout would
+    miss). And every command handed to the author is given DIRECT and
+    COMPLETE — full arguments, copy-paste runnable, never "issue the
+    same command with X changed": hand-editing arguments is a recipe
+    for non-reproducibility. The notebook's registered sequences carry
+    the full literal text of every command.
 
 ---
 
