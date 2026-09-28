@@ -18,8 +18,11 @@ README's "Roster selection" section is a summary that points here.
    RETIRED prospectively).** Rosters are built by counting usable data
    points per lineage: models at or below the REGISTERED PARAMETER
    CEILING (addendum 78 — NOT an ad-hoc number: the largest size
-   predicted to pass, size_max = BW_eff × (w/t/5.0 − 1/t_inf) = 4.92
-   GiB ≈ 4.6B params at Q8_0 under the qwen-class anchor; the
+   predicted to pass, size_max = BW_eff × (w/t/5.0 − 1/t_inf) = 76.5 ×
+   (0.412/5.0 − 1/74) = 5.27 GiB ≈ 4.92B params at Q8_0 (÷1.07 GiB/B)
+   under the qwen-class anchor (addendum 87 relabel: the old text read
+   "4.92 GiB ≈ 4.6B" — 4.92 is the PARAMS number; the size ceiling is
+   5.27 GiB, PROTOCOL row 103's own figure); the
    addendum-76 "≤4B" window was this constant rounded down), non-thinking
    or hybrid, instruct preferred (base acceptable), with a paper in the
    lineage. **The lineage is selected by the count, then EVERY member

@@ -43,8 +43,8 @@ hardware of every class above that?*
 parameter ceiling is NOT an ad-hoc number — it is **the largest size
 predicted to pass**, derived from the registered constants: the law
 inverted at the reader line gives size_max = BW_eff × (w/t/5.0 −
-1/t_inf) = 76.5 × (0.412/5.0 − 1/74) = **4.92 GiB ≈ 4.6B params at
-Q8_0 (×1.07 GiB/B)** under the qwen-class anchor. Every lineage
+1/t_inf) = 76.5 × (0.412/5.0 − 1/74) = **5.27 GiB ≈ 4.92B params at
+Q8_0 (×1.07 GiB/B)** under the qwen-class anchor (addendum 88 relabel: the old text read 4.92 GiB - 4.92 was the params number mislabeled as a size). Every lineage
 member at or below that ceiling enters the roster (the whole lineage
 matching the rules — no picking and choosing); everything above it is
 a line-endpoint FAIL row. The v3.1 T14s results (addendum 74) are the
