@@ -1,0 +1,231 @@
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU picker &mdash; which Q8_0 model serves your card?</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; margin: 0 auto; max-width: 900px;
+         padding: 1.5rem 1rem 4rem; line-height: 1.55; }
+  h1 { font-size: 1.45rem; margin-bottom: 0.2rem; }
+  .sub { color: #666; font-size: 0.95rem; margin-bottom: 1.4rem; font-style: italic; }
+  h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+  .panel { border: 1px solid #bbb; border-radius: 8px; padding: 1rem 1.2rem; margin: 0.6rem 0 1.2rem; background: rgba(127,127,127,0.06); }
+  label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.8rem; }
+  input[type=number] { font: inherit; padding: 0.35rem 0.5rem; width: 12rem; max-width: 100%; }
+  .readout { font-family: 'Courier New', monospace; margin-top: 0.9rem; font-size: 0.95rem; }
+  .verdict { border: 2px solid #2a7; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
+  .verdict.none { border-color: #b33; }
+  .verdict h3 { margin: 0 0 0.3rem; font-size: 1.15rem; }
+  .verdict .arc { font-size: 2rem; font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0 1rem; font-size: 0.85rem; font-family: Verdana, Arial, sans-serif; }
+  th, td { border: 1px solid #bbb; padding: 0.3rem 0.5rem; text-align: left; }
+  th { background: rgba(127,127,127,0.12); }
+  td.num, th.num { text-align: right; }
+  .ok { color: #1a7; font-weight: bold; }
+  .bad { color: #b33; font-weight: bold; }
+  .est { color: #888; }
+  .foot { font-size: 0.8rem; color: #555; margin-top: 2rem; border-top: 1px solid #bbb; padding-top: 0.8rem; }
+  .footnote { font-size: 0.75rem; color: #777; }
+  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
+            background: rgba(127,127,127,0.12); }
+  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
+  .mitem:hover { background: rgba(127,127,127,0.15); }
+  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
+  #gpuList { background: rgba(127,127,127,0.04); }
+</style>
+</head>
+<body>
+
+<h1>GPU picker</h1>
+<div class="sub">The recommended Q8_0 model for your GPU, by measured ARC, among the models the
+study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172.</div>
+
+<div class="panel">
+  <label for="gfilter">GPU (vendor &middot; VRAM &middot; memory bandwidth)</label>
+  <input type="search" id="gfilter" placeholder="type to filter, e.g. 3090 or 24" oninput="renderList()" style="width:20rem;max-width:100%">
+  <div class="footnote" style="margin-top:0.3rem">Cards whose bandwidth cannot run any measured model (below
+    <span id="minbw"></span>&nbsp;GB/s) are not listed. VRAM fit uses the <strong>whole measured stack cost</strong>
+    (weights + KV + buffers + runtime), conservatively taken from the CPU-side instrument &mdash; the GPU stack
+    is expected to need less, so a fit here is a lower bound on what the card can hold.</div>
+  <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
+  <div class="readout" id="bwout"></div>
+  <div class="readout" id="classout"></div>
+</div>
+
+<div id="result"></div>
+<div id="tables"></div>
+
+<div class="foot">
+  <p><strong>How the recommendation is computed.</strong> Candidates are the seven qwen lineage
+  members of the overnight sweep, each measured with the <strong>v3.1 instrument</strong> (stall-rate
+  verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates 0.0&ndash;2.6%, all PASS,
+  50 conversations / 267 turns each) &mdash; the same pool as the
+  <a href="lineage-picker.html">system-RAM lineage picker</a>. A candidate is eligible iff
+  (a) its <em>measured whole-stack cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
+  instrument) fits the card's VRAM &mdash; conservative, since the CPU-side cost is an upper bound on
+  the GPU-side one &mdash; and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader
+  line. Bandwidth scaling is the pre-registered linear form:
+  w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4.</p>
+  <p><strong>Two extrapolations, both flagged.</strong> The cost criterion carries the CPU measurement
+  onto the GPU unchanged (conservative by design; the first GPU-side calibration run should replace
+  it), and the linear bandwidth law is validated only on system RAM &mdash; on GPU, compute and kernel
+  overheads can make the true w/s <em>higher</em> than predicted for small models (the law stays
+  conservative) or the decode path can behave differently. Treat GPU recommendations as provisional
+  until the study re-benches at least one candidate on a GPU.</p>
+  <p class="footnote">VRAM figures are nominal card capacity; a small fraction is consumed by the
+  display/OS. Bandwidth figures are the card's theoretical peak (memory type &times; bus). Quant is out
+  of scope for this study: this tool answers the Q8_0 question only.</p>
+</div>
+
+<script>
+"use strict";
+// Measured records (Q8_0, v3.1-passing) - identical to lineage-picker.html. wps = words/s
+// at the corpus p05, measured on the T14s (102.4 GB/s class). cost = whole-stack machine
+// cost GiB (MemAvailable delta), measured - used here as a conservative VRAM requirement.
+var CANDIDATES = [
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99, wps: 6.32,  arc: 90.4, family: "Qwen3.5" },
+  { name: "Qwen3-4B",             size: 3.99, cost: 12.30, wps: 7.10,  arc: 85.0, family: "Qwen3" },
+  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  wps: 9.72,  arc: 76.1, family: "Qwen2.5" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  wps: 14.86, arc: 73.5, family: "Qwen2.5" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  wps: 10.66, arc: 68.0, family: "Qwen3" },
+  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  wps: 25.86, arc: 61.3, family: "Qwen3.5" },
+  { name: "Qwen2.5-0.5B-Instruct",size: 0.63, cost: 1.06,  wps: 25.03, arc: 45.8, family: "Qwen2.5" }
+];
+
+var REF_BW = 102.4;
+var READER = 5.0;
+
+// Common cards on the 2024/2025 market, used and new, that a practitioner can actually buy.
+// vram in GiB (nominal), bw in GB/s (theoretical peak). Grouped by vendor, sorted by
+// bandwidth within the group. Nothing exotic (no H100/B200 class): this is the shopper list.
+var GPUS = [
+  { name: "RTX 5090",            vram: 32,  bw: 1792.0, vendor: "NVIDIA" },
+  { name: "RTX 5080",            vram: 16,  bw: 960.0,  vendor: "NVIDIA" },
+  { name: "RTX 5070 Ti",         vram: 16,  bw: 896.0,  vendor: "NVIDIA" },
+  { name: "RTX 4090",            vram: 24,  bw: 1008.1, vendor: "NVIDIA" },
+  { name: "RTX 4080 Super",      vram: 16,  bw: 736.3,  vendor: "NVIDIA" },
+  { name: "RTX 4070 Ti Super",   vram: 16,  bw: 672.2,  vendor: "NVIDIA" },
+  { name: "RTX 4070",            vram: 12,  bw: 504.2,  vendor: "NVIDIA" },
+  { name: "RTX 4060 Ti 16GB",    vram: 16,  bw: 288.1,  vendor: "NVIDIA" },
+  { name: "RTX 3080 Ti",         vram: 12,  bw: 912.4,  vendor: "NVIDIA" },
+  { name: "RTX 3080",            vram: 10,  bw: 760.3,  vendor: "NVIDIA" },
+  { name: "RTX 3090",            vram: 24,  bw: 936.2,  vendor: "NVIDIA" },
+  { name: "RTX 3070",            vram: 8,   bw: 614.4,  vendor: "NVIDIA" },
+  { name: "RTX 3060 12GB",       vram: 12,  bw: 360.0,  vendor: "NVIDIA" },
+  { name: "RTX 2080 Ti (22GB mod)", vram: 22, bw: 616.0, vendor: "NVIDIA" },
+  { name: "RTX 2080 Super",      vram: 8,   bw: 496.1,  vendor: "NVIDIA" },
+  { name: "GTX 1080 Ti",         vram: 11,  bw: 484.3,  vendor: "NVIDIA" },
+  { name: "Titan V",             vram: 12,  bw: 652.8,  vendor: "NVIDIA" },
+  { name: "V100 32GB",           vram: 32,  bw: 900.0,  vendor: "NVIDIA" },
+  { name: "Radeon VII",          vram: 16,  bw: 1024.0, vendor: "AMD" },
+  { name: "RX 7900 XTX",        vram: 24,  bw: 960.0,  vendor: "AMD" },
+  { name: "RX 7900 XT",         vram: 20,  bw: 800.0,  vendor: "AMD" },
+  { name: "RX 7900 GRE",        vram: 16,  bw: 576.0,  vendor: "AMD" },
+  { name: "RX 7800 XT",         vram: 16,  bw: 624.1,  vendor: "AMD" },
+  { name: "RX 7700 XT",         vram: 12,  bw: 432.0,  vendor: "AMD" },
+  { name: "RX 7600 XT",         vram: 16,  bw: 288.0,  vendor: "AMD" },
+  { name: "RX 6800 XT",         vram: 16,  bw: 512.0,  vendor: "AMD" },
+  { name: "RX 6700 XT",         vram: 12,  bw: 384.0,  vendor: "AMD" },
+  { name: "RX 6600",            vram: 8,   bw: 224.0,  vendor: "AMD" },
+  { name: "RX 5700 XT",         vram: 8,   bw: 448.0,  vendor: "AMD" },
+  { name: "Intel Arc A770 16GB", vram: 16,  bw: 560.0,  vendor: "Intel" },
+  { name: "Intel Arc A750",     vram: 8,   bw: 512.0,  vendor: "Intel" }
+];
+
+// A card is listed only if it can honestly run SOME measured model: the candidate with the
+// highest measured w/s must still clear the reader line at the card's bandwidth.
+// min BW = READER x REF_BW / max(wps). Same derivation as the system-RAM picker.
+var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.wps); }, 0);
+MIN_RUN_BW = READER * REF_BW / MIN_RUN_BW;
+
+var LISTED = GPUS.filter(function (g) { return g.bw >= MIN_RUN_BW; });
+
+function $(id) { return document.getElementById(id); }
+
+var selKey = LISTED.length ? LISTED[0].name : "";
+
+function renderList() {
+  var q = ($("gfilter").value || "").toLowerCase().trim();
+  var host = $("gpuList");
+  var html = "";
+  var lastGroup = null;
+  LISTED.forEach(function (g) {
+    var label = g.name + " \u2014 " + g.vram + " GiB \u2014 " + g.bw.toFixed(0) + " GB/s";
+    if (q && label.toLowerCase().indexOf(q) < 0) return;
+    if (g.vendor !== lastGroup) {
+      html += '<div class="mgroup">' + g.vendor + "</div>";
+      lastGroup = g.vendor;
+    }
+    var cls = "mitem" + (g.name === selKey ? " msel" : "");
+    html += '<div class="' + cls + '" data-key="' + g.name +
+      '" onclick="chooseGpu(this.dataset.key)">' + label + "</div>";
+  });
+  if (!html) html = '<div class="mitem">no card matches the filter</div>';
+  host.innerHTML = html;
+}
+
+function chooseGpu(name) {
+  selKey = name;
+  renderList();
+  pick();
+}
+
+function pick() {
+  var g = LISTED.filter(function (x) { return x.name === selKey; })[0];
+  if (!g) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
+  var bw = g.bw;
+  $("bwout").textContent = g.name + ": " + bw.toFixed(1) + " GB/s memory bandwidth, " + g.vram + " GiB VRAM";
+  var cls = bw >= 204.8 ? "\u2265 204.8 GB/s class (2x the study's top class)" :
+            bw >= 102.4 ? "102.4 GB/s class (the study's reference class)" :
+            bw >= 51.2 ? "51.2 GB/s class" :
+            bw >= 25.6 ? "25.6 GB/s class" : "below 25.6 GB/s class";
+  $("classout").textContent = cls + " \u2014 predicted w/s = measured@102.4 \u00d7 " + (bw / 102.4).toFixed(2);
+
+  var rows = CANDIDATES.map(function (m) {
+    var wpred = m.wps * bw / REF_BW;
+    return { m: m, w: wpred, fits: m.cost <= g.vram, passes: wpred >= READER };
+  });
+
+  var host = $("result");
+  var eligible = rows.filter(function (r) { return r.fits && r.passes; });
+  if (eligible.length) {
+    var best = eligible.reduce(function (a, r) { return r.m.arc > a.m.arc ? r : a; });
+    host.innerHTML =
+      '<div class="verdict"><h3>Recommended: ' + best.m.name + ' Q8_0</h3>' +
+      '<div><span class="arc">' + best.m.arc.toFixed(1) + "</span> ARC-Challenge (n=1172)</div>" +
+      "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 whole-stack cost " + best.m.cost.toFixed(2) +
+      " GiB of your " + g.vram + " GiB VRAM (conservative: CPU-side measured cost)</div>" +
+      "<div>predicted " + best.w.toFixed(1) + " w/s (measured " + best.m.wps + " @102.4, linear scaling)</div></div>";
+  } else {
+    var fitting = rows.filter(function (r) { return r.fits; });
+    var cheapest = CANDIDATES.reduce(function (a, c) { return c.cost < a.cost ? c : a; });
+    var reason = fitting.length
+      ? "the model(s) that fit do not clear the 5.0 reader line at this bandwidth"
+      : "no measured model's whole-stack cost fits " + g.vram + " GiB (smallest needs " +
+        cheapest.cost.toFixed(2) + " GiB)";
+    host.innerHTML = '<div class="verdict none"><h3>No measured model qualifies</h3><div>' +
+      reason + ".</div></div>";
+  }
+
+  var t = '<table><tr><th>model</th><th class="num">file GiB</th>' +
+    '<th class="num">stack cost GiB</th><th class="num">fits ' + g.vram + ' GiB</th>' +
+    '<th class="num">w/s @' + bw.toFixed(0) + "</th><th>clears reader</th><th class=\"num\">ARC</th></tr>";
+  rows.forEach(function (r) {
+    t += "<tr><td>" + r.m.name + '</td><td class="num">' + r.m.size.toFixed(2) +
+      '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
+      (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
+      '</td><td class="num">' + r.w.toFixed(1) + "</td><td>" +
+      (r.passes ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
+      '</td><td class="num">' + r.m.arc.toFixed(1) + "</td></tr>";
+  });
+  $("tables").innerHTML = t + "</table>";
+}
+
+$("minbw").textContent = MIN_RUN_BW.toFixed(1);
+renderList();
+pick();
+</script>
+</body>
+</html>
