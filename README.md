@@ -5,6 +5,25 @@ measurement study of small instruct LLMs running from system RAM on
 integrated GPUs, with the llama.cpp Vulkan backend.
 
 **📄 Report (study #1):** [DOI: 10.5281/zenodo.22855666](https://doi.org/10.5281/zenodo.22855666)
+
+---
+
+## 🌐 The practitioner pages 🖼️ the study's main artifact
+
+The study's deliverable is not the paper - it is the two static pages a practitioner
+opens to answer "which Q8_0 model should I run on my machine?". Both run offline,
+no build step, no JavaScript dependencies:
+
+- **[lineage-picker.html](lineage-picker.html)** 🖥️ serving from **system RAM**:
+  pick your DDR generation, JEDEC speed and channel count (DDR to DDR5, single to
+  octa), enter your RAM, get the highest-ARC measured model that fits and clears the
+  300-wpm reader line at your bandwidth.
+- **[gpu-picker.html](gpu-picker.html)** 🖨️ serving from a **GPU**: enter your
+  card's VRAM, get the same recommendation (bandwidth is never the constraint on
+  current cards - the page shows the derivation).
+
+Every recommendation is backed by a v3.1-protocol measurement (reader-wall stall rate,
+ARC-Challenge) - the pages only recommend models the study actually ran.
 **🆔 ORCID:** [0009-0003-8529-2638](https://orcid.org/0009-0003-8529-2638)
 
 ---
