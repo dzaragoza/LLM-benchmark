@@ -396,7 +396,7 @@ def process_family(
 # =========================================================== main
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(
         description="end-to-end benchmark: quant selection, strict full "
         "ARC, exact-McNemar ranking - one final output"
@@ -474,6 +474,11 @@ def main():
         "kwargs enable_thinking=false; first-turn dump "
         "check confirms no reasoning appears)",
     )
+    return ap
+
+
+def main():
+    ap = build_parser()
     args = ap.parse_args()
     global DRY_RUN_ACTIVE
     DRY_RUN_ACTIVE = args.dry_run
@@ -482,31 +487,58 @@ def main():
         ap.error("--thinking and --no-thinking are mutually exclusive")
 
     if not args.dry_run:
-        for path, msg in [
-            (
-                args.corpus,
-                f"corpus not found at {args.corpus} - build it: "
-                "python3 speed_gate.py --make-corpus",
-            ),
-            (
-                QUANTIZE_BIN,
-                f"llama-quantize not found at {QUANTIZE_BIN} - "
-                "place the b10964 build in the repo root",
-            ),
-            (
-                "./llama.cpp/convert_hf_to_gguf.py",
-                "converter not found - the llama.cpp checkout must be in the repo root",
-            ),
-            (SERVER_BIN, "llama-server not found - place the b10964 build in the repo root"),
-        ]:
-            if not os.path.isfile(path):
-                sys.exit(msg)
+        check_tooling(args)
 
     state = load_state(args.state_file)
 
     if not args.families:
         ap.error("no family specs given")
 
+    failed_families = sweep_families(args, state)
+
+    if args.dry_run:
+        preflight_report(args, state, failed_families)
+        return
+
+    roster, selections, arc_jobs = prepare_phase56(args, state)
+    report_roster_notes(args, state, roster, failed_families)
+    run_arc_phase(args, state, arc_jobs)
+    run_ranking(args, state, selections)
+    write_results(args, state)
+    print_wt_table(state)
+
+    # ---- addendum 78, item 5: the git tail - commit and push every
+    # artifact the study needs (state, results, per-turn dumps, mem
+    # sidecars, ARC CSVs), force-added past the .gitignore.
+    if args.git_commit and not args.dry_run:
+        git_tail(args)
+    stamp("run complete")
+
+
+def check_tooling(args):
+    """Verify the run's tooling (real runs only; addendum 79)."""
+
+    for path, msg in [
+        (
+            args.corpus,
+            f"corpus not found at {args.corpus} - build it: python3 speed_gate.py --make-corpus",
+        ),
+        (
+            QUANTIZE_BIN,
+            f"llama-quantize not found at {QUANTIZE_BIN} - place the b10964 build in the repo root",
+        ),
+        (
+            "./llama.cpp/convert_hf_to_gguf.py",
+            "converter not found - the llama.cpp checkout must be in the repo root",
+        ),
+        (SERVER_BIN, "llama-server not found - place the b10964 build in the repo root"),
+    ]:
+        if not os.path.isfile(path):
+            sys.exit(msg)
+
+
+def sweep_families(args, state):
+    """Phase A: bench every family (per-family isolation, addendum 78)."""
     # Addendum 78, item 4: per-family isolation IN THE TOOL - a family
     # that dies (conversion OOM, unsupported architecture, a bad repo)
     # is recorded and the sweep CONTINUES; the author's "continue even
@@ -532,7 +564,11 @@ def main():
         except Exception as e:  # isolation is the point
             failed_families.append((spec, repr(e)))
             stamp(f"FAMILY FAILED: {spec} - {e!r} (recorded; the sweep continues - addendum 78)")
+    return failed_families
 
+
+def preflight_report(args, state, failed_families):
+    """The --dry-run read-only report (addendum 79) + estimate (83)."""
     if args.dry_run:
         print()
         print("=" * 60)
@@ -581,6 +617,9 @@ def main():
         print("  --dry-run to start the real run.")
         return
 
+
+def prepare_phase56(args, state):
+    """Roster, selections, and the ARC job list (addendum 86)."""
     # ---- phases 5-6: full ARC on selected models, then the ranking
     roster = (
         [f.strip() for f in args.roster.split(",")]
@@ -594,6 +633,11 @@ def main():
         if fst.get("selected") and fst["runs"][fst["selected"]].get("file"):
             selections[fam] = fst["runs"][fst["selected"]]
     arc_jobs = collect_arc_jobs(state, roster)
+    return roster, selections, arc_jobs
+
+
+def report_roster_notes(args, state, roster, failed_families):
+    """The roster missing-note and the failed-families note."""
     if roster is not None:
         missing = [
             f
@@ -610,6 +654,10 @@ def main():
         stamp("families failed this run (isolated; state preserved):")
         for spec, err in failed_families:
             print(f"  {spec}: {err}")
+
+
+def run_arc_phase(args, state, arc_jobs):
+    """Phase 5: full ARC on every benched model (addendum 86)."""
     if arc_jobs:
         print()
         print("=" * 60)
@@ -648,6 +696,9 @@ def main():
     else:
         print("\nno benched family rungs yet - skipping ARC phase")
 
+
+def run_ranking(args, state, selections):
+    """Phase 6: exact-McNemar ranking over the SELECTED models."""
     # ---- phase 6: the McNemar ranking over the SELECTED models
     rank_labels = [f"{fam} {state['families'][fam]['selected']}" for fam in selections]
     if rank_labels:
@@ -669,6 +720,9 @@ def main():
     else:
         print("\nno family has a selection yet - skipping the ranking")
 
+
+def write_results(args, state):
+    """The results file: everything for later analysis."""
     # ---- results file: everything for later analysis
     results = []
     for fam, fst in state["families"].items():
@@ -689,6 +743,9 @@ def main():
     print(f"\nresume state -> {args.state_file}")
     print(f"all data     -> {args.results_file}")
 
+
+def print_wt_table(state):
+    """The per-model w/t calibration table (addendum 78, item 4)."""
     # ---- addendum 78, item 4: the per-model w/t calibration inline
     # (the addendum-74 lesson: grading waited on a manual extraction).
     # Single-sourced from speed_gate.analyze's own fields, already in
@@ -707,13 +764,6 @@ def main():
                 f"p05={run['words_per_token_p05']:.3f} "
                 f"mean={run.get('words_per_token') or 0:.3f}"
             )
-
-    # ---- addendum 78, item 5: the git tail - commit and push every
-    # artifact the study needs (state, results, per-turn dumps, mem
-    # sidecars, ARC CSVs), force-added past the .gitignore.
-    if args.git_commit and not args.dry_run:
-        git_tail(args)
-    stamp("run complete")
 
 
 # =========================================================== git tail
