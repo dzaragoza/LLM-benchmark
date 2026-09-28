@@ -46,8 +46,9 @@ Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineag
 <div class="panel">
   <label for="gfilter">GPU VRAM (GiB) &mdash; the common card capacities</label>
   <input type="search" id="gfilter" placeholder="type to filter, e.g. 16" oninput="renderList()" style="width:20rem;max-width:100%">
-  <div class="footnote" style="margin-top:0.3rem">Only capacities that fit at least one measured model are listed
-    (the smallest needs <span id="mincost"></span>&nbsp;GiB of whole-stack cost).</div>
+  <div class="footnote" style="margin-top:0.3rem">Distinct GPU VRAM capacities of the last ~30 years of cards;
+    only tiers that fit at least one measured model are listed (the smallest needs
+    <span id="mincost"></span>&nbsp;GiB of whole-stack cost).</div>
   <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="vram">Your GPU's VRAM (GiB)</label>
   <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
@@ -106,24 +107,18 @@ var CANDIDATES = [
 var REF_BW = 102.4;
 var READER = 5.0;
 
-// Common cards on the 2024/2025 market, used and new. The picker lists the DISTINCT VRAM
-// capacities of those cards (the spec that decides the recommendation - bandwidth never
-// does, see below), keeping only tiers that fit at least one measured model.
-var CARDS = [
-  { vram: 32 }, { vram: 16 }, { vram: 16 }, { vram: 24 }, { vram: 16 }, { vram: 16 },
-  { vram: 12 }, { vram: 16 }, { vram: 12 }, { vram: 10 }, { vram: 24 }, { vram: 8 },
-  { vram: 12 }, { vram: 22 }, { vram: 8 }, { vram: 11 }, { vram: 12 }, { vram: 32 },
-  { vram: 16 }, { vram: 24 }, { vram: 20 }, { vram: 16 }, { vram: 16 }, { vram: 12 },
-  { vram: 16 }, { vram: 16 }, { vram: 12 }, { vram: 8 }, { vram: 8 }, { vram: 16 }, { vram: 8 }
+// Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years
+// (GTX 480 1.5GB through the RTX 5090/A100 era). The spec that decides the
+// recommendation is capacity only (bandwidth never does, see below), so the picker
+// lists the capacities, keeping only tiers that fit at least one measured model
+// (the smallest whole-stack cost is ~1.06 GiB, so 1.5 GiB makes the cut).
+var VRAM_TIERS = [
+  1.5, 2, 3, 4, 6, 8, 10, 11, 12, 16, 20, 22, 24, 32, 48, 80
 ];
 var MIN_COST = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.cost); }, Infinity);
 
-// distinct VRAM tiers that fit at least one measured model, ascending
-var TIERS = [];
-CARDS.forEach(function (c) {
-  if (TIERS.indexOf(c.vram) < 0 && c.vram >= MIN_COST) TIERS.push(c.vram);
-});
-TIERS.sort(function (a, b) { return a - b; });
+// keep only tiers that fit at least one measured model
+var TIERS = VRAM_TIERS.filter(function (v) { return v >= MIN_COST; });
 
 var selKey = TIERS.length ? String(TIERS[TIERS.length - 1]) : "";
 
