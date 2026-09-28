@@ -3029,3 +3029,36 @@ It grades the three pending rows: the Delta exit plan fires (4B p05 vs the 9B's 
 **The lineage read (visible in the table):** the passable window per class is ONE family-grid cell wide — 102.4 at Q8: the 3B/4B cells; 51.2 at Q8: the 1.5–1.7B cells (study #1's champion class, predicted by the machinery a generation later); ≥ 7B fails everywhere, ≤ 0.8B is sub-band everywhere. The sub-band cascade: each model serves exactly the smallest class on which it is in-band — the two class rosters are disjoint by construction (addendum 65, now with numbers).
 
 **Status:** the 102.4 column carries measured verdicts where runs exist (4B: FAIL at s=2 measured; 3B: predicted PASS, never reader-wall-benched at n=50); the 51.2 column is prediction throughout, pending the replication's law refit (phase A — the halving 0.50 / ceiling ratio 2.25 / disjointness predictions of addendum 69 are its pre-registration). The next sections (mistral, phi, llama — the other three calibrated classes) follow the same template when the author asks.
+
+### Session 30, addendum 71 — the lineage sweep pre-registered: every predicted-pass qwen cell benched overnight (addendum 70's table rewritten to the wps-band columns; the validation run of the prediction machinery itself) — either a confirmation of the predictor or the data to improve it
+
+**The author's ruling (this session):** `lineages.md`'s columns become the bands themselves — [10–20) wps (the 51.2 class's members, sub-band on the T14s), [5–10] wps (the 102.4 class's), [20–40) wps (the 25.6 class's) — one T14s-predicted number per member, sorted by parameters descending. Every predicted-pass cell is then validated on the T14s overnight, full benchmark plus ARC always, continue-even-in-failure. Either the predictor confirms or the study gains the data to improve it — both are the author's stated win conditions. The file rewrite is done (columns [10–20) / [5–10] / [20–40), the sentinel row kept honest, the band↔class mapping stated with its one unvalidated constant).
+
+**The roster (7 families, all predicted ≥ 5 w/s at Q8_0 on the T14s; every repo verified to exist with safetensors):**
+
+| model | size (GiB) | predicted t/s | predicted w/s | band | note |
+|---|---|---|---|---|---|
+| Qwen2.5-0.5B-Instruct | 0.54 (P) | 48.8 | 20.09 | [20,40) | the only 25.6-class member |
+| Qwen3.5-0.8B | 0.86 (P) | 40.5 | 16.68 | [10,20) | sub-band on T14s |
+| Qwen2.5-1.5B-Instruct | 1.60 (P) | 29.0 | 11.94 | [10,20) | study #1's champion |
+| Qwen3-1.7B | 1.82 (P) | 26.8 | 11.05 | [10,20) | |
+| Qwen2.5-3B-Instruct | 3.62 (M) | 16.4 | 6.77 | [5,10] | study #2's champion; never reader-wall-benched at n=50 |
+| Qwen3-4B | 4.28 (P) | 14.4 | 5.93 | [5,10] | the generation sibling of the failed sentinel |
+| Qwen3.5-4B | 4.29 (M) | 14.4 | 5.92 | [5,10] | the sentinel itself — re-run = the determinism replicate (verdict-stable, not magnitude-stable; addendum 69 predicts FAIL again) |
+
+Everything ≥ 7.62B (Q8 ≥ 8.2 GiB) predicts ≤ 3.4 w/s — trusted FAIL both classes, not benched (the trust band's exclusion rule; the 9B's value lives at Q5_K_M). Nothing between 4B and 7.62B ships in the line.
+
+**The instrument's 2σ (per model, pre-registered):** σ_w/s = 0.078 w/t × predicted t/s — 0.50 [0.5B] / 0.41 [0.8B] / 0.29 [1.5B] / 0.27 [1.7B] / 0.20 [3B] / 0.18 [4B] / 0.18 [3.5-4B]. The w/s grade: HIT iff measured w/s p05 (= t/s mean × w/t p05, both from the run) lands in [pred − 2σ, pred + 2σ].
+
+**Pre-registered predictions, per cell (the full grading set):**
+
+1. **Band grade (the author's headline test):** measured w/s p05 in the predicted column. Sharp-edge flags pre-registered: the 4B cells sit at the [5,10] entrance (5.92/5.93 vs a 5.9 trust edge — coin-flip on the strict wall), and the 1.5B (11.94) and 0.5B (20.09) sit within 1σ of a column edge (12.0 / 20.0) — a band flip on those two is instrument noise on a right call, not a predictor failure (pre-registered as such).
+2. **Wall verdict:** all [10,20)/[20,40) cells PASS (their corpus-min turns sit ≥ 5.07 w/s by prediction, w/t min 0.189 corpus-owned); both [5,10] 4B cells FAIL (addendum 69's verdict-stability finding); the 3B is the open cell — predicted trusted PASS (6.77, margin +0.87 above 5.9) but never measured at n=50; its event count is the sweep's cleanest new datum.
+3. **Event counts ([5,10] cells, the failure-rate rows):** 3B 0–1 of 267; Qwen3-4B 3–9; Qwen3.5-4B replicate 6 (verdict-stable) with wait magnitudes ±30% (magnitude-unstable).
+4. **Δ / cross-generation transfer (the addendum-69 finding made structural):** every run's w/t p05 vs the 0.412 anchor, graded at Δ = 0.05: HIT iff |p05 − 0.412| ≤ 0.05. The 2.5 / 3 / 3.5 generations' membership in the qwen tokenizer class is itself under test — a generation flip outside 0.05 falsifies the class assumption and re-derives the band.
+5. **The law:** worst t/s per model vs law(size) ±15% (the registered cross-family error band) — the sweep doubles as 7-point law validation across the family grid.
+6. **ARC always (author ruling):** full 1172-question ARC-Challenge on every benched model, pass or fail — phases 5–6 for selections, `arc_eval.py --models` for unselected (failed) families, parsed from the state file.
+
+**Run design (the author's machine, overnight):** `full_benchmark.py --ladder Q8_0 --corpus ./live-corpus-cal50.json --no-thinking --force` on the 7 specs (fresh state file — the 4B re-benches as the replicate), then the ARC pass on unselected families from the state file. `--force` is REQUIRED: `speed_gate.bench` reuses any dump newer than the model file, and the 4B's truncated addendum-68 `live-dump.nothink.json` (n=89) is still on disk — without `--force` the 4B would silently re-grade the aborted tail as a replicate. This is the addendum-68 lesson (dump-reuse keys on mtime only) applied one instrument-level up. Early-fail note: `full_benchmark` benches with early_abort=True (no CLI override), so a failing family's tail truncates at its first wall event (the 4B cells); verdicts stay valid (a min is monotone in data) and full tails recoverable tomorrow via `speed_gate --no-early-fail --force` if the event distribution is wanted. Disk: ~17 GiB of Q8_0 files plus transient f16 sources during acquisition; `df -h` first; f16 files and HF caches are deletable per the author's space practices (the rung files survive — they are the point).
+
+**Open items:** (1) the overnight run (author, T14s); (2) tomorrow: grade the sweep against this table (bands, walls, events, Δ, law, ARC) and update `lineages.md`'s qwen section with measured verdicts; (3) the 51.2 replication (phase A) and study #4 picks unchanged; (4) gemma debug unchanged (open, low priority).
