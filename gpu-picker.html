@@ -28,12 +28,6 @@
   .est { color: #888; }
   .foot { font-size: 0.8rem; color: #555; margin-top: 2rem; border-top: 1px solid #bbb; padding-top: 0.8rem; }
   .footnote { font-size: 0.75rem; color: #777; }
-  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
-            background: rgba(127,127,127,0.12); }
-  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
-  .mitem:hover { background: rgba(127,127,127,0.15); }
-  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
-  #gpuList { background: rgba(127,127,127,0.04); }
 </style>
 </head>
 <body>
@@ -44,13 +38,15 @@ study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). 
 Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineage picker</a>.</div>
 
 <div class="panel">
-  <label for="gfilter">GPU (vendor &middot; VRAM &middot; memory bandwidth)</label>
-  <input type="search" id="gfilter" placeholder="type to filter, e.g. 3090 or 24" oninput="renderList()" style="width:20rem;max-width:100%">
-  <div class="footnote" style="margin-top:0.3rem">Cards whose bandwidth cannot run any measured model (below
-    <span id="minbw"></span>&nbsp;GB/s) are not listed. VRAM fit uses the <strong>whole measured stack cost</strong>
-    (weights + KV + buffers + runtime), conservatively taken from the CPU-side instrument &mdash; the GPU stack
-    is expected to need less, so a fit here is a lower bound on what the card can hold.</div>
-  <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
+  <label for="vram">Your GPU's VRAM (GiB)</label>
+  <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="pick()">
+  <div class="footnote" style="margin-top:0.3rem">Bandwidth is not the constraint on GPUs: the
+    lowest-bandwidth card on the current market (224 GB/s) still predicts
+    <span id="worstwps"></span>&nbsp;w/s for the slowest measured candidate under the linear law &mdash;
+    well over the 5.0 reader line &mdash; so the recommendation depends only on VRAM. VRAM fit uses the
+    <strong>whole measured stack cost</strong> (weights + KV + buffers + runtime), conservatively taken
+    from the CPU-side instrument &mdash; the GPU stack is expected to need less, so a fit here is a lower
+    bound on what the card can hold.</div>
   <div class="readout" id="bwout"></div>
   <div class="readout" id="classout"></div>
 </div>
@@ -67,8 +63,9 @@ Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineag
   (a) its <em>measured whole-stack cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
   instrument) fits the card's VRAM &mdash; conservative, since the CPU-side cost is an upper bound on
   the GPU-side one &mdash; and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader
-  line. Bandwidth scaling is the pre-registered linear form:
-  w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4.</p>
+  line. Under that law even the lowest-bandwidth card on the current market (224 GB/s)
+  predicts 13.8 w/s for the slowest candidate, so <em>no card you can buy is bandwidth-limited for
+  this pool</em> and the recommendation depends only on VRAM.</p>
   <p><strong>Two extrapolations, both flagged.</strong> The cost criterion carries the CPU measurement
   onto the GPU unchanged (conservative by design; the first GPU-side calibration run should replace
   it), and the linear bandwidth law is validated only on system RAM &mdash; on GPU, compute and kernel
@@ -98,134 +95,56 @@ var CANDIDATES = [
 var REF_BW = 102.4;
 var READER = 5.0;
 
-// Common cards on the 2024/2025 market, used and new, that a practitioner can actually buy.
-// vram in GiB (nominal), bw in GB/s (theoretical peak). Grouped by vendor, sorted by
-// bandwidth within the group. Nothing exotic (no H100/B200 class): this is the shopper list.
-var GPUS = [
-  { name: "RTX 5090",            vram: 32,  bw: 1792.0, vendor: "NVIDIA" },
-  { name: "RTX 5080",            vram: 16,  bw: 960.0,  vendor: "NVIDIA" },
-  { name: "RTX 5070 Ti",         vram: 16,  bw: 896.0,  vendor: "NVIDIA" },
-  { name: "RTX 4090",            vram: 24,  bw: 1008.1, vendor: "NVIDIA" },
-  { name: "RTX 4080 Super",      vram: 16,  bw: 736.3,  vendor: "NVIDIA" },
-  { name: "RTX 4070 Ti Super",   vram: 16,  bw: 672.2,  vendor: "NVIDIA" },
-  { name: "RTX 4070",            vram: 12,  bw: 504.2,  vendor: "NVIDIA" },
-  { name: "RTX 4060 Ti 16GB",    vram: 16,  bw: 288.1,  vendor: "NVIDIA" },
-  { name: "RTX 3080 Ti",         vram: 12,  bw: 912.4,  vendor: "NVIDIA" },
-  { name: "RTX 3080",            vram: 10,  bw: 760.3,  vendor: "NVIDIA" },
-  { name: "RTX 3090",            vram: 24,  bw: 936.2,  vendor: "NVIDIA" },
-  { name: "RTX 3070",            vram: 8,   bw: 614.4,  vendor: "NVIDIA" },
-  { name: "RTX 3060 12GB",       vram: 12,  bw: 360.0,  vendor: "NVIDIA" },
-  { name: "RTX 2080 Ti (22GB mod)", vram: 22, bw: 616.0, vendor: "NVIDIA" },
-  { name: "RTX 2080 Super",      vram: 8,   bw: 496.1,  vendor: "NVIDIA" },
-  { name: "GTX 1080 Ti",         vram: 11,  bw: 484.3,  vendor: "NVIDIA" },
-  { name: "Titan V",             vram: 12,  bw: 652.8,  vendor: "NVIDIA" },
-  { name: "V100 32GB",           vram: 32,  bw: 900.0,  vendor: "NVIDIA" },
-  { name: "Radeon VII",          vram: 16,  bw: 1024.0, vendor: "AMD" },
-  { name: "RX 7900 XTX",        vram: 24,  bw: 960.0,  vendor: "AMD" },
-  { name: "RX 7900 XT",         vram: 20,  bw: 800.0,  vendor: "AMD" },
-  { name: "RX 7900 GRE",        vram: 16,  bw: 576.0,  vendor: "AMD" },
-  { name: "RX 7800 XT",         vram: 16,  bw: 624.1,  vendor: "AMD" },
-  { name: "RX 7700 XT",         vram: 12,  bw: 432.0,  vendor: "AMD" },
-  { name: "RX 7600 XT",         vram: 16,  bw: 288.0,  vendor: "AMD" },
-  { name: "RX 6800 XT",         vram: 16,  bw: 512.0,  vendor: "AMD" },
-  { name: "RX 6700 XT",         vram: 12,  bw: 384.0,  vendor: "AMD" },
-  { name: "RX 6600",            vram: 8,   bw: 224.0,  vendor: "AMD" },
-  { name: "RX 5700 XT",         vram: 8,   bw: 448.0,  vendor: "AMD" },
-  { name: "Intel Arc A770 16GB", vram: 16,  bw: 560.0,  vendor: "Intel" },
-  { name: "Intel Arc A750",     vram: 8,   bw: 512.0,  vendor: "Intel" }
-];
-
-// A card is listed only if it can honestly run SOME measured model: the candidate with the
-// highest measured w/s must still clear the reader line at the card's bandwidth.
-// min BW = READER x REF_BW / max(wps). Same derivation as the system-RAM picker.
-var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.wps); }, 0);
-MIN_RUN_BW = READER * REF_BW / MIN_RUN_BW;
-
-var LISTED = GPUS.filter(function (g) { return g.bw >= MIN_RUN_BW; });
+// The VRAM-only simplification is data-backed: under the linear law the lowest-bandwidth
+// card on the current market (224 GB/s) still predicts ~13.8 w/s for the slowest candidate
+// (Qwen3.5-4B, 6.32 wps @102.4) - well over the 5.0 reader line. No card you can buy is
+// bandwidth-limited for this pool; VRAM is the only constraint.
+var LOWEST_MARKET_BW = 224.0;
+var LOWEST_BW_SLOWEST_WPS = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.wps); }, Infinity) *
+  LOWEST_MARKET_BW / REF_BW;
 
 function $(id) { return document.getElementById(id); }
 
-var selKey = LISTED.length ? LISTED[0].name : "";
-
-function renderList() {
-  var q = ($("gfilter").value || "").toLowerCase().trim();
-  var host = $("gpuList");
-  var html = "";
-  var lastGroup = null;
-  LISTED.forEach(function (g) {
-    var label = g.name + " \u2014 " + g.vram + " GiB \u2014 " + g.bw.toFixed(0) + " GB/s";
-    if (q && label.toLowerCase().indexOf(q) < 0) return;
-    if (g.vendor !== lastGroup) {
-      html += '<div class="mgroup">' + g.vendor + "</div>";
-      lastGroup = g.vendor;
-    }
-    var cls = "mitem" + (g.name === selKey ? " msel" : "");
-    html += '<div class="' + cls + '" data-key="' + g.name +
-      '" onclick="chooseGpu(this.dataset.key)">' + label + "</div>";
-  });
-  if (!html) html = '<div class="mitem">no card matches the filter</div>';
-  host.innerHTML = html;
-}
-
-function chooseGpu(name) {
-  selKey = name;
-  renderList();
-  pick();
-}
-
 function pick() {
-  var g = LISTED.filter(function (x) { return x.name === selKey; })[0];
-  if (!g) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
-  var bw = g.bw;
-  $("bwout").textContent = g.name + ": " + bw.toFixed(1) + " GB/s memory bandwidth, " + g.vram + " GiB VRAM";
-  var cls = bw >= 204.8 ? "\u2265 204.8 GB/s class (2x the study's top class)" :
-            bw >= 102.4 ? "102.4 GB/s class (the study's reference class)" :
-            bw >= 51.2 ? "51.2 GB/s class" :
-            bw >= 25.6 ? "25.6 GB/s class" : "below 25.6 GB/s class";
-  $("classout").textContent = cls + " \u2014 predicted w/s = measured@102.4 \u00d7 " + (bw / 102.4).toFixed(2);
+  var vram = parseFloat($("vram").value);
+  if (!(vram > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
+  $("bwout").textContent = "VRAM: " + vram + " GiB - the whole measured pool clears the reader line on any current card";
+  $("classout").textContent = "worst case on the lowest-bandwidth card on the market (224 GB/s): " +
+    LOWEST_BW_SLOWEST_WPS.toFixed(1) + " w/s for the slowest candidate (reader line 5.0)";
 
   var rows = CANDIDATES.map(function (m) {
-    var wpred = m.wps * bw / REF_BW;
-    return { m: m, w: wpred, fits: m.cost <= g.vram, passes: wpred >= READER };
+    return { m: m, fits: m.cost <= vram };
   });
 
   var host = $("result");
-  var eligible = rows.filter(function (r) { return r.fits && r.passes; });
+  var eligible = rows.filter(function (r) { return r.fits; });
   if (eligible.length) {
     var best = eligible.reduce(function (a, r) { return r.m.arc > a.m.arc ? r : a; });
     host.innerHTML =
       '<div class="verdict"><h3>Recommended: ' + best.m.name + ' Q8_0</h3>' +
       '<div><span class="arc">' + best.m.arc.toFixed(1) + "</span> ARC-Challenge (n=1172)</div>" +
       "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 whole-stack cost " + best.m.cost.toFixed(2) +
-      " GiB of your " + g.vram + " GiB VRAM (conservative: CPU-side measured cost)</div>" +
-      "<div>predicted " + best.w.toFixed(1) + " w/s (measured " + best.m.wps + " @102.4, linear scaling)</div></div>";
+      " GiB of your " + vram + " GiB VRAM (conservative: CPU-side measured cost)</div></div>";
   } else {
-    var fitting = rows.filter(function (r) { return r.fits; });
     var cheapest = CANDIDATES.reduce(function (a, c) { return c.cost < a.cost ? c : a; });
-    var reason = fitting.length
-      ? "the model(s) that fit do not clear the 5.0 reader line at this bandwidth"
-      : "no measured model's whole-stack cost fits " + g.vram + " GiB (smallest needs " +
-        cheapest.cost.toFixed(2) + " GiB)";
     host.innerHTML = '<div class="verdict none"><h3>No measured model qualifies</h3><div>' +
-      reason + ".</div></div>";
+      "no measured model's whole-stack cost fits " + vram + " GiB (smallest needs " +
+      cheapest.cost.toFixed(2) + " GiB).</div></div>";
   }
 
   var t = '<table><tr><th>model</th><th class="num">file GiB</th>' +
-    '<th class="num">stack cost GiB</th><th class="num">fits ' + g.vram + ' GiB</th>' +
-    '<th class="num">w/s @' + bw.toFixed(0) + "</th><th>clears reader</th><th class=\"num\">ARC</th></tr>";
+    '<th class="num">stack cost GiB</th><th class="num">fits ' + vram + ' GiB</th>' +
+    '<th class="num">ARC</th></tr>';
   rows.forEach(function (r) {
     t += "<tr><td>" + r.m.name + '</td><td class="num">' + r.m.size.toFixed(2) +
       '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
       (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
-      '</td><td class="num">' + r.w.toFixed(1) + "</td><td>" +
-      (r.passes ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
       '</td><td class="num">' + r.m.arc.toFixed(1) + "</td></tr>";
   });
   $("tables").innerHTML = t + "</table>";
 }
 
-$("minbw").textContent = MIN_RUN_BW.toFixed(1);
-renderList();
+$("worstwps").textContent = LOWEST_BW_SLOWEST_WPS.toFixed(1);
 pick();
 </script>
 </body>
