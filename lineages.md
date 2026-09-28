@@ -60,8 +60,9 @@ addendum 68); measured file sizes supersede estimates where they
 exist. Prediction band (corrected, addendum 74): pred ± (2σ_w/t ×
 t/s) = pred ± 0.156·t/s. The class assignment below the band column derives from the
 halving factor 0.50 (pre-registered, addendum 69; its validation
-is the 51.2 replication's phase A — until then the band↔class
-mapping carries that one unvalidated constant).
+instrument, the 51.2 replication, is FUTURE WORK — out of this
+study's execution plan per addendum 86 — so the band↔class mapping
+carries that one unvalidated constant indefinitely).
 
 **In-band confidence:** the trust band (≥ 5.9 / ≤ 4.1, addendum 62)
 is the internal BENCH FILTER only (demoted, addendum 72). The
@@ -144,8 +145,10 @@ above 9B serves any studied class at any rung (the 12–14B class
 needs ~2× 102.4's bandwidth — the next machine up).
 
 **Caveats on record:** the halving factor 0.50 (band↔class
-mapping) is pre-registered, not yet validated (addendum 69; the
-51.2 replication's phase A). Sizes marked (P) are bpw-derived
+mapping) is pre-registered, not yet validated (addendum 69; its
+validation instrument, the 51.2 replication, is FUTURE WORK — out of
+this study's execution plan per addendum 86 — so the caveat stands
+indefinitely). Sizes marked (P) are bpw-derived
 estimates (±8% observed, addendum 68). The anchor 0.412 is
 corpus-conditional (the w/t tail is substantially corpus-owned,
 addendum 69) — these bands are for this reader and corpus class;

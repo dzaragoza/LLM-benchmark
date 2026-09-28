@@ -444,7 +444,7 @@ python3 full_benchmark.py --thinking \
   "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
 ```
 
-(Pass `--thinking` on any `--arc-only` rerun too.)
+(The addendum-86 tooling removed `--arc-only`/`--arc-models` — ARC now runs on every benched family automatically; pass `--thinking` on the rerun too, with its own state/results files.)
 
 ## Study #3 roster (protocol v2.3, T14s, pre-registered 2026-09-26)
 

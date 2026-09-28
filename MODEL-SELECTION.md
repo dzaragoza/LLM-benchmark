@@ -113,6 +113,25 @@ README's "Roster selection" section is a summary that points here.
     same command with X changed": hand-editing arguments is a recipe
     for non-reproducibility. The notebook's registered sequences carry
     the full literal text of every command.
+14. **Fixed rung: Q8_0 only (addendum 86).** The rung walk is REMOVED
+    from the tooling (`--ladder` deleted; full_benchmark benches the
+    single fixed Q8_0 rung). Quant comparison is out of scope for this
+    study — every cell is Q8_0, and every prediction and the size
+    ceiling (rule 1) are Q8_0-only; no other rung is acquired or
+    benched.
+15. **ARC runs ALWAYS (addendum 86).** Every benched family gets the
+    full ARC pass — PASS or FAIL verdict alike, selected or not; the
+    ONLY skip is an already-complete CSV (arc_csv_valid). The
+    `--arc-only`/`--arc-models` ad-hoc paths are removed; the McNemar
+    ranking still uses the selected (PASS) models only.
+
+**Future work (addendum 86):** the 51.2 GB/s-class replication run is
+OUT of this study's execution plan — the v3.1 benchmark methodology
+is too time-consuming to replicate at a second machine class. The
+halving factor 0.50 (band↔class mapping) and the BW_eff refit
+question (addendum 75) stay pre-registered-unvalidated, with their
+caveats stated in lineages.md; the replication is the first candidate
+for a follow-up study.
 
 ---
 
