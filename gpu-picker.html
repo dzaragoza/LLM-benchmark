@@ -15,6 +15,12 @@
   label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.8rem; }
   input[type=number] { font: inherit; padding: 0.35rem 0.5rem; width: 12rem; max-width: 100%; }
   .readout { font-family: 'Courier New', monospace; margin-top: 0.9rem; font-size: 0.95rem; }
+  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
+            background: rgba(127,127,127,0.12); }
+  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
+  .mitem:hover { background: rgba(127,127,127,0.15); }
+  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
+  #gpuList { background: rgba(127,127,127,0.04); }
   .verdict { border: 2px solid #2a7; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
   .verdict.none { border-color: #b33; }
   .verdict h3 { margin: 0 0 0.3rem; font-size: 1.15rem; }
@@ -38,8 +44,11 @@ study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). 
 Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineage picker</a>.</div>
 
 <div class="panel">
+  <label for="gfilter">GPU (vendor &middot; VRAM &middot; memory bandwidth)</label>
+  <input type="search" id="gfilter" placeholder="type to filter, e.g. 3090 or 24" oninput="renderList()" style="width:20rem;max-width:100%">
+  <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="vram">Your GPU's VRAM (GiB)</label>
-  <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="pick()">
+  <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
   <div class="footnote" style="margin-top:0.3rem">Bandwidth is not the constraint on GPUs: the
     lowest-bandwidth card on the current market (224 GB/s) still predicts
     <span id="worstwps"></span>&nbsp;w/s for the slowest measured candidate under the linear law &mdash;
@@ -95,6 +104,75 @@ var CANDIDATES = [
 var REF_BW = 102.4;
 var READER = 5.0;
 
+// Common cards on the 2024/2025 market, used and new, that a practitioner can actually buy.
+// vram in GiB (nominal), bw in GB/s (theoretical peak). All clear the reader-line floor
+// for this pool (min BW 19.8 GB/s), so every card is listed.
+var GPUS = [
+  { name: "RTX 5090",            vram: 32,  bw: 1792.0, vendor: "NVIDIA" },
+  { name: "RTX 5080",            vram: 16,  bw: 960.0,  vendor: "NVIDIA" },
+  { name: "RTX 5070 Ti",         vram: 16,  bw: 896.0,  vendor: "NVIDIA" },
+  { name: "RTX 4090",            vram: 24,  bw: 1008.1, vendor: "NVIDIA" },
+  { name: "RTX 4080 Super",      vram: 16,  bw: 736.3,  vendor: "NVIDIA" },
+  { name: "RTX 4070 Ti Super",   vram: 16,  bw: 672.2,  vendor: "NVIDIA" },
+  { name: "RTX 4070",            vram: 12,  bw: 504.2,  vendor: "NVIDIA" },
+  { name: "RTX 4060 Ti 16GB",    vram: 16,  bw: 288.1,  vendor: "NVIDIA" },
+  { name: "RTX 3080 Ti",         vram: 12,  bw: 912.4,  vendor: "NVIDIA" },
+  { name: "RTX 3080",            vram: 10,  bw: 760.3,  vendor: "NVIDIA" },
+  { name: "RTX 3090",            vram: 24,  bw: 936.2,  vendor: "NVIDIA" },
+  { name: "RTX 3070",            vram: 8,   bw: 614.4,  vendor: "NVIDIA" },
+  { name: "RTX 3060 12GB",       vram: 12,  bw: 360.0,  vendor: "NVIDIA" },
+  { name: "RTX 2080 Ti (22GB mod)", vram: 22, bw: 616.0, vendor: "NVIDIA" },
+  { name: "RTX 2080 Super",      vram: 8,   bw: 496.1,  vendor: "NVIDIA" },
+  { name: "GTX 1080 Ti",         vram: 11,  bw: 484.3,  vendor: "NVIDIA" },
+  { name: "Titan V",             vram: 12,  bw: 652.8,  vendor: "NVIDIA" },
+  { name: "V100 32GB",           vram: 32,  bw: 900.0,  vendor: "NVIDIA" },
+  { name: "Radeon VII",          vram: 16,  bw: 1024.0, vendor: "AMD" },
+  { name: "RX 7900 XTX",        vram: 24,  bw: 960.0,  vendor: "AMD" },
+  { name: "RX 7900 XT",         vram: 20,  bw: 800.0,  vendor: "AMD" },
+  { name: "RX 7900 GRE",        vram: 16,  bw: 576.0,  vendor: "AMD" },
+  { name: "RX 7800 XT",         vram: 16,  bw: 624.1,  vendor: "AMD" },
+  { name: "RX 7700 XT",         vram: 12,  bw: 432.0,  vendor: "AMD" },
+  { name: "RX 7600 XT",         vram: 16,  bw: 288.0,  vendor: "AMD" },
+  { name: "RX 6800 XT",         vram: 16,  bw: 512.0,  vendor: "AMD" },
+  { name: "RX 6700 XT",         vram: 12,  bw: 384.0,  vendor: "AMD" },
+  { name: "RX 6600",            vram: 8,   bw: 224.0,  vendor: "AMD" },
+  { name: "RX 5700 XT",         vram: 8,   bw: 448.0,  vendor: "AMD" },
+  { name: "Intel Arc A770 16GB", vram: 16,  bw: 560.0,  vendor: "Intel" },
+  { name: "Intel Arc A750",     vram: 8,   bw: 512.0,  vendor: "Intel" }
+];
+
+var selKey = "";
+
+function renderList() {
+  var q = ($("gfilter").value || "").toLowerCase().trim();
+  var host = $("gpuList");
+  var html = "";
+  var lastGroup = null;
+  GPUS.forEach(function (g) {
+    var label = g.name + " \u2014 " + g.vram + " GiB \u2014 " + g.bw.toFixed(0) + " GB/s";
+    if (q && label.toLowerCase().indexOf(q) < 0) return;
+    if (g.vendor !== lastGroup) {
+      html += '<div class="mgroup">' + g.vendor + "</div>";
+      lastGroup = g.vendor;
+    }
+    var cls = "mitem" + (g.name === selKey ? " msel" : "");
+    html += '<div class="' + cls + '" data-key="' + g.name +
+      '" onclick="chooseGpu(this.dataset.key)">' + label + "</div>";
+  });
+  if (!html) html = '<div class="mitem">no card matches the filter</div>';
+  host.innerHTML = html;
+}
+
+function chooseGpu(name) {
+  selKey = name;
+  var g = GPUS.filter(function (x) { return x.name === name; })[0];
+  if (g) $("vram").value = g.vram;
+  renderList();
+  pick();
+}
+
+function clearSel() { selKey = ""; renderList(); }
+
 // The VRAM-only simplification is data-backed: under the linear law the lowest-bandwidth
 // card on the current market (224 GB/s) still predicts ~13.8 w/s for the slowest candidate
 // (Qwen3.5-4B, 6.32 wps @102.4) - well over the 5.0 reader line. No card you can buy is
@@ -145,7 +223,7 @@ function pick() {
 }
 
 $("worstwps").textContent = LOWEST_BW_SLOWEST_WPS.toFixed(1);
-pick();
+chooseGpu("RTX 3090");
 </script>
 </body>
 </html>
