@@ -98,3 +98,48 @@ def test_run_ranking_uses_selected_only_and_records(tmp_path):
     assert calls == [["Qwen-A Q8_0"]]
     assert state["ranking"]["order"] == ["Qwen-A Q8_0"]
     assert state["ranking"]["scores"]["Qwen-A Q8_0"] == 0.5
+
+
+def test_preflight_report_exit_code():
+    """The dry run exits non-zero iff families failed (author ruling,
+    addendum 108): the report is a gate, its status must be scriptable."""
+    state = {"families": {}}
+    ok = fb.preflight_report(make_args(dry_run=True), state, failed_families=[])
+    bad = fb.preflight_report(
+        make_args(dry_run=True),
+        state,
+        failed_families=[("X/Qwen-X", "AssertionError()")],
+    )
+    assert ok == 0
+    assert bad == 1
+
+
+def test_dry_run_no_local_file_does_not_assert(tmp_path, monkeypatch, capsys):
+    """The addendum-108 bug class: on a dry run, a family with no local
+    rung file (the network-acquisition case) must reach the would-bench
+    prints - the path-is-None assert is a REAL-run invariant and must
+    not fire before the dry-run guard."""
+    import hf_download
+
+    monkeypatch.setattr(fb, "RUNG", "Q8_0")
+    monkeypatch.setattr(hf_download, "require_hub", lambda: None)
+    monkeypatch.setattr("full_benchmark.list_repo_files", lambda repo: ["model.safetensors"])
+    monkeypatch.setattr("full_benchmark.local_rung", lambda famdir, rung: None)
+    monkeypatch.setattr(
+        "full_benchmark.convert_quant.create",
+        lambda fam, famdir, rung, plan="", dry_run=False: None,
+    )
+    state = {"families": {}}
+    famdir = tmp_path / "Qwen-X"
+    famdir.mkdir()
+    fb.process_family(
+        "X/Qwen-X",
+        corpus=str(tmp_path / "corpus.json"),
+        models_dir=str(tmp_path),
+        state=state,
+        state_path=str(tmp_path / "state.json"),
+        dry_run=True,
+        force=False,
+    )
+    out = capsys.readouterr().out
+    assert "[3] would live-bench" in out

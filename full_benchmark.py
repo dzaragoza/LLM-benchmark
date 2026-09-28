@@ -339,7 +339,6 @@ def process_family(
             print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
             stamp("      phase 2 done (create)")
         path = run.get("file") or local_rung(famdir, rung)
-        assert path is not None  # phases 1-2 guarantee it on real runs
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
             print(
@@ -349,6 +348,7 @@ def process_family(
                 f"{speed_gate.READER_REACTION_S}s, addendum 55)"
             )
             continue
+        assert path is not None  # real runs: phases 1-2 guarantee it
         if 3 not in run["phases_done"]:
             dump = speed_gate.bench(
                 path, corpus, dry_run, thinking, no_thinking, force=force, reader_wps=reader_wps
@@ -504,8 +504,7 @@ def main() -> None:
     failed_families = sweep_families(args, state)
 
     if args.dry_run:
-        preflight_report(args, state, failed_families)
-        return
+        sys.exit(preflight_report(args, state, failed_families))
 
     roster, selections, arc_jobs = prepare_phase56(args, state)
     report_roster_notes(args, state, roster, failed_families)
@@ -576,8 +575,10 @@ def sweep_families(args: argparse.Namespace, state: dict[str, Any]) -> list[tupl
 
 def preflight_report(
     args: argparse.Namespace, state: dict[str, Any], failed_families: list[tuple[str, str]]
-) -> None:
-    """The --dry-run read-only report (addendum 79) + estimate (83)."""
+) -> int:
+    """The --dry-run read-only report (addendum 79) + estimate (83).
+    Returns the process exit code: 1 iff any family failed (author
+    ruling, addendum 108 - the pre-flight is a scriptable gate)."""
     if args.dry_run:
         print()
         print("=" * 60)
@@ -624,7 +625,8 @@ def preflight_report(
         print("  The state file was NOT modified and no files were downloaded (addendum 79).")
         print("  If the report is clean, issue the SAME command without")
         print("  --dry-run to start the real run.")
-        return
+        return 1 if failed_families else 0
+    return 0
 
 
 def prepare_phase56(

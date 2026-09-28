@@ -3597,3 +3597,22 @@ and fixed real issues: an unclosed fence in PROTOCOL.md (the addendum-106
 floor-aside deletion had removed its closing fence with it), four
 notebook tables missing MD058 blank lines, and two files missing MD047
 trailing newlines. Eleven regression tests added (tests/test_md_check.py).
+
+### Session 33, addendum 108 - the dry-run assert bug and the scriptable gate
+
+Author ruling: "the dry run should exit with non zero status to signal
+an error". Two changes:
+1. THE BUG: 24 of 31 families failed the lineage2 dry run with a bare
+   AssertionError - every network-acquisition family. Root cause:
+   full_benchmark's path-is-not-None assert sat BEFORE the dry-run
+   guard, so a dry run with no local rung file (the normal case for
+   granite/Phi/MiniCPM) tripped a real-run invariant. The refactor
+   (addendum 90) moved the assert above the guard; the dry run was
+   never re-run over network families afterwards, so it survived.
+   Fix: the dry-run guard first, the assert after it (real runs only).
+   Regression test: test_dry_run_no_local_file_does_not_assert.
+2. THE GATE: preflight_report returns 1 iff any family failed, 0
+   otherwise (test_preflight_report_exit_code); main exits with it.
+   The pre-flight is now scriptable - exit status tells the wrapper
+   whether the real run may start.
+The dry run is now the gate it was registered to be.
