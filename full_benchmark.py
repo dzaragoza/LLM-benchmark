@@ -75,9 +75,12 @@ Usage (from the repo root):
 """
 
 import argparse
+import glob
 import json
 import os
+import subprocess
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -119,6 +122,18 @@ GUIDE[6] = mcnemar.GUIDE[6]
 fail = hf_download.fail
 
 
+# =========================================================== timestamps
+# Addendum 78, item 4: every phase line carries a wall-clock stamp and
+# the elapsed sweep time - run 1's log had no durations, so every time
+# estimate had to be bracketed from commit times.
+_SWEEP_T0 = time.time()
+
+
+def stamp(msg):
+    elapsed_min = (time.time() - _SWEEP_T0) / 60.0
+    print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')} +{elapsed_min:.0f}m] {msg}")
+
+
 # =========================================================== state
 
 def load_state(path):
@@ -148,7 +163,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
 
     print()
     print("=" * 60)
-    print(f"family: {fam}")
+    stamp(f"family: {fam}")
     print(f"  model repo : {model_repo}")
     print(f"  source repo: {source_repo}")
     print(f"  folder     : {famdir}")
@@ -221,6 +236,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
                 save_state(state_path, state)
                 continue
             print(f"  [1] downloads ok  (plan: {plan})")
+            stamp("      phase 1 done (acquire)")
         if 2 not in run["phases_done"]:
             path = convert_quant.create(fam, famdir, rung,
                                         run.get("plan", ""), dry_run)
@@ -229,6 +245,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
             run["phases_done"].append(2)
             save_state(state_path, state)
             print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
+            stamp("      phase 2 done (create)")
         path = run.get("file") or local_rung(famdir, rung)
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
@@ -244,6 +261,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
             run["phases_done"].append(3)
             save_state(state_path, state)
             print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
+            stamp("      phase 3 done (bench)")
         if 4 not in run["phases_done"]:
             res = speed_gate.analyze(path, thinking, no_thinking,
                                      reader_wps=reader_wps)
@@ -274,6 +292,7 @@ def process_family(spec, ladder, corpus, models_dir, state,
                               "VmHWM, addendum 36)")
                 except Exception:
                     pass
+            stamp("      phase 4 done (analyze)")
         if str(run["verdict"]).startswith("PASS"):
             fst["selected"] = rung
             run["rung"] = rung
@@ -327,6 +346,11 @@ def main():
                          "thinking enabled (same worst-turn gate; "
                          "reasoning measured descriptively). Use separate "
                          "--state-file/--results-file for this category.")
+    ap.add_argument("--git-commit", action="store_true",
+                    help="commit and push the run's artifacts (state, "
+                         "results, per-turn dumps, mem sidecars, ARC "
+                         "CSVs) when the run completes - force-added "
+                         "past the ignores (addendum 78, item 5)")
     ap.add_argument("--no-thinking", action="store_true",
                     help="hybrid models, non-thinking category: "
                          "run with thinking disabled (chat-template "
@@ -395,11 +419,25 @@ def main():
     if not args.families:
         ap.error("no family specs given (or use --arc-only)")
 
+    # Addendum 78, item 4: per-family isolation IN THE TOOL - a family
+    # that dies (conversion OOM, unsupported architecture, a bad repo)
+    # is recorded and the sweep CONTINUES; the author's "continue even
+    # in failure" made structural, no shell wrapper needed.
+    failed_families = []
     for spec in args.families:
-        process_family(spec, ladder, args.corpus,
-                       args.models_dir, state, args.state_file,
-                       args.dry_run, args.force, args.thinking,
-                       args.no_thinking, args.reader_wps)
+        try:
+            process_family(spec, ladder, args.corpus,
+                           args.models_dir, state, args.state_file,
+                           args.dry_run, args.force, args.thinking,
+                           args.no_thinking, args.reader_wps)
+        except SystemExit as e:
+            failed_families.append((spec, str(e) or "exit"))
+            stamp(f"FAMILY FAILED: {spec} (recorded; the sweep continues "
+                  "- addendum 78)")
+        except Exception as e:  # isolation is the point
+            failed_families.append((spec, repr(e)))
+            stamp(f"FAMILY FAILED: {spec} - {e!r} (recorded; the sweep "
+                  "continues - addendum 78)")
 
     if args.dry_run:
         print("\ndry run complete - no files were downloaded or tested")
@@ -423,10 +461,15 @@ def main():
         if missing:
             print(f"  note: roster families without a selection "
                   f"(excluded from the ranking): {', '.join(missing)}")
+    if failed_families:
+        print()
+        stamp("families failed this run (isolated; state preserved):")
+        for spec, err in failed_families:
+            print(f"  {spec}: {err}")
     if selections:
         print()
         print("=" * 60)
-        print(f"PHASES 5-6: full {args.arc_config} on selected models "
+        stamp(f"PHASES 5-6: full {args.arc_config} on selected models "
               f"({args.arc_num} questions each)")
         questions = load_questions(args.arc_config, args.arc_num)
         labels = []
@@ -439,14 +482,27 @@ def main():
                     "csv": arc_csv_path(args.arc_results_dir, lbl),
                     "score": score}
                 save_state(_sp, _state)
-            arc_eval.arc_run(label, sel["file"], questions, args.arc_num,
-                             args.arc_results_dir, on_scored, False)
-        ranking, scores, pairs = mcnemar.rank(
-            labels, args.arc_num, args.arc_results_dir)
-        state["ranking"] = {"arc_num": args.arc_num,
-                            "scores": {m: scores[m] for m in ranking},
-                            "order": ranking, "pairs": pairs}
-        save_state(args.state_file, state)
+            try:
+                arc_eval.arc_run(label, sel["file"], questions, args.arc_num,
+                                 args.arc_results_dir, on_scored, False)
+                stamp(f"ARC done: {label}")
+            except SystemExit as e:
+                stamp(f"ARC FAILED: {label} ({e}; recorded; the sweep "
+                      "continues - addendum 78)")
+            except Exception as e:
+                stamp(f"ARC FAILED: {label} - {e!r} (recorded; the sweep "
+                      "continues - addendum 78)")
+        try:
+            ranking, scores, pairs = mcnemar.rank(
+                labels, args.arc_num, args.arc_results_dir)
+            state["ranking"] = {"arc_num": args.arc_num,
+                                "scores": {m: scores[m] for m in ranking},
+                                "order": ranking, "pairs": pairs}
+            save_state(args.state_file, state)
+        except SystemExit as e:
+            stamp(f"RANKING FAILED ({e}; recorded; the sweep continues)")
+        except Exception as e:
+            stamp(f"RANKING FAILED - {e!r} (recorded; the sweep continues)")
     else:
         print("\nno family has a selection yet - skipping ARC phases")
 
@@ -467,6 +523,73 @@ def main():
         json.dump(doc, f, indent=1)
     print(f"\nresume state -> {args.state_file}")
     print(f"all data     -> {args.results_file}")
+
+    # ---- addendum 78, item 4: the per-model w/t calibration inline
+    # (the addendum-74 lesson: grading waited on a manual extraction).
+    # Single-sourced from speed_gate.analyze's own fields, already in
+    # the state - no dump re-parsing, no second extraction pass.
+    print()
+    print("=" * 60)
+    stamp("per-model w/t calibration (the gate's own p05 rule)")
+    for fam, fst in state["families"].items():
+        for rung, run in fst.get("runs", {}).items():
+            if run.get("words_per_token_p05") is None:
+                continue
+            print(f"  {fam:36s} {rung:6s} "
+                  f"n={run.get('n_turns', 0):4d} "
+                  f"min={run.get('words_per_token_min') or 0:.3f} "
+                  f"p05={run['words_per_token_p05']:.3f} "
+                  f"mean={run.get('words_per_token') or 0:.3f}")
+
+    # ---- addendum 78, item 5: the git tail - commit and push every
+    # artifact the study needs (state, results, per-turn dumps, mem
+    # sidecars, ARC CSVs), force-added past the .gitignore.
+    if args.git_commit and not args.dry_run:
+        git_tail(args)
+    stamp("run complete")
+
+
+# =========================================================== git tail
+
+def git_tail(args):
+    stamp("committing artifacts to git (state, results, dumps, mem "
+          "sidecars, ARC CSVs)")
+    paths = [args.state_file, args.results_file]
+    # per-turn dumps + mem sidecars: the grading instrument's raw data
+    # (p05, Delta, stall attribution, gen_words, memory shape) - small
+    # JSON, force-added past the models/ ignore (addendum 78).
+    paths += (glob.glob("models/*/*.live-dump*.json")
+              + glob.glob("models/*/*.sentinel*.json")
+              + glob.glob("models/*/*.mem.json"))
+    if os.path.isdir(args.arc_results_dir):
+        paths.append(args.arc_results_dir)
+    existing = [p for p in paths if os.path.exists(p)]
+    if not existing:
+        stamp("nothing to commit - no artifacts found")
+        return
+    r = subprocess.run(["git", "add", "-f", "--"] + existing,
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        stamp(f"git add failed: {r.stderr.strip()}")
+        return
+    r = subprocess.run(["git", "diff", "--cached", "--quiet"])
+    if r.returncode == 0:
+        stamp("nothing new to commit")
+        return
+    msg = (f"benchmark artifacts {time.strftime('%Y-%m-%d %H:%M')} "
+           "(addendum 78 auto-commit): state, results, per-turn dumps, "
+           "mem sidecars, ARC CSVs")
+    r = subprocess.run(["git", "commit", "-m", msg],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        stamp(f"commit failed: {r.stderr.strip()}")
+        return
+    stamp(f"committed: {r.stdout.strip().splitlines()[0]}")
+    r = subprocess.run(["git", "push"], capture_output=True, text=True)
+    if r.returncode != 0:
+        stamp(f"push failed: {r.stderr.strip()} - run: git push")
+    else:
+        stamp("pushed")
 
 
 if __name__ == "__main__":

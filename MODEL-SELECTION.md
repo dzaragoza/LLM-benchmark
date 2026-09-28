@@ -16,12 +16,19 @@ README's "Roster selection" section is a summary that points here.
 
 1. **Lineage data density (the study's current criterion; popularity
    RETIRED prospectively).** Rosters are built by counting usable data
-   points per lineage: models ≤4B (the T14s's measurable window),
-   non-thinking or hybrid, instruct preferred (base acceptable), with
-   a paper in the lineage. Popularity is explicitly irrelevant
-   prospectively. (Addendum 77, the author's ruling; supersedes the
-   Ollama walk-down for all future rosters. The historical criterion
-   — start from the [Ollama library](https://ollama.com/library?sort=popular)
+   points per lineage: models at or below the REGISTERED PARAMETER
+   CEILING (addendum 78 — NOT an ad-hoc number: the largest size
+   predicted to pass, size_max = BW_eff × (w/t/5.0 − 1/t_inf) = 4.92
+   GiB ≈ 4.6B params at Q8_0 under the qwen-class anchor; the
+   addendum-76 "≤4B" window was this constant rounded down), non-thinking
+   or hybrid, instruct preferred (base acceptable), with a paper in the
+   lineage. **The lineage is selected by the count, then EVERY member
+   matching the rules enters the roster — no picking and choosing within
+   the line** (addendum 78, the author's correction). Popularity is
+   explicitly irrelevant prospectively. (Addendum 77, the author's
+   ruling; supersedes the Ollama walk-down for all future rosters. The
+   historical criterion — start from the
+   [Ollama library](https://ollama.com/library?sort=popular)
    ranked by pull count, walking down; popularity picks the *family*,
    never the weight file — stands for the study-#1/#2/#3 rosters as
    measured. Session 22; README walk-down table.)

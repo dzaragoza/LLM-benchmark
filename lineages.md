@@ -39,6 +39,17 @@ hardware of every class above that?*
   (marked FAIL with the predicted value, in the [5–10] column as
   the lowest band).
 
+**The roster window (addendum 78, the author's ruling):** the
+parameter ceiling is NOT an ad-hoc number — it is **the largest size
+predicted to pass**, derived from the registered constants: the law
+inverted at the reader line gives size_max = BW_eff × (w/t/5.0 −
+1/t_inf) = 76.5 × (0.412/5.0 − 1/74) = **4.92 GiB ≈ 4.6B params at
+Q8_0 (×1.07 GiB/B)** under the qwen-class anchor. Every lineage
+member at or below that ceiling enters the roster (the whole lineage
+matching the rules — no picking and choosing); everything above it is
+a line-endpoint FAIL row. The v3.1 T14s results (addendum 74) are the
+ceiling's calibration data.
+
 **Machinery (all registered constants):** w/s = law(size) × w/t
 anchor. Law (102.4 tier): `1/t = size/76.5 + 1/74` (fitted, R²
 0.9996). Qwen-class anchor: p05 0.412 (calibrated n=267, addendum
@@ -180,29 +191,37 @@ tokenizer-owned.
 
 ---
 
-## Granite (IBM — the size-fixed quartet, seven cells)
+## Granite (IBM — the size-fixed quartet, twelve cells)
 
 The H1-vs-H2 discriminator: FOUR models at IDENTICAL size (2B, four
 generations — 3.0, 3.1, 3.2, 3.3). With size held fixed, any p05
 scatter across the quartet is generation-owned by construction — the
 sharpest test of the generation-split hypothesis the study can run.
-granite-4.2-3b carries a thinking toggle (run non-thinking, rule 8);
-granite-4.0-h-micro is a hybrid Mamba-2/transformer (llama.cpp support
-to be verified before acquisition; the dense granite-4.0-micro is the
-same-size fallback, and the hybrid-vs-dense pair is its own datum). All
-values PRE-REGISTERED (addendum 76) under the pooled anchor 0.366 —
-none measured yet; the probe-first step may re-anchor per family
-before any weights download.
+granite-4.2-3b and granite-4.1-3b carry thinking toggles (run
+non-thinking, rule 8); granite-4.0-h-micro is a hybrid Mamba-2/transformer
+(llama.cpp support to be verified before acquisition; the dense
+granite-4.0-micro is the same-size fallback, and the hybrid-vs-dense
+pair is its own datum). The 4.0-nano tier (1.5B/1B/350M, each in
+hybrid-H and dense versions) enters under the addendum-78 ceiling —
+the whole-lineage rule, no picking and choosing. All values
+PRE-REGISTERED (addenda 76/78) under the pooled anchor 0.366 — none
+measured yet; the probe-first step may re-anchor per family before
+any weights download.
 
 | name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
 | granite-4.2-3b | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
+| granite-4.1-3b | 3.2B | 3.42 (P) | pending | — | predicted 6.28 | — |
 | granite-4.0-h-micro | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
 | granite-4.0-micro (the dense fallback; same-size hybrid-vs-dense datum) | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
 | granite-3.3-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.2-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.1-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.0-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
+| granite-4.0-h-nano | 1.5B | 1.60 (P) | pending | predicted 10.61 | — | — |
+| granite-4.0-nano (the dense 1B twin) | 1B | 1.07 (P) | pending | predicted 13.31 | — | — |
+| granite-4.0-h-350m | 0.35B | 0.37 (P) | pending | predicted 19.88 — small-end law caveat (the qwen 0.5B measured +25% over prediction) | — | — |
+| granite-4.0-350m (the dense 350M twin) | 0.35B | 0.37 (P) | pending | predicted 19.88 — small-end law caveat | — | — |
 | granite-4.0-h-small (32B/A9B, line endpoint) | 32B | 34.2 (P) | — | — | FAIL (0.9) | — |
 
 **The pre-registered question this lineage answers:** the four 2B
@@ -213,21 +232,29 @@ family-specific structure. Either result closes an open question.
 
 ---
 
-## MiniCPM (OpenBMB — the unmeasured-family ladder, four cells)
+## MiniCPM (OpenBMB — the unmeasured-family ladder, six cells)
 
-The best size spread of the three new lineages: a 0.5 → 4B ladder
-spanning all three bands in one family — the qwen shape, in a family
-with NO measured anchor. This is the pooled anchor 0.366's first
-multi-size test: if the family's p05s land far from 0.366, the pooled
-anchor needs the per-family calibration the four study-3 families got.
-All non-thinking instruct versions. All values PRE-REGISTERED
-(addendum 76) — none measured yet.
+The best size spread of the new lineages: a 0.5 → 4B ladder spanning
+all three bands in one family — the qwen shape, in a family with NO
+measured anchor. This is the pooled anchor 0.366's first multi-size
+test: if the family's p05s land far from 0.366, the pooled anchor
+needs the per-family calibration the four study-3 families got.
+MiniCPM5-2B and MiniCPM5-1B (the newest generation, hybrid
+reasoning — run with thinking disabled, rule 8; first-party GGUF
+repos) enter under the addendum-78 whole-lineage rule alongside the
+measured-paper members; their near-size overlap with MiniCPM-2B-sft /
+MiniCPM-1B-sft is a generation-pair datum, not a duplicate (same
+size, different generation — the granite quartet's question at half
+the cost). All non-thinking or hybrid-run-non-thinking. All values
+PRE-REGISTERED (addenda 76/78) — none measured yet.
 
 | name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
 | MiniCPM3-4B | 4B | 4.28 (P) | pending | — | predicted 5.27 — SHARP EDGE (band [3.0, 7.5]) | — |
-| MiniCPM-2.4B | 2.4B | 2.57 (P) | pending | — | predicted 7.77 | — |
-| MiniCPM-1.2B | 1.2B | 1.28 (P) | pending | predicted 12.08 | — | — |
+| MiniCPM5-2B | 2.5B | 2.68 (P) | pending | — | predicted 7.55 | — |
+| MiniCPM-2B-sft (2.4B non-embedding) | 2.4B | 2.57 (P) | pending | — | predicted 7.77 | — |
+| MiniCPM5-1B | 1.1B | 1.18 (P) | pending | predicted 12.66 | — | — |
+| MiniCPM-1B-sft (1.2B non-embedding) | 1.2B | 1.28 (P) | pending | predicted 12.08 | — | — |
 | MiniCPM4-0.5B | 0.5B | 0.54 (P) | pending | predicted 17.85 — small-end law caveat (the qwen 0.5B measured +25% over prediction) | — | — |
 | MiniCPM4-8B (line endpoint) | 8B | 8.6 (P) | — | — | FAIL (2.9) | — |
 
@@ -255,9 +282,9 @@ content property?
 
 | name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
-| gemma-3-4b-it | 4.0B | 4.28 (P) | 73.3 (v3.0-era Q6_K; superseded record) | — | predicted 5.27 (pooled anchor — the word-sparse-risk caveat: the family's measured content failure is NOT in any anchor) | — |
-| gemma-2-2b (candidate, not swept this round) | 2.5B | 2.68 (P) | — | — | predicted 7.55 (pooled) | — |
-| **gemma-3-1b-it (the sweep-2 probe)** | 1.0B | 1.07 (P) | pending | predicted 13.31 (pooled) | — | — |
+| gemma-3-4b-it | 4.3B | 4.60 (P) | 73.3 (v3.0-era Q6_K; superseded record) | — | predicted 4.97 (pooled anchor — SHARP EDGE: below the 5.0 line at the corrected 4.3B params, the band's only predicted-FAIL cell; the word-sparse-risk caveat also applies: the family's measured content failure is NOT in any anchor) | — |
+| gemma-2-2b (third generation datum) | 2.6B | 2.78 (P) | pending | — | predicted 7.34 (pooled) | — |
+| **gemma-3-1b-it (the word-sparse probe)** | 1.0B | 1.07 (P) | pending | predicted 13.31 (pooled) | — | — |
 
 **The pre-registered question:** the 1B's v3.1 stall rate and its
 per-turn w/t distribution. If it stalls on word-sparse turns at the
