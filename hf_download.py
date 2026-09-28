@@ -17,6 +17,8 @@ Imported by full_benchmark.py, speed_gate.py, arc_eval.py,
 convert_quant.py.
 """
 
+from __future__ import annotations
+
 import glob
 import json
 import os
@@ -25,6 +27,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from typing import Any, NoReturn
 
 # Quiet downloads (author ruling, addendum 38): hub progress bars are
 # hidden; failures still surface through fail() with the full error.
@@ -36,7 +39,7 @@ except ImportError:
     hf_hub_download = list_repo_files = snapshot_download = None
 
 
-def require_hub():
+def require_hub() -> None:
     """Only callers that actually talk to the Hub need the dependency -
     importing this module for its file helpers must not exit."""
     if list_repo_files is None:
@@ -48,7 +51,7 @@ def require_hub():
         )
 
 
-def fail(phase, rung, what, causes):
+def fail(phase: int, rung: str, what: str, causes: list[str]) -> NoReturn:
     """Abort loudly for one phase, with reader guidance."""
     print()
     print("=" * 60)
@@ -75,7 +78,7 @@ GUIDE = {
 # =========================================================== rung helpers
 
 
-def system_ram_gib():
+def system_ram_gib() -> float | None:
     """Total system RAM in GiB (best effort, cross-platform).
     Linux: /proc/meminfo; macOS: sysctl; Windows: ctypes GlobalMemoryStatusEx.
     Returns None when undetectable - the feasibility check then trusts
@@ -113,6 +116,8 @@ def system_ram_gib():
                 ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
             ]
 
+        if not hasattr(ctypes, "windll"):
+            return None
         stat = MEMORYSTATUSEX()
         stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
@@ -121,7 +126,7 @@ def system_ram_gib():
         return None
 
 
-def free_disk_gib(path="."):
+def free_disk_gib(path: str = ".") -> float | None:
     """Free disk space at `path` in GiB (None if undetectable)."""
     try:
         return shutil.disk_usage(path).free / (1024**3)
@@ -129,7 +134,7 @@ def free_disk_gib(path="."):
         return None
 
 
-def remote_file_sizes(repo):
+def remote_file_sizes(repo: str) -> dict[str, int]:
     """{filename: size_in_bytes} for a repo, from the HF metadata API -
     NO file content is downloaded. Returns {} when the hub client is
     too old to expose tree listings (the caller then estimates from
@@ -139,8 +144,9 @@ def remote_file_sizes(repo):
 
         sizes = {}
         for entry in HfApi().list_repo_tree(repo, recursive=True):
-            if getattr(entry, "size", None):
-                sizes[entry.path] = entry.size
+            size = getattr(entry, "size", None)
+            if size:
+                sizes[entry.path] = size
         return sizes
     except Exception:
         return {}
@@ -159,7 +165,9 @@ RUNG_BITS = {
 }
 
 
-def estimate_rung_gib(rung, model_files, source_files, sizes):
+def estimate_rung_gib(
+    rung: str, model_files: list[str], source_files: list[str], sizes: dict[str, int]
+) -> float | None:
     """Estimated size in GiB of the rung file, WITHOUT downloading it
     (addendum 35 - the memory shortcut). Exact when the repo ships the
     rung GGUF (remote metadata); ratio-scaled from the fp16/safetensors
@@ -200,7 +208,7 @@ def estimate_rung_gib(rung, model_files, source_files, sizes):
 RAM_RESERVE_GIB = 4.0
 
 
-def find_rung_file(names, rung):
+def find_rung_file(names: list[str] | tuple[str, ...], rung: str) -> str | None:
     tok = rung.lower()
     for f in names:
         low = f.lower()
@@ -213,7 +221,7 @@ def find_rung_file(names, rung):
     return None
 
 
-def find_f16_files(names):
+def find_f16_files(names: list[str]) -> list[str]:
     singles, shards = [], []
     for f in names:
         low = f.lower()
@@ -234,11 +242,11 @@ def find_f16_files(names):
     return [singles[0]] if singles else []
 
 
-def has_safetensors(names):
+def has_safetensors(names: list[str]) -> bool:
     return any(f.lower().endswith(".safetensors") for f in names)
 
 
-def has_pytorch_bin(names):
+def has_pytorch_bin(names: list[str]) -> bool:
     """pytorch_model.bin (+ sharded index) - the legacy pickle format the
     pinned b10964 converter loads natively (conversion/base.py falls
     back to pytorch_model*.bin when no safetensors parts exist; addendum 81
@@ -249,7 +257,7 @@ def has_pytorch_bin(names):
     )
 
 
-def resolve_f16_local(famdir):
+def resolve_f16_local(famdir: str) -> str | None:
     """Local f16/fp16/bf16 GGUF (fp16 does NOT match a *f16* glob)."""
     if not os.path.isdir(famdir):
         return None
@@ -260,7 +268,7 @@ def resolve_f16_local(famdir):
     return sorted(hits)[0] if hits else None
 
 
-def local_rung(famdir, rung):
+def local_rung(famdir: str, rung: str) -> str | None:
     if not os.path.isdir(famdir):
         return None
     f = find_rung_file(os.listdir(famdir), rung)
@@ -270,7 +278,16 @@ def local_rung(famdir, rung):
 # =========================================================== phase 1
 
 
-def acquire(fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run):
+def acquire(
+    fam: str,
+    famdir: str,
+    rung: str,
+    model_repo: str,
+    model_files: list[str],
+    source_repo: str,
+    source_files: list[str],
+    dry_run: bool,
+) -> tuple[str | None, str]:
     """Phase 1: make sure the rung file, or the data to create it,
     is on disk. Returns (path_or_None, plan).
     Memory shortcut (addendum 35): rungs whose estimated size cannot
@@ -278,6 +295,9 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo, source_file
     download - no time spent on rungs the machine cannot run at all.
     Disk is checked the same way (source files can be 2x the rung)."""
     require_hub()
+    assert (
+        hf_hub_download is not None and snapshot_download is not None
+    )  # require_hub exits when the hub is missing
     os.makedirs(famdir, exist_ok=True)
     if local_rung(famdir, rung):
         return local_rung(famdir, rung), "local file"
@@ -401,7 +421,12 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo, source_file
 # =========================================================== ARC questions
 
 
-def _http_get_json(url, params=None, timeout=60, retries=4):
+def _http_get_json(
+    url: str,
+    params: dict[str, str | int] | None = None,
+    timeout: int = 60,
+    retries: int = 4,
+) -> Any:
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
     last_err = None
@@ -417,10 +442,10 @@ def _http_get_json(url, params=None, timeout=60, retries=4):
                 file=sys.stderr,
             )
             time.sleep(wait)
-    raise last_err
+    raise RuntimeError(f"http get failed after {retries} attempts: {url}") from last_err
 
 
-def load_questions(config, n):
+def load_questions(config: str, n: int) -> list[dict[str, Any]]:
     """ARC questions from the HF datasets-server; cached in the repo root
     (same questions across runs and models - McNemar pairing depends
     on it)."""

@@ -48,11 +48,14 @@ Usage (from the repo root, on the machine that ran the benchmark):
 One machine's dumps per invocation (same rule as law_fit.py).
 """
 
+from __future__ import annotations
+
 import argparse
 import glob
 import json
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -67,7 +70,7 @@ from speed_gate import READER_WPS_DEFAULT
 READER_WPS = READER_WPS_DEFAULT
 
 
-def load_dumps(paths):
+def load_dumps(paths: list[str]) -> list[dict[str, Any]]:
     """Read dumps; return a list of {path, label, turns}."""
     dumps = []
     for p in paths:
@@ -86,7 +89,7 @@ def load_dumps(paths):
     return dumps
 
 
-def percentile(sorted_vals, q):
+def percentile(sorted_vals: list[float], q: float) -> float | None:
     """Nearest-rank percentile of a sorted list."""
     if not sorted_vals:
         return None
@@ -94,7 +97,7 @@ def percentile(sorted_vals, q):
     return sorted_vals[idx]
 
 
-def analyze_dump(dump, reader_wps):
+def analyze_dump(dump: dict[str, Any], reader_wps: float) -> dict[str, Any]:
     """All lag metrics for one dump. Reader-line metrics are in WORDS
     per second (addendum 44): each turn's measured server_wps vs the
     5.0 w/s anchor. (The k=3 default-line stall fraction stlD is
@@ -152,7 +155,7 @@ def analyze_dump(dump, reader_wps):
     }
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="Andes-style streaming-lag analysis of live dumps "
         "(turn-granularity stall metrics vs the reader line)"

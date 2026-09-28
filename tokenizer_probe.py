@@ -40,21 +40,24 @@ family per --repo invocation; tokenizers load from the HF cache
 when present, fetching only tokenizer files on first use.
 """
 
+from __future__ import annotations
+
 import argparse
 import glob
 import json
 import os
 import sys
+from typing import Any
 
 CORPUS_DEFAULT = "./live-corpus.json"
 
 
-def count_words(text):
+def count_words(text: str) -> int:
     """The gate's word rule, single-sourced: whitespace words."""
     return len(text.split()) if text.strip() else 0
 
 
-def load_tokenizer(repo):
+def load_tokenizer(repo: str) -> Any:
     """Tokenizer files only - no weights download."""
     try:
         from transformers import AutoTokenizer
@@ -73,14 +76,14 @@ def load_tokenizer(repo):
         )
 
 
-def corpus_texts(corpus_path):
+def corpus_texts(corpus_path: str) -> list[str]:
     """The corpus's user prompts - fixed, pre-registered text set."""
     with open(corpus_path, encoding="utf-8") as f:
         corpus = json.load(f)
     return [t for conv in corpus["conversations"] for t in conv["user_turns"]]
 
 
-def arc_texts(arc_config, arc_num):
+def arc_texts(arc_config: str, arc_num: int) -> list[str]:
     """The ARC prompt set - the second registered text set."""
     import hf_download
 
@@ -88,7 +91,7 @@ def arc_texts(arc_config, arc_num):
     return [q["q"] if isinstance(q, dict) else str(q) for q in questions]
 
 
-def tokenizer_wt(tok, texts, label):
+def tokenizer_wt(tok: Any, texts: list[str], label: str) -> float:
     """Words per token of one text set under one tokenizer."""
     words = sum(count_words(t) for t in texts)
     tokens = sum(len(tok(t)["input_ids"]) for t in texts)
@@ -97,7 +100,7 @@ def tokenizer_wt(tok, texts, label):
     return wt
 
 
-def dump_wt_distribution(path):
+def dump_wt_distribution(path: str) -> dict[str, Any] | None:
     """Measured per-turn w/t from a live dump (v2.1+: gen_words +
     generated tokens per turn). Returns None for legacy dumps."""
     with open(path, encoding="utf-8") as f:
@@ -124,7 +127,7 @@ def dump_wt_distribution(path):
     }
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="offline words/token probe: tokenizer efficiency on "
         "the registered text sets (the w/t predictor's first "

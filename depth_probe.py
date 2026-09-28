@@ -47,10 +47,13 @@ re-measure (fresh noise samples, no dump reuse): unlike the pipeline
 phases this is a one-shot experiment instrument, minutes per model.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
+from typing import Any, NoReturn
 
 import llama_server
 from law_fit import kv_gib
@@ -82,7 +85,7 @@ GUIDE = {
 }
 
 
-def fail(step, what, causes):
+def fail(step: str, what: str, causes: list[str]) -> NoReturn:
     print()
     print("=" * 60)
     print(f"DEPTH PROBE FAILED at {step}: {what}")
@@ -93,7 +96,7 @@ def fail(step, what, causes):
     sys.exit(1)
 
 
-def load_pool(corpus_file, text_file):
+def load_pool(corpus_file: str, text_file: str | None) -> str:
     if text_file:
         with open(text_file) as f:
             return f.read()
@@ -105,7 +108,7 @@ def load_pool(corpus_file, text_file):
     return "\n\n".join(turns)
 
 
-def tokenize(port, content):
+def tokenize(port: int, content: str) -> list[Any]:
     try:
         data = llama_server.post_json(port, "/tokenize", {"content": content})
     except Exception as e:
@@ -116,7 +119,7 @@ def tokenize(port, content):
     return toks
 
 
-def build_blob(port, pool, depth):
+def build_blob(port: int, pool: str, depth: int) -> tuple[str, int]:
     """Repeat the pool past the depth budget, then trim characters until
     the token count lands in [depth - DEPTH_TOLERANCE, depth]."""
     n_pool = len(tokenize(port, pool))
@@ -143,7 +146,7 @@ def build_blob(port, pool, depth):
     return best
 
 
-def probe_depth(port, blob, gen_tokens, samples):
+def probe_depth(port: int, blob: str, gen_tokens: int, samples: int) -> list[dict[str, Any]]:
     """Prime the slot with the blob, then take `samples` identical decode
     samples: after the first request every prefill is a cache hit, so
     each response is a decode sample at the same depth."""
@@ -182,7 +185,9 @@ def probe_depth(port, blob, gen_tokens, samples):
     return recs
 
 
-def summarize(recs, depth_target, reader_tp):
+def summarize(
+    recs: list[dict[str, Any]], depth_target: int, reader_tp: float | None
+) -> dict[str, Any]:
     tps = [r["tps"] for r in recs if r["tps"]]
     if not tps:
         fail("completion", "no predicted_per_second in any sample", GUIDE["completion"])
@@ -215,7 +220,7 @@ def summarize(recs, depth_target, reader_tp):
     }
 
 
-def parse_kv(spec):
+def parse_kv(spec: str) -> tuple[int, int, int, float]:
     parts = [p.strip() for p in spec.split(",")]
     if len(parts) < 3:
         sys.exit(f"bad --kv spec (need layers,kv_heads,head_dim): {spec}")
@@ -224,7 +229,7 @@ def parse_kv(spec):
     return layers, kvh, hd, bpe
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="decode speed at context depth via prefill blobs "
         "(the addendum-11 depth protocol)"
@@ -306,7 +311,7 @@ def main():
     )
 
     extra = ["-ngl", "99", "-c", str(args.ctx)]
-    results = []
+    results: list[dict[str, Any]] = []
     for d in depths:
         # fresh server per depth: the slot cache survives across depths
         # on one server, and consecutive blobs share the corpus pool's

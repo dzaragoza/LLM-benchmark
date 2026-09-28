@@ -52,10 +52,13 @@ One machine's data per invocation: pooled fits mix machines. Manual
 pass only what belongs to the machine being fit.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -73,7 +76,7 @@ READER_PROFILES = {  # Brysbaert 2019, silent English non-fiction,
 }
 
 
-def harvest_state(state_files):
+def harvest_state(state_files: list[str]) -> list[dict[str, Any]]:
     """Every measured (size, worst, mean) pair from pipeline state."""
     pts = []
     for sf in state_files:
@@ -108,7 +111,7 @@ def harvest_state(state_files):
     return pts
 
 
-def parse_points(specs):
+def parse_points(specs: list[str]) -> list[dict[str, Any]]:
     """Manual archive points: 'label,size_gib,worst[,mean]'."""
     pts = []
     for s in specs:
@@ -129,7 +132,9 @@ def parse_points(specs):
     return pts
 
 
-def ols(points, tkey="worst"):
+def ols(
+    points: list[dict[str, Any]], tkey: str = "worst"
+) -> tuple[float, float, float, int] | None:
     """Fit 1/t = a*size + b. Returns (a, b, r2, n)."""
     xs = [p["size"] for p in points]
     ys = [1.0 / p[tkey] for p in points]
@@ -150,13 +155,13 @@ def ols(points, tkey="worst"):
     return a, b, r2, n
 
 
-def law_worst(size_gib, a, b):
+def law_worst(size_gib: float, a: float, b: float) -> float:
     if b <= 0:
         return a * 0 + 1 / (a * size_gib) if a > 0 else float("inf")
     return 1.0 / (a * size_gib + b)
 
 
-def kv_gib(layers, kv_heads, head_dim, depth, bpe=2.0):
+def kv_gib(layers: int, kv_heads: int, head_dim: int, depth: int, bpe: float = 2.0) -> float:
     """KV cache size at depth, from architecture constants.
 
     One K and one V vector per layer per token, each kv_heads x
@@ -166,7 +171,7 @@ def kv_gib(layers, kv_heads, head_dim, depth, bpe=2.0):
     return 2.0 * layers * kv_heads * head_dim * bpe * depth / GIB_BYTES
 
 
-def print_fit(name, a, b, r2, n):
+def print_fit(name: str, a: float, b: float, r2: float, n: int) -> tuple[float, float]:
     bw = 1.0 / a if a > 0 else float("inf")
     tinf = 1.0 / b if b > 0 else float("inf")
     print(
@@ -178,7 +183,7 @@ def print_fit(name, a, b, r2, n):
     return bw, tinf
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="harvest the ladder data, fit the bandwidth->size law, "
         "print the right-sizing boundary size*(floor)"
