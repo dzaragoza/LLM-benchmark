@@ -42,11 +42,14 @@ Writes <model>.session.json next to the model file (both passes' turn
 records plus the streamed arrival-time telemetry).
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
 import time
+from typing import Any
 
 import llama_server
 from speed_gate import (
@@ -62,9 +65,11 @@ CORPUS_DEFAULT = "./live-corpus.json"
 PORT_DEFAULT = 8079
 
 
-def replay_turn(port, history, cap_tokens, thinking, no_thinking):
+def replay_turn(
+    port: int, history: list[dict[str, str]], cap_tokens: int, thinking: bool, no_thinking: bool
+) -> tuple[str, dict[str, Any]]:
     """One gate-faithful non-streaming turn (the gate's own request)."""
-    payload = {
+    payload: dict[str, Any] = {
         "messages": list(history),
         "max_tokens": (cap_tokens + THINK_ALLOWANCE) if thinking else cap_tokens,
         "temperature": 0,
@@ -88,7 +93,9 @@ def replay_turn(port, history, cap_tokens, thinking, no_thinking):
     }
 
 
-def stream_turn(port, history, cap_tokens, thinking, no_thinking):
+def stream_turn(
+    port: int, history: list[dict[str, str]], cap_tokens: int, thinking: bool, no_thinking: bool
+) -> tuple[str, dict[str, Any]]:
     """The live pass: stream the answer to the terminal as it arrives,
     recording per-delta arrival times. Returns (answer, telemetry).
     Per-delta word positions are recorded ("deltas": cumulative word
@@ -132,7 +139,9 @@ def stream_turn(port, history, cap_tokens, thinking, no_thinking):
     }
 
 
-def reader_collision(deltas, n_words, reader_wps, reaction_s):
+def reader_collision(
+    deltas: list[dict[str, Any]], n_words: int, reader_wps: float, reaction_s: float
+) -> dict[str, Any]:
     """The true felt-lag measurement (author ruling, addendum 30) -
     PROTOCOL v3.0 (addendum 55): this simulation IS the speed gate's
     verdict now (speed_gate.reader_wall_test, single-sourced there);
@@ -192,7 +201,7 @@ def reader_collision(deltas, n_words, reader_wps, reaction_s):
     }
 
 
-def resim_mode(session_path, reader_wps, reaction_s):
+def resim_mode(session_path: str, reader_wps: float, reaction_s: float) -> None:
     """Post-hoc re-simulation (no server): read a .session.json and
     re-run the reader-collision simulation at a new reader speed /
     reaction time. The author's reading speed is variable run-to-run;
@@ -231,7 +240,7 @@ def resim_mode(session_path, reader_wps, reaction_s):
     )
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description="replay the gate's conversation live, streaming")
     ap.add_argument(
         "--resim",
@@ -313,7 +322,7 @@ def main():
             sys.exit("no blob budget for this conversation")
 
         # pass 1: gate-faithful non-streaming replay (matches the dump)
-        records = []
+        records: list[dict[str, Any]] = []
         if args.interactive:
             print("  interactive mode: press Enter to send each turn yourself.")
         if not args.stream_only and not args.interactive:

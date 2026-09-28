@@ -19,6 +19,8 @@ Merged in from the former live-bench.py (its server-management half)
 when live-bench was absorbed into speed_gate.py.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -26,9 +28,10 @@ import subprocess
 import sys
 import time
 import urllib.request
+from typing import Any
 
 
-def find_server():
+def find_server() -> str | None:
     """llama-server binary: repo-relative first, pre-reorg HOME fallback.
     Windows builds ship llama-server.exe - pick the right name."""
     home = os.path.expanduser("~")
@@ -43,7 +46,7 @@ def find_server():
     return os.path.join(".", "llama-b10964-gpu", exe)
 
 
-def wait_healthy(port, timeout=300, proc=None):
+def wait_healthy(port: int, timeout: float = 300, proc: Any = None) -> bool:
     """Poll /health until 200. Returns True on healthy; if proc dies,
     or the timeout passes, returns False."""
     url = f"http://127.0.0.1:{port}/health"
@@ -62,15 +65,22 @@ def wait_healthy(port, timeout=300, proc=None):
 
 
 def start_server(
-    model_path, port, extra_args=None, server_bin=None, health_timeout=1800, log_path=None
-):
+    model_path: str,
+    port: int,
+    extra_args: list[str] | None = None,
+    server_bin: str | None = None,
+    health_timeout: float = 1800,
+    log_path: str | None = None,
+) -> tuple[Any, bool]:
     """Launch llama-server on a model. Returns (proc, healthy_bool).
     log_path (addendum 36): capture the server's stdout/stderr instead
     of discarding them - llama.cpp's startup banner carries its own
     memory accounting (model size, KV cache, compute buffers), which
     the memory report parses. The log is truncated per launch (the
     last launch's banner is the reported one)."""
-    cmd = [server_bin or find_server(), "-m", model_path, "--port", str(port)]
+    server = server_bin or find_server()
+    assert server is not None  # the caller (check_tooling) verified the binary exists
+    cmd = [server, "-m", model_path, "--port", str(port)]
     if extra_args:
         cmd += list(extra_args)
     if log_path:
@@ -85,7 +95,7 @@ def start_server(
     return proc, healthy
 
 
-def peak_rss_gib(proc):
+def peak_rss_gib(proc: Any) -> float | None:
     """Peak resident set size (VmHWM) of the server process, in GiB -
     the kernel's own accounting of everything the launch took: model
     weights + KV cache + compute buffers + runtime overhead. This is
@@ -103,7 +113,7 @@ def peak_rss_gib(proc):
     return None
 
 
-def system_memavailable_gib():
+def system_memavailable_gib() -> float | None:
     """System-wide MemAvailable in GiB (Linux /proc/meminfo). The
     before/after difference across a server launch is the launch's
     cost to the MACHINE - immune to the accounting quirks that make
@@ -119,7 +129,7 @@ def system_memavailable_gib():
     return None
 
 
-def memory_cost_gib(before, after):
+def memory_cost_gib(before: float | None, after: float | None) -> float | None:
     """The launch's memory cost from two system_memavailable_gib()
     readings: before minus after. Positive = the launch consumed
     MemAvailable. Guarded against interference (other processes
@@ -130,7 +140,7 @@ def memory_cost_gib(before, after):
     return before - after
 
 
-def parse_memory_log(log_path):
+def parse_memory_log(log_path: str) -> dict[str, Any] | None:
     """Best-effort parse of llama.cpp's own memory accounting from the
     captured server log (addendum 36). The banner format moves between
     builds, so this extracts structured keys where the wording is
@@ -166,7 +176,7 @@ def parse_memory_log(log_path):
     return out
 
 
-def stop_server(proc, port, warn_after=60):
+def stop_server(proc: Any, port: int, warn_after: float = 60) -> bool:
     """Kill the server and verify the port is free (a lingering server
     silently redirects the next run at the WRONG model)."""
     if proc.poll() is None:
@@ -194,7 +204,7 @@ def stop_server(proc, port, warn_after=60):
     return False
 
 
-def post_json(port, endpoint, payload, timeout=1800):
+def post_json(port: int, endpoint: str, payload: dict[str, Any], timeout: float = 1800) -> Any:
     """POST JSON to the server and return the decoded response.
     Supports both chat (/v1/chat/completions) and completion
     (/v1/completions) endpoints - the two request shapes the study
@@ -206,7 +216,7 @@ def post_json(port, endpoint, payload, timeout=1800):
         return json.loads(resp.read().decode("utf-8"))
 
 
-def tokenize(port, content, timeout=300):
+def tokenize(port: int, content: str, timeout: float = 300) -> list[Any]:
     """POST /tokenize: the server's own token count for a text.
     The depth-prefill gate budgets its blob with this (exact per
     model - tokenizers differ), and the words-per-token protocol
@@ -218,7 +228,9 @@ def tokenize(port, content, timeout=300):
     return toks
 
 
-def trim_to_tokens(port, text, target, tolerance=8, max_iter=24):
+def trim_to_tokens(
+    port: int, text: str, target: int, tolerance: int = 8, max_iter: int = 24
+) -> tuple[str, int]:
     """Trim text down to a token budget: returns (text, n_tokens)
     with n_tokens <= target, within tolerance when possible.
     Converges by bisection on character count (tokenizers are
@@ -248,7 +260,12 @@ def trim_to_tokens(port, text, target, tolerance=8, max_iter=24):
     return best
 
 
-def stream_completion(port, payload, timeout=1800, meta=None):
+def stream_completion(
+    port: int,
+    payload: dict[str, Any],
+    timeout: float = 1800,
+    meta: dict[str, Any] | None = None,
+) -> Any:
     """POST a streaming /v1/chat/completions request and yield content
     deltas as they arrive, with per-delta wall arrival times (the
     felt-experience view the non-streaming gate cannot see: TTFT and

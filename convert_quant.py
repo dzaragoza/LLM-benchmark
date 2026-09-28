@@ -13,9 +13,12 @@ Create stage of the pipeline (its phase 2).
 Imported by full_benchmark.py; file helpers shared from hf_download.py.
 """
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
+from typing import NoReturn
 
 import hf_download
 
@@ -35,7 +38,7 @@ GUIDE = {
 }
 
 
-def fail(phase, rung, what, causes):
+def fail(phase: int, rung: str, what: str, causes: list[str]) -> NoReturn:
     """Abort loudly for one phase, with reader guidance."""
     print()
     print("=" * 60)
@@ -49,7 +52,7 @@ def fail(phase, rung, what, causes):
     sys.exit(1)
 
 
-def run_quiet(cmd, log_path, phase, rung, what):
+def run_quiet(cmd: list[str], log_path: str, phase: int, rung: str, what: str) -> int:
     """Quiet tooling (author ruling, addendum 38): the converter's and
     quantizer's stdout/stderr is captured to log_path and printed
     only when the tool fails - success stays silent."""
@@ -68,7 +71,7 @@ def run_quiet(cmd, log_path, phase, rung, what):
     return r.returncode
 
 
-def create(fam, famdir, rung, plan="", dry_run=False):
+def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = False) -> str | None:
     """Phase 2: ensure the rung file exists locally. Returns its path
     (None on dry run with nothing to do)."""
     p = hf_download.local_rung(famdir, rung)

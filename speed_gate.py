@@ -90,6 +90,8 @@ CLI (standalone use, from the repo root):
 Imported by full_benchmark.py (bench, analyze, live_dump_name).
 """
 
+from __future__ import annotations
+
 import argparse
 import glob
 import json
@@ -98,6 +100,7 @@ import os
 import random
 import sys
 import time
+from typing import Any, NoReturn
 
 import llama_server
 
@@ -143,7 +146,7 @@ GUIDE = {
 }
 
 
-def fail(phase, rung, what, causes):
+def fail(phase: int, rung: str, what: str, causes: list[str]) -> NoReturn:
     """Abort loudly for one phase, with reader guidance."""
     print()
     print("=" * 60)
@@ -161,7 +164,7 @@ def fail(phase, rung, what, causes):
 # (from the former live-bench.py, verbatim protocol)
 
 
-def make_english_sample(n_sample=5000):
+def make_english_sample(n_sample: int = 5000) -> None:
     import pyarrow.parquet as pq
 
     files = sorted(glob.glob(os.path.join(ARENA_DIR, "**", "*.parquet"), recursive=True))
@@ -191,7 +194,14 @@ def make_english_sample(n_sample=5000):
     print(f"{len(english)} English conversations; wrote {len(sample)}-conv sample -> {SAMPLE_OUT}")
 
 
-def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns, max_cap_tokens):
+def make_corpus(
+    arena_file: str,
+    out_file: str,
+    n_conversations: int,
+    min_turns: int,
+    max_turns: int,
+    max_cap_tokens: int,
+) -> None:
     with open(arena_file) as f:
         items = json.load(f)
 
@@ -253,7 +263,7 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns, max
 # =========================================================== measurement
 
 
-def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
+def depth_budget(user_turns: list[str], cap_tokens: int, ctx: int, thinking: bool = False) -> int:
     """Per-conversation blob budget: the deepest turn must land at the
     reference depth without ever exceeding ctx (context shift would
     silently discard the blob - and gemma-3 hard-errors on shift).
@@ -278,7 +288,7 @@ def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
     return max(0, budget)
 
 
-def build_blob(port, pool, budget):
+def build_blob(port: int, pool: str, budget: int) -> tuple[str | None, int]:
     """Depth-prefill blob for one conversation: repeated corpus text
     trimmed to the exact per-model token budget via /tokenize."""
     if budget <= 0:
@@ -288,7 +298,12 @@ def build_blob(port, pool, budget):
     return llama_server.trim_to_tokens(port, text, budget)
 
 
-def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT, reaction_s=READER_REACTION_S):
+def reader_wall_test(
+    deltas: list[dict[str, Any]],
+    n_words: int,
+    reader_wps: float = READER_WPS_DEFAULT,
+    reaction_s: float = READER_REACTION_S,
+) -> dict[str, Any]:
     """The guarantee's verdict, protocol v3.0 (author ruling, addendum
     55): simulate the reader on the per-word arrival stream - the
     registered addendum-30 collision model, exact form. The reader
@@ -342,16 +357,16 @@ def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT, reaction_s=
 
 
 def run_conversation(
-    port,
-    user_turns,
-    cap_tokens,
-    ctx_tokens,
-    thinking=False,
-    no_thinking=False,
-    blob=None,
-    blob_tokens=0,
-    reader_wps=None,
-):
+    port: int,
+    user_turns: list[str],
+    cap_tokens: int,
+    ctx_tokens: int,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    blob: str | None = None,
+    blob_tokens: int = 0,
+    reader_wps: float | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     """Protocol v2: the conversation runs ON TOP of the depth prefill.
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
@@ -378,7 +393,7 @@ def run_conversation(
         history.append({"role": "assistant", "content": "Understood."})
     for i, question in enumerate(user_turns):
         history.append({"role": "user", "content": question})
-        payload = {
+        payload: dict[str, Any] = {
             "messages": list(history),
             "max_tokens": (cap_tokens + THINK_ALLOWANCE) if thinking else cap_tokens,
             "temperature": 0,
@@ -502,17 +517,17 @@ NOISE_OVERHEAD = 96  # rendered noise message + template wrappers
 
 
 def noise_sample(
-    port,
-    history,
-    cap_tokens,
-    ctx_tokens,
-    blob_tokens=0,
-    thinking=False,
-    no_thinking=False,
-    samples=2,
-    last_prompt_n=None,
-    last_gen_tokens=None,
-):
+    port: int,
+    history: list[dict[str, str]],
+    cap_tokens: int,
+    ctx_tokens: int,
+    blob_tokens: int = 0,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    samples: int = 2,
+    last_prompt_n: int | None = None,
+    last_gen_tokens: int | None = None,
+) -> list[dict[str, Any]]:
     """Same-depth noise samples: a short follow-up appended to the
     conversation's own history. The follow-up MUST ride the history:
     llama-server's slot cache reuses only the longest common token
@@ -607,18 +622,18 @@ def noise_sample(
 
 
 def bench_model(
-    model,
-    corpus_file,
-    port,
-    ctx,
-    repeats,
-    thinking=False,
-    no_thinking=False,
-    server_bin=None,
-    label=None,
-    reader_wps=None,
-    n_conversations=None,
-):
+    model: str,
+    corpus_file: str,
+    port: int,
+    ctx: int,
+    repeats: int,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    server_bin: str | None = None,
+    label: str | None = None,
+    reader_wps: float | None = None,
+    n_conversations: int | None = None,
+) -> tuple[list[dict[str, Any]], tuple[str, float, float] | None, list[dict[str, Any]]]:
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
@@ -758,7 +773,7 @@ def bench_model(
                         "rep": rep,
                         "peak_rss_gib": peak,
                         "mem_cost_gib": cost,
-                        **llama_server.parse_memory_log(log_path),
+                        **(llama_server.parse_memory_log(log_path) or {}),
                     }
                 )
                 note = (
@@ -804,7 +819,7 @@ def bench_model(
         )
         summary = (label, worst, avg_worsts)
     if noise_records:
-        ntps = [r["tps"] for r in noise_records if r.get("tps")]
+        ntps = [float(r["tps"]) for r in noise_records if r.get("tps")]
         if ntps:
             nw = min(ntps)
             nm = sum(ntps) / len(ntps)
@@ -813,7 +828,9 @@ def bench_model(
                 f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})"
             )
     if mem_reports:
-        peaks = [m["peak_rss_gib"] for m in mem_reports]
+        peaks = [
+            float(v) for m in mem_reports if isinstance(v := m.get("peak_rss_gib"), (int, float))
+        ]
         print(
             f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
             f"across {len(peaks)} rep(s) - file "
@@ -827,7 +844,7 @@ def bench_model(
 # =========================================================== dump + verdict
 
 
-def live_dump_name(path, thinking=False, no_thinking=False):
+def live_dump_name(path: str, thinking: bool = False, no_thinking: bool = False) -> str:
     """Mode-suffixed dump name: a thinking-mode dump must NEVER be reused
     by a non-thinking run (or vice versa) - the resume check compares
     timestamps only, so the mode must live in the filename (Session 25
@@ -841,19 +858,19 @@ def live_dump_name(path, thinking=False, no_thinking=False):
 
 
 def bench(
-    path,
-    corpus,
-    dry_run,
-    thinking=False,
-    no_thinking=False,
-    port=PORT_DEFAULT,
-    ctx=CTX_DEFAULT,
-    repeats=REPEATS_DEFAULT,
-    dump_override=None,
-    force=False,
-    reader_wps=None,
-    conversations=None,
-):
+    path: str,
+    corpus: str,
+    dry_run: bool,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    port: int = PORT_DEFAULT,
+    ctx: int = CTX_DEFAULT,
+    repeats: int = REPEATS_DEFAULT,
+    dump_override: str | None = None,
+    force: bool = False,
+    reader_wps: float | None = None,
+    conversations: int | None = None,
+) -> str:
     """Phase 3: live-bench the model file; returns the dump path.
     force: re-measure even if a valid newer dump exists (the resume
     machinery is the pipeline default; --force is the re-measurement
@@ -931,8 +948,12 @@ def bench(
 
 
 def analyze(
-    path, thinking=False, no_thinking=False, dump_override=None, reader_wps=READER_WPS_DEFAULT
-):
+    path: str,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    dump_override: str | None = None,
+    reader_wps: float = READER_WPS_DEFAULT,
+) -> dict[str, Any]:
     """Phase 4: the guarantee verdict from the dump.
 
     Protocol v2.1 (author catch, Session 27): t/s is not w/s. The
@@ -1084,7 +1105,7 @@ def analyze(
 # =========================================================== CLI
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="speed gate: live-bench a model and grade the worst "
         "turn against the reader line (absorbs the former "

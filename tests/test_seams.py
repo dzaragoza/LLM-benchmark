@@ -87,7 +87,7 @@ def test_run_ranking_uses_selected_only_and_records(tmp_path):
             return list(labels), {m: 0.5 for m in labels}, {}
 
     fb_mcnemar = fb.mcnemar
-    fb.mcnemar = FakeMcnemar()
+    fb.mcnemar = FakeMcnemar()  # ty: ignore[invalid-assignment]
     try:
         state = make_state()
         _, selections, _ = fb.prepare_phase56(make_args(), state)

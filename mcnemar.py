@@ -13,12 +13,15 @@ Standalone use (from the repo root):
 Imported by full-benchmark.py (rank, pairs_from_csvs, csv_per_question).
 """
 
+from __future__ import annotations
+
 import argparse
 import csv as _csv
 import math
 import os
 import sys
 from itertools import combinations
+from typing import Any, NoReturn
 
 ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
@@ -31,7 +34,7 @@ GUIDE = {
 }
 
 
-def fail(phase, rung, what, causes):
+def fail(phase: int, rung: str, what: str, causes: list[str]) -> NoReturn:
     """Abort loudly for one phase, with reader guidance."""
     print()
     print("=" * 60)
@@ -45,15 +48,15 @@ def fail(phase, rung, what, causes):
     sys.exit(1)
 
 
-def safe_label(label):
+def safe_label(label: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in label)
 
 
-def arc_csv_path(arc_dir, label):
+def arc_csv_path(arc_dir: str, label: str) -> str:
     return os.path.join(arc_dir, safe_label(label) + "-arc-timing.csv")
 
 
-def csv_per_question(path, label, arc_num, arc_dir):
+def csv_per_question(path: str | None, label: str, arc_num: int, arc_dir: str) -> dict[int, bool]:
     """Load one model's CSV as {question_id: correct_bool}; fail if
     missing or short. path may be None to resolve from label+arc_dir."""
     p = path if path else arc_csv_path(arc_dir, label)
@@ -80,7 +83,7 @@ def csv_per_question(path, label, arc_num, arc_dir):
 # =========================================================== statistic
 
 
-def binom_two_sided(k, n, p=0.5):
+def binom_two_sided(k: int, n: int, p: float = 0.5) -> float:
     """Exact two-sided binomial p-value, computed in log space.
 
     math.comb(n, i) * p**i * (1-p)**(n-i) overflows float conversion
@@ -109,14 +112,16 @@ def binom_two_sided(k, n, p=0.5):
     return min(1.0, math.exp(math.log(total) + shift))
 
 
-def mcnemar_exact(b, c):
+def mcnemar_exact(b: int, c: int) -> float:
     n = b + c
     if n == 0:
         return 1.0
     return binom_two_sided(min(b, c), n)
 
 
-def pairs_from_csvs(models, arc_num, arc_dir):
+def pairs_from_csvs(
+    models: dict[str, dict[int, bool]], arc_num: int, arc_dir: str
+) -> tuple[list[str], dict[str, int], dict[str, dict[str, float]]]:
     """models: {label: per_question_dict}. Returns the pairs dict."""
     scores = {m: sum(v.values()) for m, v in models.items()}
     ranking = sorted(models, key=lambda m: (-scores[m], m))
@@ -137,7 +142,9 @@ def pairs_from_csvs(models, arc_num, arc_dir):
     return ranking, scores, pairs
 
 
-def print_ranking(ranking, scores, pairs, arc_num):
+def print_ranking(
+    ranking: list[str], scores: dict[str, int], pairs: dict[str, Any], arc_num: int
+) -> None:
     print()
     print("=" * 60)
     print(f"FINAL RANKING (ARC-Challenge, n={arc_num}, exact McNemar)")
@@ -158,7 +165,9 @@ def print_ranking(ranking, scores, pairs, arc_num):
     print("=" * 60)
 
 
-def rank(labels, arc_num, arc_dir):
+def rank(
+    labels: list[str], arc_num: int, arc_dir: str
+) -> tuple[list[str], dict[str, int], dict[str, Any]]:
     """Pairwise exact McNemar; the pipeline's FINAL OUTPUT is this
     ranking. Returns (ranking, scores, pairs)."""
     models = {}
@@ -172,7 +181,7 @@ def rank(labels, arc_num, arc_dir):
 # =========================================================== main
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description="exact McNemar ranking from per-question ARC CSVs")
     ap.add_argument(
         "--labels",

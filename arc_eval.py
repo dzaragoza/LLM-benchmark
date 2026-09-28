@@ -21,11 +21,15 @@ Imported by full_benchmark.py (arc_run, arc_csv_path, arc_csv_valid,
 safe_label).
 """
 
+from __future__ import annotations
+
 import argparse
 import csv as _csv
 import os
 import sys
 import time
+from collections.abc import Callable
+from typing import Any, NoReturn
 
 import hf_download
 import llama_server
@@ -55,7 +59,7 @@ GUIDE = {
 }
 
 
-def fail(phase, rung, what, causes):
+def fail(phase: int, rung: str, what: str, causes: list[str]) -> NoReturn:
     """Abort loudly for one phase, with reader guidance."""
     print()
     print("=" * 60)
@@ -74,7 +78,7 @@ SERVER_BIN = llama_server.find_server()
 # =========================================================== questions
 
 
-def build_prompt(q):
+def build_prompt(q: dict[str, Any]) -> str:
     prompt = f"Question: {q['q']}\n"
     for label, text in q["choices"]:
         prompt += f"{label}) {text}\n"
@@ -85,7 +89,7 @@ def build_prompt(q):
 # =========================================================== scoring
 
 
-def arc_score_one(q, port):
+def arc_score_one(q: dict[str, Any], port: int) -> tuple[bool, float, int]:
     """One question: compare logprobs of answer letters."""
     prompt = build_prompt(q)
     t0 = time.perf_counter()
@@ -108,7 +112,7 @@ def arc_score_one(q, port):
         pass
     correct = False
     if logps:
-        correct = max(logps, key=logps.get) == q["ans"]
+        correct = max(logps, key=lambda k: logps[k]) == q["ans"]
     else:
         try:
             gen = r["choices"][0]["text"].strip()
@@ -121,14 +125,14 @@ def arc_score_one(q, port):
 # =========================================================== server
 
 
-def arc_start_server(model_path):
+def arc_start_server(model_path: str) -> tuple[Any, bool]:
     """Launch llama-server for ARC (llama_server.py does the lifecycle).
     Returns (proc, healthy)."""
     extra = ["-t", str(ARC_THREADS), "-c", str(ARC_CTX), "-ngl", str(ARC_NGPU)]
     return start_server(model_path, ARC_PORT, extra, SERVER_BIN)
 
 
-def arc_stop_server(proc):
+def arc_stop_server(proc: Any) -> None:
     """Kill the server and verify the port is free (llama_server.py)."""
     stop_server(proc, ARC_PORT)
 
@@ -136,15 +140,15 @@ def arc_stop_server(proc):
 # =========================================================== csv
 
 
-def safe_label(label):
+def safe_label(label: str) -> str:
     return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in label)
 
 
-def arc_csv_path(arc_dir, label):
+def arc_csv_path(arc_dir: str, label: str) -> str:
     return os.path.join(arc_dir, safe_label(label) + "-arc-timing.csv")
 
 
-def arc_csv_valid(path, n):
+def arc_csv_valid(path: str, n: int) -> bool:
     """Complete run = exactly n question rows, ids 0..n-1."""
     if not os.path.isfile(path):
         return False
@@ -161,7 +165,7 @@ def arc_csv_valid(path, n):
 # =========================================================== run
 
 
-def arc_ctx_precondition(questions, label):
+def arc_ctx_precondition(questions: list[dict[str, Any]], label: str) -> int:
     """The ctx precondition (addendum 44; ctx now 4096, addendum 45):
     every rendered prompt is verified against the server's ctx before
     any run starts. A raw /v1/completions prompt that overflowed ctx
@@ -180,7 +184,15 @@ def arc_ctx_precondition(questions, label):
     return worst
 
 
-def arc_run(label, model_path, questions, arc_num, arc_dir, on_scored=None, dry_run=False):
+def arc_run(
+    label: str,
+    model_path: str,
+    questions: list[dict[str, Any]],
+    arc_num: int,
+    arc_dir: str,
+    on_scored: Callable[[str, float], None] | None = None,
+    dry_run: bool = False,
+) -> str:
     """Full strict-ARC run on one model. Post-condition: complete CSV
     (or a dry-run report). on_scored(label, score) fires once per
     completed model - the caller uses it to persist resume state."""
@@ -235,7 +247,7 @@ def arc_run(label, model_path, questions, arc_num, arc_dir, on_scored=None, dry_
 # =========================================================== main
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(
         description="strict ARC-Challenge evaluation on a list of models "
         "(raw completions, logprob letter scoring)"

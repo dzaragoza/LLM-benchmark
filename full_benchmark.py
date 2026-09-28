@@ -72,6 +72,8 @@ Usage (from the repo root):
   confirms no reasoning appears).
 """
 
+from __future__ import annotations
+
 import argparse
 import glob
 import json
@@ -79,6 +81,7 @@ import os
 import subprocess
 import sys
 import time
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -129,7 +132,7 @@ fail = hf_download.fail
 _SWEEP_T0 = time.time()
 
 
-def stamp(msg):
+def stamp(msg: str) -> None:
     elapsed_min = (time.time() - _SWEEP_T0) / 60.0
     print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')} +{elapsed_min:.0f}m] {msg}")
 
@@ -154,7 +157,7 @@ PLAN_COST_MIN = {
 }
 
 
-def classify_plan(plan):
+def classify_plan(plan: str) -> str:
     """One acquisition plan string -> its cost class."""
     if plan.startswith("local file"):
         return "local"
@@ -167,7 +170,7 @@ def classify_plan(plan):
     return "unknown"
 
 
-def estimate_runtime(state):
+def estimate_runtime(state: dict[str, Any]) -> tuple[dict[str, int], int]:
     """State -> (plan_counts, total_min). Infeasible cells excluded."""
     counts, total = {}, 0
     for fst in state.get("families", {}).values():
@@ -189,7 +192,9 @@ def estimate_runtime(state):
 # (addendum 87). Pure: state -> [(family, rung, run), ...].
 
 
-def collect_arc_jobs(state, roster=None):
+def collect_arc_jobs(
+    state: dict[str, Any], roster: list[str] | None = None
+) -> list[tuple[str, str, dict[str, Any]]]:
     jobs = []
     for fam, fst in state.get("families", {}).items():
         if roster is not None and fam not in roster:
@@ -207,14 +212,14 @@ def collect_arc_jobs(state, roster=None):
 # =========================================================== state
 
 
-def load_state(path):
+def load_state(path: str) -> dict[str, Any]:
     if os.path.isfile(path):
         with open(path) as f:
             return json.load(f)
     return {"families": {}}
 
 
-def save_state(path, state):
+def save_state(path: str, state: dict[str, Any]) -> None:
     # --dry-run is a READ-ONLY pre-flight (addendum 79): a dry run must
     # never write the state file, or the pre-flight-then-real-run way
     # of working would poison the real run (phases marked done with no
@@ -229,17 +234,17 @@ def save_state(path, state):
 
 
 def process_family(
-    spec,
-    corpus,
-    models_dir,
-    state,
-    state_path,
-    dry_run,
-    force,
-    thinking=False,
-    no_thinking=False,
-    reader_wps=READER_WPS_DEFAULT,
-):
+    spec: str,
+    corpus: str,
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    dry_run: bool,
+    force: bool,
+    thinking: bool = False,
+    no_thinking: bool = False,
+    reader_wps: float = READER_WPS_DEFAULT,
+) -> None:
     model_repo, _, source_repo = spec.partition("=")
     if not source_repo:
         source_repo = model_repo
@@ -296,6 +301,7 @@ def process_family(
             )
 
     hf_download.require_hub()
+    assert list_repo_files is not None  # require_hub exits when the hub is missing
     try:
         model_files = list_repo_files(model_repo)
         source_files = model_files if source_repo == model_repo else list_repo_files(source_repo)
@@ -333,6 +339,7 @@ def process_family(
             print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
             stamp("      phase 2 done (create)")
         path = run.get("file") or local_rung(famdir, rung)
+        assert path is not None  # phases 1-2 guarantee it on real runs
         if dry_run and not path:
             print(f"  [3] would live-bench the {rung} file")
             print(
@@ -396,7 +403,7 @@ def process_family(
 # =========================================================== main
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="end-to-end benchmark: quant selection, strict full "
         "ARC, exact-McNemar ranking - one final output"
@@ -477,7 +484,7 @@ def build_parser():
     return ap
 
 
-def main():
+def main() -> None:
     ap = build_parser()
     args = ap.parse_args()
     global DRY_RUN_ACTIVE
@@ -515,7 +522,7 @@ def main():
     stamp("run complete")
 
 
-def check_tooling(args):
+def check_tooling(args: argparse.Namespace) -> None:
     """Verify the run's tooling (real runs only; addendum 79)."""
 
     for path, msg in [
@@ -531,13 +538,13 @@ def check_tooling(args):
             "./llama.cpp/convert_hf_to_gguf.py",
             "converter not found - the llama.cpp checkout must be in the repo root",
         ),
-        (SERVER_BIN, "llama-server not found - place the b10964 build in the repo root"),
+        (SERVER_BIN or "", "llama-server not found - place the b10964 build in the repo root"),
     ]:
         if not os.path.isfile(path):
             sys.exit(msg)
 
 
-def sweep_families(args, state):
+def sweep_families(args: argparse.Namespace, state: dict[str, Any]) -> list[tuple[str, str]]:
     """Phase A: bench every family (per-family isolation, addendum 78)."""
     # Addendum 78, item 4: per-family isolation IN THE TOOL - a family
     # that dies (conversion OOM, unsupported architecture, a bad repo)
@@ -567,7 +574,9 @@ def sweep_families(args, state):
     return failed_families
 
 
-def preflight_report(args, state, failed_families):
+def preflight_report(
+    args: argparse.Namespace, state: dict[str, Any], failed_families: list[tuple[str, str]]
+) -> None:
     """The --dry-run read-only report (addendum 79) + estimate (83)."""
     if args.dry_run:
         print()
@@ -618,7 +627,9 @@ def preflight_report(args, state, failed_families):
         return
 
 
-def prepare_phase56(args, state):
+def prepare_phase56(
+    args: argparse.Namespace, state: dict[str, Any]
+) -> tuple[list[str], dict[str, dict[str, Any]], list[tuple[str, str, dict[str, Any]]]]:
     """Roster, selections, and the ARC job list (addendum 86)."""
     # ---- phases 5-6: full ARC on selected models, then the ranking
     roster = (
@@ -636,7 +647,12 @@ def prepare_phase56(args, state):
     return roster, selections, arc_jobs
 
 
-def report_roster_notes(args, state, roster, failed_families):
+def report_roster_notes(
+    args: argparse.Namespace,
+    state: dict[str, Any],
+    roster: list[str],
+    failed_families: list[tuple[str, str]],
+) -> None:
     """The roster missing-note and the failed-families note."""
     if roster is not None:
         missing = [
@@ -656,7 +672,11 @@ def report_roster_notes(args, state, roster, failed_families):
             print(f"  {spec}: {err}")
 
 
-def run_arc_phase(args, state, arc_jobs):
+def run_arc_phase(
+    args: argparse.Namespace,
+    state: dict[str, Any],
+    arc_jobs: list[tuple[str, str, dict[str, Any]]],
+) -> None:
     """Phase 5: full ARC on every benched model (addendum 86)."""
     if arc_jobs:
         print()
@@ -697,7 +717,11 @@ def run_arc_phase(args, state, arc_jobs):
         print("\nno benched family rungs yet - skipping ARC phase")
 
 
-def run_ranking(args, state, selections):
+def run_ranking(
+    args: argparse.Namespace,
+    state: dict[str, Any],
+    selections: dict[str, dict[str, Any]],
+) -> None:
     """Phase 6: exact-McNemar ranking over the SELECTED models."""
     # ---- phase 6: the McNemar ranking over the SELECTED models
     rank_labels = [f"{fam} {state['families'][fam]['selected']}" for fam in selections]
@@ -721,7 +745,7 @@ def run_ranking(args, state, selections):
         print("\nno family has a selection yet - skipping the ranking")
 
 
-def write_results(args, state):
+def write_results(args: argparse.Namespace, state: dict[str, Any]) -> None:
     """The results file: everything for later analysis."""
     # ---- results file: everything for later analysis
     results = []
@@ -744,7 +768,7 @@ def write_results(args, state):
     print(f"all data     -> {args.results_file}")
 
 
-def print_wt_table(state):
+def print_wt_table(state: dict[str, Any]) -> None:
     """The per-model w/t calibration table (addendum 78, item 4)."""
     # ---- addendum 78, item 4: the per-model w/t calibration inline
     # (the addendum-74 lesson: grading waited on a manual extraction).
@@ -769,7 +793,7 @@ def print_wt_table(state):
 # =========================================================== git tail
 
 
-def git_tail(args):
+def git_tail(args: argparse.Namespace) -> None:
     stamp("committing artifacts to git (state, results, dumps, mem sidecars, ARC CSVs)")
     paths = [args.state_file, args.results_file]
     # per-turn dumps + mem sidecars: the grading instrument's raw data
