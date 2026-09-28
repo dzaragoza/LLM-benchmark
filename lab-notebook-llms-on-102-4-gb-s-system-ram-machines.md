@@ -3634,3 +3634,22 @@ The exact predictor for self-made quants is two-term config
 arithmetic (body@8.5 + embedding, tied/untied, per config.json) -
 queued for the author's machine (HF API blocked from the agent
 sandbox; one huggingface_hub read per family).
+
+### Session 33, addendum 110 - size_predict.py: config-only file sizes, the converter policy identified
+
+Author question: "could you compute the sizes only having
+config.json?" Yes. The addendum-109 residual is now identified as
+llama.cpp's --leave-output-tensor default: the OUTPUT tensor (the
+lm_head; the embedding when tie_word_embeddings is true) stays F16
+while everything else quantizes to exactly 8.5 bpw. With that rule
+the per-tensor arithmetic hits the measured v3.1 qwen set at -2.7%
+to +3.1% (0.5B through untied 4B), versus -9% to -21% for the naive
+all-Q8_0 arithmetic. The 4.29-vs-3.99 4B split is tie_word_embeddings
+read from the config (the untied premium is exactly the embedding at
+Q8_0, 0.38 GiB). Registered as size_predict.py (config.json in,
+params + Q8_0 GiB out; MoE and non-standard configs REFUSED loudly
+rather than mis-predicted; 7 tests pinning the measured set). Also
+answered from the code: the speed gate DOES prefill the KV cache -
+each conversation runs on a corpus blob sized via /tokenize so the
+deepest turn lands just under ctx 4096 (speed_gate.py "depth
+prefill"), retained by cache_prompt turn-to-turn.
