@@ -139,6 +139,69 @@ def stamp(msg):
 DRY_RUN_ACTIVE = False
 
 
+# =========================================================== estimator
+# Addendum 83: the dry-run run-time estimate. Pure: state in, counts
+# and minutes out. Extracted from main() for the test suite
+# (addendum 87) - the classification-order rule (f16 BEFORE download)
+# is the bug class the tests pin.
+
+PLAN_COST_MIN = {
+    "local": 15,
+    "download": 30,
+    "f16_quantize": 45,
+    "convert_quantize": 60,
+    "unknown": 45,
+}
+
+
+def classify_plan(plan):
+    """One acquisition plan string -> its cost class."""
+    if plan.startswith("local file"):
+        return "local"
+    if "f16 from" in plan:
+        return "f16_quantize"
+    if plan.startswith("download "):
+        return "download"
+    if ("safetensors from" in plan
+            or "pytorch_model.bin from" in plan):
+        return "convert_quantize"
+    return "unknown"
+
+
+def estimate_runtime(state):
+    """State -> (plan_counts, total_min). Infeasible cells excluded."""
+    counts, total = {}, 0
+    for fst in state.get("families", {}).values():
+        for run in fst.get("runs", {}).values():
+            plan = run.get("plan", "") or ""
+            verdict = run.get("verdict", "") or ""
+            if not plan or verdict.startswith("FAIL (infeasible"):
+                continue
+            cls = classify_plan(plan)
+            counts[cls] = counts.get(cls, 0) + 1
+            total += PLAN_COST_MIN[cls]
+    return counts, total
+
+
+# =========================================================== arc jobs
+# Addendum 86: ARC runs on EVERY benched family (PASS or FAIL
+# verdict) with a file; the only skip is an already-complete CSV
+# (inside arc_eval.arc_run). Extracted from main() for the test suite
+# (addendum 87). Pure: state -> [(family, rung, run), ...].
+
+def collect_arc_jobs(state, roster=None):
+    jobs = []
+    for fam, fst in state.get("families", {}).items():
+        if roster is not None and fam not in roster:
+            continue
+        for rung, run in fst.get("runs", {}).items():
+            if (run.get("file") and run.get("verdict")
+                    and not str(run["verdict"]).startswith(
+                        "FAIL (infeasible")):
+                jobs.append((fam, rung, run))
+    return jobs
+
+
 # =========================================================== state
 
 def load_state(path):
@@ -428,34 +491,7 @@ def main():
         # cells, acquisition-dominated), split by acquisition-plan
         # class. Pre-registered brackets, converted to measurements as
         # sweep 2's stamps land.
-        PLAN_COST_MIN = {
-            "local": 15,
-            "download": 30,
-            "f16_quantize": 45,
-            "convert_quantize": 60,
-            "unknown": 45,
-        }
-        plan_counts = {}
-        total_min = 0
-        for fst in state.get("families", {}).values():
-            for run in fst.get("runs", {}).values():
-                plan = run.get("plan", "") or ""
-                verdict = run.get("verdict", "") or ""
-                if not plan or verdict.startswith("FAIL (infeasible"):
-                    continue
-                if plan.startswith("local file"):
-                    cls = "local"
-                elif "f16 from" in plan:
-                    cls = "f16_quantize"
-                elif plan.startswith("download "):
-                    cls = "download"
-                elif ("safetensors from" in plan
-                      or "pytorch_model.bin from" in plan):
-                    cls = "convert_quantize"
-                else:
-                    cls = "unknown"
-                plan_counts[cls] = plan_counts.get(cls, 0) + 1
-                total_min += PLAN_COST_MIN[cls]
+        plan_counts, total_min = estimate_runtime(state)
         if plan_counts:
             print("  run-time estimate (run-1 brackets by acquisition "
                   "class):")
@@ -493,21 +529,12 @@ def main():
               [os.path.basename(s.partition("=")[0].rstrip("/"))
                for s in args.families])
     selections = {}
-    arc_jobs = []
     for fam, fst in state["families"].items():
         if roster is not None and fam not in roster:
             continue
         if fst.get("selected") and fst["runs"][fst["selected"]].get("file"):
             selections[fam] = fst["runs"][fst["selected"]]
-        # Addendum 86: ARC runs on EVERY benched family - PASS or FAIL
-        # verdict alike; the only skip is an already-complete CSV
-        # (arc_csv_valid, inside arc_eval.arc_run). Infeasible and
-        # not-yet-benched families have no file and are excluded.
-        for rung, run in fst.get("runs", {}).items():
-            if (run.get("file") and run.get("verdict")
-                    and not str(run["verdict"]).startswith(
-                        "FAIL (infeasible")):
-                arc_jobs.append((fam, rung, run))
+    arc_jobs = collect_arc_jobs(state, roster)
     if roster is not None:
         missing = [f for f in roster
                    if f not in state.get("families", {})
