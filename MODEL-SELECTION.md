@@ -125,6 +125,17 @@ README's "Roster selection" section is a summary that points here.
     `--arc-only`/`--arc-models` ad-hoc paths are removed; the McNemar
     ranking still uses the selected (PASS) models only.
 
+16. **The way of working: tests before any sweep (addendum 87).**
+    `python3 -m pytest tests/ -q` runs before any benchmark command
+    (seconds, no network/models/GPU). The suite pins the four
+    contracts the study depends on: the registered-constants
+    arithmetic (PROTOCOL.md-derived ceiling/law/band), the state-file
+    contract (the addendum-79 dry-run never-writes guard), the
+    addendum-83 plan classifier (f16-before-download order), and the
+    addendum-86 ARC-jobs filter (PASS and FAIL both ARC; infeasible
+    and unbenched skip). Any edit to full_benchmark.py that breaks a
+    contract fails here first.
+
 **Future work (addendum 86):** the 51.2 GB/s-class replication run is
 OUT of this study's execution plan — the v3.1 benchmark methodology
 is too time-consuming to replicate at a second machine class. The
