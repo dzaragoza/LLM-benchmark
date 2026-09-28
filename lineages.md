@@ -201,8 +201,13 @@ granite-4.2-3b and granite-4.1-3b carry thinking toggles (run
 non-thinking, rule 8); granite-4.0-h-micro is a hybrid Mamba-2/transformer
 (llama.cpp support to be verified before acquisition; the dense
 granite-4.0-micro is the same-size fallback, and the hybrid-vs-dense
-pair is its own datum). The 4.0-nano tier (1.5B/1B/350M, each in
-hybrid-H and dense versions) enters under the addendum-78 ceiling —
+pair is its own datum). The 4.0-1b pair (1b / h-1b — ADDENDUM 81
+CORRECTION: the addendum-78 "nano tier" never existed on the hub, a
+phantom from bad web facts; the real ~1B tier is 4.0-1b (dense) and
+4.0-h-1b (hybrid-H), both with official Q8_0 GGUF repos, both
+GraniteMoeHybridForCausalLM — llama.cpp b10964 support VERIFIED at the
+source: the converter registers the arch and the runtime carries
+LLM_ARCH_GRANITE_HYBRID) enters under the addendum-78 ceiling —
 the whole-lineage rule, no picking and choosing. All values
 PRE-REGISTERED (addenda 76/78) under the pooled anchor 0.366 — none
 measured yet; the probe-first step may re-anchor per family before
@@ -218,8 +223,8 @@ any weights download.
 | granite-3.2-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.1-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.0-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
-| granite-4.0-h-nano | 1.5B | 1.60 (P) | pending | predicted 10.61 | — | — |
-| granite-4.0-nano (the dense 1B twin) | 1B | 1.07 (P) | pending | predicted 13.31 | — | — |
+| granite-4.0-1b (dense ~1B; ADDENDUM 81: replaces the phantom granite-4.0-nano; official Q8_0 1.62 GiB) | 1B | 1.62 (P) | pending | predicted 10.55 | — | — |
+| granite-4.0-h-1b (hybrid-H ~1B; ADDENDUM 81: replaces the phantom granite-4.0-h-nano; official Q8_0 1.45 GiB) | 1B | 1.45 (P) | pending | predicted 11.27 | — | — |
 | granite-4.0-h-350m | 0.35B | 0.37 (P) | pending | predicted 19.88 — small-end law caveat (the qwen 0.5B measured +25% over prediction) | — | — |
 | granite-4.0-350m (the dense 350M twin) | 0.35B | 0.37 (P) | pending | predicted 19.88 — small-end law caveat | — | — |
 | granite-4.0-h-small (32B/A9B, line endpoint) | 32B | 34.2 (P) | — | — | FAIL (0.9) | — |
@@ -246,15 +251,24 @@ measured-paper members; their near-size overlap with MiniCPM-2B-sft /
 MiniCPM-1B-sft is a generation-pair datum, not a duplicate (same
 size, different generation — the granite quartet's question at half
 the cost). All non-thinking or hybrid-run-non-thinking. All values
-PRE-REGISTERED (addenda 76/78) — none measured yet.
+PRE-REGISTERED (addenda 76/78) — none measured yet. ADDENDUM 81 SPEC
+CORRECTIONS (the addendum-78 specs failed the pre-flight): MiniCPM3-4B
+ships bin-only in its source repo but has an official
+MiniCPM3-4B-GGUF repo with an f16 GGUF (download f16 → pinned
+llama-quantize → Q8_0 at 4.03 GiB, provenance preserved); the sft
+models' repos are -bf16-suffixed and bin-only (openbmb/MiniCPM-2B-sft-bf16
+at 5.45 GB, openbmb/MiniCPM-1B-sft-bf16 at 2.72 GB — the pinned b10964
+converter loads pytorch_model.bin natively; the tool's phase-1 .bin
+branch is the addendum-81 extension); MiniCPM5-2B/1B are plain
+LlamaForCausalLM. Predictions re-derived from the registered constants.
 
 | name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
 |---|---|---|---|---|---|---|
-| MiniCPM3-4B | 4B | 4.28 (P) | pending | — | predicted 5.27 — SHARP EDGE (band [3.0, 7.5]) | — |
+| MiniCPM3-4B | 4B | 4.03 (P) | pending | — | predicted 5.52 — SHARP EDGE (band [3.4, 7.7]) | — |
 | MiniCPM5-2B | 2.5B | 2.68 (P) | pending | — | predicted 7.55 | — |
-| MiniCPM-2B-sft (2.4B non-embedding) | 2.4B | 2.57 (P) | pending | — | predicted 7.77 | — |
+| MiniCPM-2B-sft (2.4B non-embedding; ADDENDUM 81: repo is MiniCPM-2B-sft-bf16, pytorch_model.bin) | 2.4B | 2.70 (P) | pending | — | predicted 7.50 | — |
 | MiniCPM5-1B | 1.1B | 1.18 (P) | pending | predicted 12.66 | — | — |
-| MiniCPM-1B-sft (1.2B non-embedding) | 1.2B | 1.28 (P) | pending | predicted 12.08 | — | — |
+| MiniCPM-1B-sft (1.2B non-embedding; ADDENDUM 81: repo is MiniCPM-1B-sft-bf16, pytorch_model.bin) | 1.2B | 1.35 (P) | pending | predicted 11.78 | — | — |
 | MiniCPM4-0.5B | 0.5B | 0.54 (P) | pending | predicted 17.85 — small-end law caveat (the qwen 0.5B measured +25% over prediction) | — | — |
 | MiniCPM4-8B (line endpoint) | 8B | 8.6 (P) | — | — | FAIL (2.9) | — |
 
