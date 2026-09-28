@@ -134,6 +134,11 @@ def stamp(msg):
     print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')} +{elapsed_min:.0f}m] {msg}")
 
 
+# --dry-run read-only guard (addendum 79): set in main(); save_state
+# checks it so a pre-flight never mutates the state file.
+DRY_RUN_ACTIVE = False
+
+
 # =========================================================== state
 
 def load_state(path):
@@ -144,6 +149,12 @@ def load_state(path):
 
 
 def save_state(path, state):
+    # --dry-run is a READ-ONLY pre-flight (addendum 79): a dry run must
+    # never write the state file, or the pre-flight-then-real-run way
+    # of working would poison the real run (phases marked done with no
+    # file on disk). Guarded here at the single choke point.
+    if DRY_RUN_ACTIVE:
+        return
     with open(path, "w") as f:
         json.dump(state, f, indent=1)
 
@@ -338,7 +349,15 @@ def main():
     ap.add_argument("--arc-models", default=None,
                     help="comma-separated .gguf files to ARC and rank "
                          "(with --arc-only); labels from filenames")
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="READ-ONLY pre-flight (addendum 79): lists "
+                         "every repo, verifies tooling, runs the "
+                         "RAM/disk feasibility checks and reports each "
+                         "family's acquisition plan WITHOUT downloading, "
+                         "converting, benching or touching the state "
+                         "file. THE WAY OF WORKING: always run the "
+                         "command with --dry-run first, read the "
+                         "pre-flight report, then issue it without.")
     ap.add_argument("--force", action="store_true",
                     help="redo families that already have a selection")
     ap.add_argument("--thinking", action="store_true",
@@ -357,6 +376,8 @@ def main():
                          "kwargs enable_thinking=false; first-turn dump "
                          "check confirms no reasoning appears)")
     args = ap.parse_args()
+    global DRY_RUN_ACTIVE
+    DRY_RUN_ACTIVE = args.dry_run
 
     if args.thinking and args.no_thinking:
         ap.error("--thinking and --no-thinking are mutually exclusive")
@@ -440,7 +461,26 @@ def main():
                   "continues - addendum 78)")
 
     if args.dry_run:
-        print("\ndry run complete - no files were downloaded or tested")
+        print()
+        print("=" * 60)
+        stamp("DRY RUN COMPLETE - READ-ONLY PRE-FLIGHT REPORT")
+        print(f"  families checked : {len(args.families)}")
+        print(f"  rung (ladder)    : {', '.join(ladder)}")
+        if failed_families:
+            print(f"  FAILED families  : {len(failed_families)} of "
+                  f"{len(args.families)} - fix these BEFORE the real "
+                  f"run (the sweep would skip them):")
+            for spec, err in failed_families:
+                print(f"    {spec}: {err}")
+        else:
+            print("  failures         : none - every family's plan "
+                  "verified (repos exist, sizes estimated, "
+                  "RAM/disk feasible)")
+        print()
+        print("  The state file was NOT modified and no files were "
+              "downloaded (addendum 79).")
+        print("  If the report is clean, issue the SAME command without")
+        print("  --dry-run to start the real run.")
         return
 
     # ---- phases 5-6: full ARC on selected models, then the ranking
