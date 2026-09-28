@@ -198,6 +198,7 @@ before any weights download.
 |---|---|---|---|---|---|---|
 | granite-4.2-3b | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
 | granite-4.0-h-micro | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
+| granite-4.0-micro (the dense fallback; same-size hybrid-vs-dense datum) | 3B | 3.21 (P) | pending | — | predicted 6.60 | — |
 | granite-3.3-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.2-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
 | granite-3.1-2b | 2B | 2.14 (P) | pending | — | predicted 8.82 | — |
@@ -236,3 +237,37 @@ anchor's first real test across a size ladder — the per-size p05s vs
 contact with an unmeasured family; (2) the law's cross-family ±15%
 band at a fourth family; (3) the small-end t_inf caveat on a second
 0.5B model.
+
+---
+
+## Gemma (Google — back in scope, the word-sparse probe)
+
+Ruled back in scope by the author (addendum 77, superseding the
+addendum-47 "no debugging" ruling — the re-scope is prospective; the
+recorded v3.0-era verdicts stand as history). The family's measured
+record is unique in the study: a HEALTHY tokenizer (probes 0.55–0.70)
+with WORD-SPARSE content failure (worst turns w/t 0.03–0.29, addendum
+46) that is rung-independent — and never yet graded under v3.1. The
+right-sized probe is the 1B: predicted comfortably in-band, cheap to
+bench, and the answer to the question no other lineage can address —
+is the word-sparse failure a 3B-and-up artifact or a family-wide
+content property?
+
+| name | parameters | Q8_0 size (GiB) | ARC (n=1172) | [10–20) wps | [5–10] wps | [20–40) wps |
+|---|---|---|---|---|---|---|
+| gemma-3-4b-it | 4.0B | 4.28 (P) | 73.3 (v3.0-era Q6_K; superseded record) | — | predicted 5.27 (pooled anchor — the word-sparse-risk caveat: the family's measured content failure is NOT in any anchor) | — |
+| gemma-2-2b (candidate, not swept this round) | 2.5B | 2.68 (P) | — | — | predicted 7.55 (pooled) | — |
+| **gemma-3-1b-it (the sweep-2 probe)** | 1.0B | 1.07 (P) | pending | predicted 13.31 (pooled) | — | — |
+
+**The pre-registered question:** the 1B's v3.1 stall rate and its
+per-turn w/t distribution. If it stalls on word-sparse turns at the
+same corpus points, the family failure is content-owned and
+size-independent (the well-behaved-generation conditional is
+violated family-wide — the certificate's word-for-word caveat
+confirmed on a fourth family); if it runs clean, the 3B/4B failures
+were size-linked and the family's anchor is rescuable at small sizes.
+**Caveat on every gemma prediction:** the pooled anchor 0.366 is a
+well-behaved-family floor; the gemma family's failure mode (word-sparse
+content) is by construction NOT in any anchor — the prediction band
+here does not carry the family's known risk, and the bench is the
+only instrument that can.
