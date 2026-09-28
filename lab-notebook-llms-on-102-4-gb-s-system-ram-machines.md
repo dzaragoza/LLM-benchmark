@@ -42,6 +42,7 @@
 - Zen 4 CPU (AVX-512 on the CPU side, unlike study #1's Zen 3 AVX2) — CPU-vs-Vulkan comparison will differ from study #1 in both directions.
 
 **Study-relevant hardware summary:**
+
 | Component | Spec |
 |---|---|
 | CPU | Ryzen 7 PRO 7840U — 8C/16T Zen 4 ("Phoenix"), up to ~5.1 GHz, 16 MB L3, AVX-512 |
@@ -609,6 +610,7 @@ Llama3.2 Q4_K_M 29.0, Q5_K_M 25.1, Q6_K 22.6; Qwen Q4_0 32.2, Q4_K_M 30.6, Q5_0 
 | SmolLM2 Q5_0 | 54.9 | 53.6 | −1.3 |
 | SmolLM2 Q5_K_M | 49.6 | 49.6 | **0.0 exact** |
 | SmolLM2 Q6_K | 55.2 | 55.4 | +0.2 |
+
 (*from earlier partial old-script run/figure; confirm before report)
 
 **Prediction 1 (reproduction ±0.5 pp): GRADED mostly PASS — max |Δ| = 1.3 pp, two configs exact.** Strict-ARC accuracy is hardware-portable across GPU/driver/OS to ~±1 pp. Prediction 2 (SmolLM2 paper gap): replicated (49.6–55.4 band, unchanged ~20 pp below paper). GLM internal ordering reproduces (Q5_1 best, Q4_1 worst, Q5_K_M<Q6_K). Recovery Q4→Q6: GLM +2.0 (study1 +2.5), SmolLM2 +3.4 (study1 +3.2) — direction/size consistent, verdict pending McNemar.
@@ -1057,6 +1059,7 @@ Ranking: among qualifying models, pick highest quality (ARC score ladder positio
 ### Session 18q — 2026-09-23 (GALLOP RUN COMPLETE — full predictor upset, all 4 probes passed)
 
 **Measured (live means, 1 rep, server-timed) vs predicted:**
+
 | model | pred live | actual | pred verdict | ACTUAL | worst turn |
 |---|---|---|---|---|---|
 | Qwen Q8_0 | 19.9 | **22.0** | FAIL | PASS | 21.5 |
@@ -1271,6 +1274,7 @@ Consecutive-pair McNemar: #1 vs #2 +8.70 pp p=4.2e-12 SEPARATED; #2 vs #3 +2.82 
 3. Floor: the README's own scaling rule applies at this tier (**102.4 GB/s → --floor 40**); floor-20 alternative noted below where it changes a prediction.
 
 **Walk-down (live Ollama library scan 2026-09-24, sort=popular, 161 families, 18 thinking-tagged; top-20 pull counts identical to the pre-registered 2026-09-23 snapshot — snapshot stands):**
+
 | # | Family | Pulls | Small variant | Verdict |
 |---|---|---|---|---|
 | 2 | deepseek-r1 | 93.1M | 1.5b (~1.1 GiB Q4) | **SELECT** (Qwen distill caveat) |
@@ -3579,3 +3583,17 @@ between the preceding paragraph/heading and the header row, which
 GitHub's GFM parser requires to open a table. The README tables rendered
 because they had the blank line. Blank lines added; tables verified by
 column-count and header-position check.
+
+### Session 33, addendum 107 - the markdown checker upgraded to markdownlint rule IDs
+
+Author ruling: keep the custom checker, name its findings with the
+markdownlint rule IDs. md_table_check.py renamed md_check.py; findings
+now report MD055 (table-pipe-style), MD056 (table-column-count), MD058
+(blanks-around-tables, before AND after), MD047
+(single-trailing-newline), and the MD048-family fence-balance check
+(an unclosed code fence renders everything after it as code - the worst
+non-table GitHub failure mode). First run of the upgraded checker found
+and fixed real issues: an unclosed fence in PROTOCOL.md (the addendum-106
+floor-aside deletion had removed its closing fence with it), four
+notebook tables missing MD058 blank lines, and two files missing MD047
+trailing newlines. Eleven regression tests added (tests/test_md_check.py).

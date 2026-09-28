@@ -38,6 +38,7 @@ Chain of derivation from the anchor:
 ```
 5.0 w/s  --/w/t_min-->  t/s needed per model/rung  --law-->  size*(rung)
     |                                        (per-family w/t_min, [D])
+```
 The guarantee (protocol v3.1, addendum 73): **the reader stalls on
 at most 5% of turns** - simulating the registered reader (5.0 w/s,
 0.45 s reaction) on each turn's per-word arrival stream, a turn
