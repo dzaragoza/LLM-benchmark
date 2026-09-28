@@ -14,7 +14,7 @@ The study's deliverable is not the paper - it is the two static pages a practiti
 opens to answer "which Q8_0 model should I run on my machine?". Both run offline,
 no build step, no JavaScript dependencies:
 
-- **[lineage-picker.html](lineage-picker.html)** 🖥️ **Local LLM picker — CPU/iGPU** — serving from **system RAM**:
+- **[cpu-picker.html](cpu-picker.html)** 🖥️ **Local LLM picker — CPU/iGPU** — serving from **system RAM**:
   pick your DDR generation, JEDEC speed and channel count (DDR to DDR5, single to
   octa), enter your RAM, get the highest-ARC measured model that fits and clears the
   300-wpm reader line at your bandwidth.
