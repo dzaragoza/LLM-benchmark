@@ -33,6 +33,12 @@
   summary { cursor: pointer; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.85rem; }
   .foot { font-size: 0.8rem; color: #555; margin-top: 2rem; border-top: 1px solid #bbb; padding-top: 0.8rem; }
   .footnote { font-size: 0.75rem; color: #777; }
+  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
+            background: rgba(127,127,127,0.12); position: sticky; top: 0; }
+  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
+  .mitem:hover { background: rgba(127,127,127,0.15); }
+  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
+  #machineList { background: rgba(127,127,127,0.04); }
 </style>
 </head>
 <body>
@@ -42,8 +48,9 @@
 study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172.</div>
 
 <div class="panel">
-  <label for="machine">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
-  <select id="machine" onchange="applyMachine()"></select>
+  <label for="filter">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
+  <input type="search" id="filter" placeholder="type to filter, e.g. ddr5 or 3200" oninput="renderList()" style="width:20rem;max-width:100%">
+  <div id="machineList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="perch" id="perchLabel" style="display:none">Custom per-channel memory bandwidth (GB/s)</label>
   <input type="number" id="perch" min="1" max="200" step="0.1" value="25.6" style="display:none" oninput="pick()">
   <label for="chcustom" id="chLabel" style="display:none">Custom channel count</label>
@@ -102,23 +109,15 @@ var REF_BW = 102.4, READER = 5.0;
 
 function $(id) { return document.getElementById(id); }
 
-function applyMachine() {
-  var v = $("machine").value;
-  var isCustom = v === "custom";
-  $("perch").style.display = isCustom ? "" : "none";
-  $("chcustom").style.display = isCustom ? "" : "none";
-  $("perchLabel").style.display = isCustom ? "" : "none";
-  $("chLabel").style.display = isCustom ? "" : "none";
-  pick();
-}
+var MACHINES = [];   // {gen, mt, ch, perch, bw, label, key}
+var selKey = "51.2|2";   // default: DDR5-6400 dual (128-bit) - the measured class
 
-// Addendum 84: the machine dropdown. One option per (generation, JEDEC
-// speed, channel count) - the channel choice is part of the option, no
-// separate radio row. per-channel GB/s = MT/s x 8 bytes / 1000. Bus
-// width: 64 bits per channel (single 64, dual 128, quad 256).
-// Channel variants offered where they make sense: single/dual for
-// every generation, quad from DDR3 on (the server/HEDT tier; DDR and
-// DDR2 quad boards were exotic and are omitted).
+// Addendum 84: the machine list. One entry per (generation, JEDEC speed,
+// channel count). per-channel GB/s = MT/s x 8 bytes / 1000. Bus width:
+// 64 bits per channel (single 64, dual 128, quad 256). Channel variants
+// offered where they make sense: single/dual for every generation, quad
+// from DDR3 on (the server/HEDT tier; DDR and DDR2 quad boards were
+// exotic and are omitted).
 var GENERATIONS = [
   { gen: "DDR",  mts: [200, 266, 333, 400],                       quad: false },
   { gen: "DDR2", mts: [400, 533, 667, 800, 1066],                 quad: false },
@@ -128,54 +127,72 @@ var GENERATIONS = [
 ];
 
 function buildMachineMenu() {
-  var sel = $("machine");
   [1, 2, 4].forEach(function (ch) {
     GENERATIONS.forEach(function (g) {
       if (ch === 4 && !g.quad) return;
-      var og = document.createElement("optgroup");
-      og.label = g.gen + " " + (ch === 1 ? "single channel (64-bit)"
-        : ch === 2 ? "dual channel (128-bit)" : "quad channel (256-bit)");
       g.mts.forEach(function (mt) {
         var perch = mt * 8 / 1000;
         var bw = perch * ch;
-        var o = document.createElement("option");
-        o.value = perch + "|" + ch;
-        o.textContent = g.gen + "-" + mt + " \u2014 " + bw.toFixed(1) + " GB/s";
-        og.appendChild(o);
+        var chName = ch === 1 ? "single" : ch === 2 ? "dual" : "quad";
+        MACHINES.push({
+          gen: g.gen, mt: mt, ch: ch, perch: perch, bw: bw,
+          key: perch + "|" + ch,
+          label: g.gen + "-" + mt + " \u2014 " + chName + " channel (" +
+            (64 * ch) + "-bit) \u2014 " + bw.toFixed(1) + " GB/s",
+          group: g.gen + " " + chName + " channel (" + (64 * ch) + "-bit bus)"
+        });
       });
-      sel.appendChild(og);
     });
   });
-  var custom = document.createElement("option");
-  custom.value = "custom";
-  custom.textContent = "custom\u2026";
-  sel.appendChild(custom);
-  // default: the study's measured class (DDR5-6400 dual = 102.4 GB/s)
-  sel.value = "51.2|2";
+  MACHINES.push({ gen: "custom", key: "custom", label: "custom\u2026", group: "custom" });
 }
 
-function bandOf(w) {
-  if (w < 5) return "below 5";
-  if (w <= 10) return "[5\u201310]";
-  if (w < 20) return "[10\u201320)";
-  return "[20\u201340)";
+function renderList() {
+  var q = ($("filter").value || "").toLowerCase().trim();
+  var host = $("machineList");
+  var html = "";
+  var lastGroup = null;
+  MACHINES.forEach(function (m) {
+    if (q && m.label.toLowerCase().indexOf(q) < 0) return;
+    if (m.group !== lastGroup) {
+      html += '<div class="mgroup">' + m.group + "</div>";
+      lastGroup = m.group;
+    }
+    var cls = "mitem" + (m.key === selKey ? " msel" : "");
+    html += '<div class="' + cls + '" data-key="' + m.key +
+      '" onclick="chooseMachine(this.dataset.key)">' + m.label + "</div>";
+  });
+  if (!html) html = '<div class="mitem">no machine matches the filter</div>';
+  host.innerHTML = html;
+}
+
+function chooseMachine(key) {
+  selKey = key;
+  renderList();
+  applyMachine();
+}
+
+function applyMachine() {
+  var isCustom = selKey === "custom";
+  $("perch").style.display = isCustom ? "" : "none";
+  $("chcustom").style.display = isCustom ? "" : "none";
+  $("perchLabel").style.display = isCustom ? "" : "none";
+  $("chLabel").style.display = isCustom ? "" : "none";
+  pick();
 }
 
 function pick() {
   var perch, ch, chLabel;
-  var v = $("machine").value;
-  if (v === "custom") {
+  var m = MACHINES.filter(function (x) { return x.key === selKey; })[0];
+  if (!m) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
+  if (m.key === "custom") {
     perch = parseFloat($("perch").value);
     ch = parseFloat($("chcustom").value);
     chLabel = ch + " channel" + (ch > 1 ? "s" : "") + ", custom \u2014 " +
       (64 * ch) + "-bit bus";
   } else {
-    var parts = v.split("|");
-    perch = parseFloat(parts[0]);
-    ch = parseFloat(parts[1]);
-    var chName = ch === 1 ? "single channel" : ch === 2 ? "dual channel" : "quad channel";
-    chLabel = $("machine").selectedOptions[0].textContent + " \u2014 " + chName +
-      " (" + (64 * ch) + "-bit bus)";
+    perch = m.perch; ch = m.ch;
+    chLabel = m.label;
   }
   var ram = parseFloat($("ram").value);
   if (!(perch > 0) || !(ram > 0) || !(ch > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
@@ -202,8 +219,7 @@ function pick() {
     var r = eligible[0];
     html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (Q8_0)</h3>" +
       "<div><span class=\"arc\">" + r.m.arc.toFixed(1) + "%</span> ARC-Challenge (n=1172)</div>" +
-      "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s \u2014 band " + bandOf(r.w) +
-      " (measured " + r.m.wps.toFixed(2) + " w/s at 102.4, v3.1 PASS)</div>" +
+      "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (v3.1 PASS on the measured class)</div>" +
       "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 machine cost " + r.m.cost.toFixed(2) +
       " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + ram + " GiB</div></div>";
   } else {
@@ -222,13 +238,13 @@ function pick() {
   $("result").innerHTML = html;
 
   var t = "<table><tr><th>model (Q8_0)</th><th class=\"num\">ARC %</th><th class=\"num\">file GiB</th>" +
-    "<th class=\"num\">machine cost GiB</th><th class=\"num\">w/s @102.4</th>" +
-    "<th class=\"num\">w/s @ you</th><th>band</th><th>fits RAM</th><th>clears reader</th></tr>";
+    "<th class=\"num\">machine cost GiB</th>" +
+    "<th class=\"num\">w/s @ you</th><th>fits RAM</th><th>clears reader</th></tr>";
   rows.forEach(function (r) {
     t += "<tr><td>" + r.m.name + "</td><td class=\"num\">" + r.m.arc.toFixed(1) + "</td><td class=\"num\">" +
       r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
-      "</td><td class=\"num\">" + r.m.wps.toFixed(2) + "</td><td class=\"num\">" + r.w.toFixed(2) +
-      "</td><td>" + bandOf(r.w) + "</td><td class=\"" + (r.fits ? "ok" : "bad") + "\">" +
+      "</td><td class=\"num\">" + r.w.toFixed(2) +
+      "</td><td class=\"" + (r.fits ? "ok" : "bad") + "\">" +
       (r.fits ? "yes" : "no") + "</td><td class=\"" + (r.passes ? "ok" : "bad") + "\">" +
       (r.passes ? "yes" : "no") + "</td></tr>";
   });
@@ -236,6 +252,7 @@ function pick() {
   $("tables").innerHTML = t;
 }
 buildMachineMenu();
+renderList();
 applyMachine();
 pick();
 </script>
