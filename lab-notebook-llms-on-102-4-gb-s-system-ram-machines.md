@@ -3813,3 +3813,14 @@ THE HONEST ANSWER, in three parts.
   where the prior for an UNBENCHED family starts from the probe-vs-anchor gap of benched families (~0.15-0.25 for healthy families; qwen's measured gap) - widened to a band until the family's first bench calibrates it.
 
 THE GRADING TEST (same data already queued for addendum 115): tomorrow's three families x multiple sizes give probe-vs-measured-anchor gaps per family. If the gaps CLUSTER across families, the prior is TRANSFERABLE (one number; the predictor stays a value); if they SCATTER, sparseness is family-specific (one calibrated constant per family - the addendum-115 model); if they vary WITHIN a family across sizes, it degrades to a family band. Either way, the pre-bench predictor's worst case is: probe minus a widened prior band, and one bench pins the family constant.
+### Session 33, addendum 117 - ARC vs parameters on the qwen set: the log-linear fit
+
+Author question: can the v3.1 ARC scores be fitted to a function of parameters? THE FIT (7 qwen points, 0.5B-4B, all v3.1 instrument, n=1172):
+
+  score = 61.5 + 41.0 * log10(P)
+
+R2 = 0.920, rmse 3.9 points. Linear-in-P is clearly worse (R2 0.845, rmse 5.5); a saturating form (logistic toward ~95) cannot be pinned by 7 points and is not registered.
+
+THE STRUCTURAL FINDING (the interesting part): fitting the two subfamilies separately gives nearly IDENTICAL laws - qwen2.5: 60.3 + 39.8*log10(P); qwen3/3.5: 63.0 + 39.5*log10(P). The slope is family-STABLE (~40 points per decade of parameters); the subfamily intercepts differ by only ~3 points. What the pooled fit's residuals actually are: series effects at the SAME parameter count (Qwen3.5-4B 90.4 vs Qwen3-4B 85.0; Qwen2.5-1.5B 73.5 vs Qwen3-1.7B 68.0) - a new series within a lineage buys a few ARC points at fixed size, not a shifted scaling law.
+
+STATUS: descriptive, not predictive-registered - 7 points, one lineage, in-sample. The overnight run's 20+ granite/Phi/MiniCPM cells give the cross-family test for free: if they fall on slope ~40 with family-specific intercepts, the ARC column of the pages can carry predicted scores for unbenched members (a banded estimate: fit +/- 5 points); if the slope differs per lineage, ARC-vs-parameters is family-specific and stays measured-only. Same discipline as the w/t anchor: one term, graded on tomorrow's data before it enters any artifact.
