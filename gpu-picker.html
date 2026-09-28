@@ -2,7 +2,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GPU picker &mdash; which Q8_0 model serves your card?</title>
+<title>Local LLM picker &mdash; GPU: which Q8_0 model serves your card?</title>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -38,14 +38,16 @@
 </head>
 <body>
 
-<h1>GPU picker</h1>
+<h1>Local LLM picker &mdash; GPU</h1>
 <div class="sub">The recommended Q8_0 model for your GPU, by measured ARC, among the models the
 study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172.
 Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineage picker</a>.</div>
 
 <div class="panel">
-  <label for="gfilter">GPU (vendor &middot; VRAM &middot; memory bandwidth)</label>
-  <input type="search" id="gfilter" placeholder="type to filter, e.g. 3090 or 24" oninput="renderList()" style="width:20rem;max-width:100%">
+  <label for="gfilter">GPU VRAM (GiB) &mdash; the common card capacities</label>
+  <input type="search" id="gfilter" placeholder="type to filter, e.g. 16" oninput="renderList()" style="width:20rem;max-width:100%">
+  <div class="footnote" style="margin-top:0.3rem">Only capacities that fit at least one measured model are listed
+    (the smallest needs <span id="mincost"></span>&nbsp;GiB of whole-stack cost).</div>
   <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="vram">Your GPU's VRAM (GiB)</label>
   <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
@@ -104,69 +106,45 @@ var CANDIDATES = [
 var REF_BW = 102.4;
 var READER = 5.0;
 
-// Common cards on the 2024/2025 market, used and new, that a practitioner can actually buy.
-// vram in GiB (nominal), bw in GB/s (theoretical peak). All clear the reader-line floor
-// for this pool (min BW 19.8 GB/s), so every card is listed.
-var GPUS = [
-  { name: "RTX 5090",            vram: 32,  bw: 1792.0, vendor: "NVIDIA" },
-  { name: "RTX 5080",            vram: 16,  bw: 960.0,  vendor: "NVIDIA" },
-  { name: "RTX 5070 Ti",         vram: 16,  bw: 896.0,  vendor: "NVIDIA" },
-  { name: "RTX 4090",            vram: 24,  bw: 1008.1, vendor: "NVIDIA" },
-  { name: "RTX 4080 Super",      vram: 16,  bw: 736.3,  vendor: "NVIDIA" },
-  { name: "RTX 4070 Ti Super",   vram: 16,  bw: 672.2,  vendor: "NVIDIA" },
-  { name: "RTX 4070",            vram: 12,  bw: 504.2,  vendor: "NVIDIA" },
-  { name: "RTX 4060 Ti 16GB",    vram: 16,  bw: 288.1,  vendor: "NVIDIA" },
-  { name: "RTX 3080 Ti",         vram: 12,  bw: 912.4,  vendor: "NVIDIA" },
-  { name: "RTX 3080",            vram: 10,  bw: 760.3,  vendor: "NVIDIA" },
-  { name: "RTX 3090",            vram: 24,  bw: 936.2,  vendor: "NVIDIA" },
-  { name: "RTX 3070",            vram: 8,   bw: 614.4,  vendor: "NVIDIA" },
-  { name: "RTX 3060 12GB",       vram: 12,  bw: 360.0,  vendor: "NVIDIA" },
-  { name: "RTX 2080 Ti (22GB mod)", vram: 22, bw: 616.0, vendor: "NVIDIA" },
-  { name: "RTX 2080 Super",      vram: 8,   bw: 496.1,  vendor: "NVIDIA" },
-  { name: "GTX 1080 Ti",         vram: 11,  bw: 484.3,  vendor: "NVIDIA" },
-  { name: "Titan V",             vram: 12,  bw: 652.8,  vendor: "NVIDIA" },
-  { name: "V100 32GB",           vram: 32,  bw: 900.0,  vendor: "NVIDIA" },
-  { name: "Radeon VII",          vram: 16,  bw: 1024.0, vendor: "AMD" },
-  { name: "RX 7900 XTX",        vram: 24,  bw: 960.0,  vendor: "AMD" },
-  { name: "RX 7900 XT",         vram: 20,  bw: 800.0,  vendor: "AMD" },
-  { name: "RX 7900 GRE",        vram: 16,  bw: 576.0,  vendor: "AMD" },
-  { name: "RX 7800 XT",         vram: 16,  bw: 624.1,  vendor: "AMD" },
-  { name: "RX 7700 XT",         vram: 12,  bw: 432.0,  vendor: "AMD" },
-  { name: "RX 7600 XT",         vram: 16,  bw: 288.0,  vendor: "AMD" },
-  { name: "RX 6800 XT",         vram: 16,  bw: 512.0,  vendor: "AMD" },
-  { name: "RX 6700 XT",         vram: 12,  bw: 384.0,  vendor: "AMD" },
-  { name: "RX 6600",            vram: 8,   bw: 224.0,  vendor: "AMD" },
-  { name: "RX 5700 XT",         vram: 8,   bw: 448.0,  vendor: "AMD" },
-  { name: "Intel Arc A770 16GB", vram: 16,  bw: 560.0,  vendor: "Intel" },
-  { name: "Intel Arc A750",     vram: 8,   bw: 512.0,  vendor: "Intel" }
+// Common cards on the 2024/2025 market, used and new. The picker lists the DISTINCT VRAM
+// capacities of those cards (the spec that decides the recommendation - bandwidth never
+// does, see below), keeping only tiers that fit at least one measured model.
+var CARDS = [
+  { vram: 32 }, { vram: 16 }, { vram: 16 }, { vram: 24 }, { vram: 16 }, { vram: 16 },
+  { vram: 12 }, { vram: 16 }, { vram: 12 }, { vram: 10 }, { vram: 24 }, { vram: 8 },
+  { vram: 12 }, { vram: 22 }, { vram: 8 }, { vram: 11 }, { vram: 12 }, { vram: 32 },
+  { vram: 16 }, { vram: 24 }, { vram: 20 }, { vram: 16 }, { vram: 16 }, { vram: 12 },
+  { vram: 16 }, { vram: 16 }, { vram: 12 }, { vram: 8 }, { vram: 8 }, { vram: 16 }, { vram: 8 }
 ];
+var MIN_COST = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.cost); }, Infinity);
 
-var selKey = "";
+// distinct VRAM tiers that fit at least one measured model, ascending
+var TIERS = [];
+CARDS.forEach(function (c) {
+  if (TIERS.indexOf(c.vram) < 0 && c.vram >= MIN_COST) TIERS.push(c.vram);
+});
+TIERS.sort(function (a, b) { return a - b; });
+
+var selKey = TIERS.length ? String(TIERS[TIERS.length - 1]) : "";
 
 function renderList() {
   var q = ($("gfilter").value || "").toLowerCase().trim();
   var host = $("gpuList");
   var html = "";
-  var lastGroup = null;
-  GPUS.forEach(function (g) {
-    var label = g.name + " \u2014 " + g.vram + " GiB \u2014 " + g.bw.toFixed(0) + " GB/s";
+  TIERS.forEach(function (v) {
+    var label = v + " GiB VRAM";
     if (q && label.toLowerCase().indexOf(q) < 0) return;
-    if (g.vendor !== lastGroup) {
-      html += '<div class="mgroup">' + g.vendor + "</div>";
-      lastGroup = g.vendor;
-    }
-    var cls = "mitem" + (g.name === selKey ? " msel" : "");
-    html += '<div class="' + cls + '" data-key="' + g.name +
-      '" onclick="chooseGpu(this.dataset.key)">' + label + "</div>";
+    var cls = "mitem" + (String(v) === selKey ? " msel" : "");
+    html += '<div class="' + cls + '" data-key="' + v +
+      '" onclick="chooseVram(this.dataset.key)">' + label + "</div>";
   });
-  if (!html) html = '<div class="mitem">no card matches the filter</div>';
+  if (!html) html = '<div class="mitem">no capacity matches the filter</div>';
   host.innerHTML = html;
 }
 
-function chooseGpu(name) {
-  selKey = name;
-  var g = GPUS.filter(function (x) { return x.name === name; })[0];
-  if (g) $("vram").value = g.vram;
+function chooseVram(v) {
+  selKey = v;
+  $("vram").value = v;
   renderList();
   pick();
 }
@@ -223,7 +201,8 @@ function pick() {
 }
 
 $("worstwps").textContent = LOWEST_BW_SLOWEST_WPS.toFixed(1);
-chooseGpu("RTX 3090");
+$("mincost").textContent = MIN_COST.toFixed(2);
+chooseVram(selKey);
 </script>
 </body>
 </html>
