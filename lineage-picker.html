@@ -49,6 +49,7 @@ study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). 
 
 <div class="panel">
   <label for="filter">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
+  <div style="font-weight:bold;margin:0.2rem 0">Any machine with higher specs than the options below (over 102.4&nbsp;GB/s) will run the same models as the default.</div>
   <input type="search" id="filter" placeholder="type to filter, e.g. ddr5 or 3200" oninput="renderList()" style="width:20rem;max-width:100%">
   <div class="footnote" style="margin-top:0.3rem">Configurations whose bandwidth cannot run any measured model (below
     <span id="minbw"></span>&nbsp;GB/s) are not listed.</div>
@@ -129,6 +130,12 @@ var GENERATIONS = [
   { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true, octa: true }
 ];
 
+// The list is trimmed at the study's top class, 102.4 GB/s: a faster
+// machine runs the same models (nothing in the measured pool needs more
+// bandwidth to clear the reader line), so listing higher configs would be
+// options without consequences.
+var MAX_BW = 102.4;
+
 // A machine config is listed only if it can honestly run SOME measured
 // model: the candidate with the highest measured w/s (the most
 // bandwidth-forgiving one) must still clear the reader line when scaled
@@ -145,6 +152,7 @@ function buildMachineMenu() {
         var perch = mt * 8 / 1000;
         var bw = perch * ch;
         if (bw < MIN_RUN_BW) return;   // cannot run any measured model - not listed
+        if (bw > MAX_BW) return;       // above the study's top class - same models as the default
         var chName = ch === 1 ? "single" : ch === 2 ? "dual" : ch === 4 ? "quad" : "octa";
         MACHINES.push({
           gen: g.gen, mt: mt, ch: ch, perch: perch, bw: bw,
