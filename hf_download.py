@@ -162,6 +162,12 @@ def estimate_rung_gib(rung, model_files, source_files, sizes):
            and not f.lower().startswith("original/")]
     if sts:
         return sum(sts) / (1024 ** 3) * bits / 16
+    bins = [s for f, s in sizes.items()
+            if (f.lower().endswith("pytorch_model.bin")
+                or (f.lower().startswith("pytorch_model-")
+                    and f.lower().endswith(".bin")))]
+    if bins:
+        return sum(bins) / (1024 ** 3) * bits / 16
     return None
 
 # system-RAM reserve for the OS + the KV cache at the 4096 reference
@@ -205,6 +211,16 @@ def find_f16_files(names):
 
 def has_safetensors(names):
     return any(f.lower().endswith(".safetensors") for f in names)
+
+
+def has_pytorch_bin(names):
+    """pytorch_model.bin (+ sharded index) - the legacy pickle format the
+    pinned b10964 converter loads natively (conversion/base.py falls
+    back to pytorch_model*.bin when no safetensors parts exist; addendum 81
+    - the MiniCPM-2B/1B-sft-bf16 repos ship bin-only)."""
+    return any(f.lower().endswith("pytorch_model.bin")
+               or f.lower().startswith("pytorch_model-00001-of-")
+               for f in names)
 
 
 def resolve_f16_local(famdir):
@@ -315,8 +331,29 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
             fail(1, rung, "snapshot download finished, no safetensors found",
                  GUIDE[1])
         return None, f"safetensors from {source_repo}, convert + quantize"
-    fail(1, rung, f"no {rung} file, no f16 GGUF, no safetensors in "
-         f"{source_repo} - nothing to download or quantize from", GUIDE[1])
+    if has_pytorch_bin(source_files):
+        st_dir = os.path.join(famdir, "safetensors-source")
+        if dry_run or (os.path.isdir(st_dir)
+                       and glob.glob(os.path.join(st_dir, "pytorch_model*.bin"))):
+            return None, (f"pytorch_model.bin from {source_repo}, "
+                          "convert + quantize")
+        try:
+            print(f"  [1] downloading pytorch_model.bin from {source_repo} "
+                  "(weights + configs; output hidden; shown on error)")
+            snapshot_download(
+                source_repo, local_dir=st_dir,
+                allow_patterns=["pytorch_model*.bin", "*.json", "*.txt",
+                                "tokenizer.model", "tokenizer.model.v3"])
+        except Exception as e:
+            fail(1, rung, f"pytorch_model.bin download from {source_repo} "
+                 f"failed: {e}", GUIDE[1])
+        if not glob.glob(os.path.join(st_dir, "pytorch_model*.bin")):
+            fail(1, rung, "bin download finished, no pytorch_model*.bin found",
+                 GUIDE[1])
+        return None, f"pytorch_model.bin from {source_repo}, convert + quantize"
+    fail(1, rung, f"no {rung} file, no f16 GGUF, no safetensors, no "
+         f"pytorch_model.bin in {source_repo} - nothing to download or "
+         "quantize from", GUIDE[1])
 
 
 # =========================================================== ARC questions
