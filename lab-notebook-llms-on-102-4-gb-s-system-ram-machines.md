@@ -3793,3 +3793,23 @@ ALSO REGISTERED: the probe needs the tokenizer FILES, which land
 with tonight's run for all three new families (the converter
 downloads them). Tomorrow: probe all three, compare to measured
 p05s, grade the two-channel model.
+### Session 33, addendum 116 - the sparseness prior: what can be calculated pre-bench, and what cannot
+
+Author question: can channel 2 (content sparseness at the p05 turn) itself be calculated, even roughly? Any data from the tokenizer? From config.json?
+
+THE HONEST ANSWER, in three parts.
+
+  config.json: NOTHING for channel 2 - by design. It is architecture only (dims, layers, heads, vocab, tying) and its entire contribution is already captured: exact params -> exact file size (addendum 110), exact KV (addendum 112). Nothing in it says anything about generation behavior. Case closed.
+
+  tokenizer files: ROUGH SIGNALS exist, all readable offline with machinery already registered (tokenizer_probe.py; no new tool):
+  a. PROBE SPREAD across the two registered text sets (corpus prompts vs ARC questions). A tokenizer whose w/t varies widely by text TYPE is more exposed to the model choosing word-sparse styles on some turns - the spread is a cheap risk indicator for how much w/t can swing by content.
+  b. VOCAB COMPOSITION - coverage of numerals, math symbols, markdown tokens. A tokenizer that packs math/markdown densely enables word-sparse output CHEAPLY (one token per code/math chunk), which is plausibly part of why qwen's measured p05 sits at 0.36-0.45 against probes of 0.55-0.70: the option to go sparse is cheap, and the p05 turn exercises it.
+  c. --dump mode already prints measured per-turn distributions next to the probe term for exactly this comparison - the instrument for grading a and b is in place.
+
+  THE LIMIT (registered, not negotiable): sparseness is BEHAVIORAL - the model's content choice at its p05 turn. Any pre-bench estimate is a PRIOR, not a calculation. The best rough formula available today:
+
+  anchor ~= probe - sparseness_prior
+
+  where the prior for an UNBENCHED family starts from the probe-vs-anchor gap of benched families (~0.15-0.25 for healthy families; qwen's measured gap) - widened to a band until the family's first bench calibrates it.
+
+THE GRADING TEST (same data already queued for addendum 115): tomorrow's three families x multiple sizes give probe-vs-measured-anchor gaps per family. If the gaps CLUSTER across families, the prior is TRANSFERABLE (one number; the predictor stays a value); if they SCATTER, sparseness is family-specific (one calibrated constant per family - the addendum-115 model); if they vary WITHIN a family across sizes, it degrades to a family band. Either way, the pre-bench predictor's worst case is: probe minus a widened prior band, and one bench pins the family constant.
