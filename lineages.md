@@ -1,4 +1,4 @@
-# Lineages — the wps bands (T14s predictions)
+# Lineages — the wps bands (T14s, predicted and measured)
 
 One section per family lineage, the study's right-sizing view turned
 into a table: every member of the line, at the fixed rung **Q8_0**,
@@ -34,7 +34,8 @@ anchor. Law (102.4 tier): `1/t = size/76.5 + 1/74` (fitted, R²
 one anchor serves the whole lineage). Q8_0 size = params × 1.07
 GiB/B (calibrated on the measured 4B file: 4.29 GiB / 4.0B,
 addendum 68); measured file sizes supersede estimates where they
-exist. The class assignment below the band column derives from the
+exist. Prediction band (corrected, addendum 74): pred ± (2σ_w/t ×
+t/s) = pred ± 0.156·t/s. The class assignment below the band column derives from the
 halving factor 0.50 (pre-registered, addendum 69; its validation
 is the 51.2 replication's phase A — until then the band↔class
 mapping carries that one unvalidated constant).
@@ -72,13 +73,13 @@ the seven members at or above 5 w/s.
 | Qwen3.6-27B | ~27B | Q8_0 | 28.9 (P) | — | FAIL (1.1) | — |
 | Qwen3.5-9B | ~8.7B | Q8_0 | 9.3 (P, from measured Q5 6.19) | — | FAIL (3.1) | — |
 | Qwen2.5-7B-Instruct | 7.62B | Q8_0 | 8.2 (P) | — | FAIL (3.4) | — |
-| Qwen3.5-4B | 4.0B | Q8_0 | 4.29 (M) | — | **5.92 — measured 2.2% stalls (v3.0 FAIL / v3.1 PASS)** † | — |
-| Qwen3-4B | 4.0B | Q8_0 | 4.3 (P) | — | 5.93 | — |
-| Qwen2.5-3B-Instruct | 3.1B | Q8_0 | 3.62 (M) | — | 6.77 | — |
-| Qwen3-1.7B | 1.7B | Q8_0 | 1.8 (P) | 11.05 | — | — |
-| Qwen2.5-1.5B-Instruct | 1.5B | Q8_0 | 1.6 (P) | 11.94 | — | — |
-| Qwen3.5-0.8B | 0.8B | Q8_0 | 0.9 (P) | 16.68 | — | — |
-| Qwen2.5-0.5B-Instruct | 0.5B | Q8_0 | 0.5 (P) | — | — | 20.09 |
+| Qwen3.5-4B | 4.0B | Q8_0 | 4.29 (M) | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — |
+| Qwen3-4B | 4.0B | Q8_0 | 3.99 (M) | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — |
+| Qwen2.5-3B-Instruct | 3.1B | Q8_0 | 3.37 (M) | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — |
+| Qwen3-1.7B | 1.7B | Q8_0 | 1.71 (M) | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — |
+| Qwen2.5-1.5B-Instruct | 1.5B | Q8_0 | 1.76 (M) | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — |
+| Qwen3.5-0.8B | 0.8B | Q8_0 | 0.86 (M) | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) |
+| Qwen2.5-0.5B-Instruct | 0.5B | Q8_0 | 0.63 (M) | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) |
 
 † **The sentinel row, honestly stated (addenda 69/73):** the 4B is
 the predicted in-band member (5.92, dead in [5–10]) whose measured
@@ -87,20 +88,20 @@ under protocol v3.0 (the never-guarantee; also the cone's
 quantile tier: ε 1.29 vs 2σ 1.22, short by 0.07, so the
 certificate did not issue) and a **PASS under protocol v3.1** (the
 stall-rate guarantee). The predictor's w/s band [5.1, 7.5] was HIT
-(measured 6.4). The verdict-stability finding (addendum 69:
-deterministic is verdict-stable, not magnitude-stable) predicts
-the replicate lands at the same ~2% rate — a v3.1 PASS both times.
-Consequence under v3.0 on record: the qwen-class Q8 roster on the
-102.4 class was EMPTY; under v3.1 the 4B cells re-enter the roster
-pending the overnight measurement.
+(measured 6.4). The overnight replicate (addendum 74) CONFIRMED the
+verdict-stability finding: 7/267 stalls (2.6%), the same stalling
+conversations (19/33/39), magnitudes drifted ±30–75% — a v3.1 PASS
+both times, and the qwen-class Q8 roster on the 102.4 class now
+holds all three [5,10] cells by measurement.
 
-**The lineage's shape (the right-sizing read):** each band holds
-one family-grid cell of this line. [5–10]: the 3B/4B cells (the
-4B measured 2.2% stalls — v3.0 FAIL / v3.1 PASS; the 3B predicted
-6.77, never reader-wall-benched at n=50 — the overnight run
-measures it). [10–20): the 1.5–1.7B
-cells (study #1's champion class) plus the 0.8B. [20–40): the
-0.5B alone — the only member that serves the 25.6 class. Below 5:
+**The lineage's shape (the right-sizing read, measured):** each
+band holds one family-grid cell of this line. [5–10]: the 3B/4B
+cells — all three measured v3.1 PASS at 0.4–2.6% stalls, the
+sweep's headline. [10–20): the 1.5–1.7B cells (study #1's
+champion class), measured 10.66–14.86. [20–40): the 0.8B and
+0.5B — BOTH measured above 25 w/s (the 0.8B flipped from its
+predicted band by the law's small-end miss, addendum 74; the 0.5B
+confirmed its superseded prediction). Below 5:
 everything ≥ 7B at Q8 (the 9B's value lives at Q5_K_M, not Q8).
 The lineage's grids (0.5 / 1.5 / 3 / 4 / 7–9 / 27–30 / 72+)
 quantize coarser than any class window: the right-size member is
@@ -122,6 +123,9 @@ estimates (±8% observed, addendum 68). The anchor 0.412 is
 corpus-conditional (the w/t tail is substantially corpus-owned,
 addendum 69) — these bands are for this reader and corpus class;
 generation-side well-behavedness is assumed per the qwen line's
-measured record. The overnight run (addendum 71) tests that
-assumption across generations: the 2.5 / 3 / 3.5 members' measured
-w/t p05s vs the 0.412 anchor is the cross-generation Δ test.
+measured record. The overnight run (addenda 71/74) TESTED that
+assumption across generations: the cross-generation Δ test came back
+5/7 — the two Qwen3.5 members and the 2.5-1.5B/3B/4B inside the band,
+the 2.5-0.5B (gap 0.162) and Qwen3-1.7B (gap 0.081) outside. The
+generation-split question (is the qwen class one class or two?) is
+logged open in addendum 74's completion.
