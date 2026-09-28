@@ -76,7 +76,11 @@ Bands above 10 carry no wall risk at n=50 by prediction (their
 corpus-min turns sit ≥ 5.07 w/s).
 
 **Provenance markers:** (M) = measured file size on the T14s;
-(P) = bpw-derived estimate. **ARC column:** ARC-Challenge test,
+(P) = params x 1.07 GiB/B (the addendum-68 calibrated rate;
+NOT the raw 8.5-bpw arithmetic - the converter keeps embedding
+tensors at higher precision, so measured files run 1.006-1.26 GiB/B,
+and the calibrated rate beats the arithmetic on the measured set).
+**ARC column:** ARC-Challenge test,
 n=1172, measured at Q8_0 on the T14s (the overnight run, addendum
 74); higher is better. The cross-family Q8_0 records for comparison:
 Phi-4-mini 81.1% and Llama-3.2-3B 72.6% (both 0/267 stalls at n=50,

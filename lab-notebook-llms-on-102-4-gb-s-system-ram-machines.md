@@ -3616,3 +3616,21 @@ an error". Two changes:
    The pre-flight is now scriptable - exit status tells the wrapper
    whether the real run may start.
 The dry run is now the gate it was registered to be.
+
+### Session 33, addendum 109 - the file-size arithmetic tested against the measured set: the converter's embedding policy
+
+Author question: "can the file size be determined only by number of
+parameters and quant?" The exact-arithmetic candidate (params x 8.5
+bpw) was computed for every (P) row and tested against the seven
+measured v3.1 qwen files. RESULT: the arithmetic sits uniformly
+~7.5% BELOW every measured file (0.989 GiB/B floor vs measured
+1.006-1.26 GiB/B). The 8.5 bpw is exact per Q8_0 block, but the
+llama.cpp converter does not quantize every tensor - embedding
+tensors are kept at higher precision, and the premium scales with
+vocab share of params (0.5B +28%, 4B +8%). RULING: the (P) values
+stay at the calibrated 1.07 GiB/B rate (it beats the arithmetic on
+the measured set); the legend now states this instead of "+/-8%".
+The exact predictor for self-made quants is two-term config
+arithmetic (body@8.5 + embedding, tied/untied, per config.json) -
+queued for the author's machine (HF API blocked from the agent
+sandbox; one huggingface_hub read per family).
