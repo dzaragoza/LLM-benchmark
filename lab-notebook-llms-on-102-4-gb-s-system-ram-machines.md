@@ -3721,3 +3721,36 @@ the fit's intercept is weakly constrained by the data (the 7 points
 crowd the 15-100 t/s range; the asymptote is extrapolation). The
 cross-family refit (26 more points, wider size range) should pin
 it - or show v2's functional form is missing a term.
+
+### Session 33, addendum 114 - the pass/fail gap list and the v2 machine-class scaling
+
+Author questions: "anything else we may be missing for the
+pass/fail predictor?" and "these formulas should also help
+predicting other machine classes." THE GAP LIST (what stands
+between the current stack and a closed-form pass/fail predictor):
+1. w/t anchor - the ONE empirical constant left (corpus-owned tail,
+   addendum 69). Per-family anchors exist for qwen; cross-family
+   anchors land tomorrow. Unsolvable by arithmetic (it IS the
+   corpus-model interaction); solved by calibration.
+2. The stall mechanism's shape - the law predicts mean t/s; the
+   verdict is a TAIL event (p05 w/t x worst turns). The link is
+   the anchor (p05), validated at gap 0.000 on the sentinel. The
+   remaining risk: turn-level variance (launch noise +-10-30%,
+   addendum 69) is not modeled; the 5% rate gate absorbs it
+   empirically at n=267.
+3. Think-time / server warmup - the reaction allowance and first-
+   turn effects are in the measured constants, unseparated. Fine
+   while the corpus is fixed; a caveat if the corpus ever changes.
+4. Quantized KV / FlashAttention choices - llama.cpp defaults are
+   in the measured constants; if a future run flips them, v2's KV
+   term is the first place it shows.
+MACHINE-CLASS SCALING UNDER v2 (the pages' use case): the ratio
+t/s(51.2)/t/s(102.4) is NOT 0.500 - it is 0.50-0.53, model-
+dependent: 4B 0.504, 3B 0.506, 1.5B 0.511, 0.5B 0.529. The
+registered halving factor 0.50 (pre-registered for the 51.2
+replication) is thus CONSERVATIVE for small models: the t_inf term
+softens the drop. If v2 survives tomorrow's cross-family refit,
+the pages' est. w/s column should scale per-model by v2 rather
+than by the flat 0.50-class ratio. Same form, all classes:
+t/s = 1/((file+KV)/(0.73 x spec_BW) + 1/t_inf) - BW_eff tracks
+the class, everything else is model-side config arithmetic.
