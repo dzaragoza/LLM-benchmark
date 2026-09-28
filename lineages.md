@@ -90,6 +90,8 @@ n=1172, measured at Q8_0 on the T14s (the overnight run, addendum
 Phi-4-mini 81.1% and Llama-3.2-3B 72.6% (both 0/267 stalls at n=50,
 addendum 66) — mistral has no passing Q8_0 member (measured FAIL).
 
+**ARC vs parameters (addendum 117, the qwen fit):** on the v3.1 qwen set the score is log-linear in parameters - score = 61.5 + 41.0*log10(P), R2 0.920, rmse 3.9 points. Read it as hardness: 25% is random chance (4-way choice), 50% is reachable below 1B, but a constant slope in log10(P) means every equal step up the ARC scale costs a constant MULTIPLICATIVE factor in parameters (~2.3x per 10 ARC points). Within a lineage, ARC-per-parameters is a fixed exchange rate - buying ARC with size is exponential in parameters, which is why the bandwidth-bound regime is a plateau where you pick the family intercept, not a scale race. Descriptive until the cross-family cells grade the slope.
+
 ---
 
 ## Qwen (the lineage that armed the study)
