@@ -50,6 +50,8 @@ study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). 
 <div class="panel">
   <label for="filter">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
   <input type="search" id="filter" placeholder="type to filter, e.g. ddr5 or 3200" oninput="renderList()" style="width:20rem;max-width:100%">
+  <div class="footnote" style="margin-top:0.3rem">Configurations whose bandwidth cannot run any measured model (below
+    <span id="minbw"></span>&nbsp;GB/s) are not listed.</div>
   <div id="machineList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="perch" id="perchLabel" style="display:none">Custom per-channel memory bandwidth (GB/s)</label>
   <input type="number" id="perch" min="1" max="200" step="0.1" value="25.6" style="display:none" oninput="pick()">
@@ -126,6 +128,13 @@ var GENERATIONS = [
   { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true }
 ];
 
+// A machine config is listed only if it can honestly run SOME measured
+// model: the candidate with the highest measured w/s (the most
+// bandwidth-forgiving one) must still clear the reader line when scaled
+// to the config's bandwidth. min BW = READER x REF_BW / max(wps).
+var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.wps); }, 0);
+MIN_RUN_BW = READER * REF_BW / MIN_RUN_BW;   // ~19.8 GB/s with the current pool
+
 function buildMachineMenu() {
   [1, 2, 4].forEach(function (ch) {
     GENERATIONS.forEach(function (g) {
@@ -133,6 +142,7 @@ function buildMachineMenu() {
       g.mts.forEach(function (mt) {
         var perch = mt * 8 / 1000;
         var bw = perch * ch;
+        if (bw < MIN_RUN_BW) return;   // cannot run any measured model - not listed
         var chName = ch === 1 ? "single" : ch === 2 ? "dual" : "quad";
         MACHINES.push({
           gen: g.gen, mt: mt, ch: ch, perch: perch, bw: bw,
@@ -252,6 +262,7 @@ function pick() {
   $("tables").innerHTML = t;
 }
 buildMachineMenu();
+$("minbw").textContent = MIN_RUN_BW.toFixed(1);
 renderList();
 applyMachine();
 pick();
