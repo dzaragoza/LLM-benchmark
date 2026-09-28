@@ -14,10 +14,17 @@ README's "Roster selection" section is a summary that points here.
 
 ## The rules
 
-1. **Popularity-sourced.** Start from the [Ollama library](https://ollama.com/library?sort=popular)
-   ranked by pull count (snapshot: 2026-09-23), walking down the
-   list. Popularity picks the *family*, never the weight file.
-   (Session 22; README walk-down table.)
+1. **Lineage data density (the study's current criterion; popularity
+   RETIRED prospectively).** Rosters are built by counting usable data
+   points per lineage: models ≤4B (the T14s's measurable window),
+   non-thinking or hybrid, instruct preferred (base acceptable), with
+   a paper in the lineage. Popularity is explicitly irrelevant
+   prospectively. (Addendum 77, the author's ruling; supersedes the
+   Ollama walk-down for all future rosters. The historical criterion
+   — start from the [Ollama library](https://ollama.com/library?sort=popular)
+   ranked by pull count, walking down; popularity picks the *family*,
+   never the weight file — stands for the study-#1/#2/#3 rosters as
+   measured. Session 22; README walk-down table.)
 
 2. **Distinct families only — family = publisher/author.** No two
    roster models from the same model family, where family is the
