@@ -24,7 +24,11 @@ README's "Roster selection" section is a summary that points here.
    or hybrid, instruct preferred (base acceptable), with a paper in the
    lineage. **The lineage is selected by the count, then EVERY member
    matching the rules enters the roster — no picking and choosing within
-   the line** (addendum 78, the author's correction). Popularity is
+   the line** (addendum 78, the author's correction). **Four lineages
+   per study; among qualifying lineages, pick only those that
+   contribute the most cells** (addendum 79, the author's ruling —
+   gemma's 3 cells lost to granite's 12 and phi/minicpm's 6 each; the
+   study's four: qwen + granite + phi + minicpm). Popularity is
    explicitly irrelevant prospectively. (Addendum 77, the author's
    ruling; supersedes the Ollama walk-down for all future rosters. The
    historical criterion — start from the
@@ -83,6 +87,22 @@ README's "Roster selection" section is a summary that points here.
    would simply switch to another machine). The real benefit for
    practitioners is the class-exclusive set: the models the
    machine unlocks. (Author ruling, addendum 65.)
+
+11. **Data hygiene: v3.1-instrument measurements only (addendum 79).**
+    Avoid using any data collected before protocol v3.1 in study
+    arithmetic — the protocol was not as mature (the v3.0-era records
+    stand as history; the picker's pool cut, addendum 76, is the
+    precedent — now a standing rule, not a one-off). Pre-v3.1 numbers
+    may be quoted as history, never consumed as inputs.
+
+12. **The way of working: dry-run pre-flight, always (addendum 79).**
+    Every `full_benchmark.py` invocation is issued TWICE: first with
+    `--dry-run` (the READ-ONLY pre-flight — verifies tooling, lists
+    every repo, runs the RAM/disk feasibility checks, reports each
+    family's acquisition plan, and never touches the state file), read
+    the report, then the SAME command without the flag. The pre-flight
+    is the risk mitigation: a bad repo, a missing converter or an
+    infeasible size is caught in minutes, not mid-sweep.
 
 ---
 

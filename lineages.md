@@ -286,13 +286,13 @@ content property?
 | gemma-2-2b (third generation datum) | 2.6B | 2.78 (P) | pending | — | predicted 7.34 (pooled) | — |
 | **gemma-3-1b-it (the word-sparse probe)** | 1.0B | 1.07 (P) | pending | predicted 13.31 (pooled) | — | — |
 
-**The pre-registered question:** the 1B's v3.1 stall rate and its
-per-turn w/t distribution. If it stalls on word-sparse turns at the
-same corpus points, the family failure is content-owned and
-size-independent (the well-behaved-generation conditional is
-violated family-wide — the certificate's word-for-word caveat
-confirmed on a fourth family); if it runs clean, the 3B/4B failures
-were size-linked and the family's anchor is rescuable at small sizes.
+**The question this family would answer (open, unscheduled):** the
+1B's v3.1 stall rate and its per-turn w/t distribution. If it stalls
+on word-sparse turns at the same corpus points, the family failure is
+content-owned and size-independent; if it runs clean, the 3B/4B
+failures were size-linked and the family's anchor is rescuable at
+small sizes. One cell answers it — the cost/benefit call is the
+author's, at probe-first time.
 **Caveat on every gemma prediction:** the pooled anchor 0.366 is a
 well-behaved-family floor; the gemma family's failure mode (word-sparse
 content) is by construction NOT in any anchor — the prediction band
