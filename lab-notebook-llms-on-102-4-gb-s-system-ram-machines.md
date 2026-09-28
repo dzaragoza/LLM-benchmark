@@ -3672,3 +3672,28 @@ Note for tomorrow: the 7B's Q4_0 teaser cell moves with the new
 size: 8.01 x 4.5/8.5 = 4.24 GiB - comfortably under the 5.27
 ceiling now (was 4.34); the 9B row stays (P) until its config
 lands (the 9B is not in tonight's roster).
+
+### Session 33, addendum 112 - the explicit-KV law (v2 candidate): the per-token traffic model
+
+The KV-cache analysis (author question: "the model needs to read the
+cache before every token?" - YES, full cache, every layer, every
+token) refit on the seven v3.1 qwen points at ctx 4096, KV F16:
+  OLD (size only):  1/t = S/67.8 + 1/649     rmse 0.0031 (1/t units)
+  NEW (S + KV):     1/t = (S+KV)/75.0 + 1/891  rmse 0.0014 (halved)
+The KV term is config arithmetic: KV(ctx) = 2*ctx*L*kv_heads*head_dim
+*2 bytes. The new BW_eff 75.0 sits at 73% of the 102.4 spec (old
+67.8, 66%) - the explicit term moves the fitted bandwidth TOWARD the
+hardware spec, exactly what a real-traffic model should do. t_inf
+649 -> 891 t/s. Biggest prediction fix: Qwen3-1.7B (GQA-8, the
+largest KV/file ratio at 0.26): old overpredicted 37.4 vs measured
+32.2; new predicts 33.6.
+CAVEATS (why this is a v2 CANDIDATE, not yet the registered law):
+(1) seven points, one family - the qwen shapes are correlated; the
+cross-family refit (granite/Phi/MiniCPM, very different kv/L/vocab)
+lands with tonight's run and is the real test; (2) the Qwen3.5-0.8B
+config (L/kv/head_dim) is unverified - its KV cell is small (0.12
+GiB) but the point carries the guess; (3) w/t anchoring unchanged -
+the law predicts t/s, the anchor converts, pass/fail machinery is
+untouched. The ceiling, re-derived under v2 at w/t 0.412 and
+qwen-4B-class KV (0.56 GiB): 5.53 GiB file (old: 5.27) - now
+per-architecture, because each model subtracts its OWN KV.
