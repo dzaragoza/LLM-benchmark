@@ -41,26 +41,23 @@
 <h1>Local LLM picker &mdash; GPU</h1>
 <div class="sub">The recommended Q8_0 model for your GPU, by measured ARC, among the models the
 study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172.
-Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineage picker</a>.</div>
+Serving from system RAM instead? <a href="lineage-picker.html">System RAM picker</a>.</div>
 
 <div class="panel">
   <label for="gfilter">GPU VRAM (GiB) &mdash; the common card capacities</label>
   <input type="search" id="gfilter" placeholder="type to filter, e.g. 16" oninput="renderList()" style="width:20rem;max-width:100%">
   <div class="footnote" style="margin-top:0.3rem">Distinct GPU VRAM capacities of the last ~30 years of cards;
     only tiers that fit at least one measured model are listed (the smallest needs
-    <span id="mincost"></span>&nbsp;GiB of whole-stack cost).</div>
+    <span id="mincost"></span>&nbsp;GiB of whole-stack cost). The estimated w/s column uses the
+    lowest-bandwidth card found at each capacity &mdash; conservative for anything faster.</div>
   <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="vram">Your GPU's VRAM (GiB)</label>
   <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
-  <div class="footnote" style="margin-top:0.3rem">Bandwidth is not the constraint on GPUs: the
-    lowest-bandwidth card on the current market (224 GB/s) still predicts
-    <span id="worstwps"></span>&nbsp;w/s for the slowest measured candidate under the linear law &mdash;
-    well over the 5.0 reader line &mdash; so the recommendation depends only on VRAM. VRAM fit uses the
+  <div class="footnote" style="margin-top:0.3rem">VRAM fit uses the
     <strong>whole measured stack cost</strong> (weights + KV + buffers + runtime), conservatively taken
     from the CPU-side instrument &mdash; the GPU stack is expected to need less, so a fit here is a lower
     bound on what the card can hold.</div>
   <div class="readout" id="bwout"></div>
-  <div class="readout" id="classout"></div>
 </div>
 
 <div id="result"></div>
@@ -75,9 +72,8 @@ Serving from system RAM instead? <a href="lineage-picker.html">system-RAM lineag
   (a) its <em>measured whole-stack cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
   instrument) fits the card's VRAM &mdash; conservative, since the CPU-side cost is an upper bound on
   the GPU-side one &mdash; and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader
-  line. Under that law even the lowest-bandwidth card on the current market (224 GB/s)
-  predicts 13.8 w/s for the slowest candidate, so <em>no card you can buy is bandwidth-limited for
-  this pool</em> and the recommendation depends only on VRAM.</p>
+  line, evaluated at each capacity's lowest-bandwidth card (conservative for anything
+  faster). Eligibility is the VRAM fit; the w/s column shows the reader-line margin.</p>
   <p><strong>Two extrapolations, both flagged.</strong> The cost criterion carries the CPU measurement
   onto the GPU unchanged (conservative by design; the first GPU-side calibration run should replace
   it), and the linear bandwidth law is validated only on system RAM &mdash; on GPU, compute and kernel
@@ -107,34 +103,59 @@ var CANDIDATES = [
 var REF_BW = 102.4;
 var READER = 5.0;
 
-// Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years
-// (GTX 480 1.5GB through the RTX 5090/A100 era). The spec that decides the
-// recommendation is capacity only (bandwidth never does, see below), so the picker
-// lists the capacities, keeping only tiers that fit at least one measured model
-// (the smallest whole-stack cost is ~1.06 GiB, so 1.5 GiB makes the cut).
+function $(id) { return document.getElementById(id); }
+
+// Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
+// each paired with the lowest memory bandwidth among cards found at that capacity
+// (the conservative w/s estimate for the tier). Only tiers that fit at least one
+// measured model are listed; the smallest whole-stack cost is ~1.06 GiB.
 var VRAM_TIERS = [
-  1.5, 2, 3, 4, 6, 8, 10, 11, 12, 16, 20, 22, 24, 32, 48, 80
+  { v: 1.5,  bw: 177.4 },   // GTX 480 (2010)
+  { v: 2,    bw: 176.0 },   // Radeon HD 6970 (2010)
+  { v: 3,    bw: 240.0 },   // Radeon HD 7950 (2012, 3 GB)
+  { v: 4,    bw: 224.1 },   // GTX 970 (2014)
+  { v: 6,    bw: 192.0 },   // GTX 1060 6GB (2016)
+  { v: 8,    bw: 211.0 },   // Radeon RX 470 8GB (2016)
+  { v: 10,   bw: 760.3 },   // RTX 3080 10GB (2020)
+  { v: 11,   bw: 484.3 },   // GTX 1080 Ti (2017)
+  { v: 12,   bw: 360.0 },   // RTX 3060 12GB (2021)
+  { v: 16,   bw: 288.1 },   // RTX 4060 Ti 16GB (2024)
+  { v: 20,   bw: 800.0 },   // RX 7900 XT (2022)
+  { v: 22,   bw: 616.0 },   // RTX 2080 Ti 22GB mod (2018)
+  { v: 24,   bw: 936.2 },   // RTX 3090 (2020)
+  { v: 32,   bw: 900.0 },   // V100 32GB (2017)
+  { v: 48,   bw: 768.0 },   // RTX A6000 (2020)
+  { v: 80,   bw: 2039.0 }   // A100 80GB (2020)
 ];
 var MIN_COST = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.cost); }, Infinity);
+var MAX_COST = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.cost); }, 0);
 
 // keep only tiers that fit at least one measured model
-var TIERS = VRAM_TIERS.filter(function (v) { return v >= MIN_COST; });
+var TIERS = VRAM_TIERS.filter(function (t) { return t.v >= MIN_COST; });
 
-var selKey = TIERS.length ? String(TIERS[TIERS.length - 1]) : "";
+// default: the smallest capacity that runs every measured model
+var DEFAULT_TIER = TIERS.filter(function (t) { return t.v >= MAX_COST; })[0] || TIERS[0];
+
+var selKey = DEFAULT_TIER ? String(DEFAULT_TIER.v) : "";
 
 function renderList() {
   var q = ($("gfilter").value || "").toLowerCase().trim();
   var host = $("gpuList");
   var html = "";
-  TIERS.forEach(function (v) {
-    var label = v + " GiB VRAM";
+  TIERS.forEach(function (t) {
+    var label = t.v + " GiB VRAM";
     if (q && label.toLowerCase().indexOf(q) < 0) return;
-    var cls = "mitem" + (String(v) === selKey ? " msel" : "");
-    html += '<div class="' + cls + '" data-key="' + v +
+    var cls = "mitem" + (String(t.v) === selKey ? " msel" : "");
+    html += '<div class="' + cls + '" data-key="' + t.v +
       '" onclick="chooseVram(this.dataset.key)">' + label + "</div>";
   });
   if (!html) html = '<div class="mitem">no capacity matches the filter</div>';
   host.innerHTML = html;
+}
+
+function tierBw(vram) {
+  var t = TIERS.filter(function (x) { return String(x.v) === String(vram); })[0];
+  return t ? t.bw : null;
 }
 
 function chooseVram(v) {
@@ -146,25 +167,16 @@ function chooseVram(v) {
 
 function clearSel() { selKey = ""; renderList(); }
 
-// The VRAM-only simplification is data-backed: under the linear law the lowest-bandwidth
-// card on the current market (224 GB/s) still predicts ~13.8 w/s for the slowest candidate
-// (Qwen3.5-4B, 6.32 wps @102.4) - well over the 5.0 reader line. No card you can buy is
-// bandwidth-limited for this pool; VRAM is the only constraint.
-var LOWEST_MARKET_BW = 224.0;
-var LOWEST_BW_SLOWEST_WPS = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.wps); }, Infinity) *
-  LOWEST_MARKET_BW / REF_BW;
-
-function $(id) { return document.getElementById(id); }
-
 function pick() {
   var vram = parseFloat($("vram").value);
   if (!(vram > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
-  $("bwout").textContent = "VRAM: " + vram + " GiB - the whole measured pool clears the reader line on any current card";
-  $("classout").textContent = "worst case on the lowest-bandwidth card on the market (224 GB/s): " +
-    LOWEST_BW_SLOWEST_WPS.toFixed(1) + " w/s for the slowest candidate (reader line 5.0)";
+  var bw = tierBw(vram) || null;
+  $("bwout").textContent = "VRAM: " + vram + " GiB" +
+    (bw ? " \u00b7 w/s estimated at " + bw.toFixed(0) + " GB/s (the lowest-bandwidth card found at this capacity)" : "");
 
   var rows = CANDIDATES.map(function (m) {
-    return { m: m, fits: m.cost <= vram };
+    var wpred = bw ? m.wps * bw / REF_BW : null;
+    return { m: m, w: wpred, fits: m.cost <= vram };
   });
 
   var host = $("result");
@@ -185,17 +197,18 @@ function pick() {
 
   var t = '<table><tr><th>model</th><th class="num">file GiB</th>' +
     '<th class="num">stack cost GiB</th><th class="num">fits ' + vram + ' GiB</th>' +
-    '<th class="num">ARC</th></tr>';
+    '<th class="num">est. w/s</th><th class="num">ARC</th></tr>';
   rows.forEach(function (r) {
     t += "<tr><td>" + r.m.name + '</td><td class="num">' + r.m.size.toFixed(2) +
       '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
       (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
+      '</td><td class="num">' + (r.w !== null ? r.w.toFixed(1) : "\u2014") +
       '</td><td class="num">' + r.m.arc.toFixed(1) + "</td></tr>";
   });
-  $("tables").innerHTML = t + "</table>";
+  $("tables").innerHTML = t + "</table>" +
+    '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s with 95% confidence</strong>: below the reader line, a 300-wpm reader stalls on more than 5% of turns.</div>';
 }
 
-$("worstwps").textContent = LOWEST_BW_SLOWEST_WPS.toFixed(1);
 $("mincost").textContent = MIN_COST.toFixed(2);
 chooseVram(selKey);
 </script>
