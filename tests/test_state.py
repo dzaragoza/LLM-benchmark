@@ -14,8 +14,7 @@ import full_benchmark as fb
 
 @pytest.fixture
 def state():
-    return {"families": {"Fam": {"spec": "org/repo",
-                                 "runs": {}, "selected": None}}}
+    return {"families": {"Fam": {"spec": "org/repo", "runs": {}, "selected": None}}}
 
 
 def test_load_state_missing_file(tmp_path):
@@ -57,10 +56,7 @@ def test_dry_run_writes_nothing_even_after_real_save(tmp_path):
     fb.save_state(path, {"families": {}})
     fb.DRY_RUN_ACTIVE = True
     try:
-        fb.save_state(path, {"families": {"X": {"spec": "y/z",
-                                                "runs": {},
-                                                "selected": "Q8_0"}}})
-        assert json.loads((tmp_path / "state.json").read_text()) == \
-            {"families": {}}
+        fb.save_state(path, {"families": {"X": {"spec": "y/z", "runs": {}, "selected": "Q8_0"}}})
+        assert json.loads((tmp_path / "state.json").read_text()) == {"families": {}}
     finally:
         fb.DRY_RUN_ACTIVE = False

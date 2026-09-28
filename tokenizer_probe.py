@@ -59,30 +59,33 @@ def load_tokenizer(repo):
     try:
         from transformers import AutoTokenizer
     except ImportError:
-        sys.exit("transformers is required (already in requirements.txt "
-                 "for the converter; pip install -r requirements.txt)")
+        sys.exit(
+            "transformers is required (already in requirements.txt "
+            "for the converter; pip install -r requirements.txt)"
+        )
     try:
         return AutoTokenizer.from_pretrained(repo)
     except Exception as e:
-        sys.exit(f"could not load tokenizer from {repo}: {e}\n"
-                 "  (gated repo? accept the license on hf.co and "
-                 "hf auth login)")
+        sys.exit(
+            f"could not load tokenizer from {repo}: {e}\n"
+            "  (gated repo? accept the license on hf.co and "
+            "hf auth login)"
+        )
 
 
 def corpus_texts(corpus_path):
     """The corpus's user prompts - fixed, pre-registered text set."""
     with open(corpus_path, encoding="utf-8") as f:
         corpus = json.load(f)
-    return [t for conv in corpus["conversations"]
-            for t in conv["user_turns"]]
+    return [t for conv in corpus["conversations"] for t in conv["user_turns"]]
 
 
 def arc_texts(arc_config, arc_num):
     """The ARC prompt set - the second registered text set."""
     import hf_download
+
     questions = hf_download.load_questions(arc_config, arc_num)
-    return [q["q"] if isinstance(q, dict) else str(q)
-            for q in questions]
+    return [q["q"] if isinstance(q, dict) else str(q) for q in questions]
 
 
 def tokenizer_wt(tok, texts, label):
@@ -90,8 +93,7 @@ def tokenizer_wt(tok, texts, label):
     words = sum(count_words(t) for t in texts)
     tokens = sum(len(tok(t)["input_ids"]) for t in texts)
     wt = words / tokens if tokens else 0.0
-    print(f"  {label:24} {len(texts):5} texts  "
-          f"{words:7} words  {tokens:8} tokens  w/t {wt:.3f}")
+    print(f"  {label:24} {len(texts):5} texts  {words:7} words  {tokens:8} tokens  w/t {wt:.3f}")
     return wt
 
 
@@ -113,8 +115,7 @@ def dump_wt_distribution(path):
     pts.sort()
     n = len(pts)
     return {
-        "label": (data.get("label") if isinstance(data, dict) else None)
-                 or os.path.basename(path),
+        "label": (data.get("label") if isinstance(data, dict) else None) or os.path.basename(path),
         "n": n,
         "min": pts[0],
         "p50": pts[n // 2],
@@ -126,45 +127,50 @@ def dump_wt_distribution(path):
 def main():
     ap = argparse.ArgumentParser(
         description="offline words/token probe: tokenizer efficiency on "
-                    "the registered text sets (the w/t predictor's first "
-                    "channel, addendum 51)")
-    ap.add_argument("--repo", default=None,
-                    help="HF repo id - tokenizer files only, no weights")
+        "the registered text sets (the w/t predictor's first "
+        "channel, addendum 51)"
+    )
+    ap.add_argument("--repo", default=None, help="HF repo id - tokenizer files only, no weights")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument("--arc-config", default="ARC-Challenge",
-                    help="ARC config name (hf_download.load_questions "
-                         "resolves the repo-root cache "
-                         "arc-<config>-test-<n>.json or fetches from "
-                         "the HF datasets-server)")
-    ap.add_argument("--arc-num", type=int, default=1172,
-                    help="number of ARC questions (the registered full "
-                         "test split)")
-    ap.add_argument("--dump", action="append", default=[],
-                    help="live-dump glob(s) for the measured side "
-                         "(repeatable)")
+    ap.add_argument(
+        "--arc-config",
+        default="ARC-Challenge",
+        help="ARC config name (hf_download.load_questions "
+        "resolves the repo-root cache "
+        "arc-<config>-test-<n>.json or fetches from "
+        "the HF datasets-server)",
+    )
+    ap.add_argument(
+        "--arc-num",
+        type=int,
+        default=1172,
+        help="number of ARC questions (the registered full test split)",
+    )
+    ap.add_argument(
+        "--dump",
+        action="append",
+        default=[],
+        help="live-dump glob(s) for the measured side (repeatable)",
+    )
     args = ap.parse_args()
 
     if not args.repo and not args.dump:
-        sys.exit("pass --repo (tokenizer side), --dump (measured side), "
-                 "or both")
+        sys.exit("pass --repo (tokenizer side), --dump (measured side), or both")
 
     if args.repo:
         print("=" * 72)
         print(f"TOKENIZER SIDE  ({args.repo} - tokenizer files only)")
         print("=" * 72)
         tok = load_tokenizer(args.repo)
-        tokenizer_wt(tok, corpus_texts(args.corpus),
-                     "corpus user prompts")
+        tokenizer_wt(tok, corpus_texts(args.corpus), "corpus user prompts")
         try:
             arc = arc_texts(args.arc_config, args.arc_num)
             tokenizer_wt(tok, arc, "ARC prompts")
         except Exception as e:
             print(f"  ARC prompts: skipped ({e})")
         print()
-        print("  reading: if these terms predict the family's measured "
-              "healthy-turn")
-        print("  w/t, the unknown-family selection filter needs only the "
-              "sparseness")
+        print("  reading: if these terms predict the family's measured healthy-turn")
+        print("  w/t, the unknown-family selection filter needs only the sparseness")
         print("  channel from the first run. Compare with --dump.")
 
     if args.dump:
@@ -172,23 +178,26 @@ def main():
         print("=" * 72)
         print("MEASURED SIDE  (per-turn w/t distributions from dumps)")
         print("=" * 72)
-        paths = sorted(set(p for g in args.dump for p in glob.glob(g)
-                           if not p.endswith(".mem.json")))
+        paths = sorted(
+            set(p for g in args.dump for p in glob.glob(g) if not p.endswith(".mem.json"))
+        )
         if not paths:
             sys.exit("no dumps matched the --dump glob(s)")
-        print(f"  {'dump':44} {'n':>4} {'min':>6} {'p50':>6} "
-              f"{'mean':>6} {'<0.30':>5}")
+        print(f"  {'dump':44} {'n':>4} {'min':>6} {'p50':>6} {'mean':>6} {'<0.30':>5}")
         for p in paths:
             d = dump_wt_distribution(p)
             if d is None:
-                print(f"  {os.path.basename(p):44} legacy dump "
-                      "(no per-turn gen_words/tokens) - skipped")
+                print(
+                    f"  {os.path.basename(p):44} legacy dump "
+                    "(no per-turn gen_words/tokens) - skipped"
+                )
                 continue
-            print(f"  {d['label'][:44]:44} {d['n']:4d} {d['min']:6.3f} "
-                  f"{d['p50']:6.3f} {d['mean']:6.3f} {d['below']:5d}")
+            print(
+                f"  {d['label'][:44]:44} {d['n']:4d} {d['min']:6.3f} "
+                f"{d['p50']:6.3f} {d['mean']:6.3f} {d['below']:5d}"
+            )
         print()
-        print("  reading: min << p50 = the sparseness channel lives in a "
-              "few turns;")
+        print("  reading: min << p50 = the sparseness channel lives in a few turns;")
         print("  min ~ p50 = the tokenizer term IS the family constant.")
 
 

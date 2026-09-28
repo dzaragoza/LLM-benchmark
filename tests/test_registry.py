@@ -16,12 +16,12 @@ import pytest
 import full_benchmark as fb
 
 # ---- the registry (PROTOCOL.md rows 100/103/124; single source) ----
-BW_EFF = 76.5          # GiB/s, 102.4 tier
-T_INF = 74.0           # t/s
-W_T_P05_QWEN = 0.412   # the qwen-class anchor
+BW_EFF = 76.5  # GiB/s, 102.4 tier
+T_INF = 74.0  # t/s
+W_T_P05_QWEN = 0.412  # the qwen-class anchor
 W_T_P05_POOLED = 0.366
-READER_WPS = 5.0       # the k=1 guarantee line
-GIB_PER_B = 1.07       # Q8_0 file size per B params
+READER_WPS = 5.0  # the k=1 guarantee line
+GIB_PER_B = 1.07  # Q8_0 file size per B params
 
 
 def law_tps(size_gib, bw=BW_EFF, t_inf=T_INF):

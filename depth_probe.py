@@ -107,8 +107,7 @@ def load_pool(corpus_file, text_file):
 
 def tokenize(port, content):
     try:
-        data = llama_server.post_json(port, "/tokenize",
-                                      {"content": content})
+        data = llama_server.post_json(port, "/tokenize", {"content": content})
     except Exception as e:
         fail("tokenize", f"/tokenize request failed: {e}", GUIDE["tokenize"])
     toks = data.get("tokens")
@@ -140,8 +139,7 @@ def build_blob(port, pool, depth):
         else:
             chars += max(64, (depth - n) * 32)
     if best is None:
-        fail("blob", "could not trim the blob under the depth budget",
-             GUIDE["blob"])
+        fail("blob", "could not trim the blob under the depth budget", GUIDE["blob"])
     return best
 
 
@@ -162,8 +160,7 @@ def probe_depth(port, blob, gen_tokens, samples):
         try:
             data = llama_server.post_json(port, "/completion", payload)
         except Exception as e:
-            fail("completion", f"/completion request failed: {e}",
-                 GUIDE["completion"])
+            fail("completion", f"/completion request failed: {e}", GUIDE["completion"])
         t = data.get("timings", {})
         rec = {
             "sample": i,
@@ -178,35 +175,44 @@ def probe_depth(port, blob, gen_tokens, samples):
             continue
         pm = rec["prompt_ms"]
         cache = "cache hit" if pm < 50 else "PREFILL"
-        print(f"    sample {i}: t/s {rec['tps']:.2f}  "
-              f"(prompt_n {rec['prompt_n']}, prompt_ms {pm:.1f} - {cache})")
+        print(
+            f"    sample {i}: t/s {rec['tps']:.2f}  "
+            f"(prompt_n {rec['prompt_n']}, prompt_ms {pm:.1f} - {cache})"
+        )
     return recs
 
 
 def summarize(recs, depth_target, reader_tp):
     tps = [r["tps"] for r in recs if r["tps"]]
     if not tps:
-        fail("completion", "no predicted_per_second in any sample",
-             GUIDE["completion"])
+        fail("completion", "no predicted_per_second in any sample", GUIDE["completion"])
     worst = min(tps)
     mean = sum(tps) / len(tps)
     wm = worst / mean if mean else 0.0
     prompt_n = next((r["prompt_n"] for r in recs if r["prompt_n"]), None)
     print(f"  depth target {depth_target} (measured prompt_n {prompt_n})")
-    print(f"  decode at depth: worst {worst:.2f}  mean {mean:.2f}  "
-          f"worst/mean {wm:.3f}  (n={len(tps)} samples)")
+    print(
+        f"  decode at depth: worst {worst:.2f}  mean {mean:.2f}  "
+        f"worst/mean {wm:.3f}  (n={len(tps)} samples)"
+    )
     if reader_tp is None:
-        print("  reader line: not checked (pass --reader-tp = 5.0 / "
-              "w/t_min(family) - the 6.5 default is deleted, "
-              "addendum 44: unanchored 0.75 inheritance)")
+        print(
+            "  reader line: not checked (pass --reader-tp = 5.0 / "
+            "w/t_min(family) - the 6.5 default is deleted, "
+            "addendum 44: unanchored 0.75 inheritance)"
+        )
     elif worst >= reader_tp:
-        print(f"  reader line {reader_tp:g} t/s: worst >= reader "
-              f"-> guarantee HOLDS at depth")
+        print(f"  reader line {reader_tp:g} t/s: worst >= reader -> guarantee HOLDS at depth")
     else:
-        print(f"  reader line {reader_tp:g} t/s: worst < reader "
-              f"-> guarantee BROKEN at depth")
-    return {"depth_target": depth_target, "prompt_n": prompt_n,
-            "samples": recs, "worst": worst, "mean": mean, "wm": wm}
+        print(f"  reader line {reader_tp:g} t/s: worst < reader -> guarantee BROKEN at depth")
+    return {
+        "depth_target": depth_target,
+        "prompt_n": prompt_n,
+        "samples": recs,
+        "worst": worst,
+        "mean": mean,
+        "wm": wm,
+    }
 
 
 def parse_kv(spec):
@@ -221,41 +227,62 @@ def parse_kv(spec):
 def main():
     ap = argparse.ArgumentParser(
         description="decode speed at context depth via prefill blobs "
-                    "(the addendum-11 depth protocol)")
+        "(the addendum-11 depth protocol)"
+    )
     ap.add_argument("--model", required=True, help=".gguf file to probe")
-    ap.add_argument("--depth", action="append", type=int, default=[],
-                    metavar="TOK",
-                    help="prefill depth in tokens (repeatable for the "
-                         "two-depth linearity check; default 4000, just "
-                         "under the 4096 protocol constant)")
-    ap.add_argument("--samples", type=int, default=SAMPLES_DEFAULT,
-                    help="decode samples per depth (default 5: the "
-                         "noise-at-depth measurement needs a handful)")
-    ap.add_argument("--gen-tokens", type=int, default=GEN_TOKENS_DEFAULT,
-                    help="tokens generated per sample (default 64; "
-                         "ignore_eos guarantees the full length)")
+    ap.add_argument(
+        "--depth",
+        action="append",
+        type=int,
+        default=[],
+        metavar="TOK",
+        help="prefill depth in tokens (repeatable for the "
+        "two-depth linearity check; default 4000, just "
+        "under the 4096 protocol constant)",
+    )
+    ap.add_argument(
+        "--samples",
+        type=int,
+        default=SAMPLES_DEFAULT,
+        help="decode samples per depth (default 5: the noise-at-depth measurement needs a handful)",
+    )
+    ap.add_argument(
+        "--gen-tokens",
+        type=int,
+        default=GEN_TOKENS_DEFAULT,
+        help="tokens generated per sample (default 64; ignore_eos guarantees the full length)",
+    )
     ap.add_argument("--port", type=int, default=PORT_DEFAULT)
-    ap.add_argument("--ctx", type=int, default=CTX_DEFAULT,
-                    help="server n_ctx (default 4096, the protocol "
-                         "constant; depth + gen_tokens must fit)")
-    ap.add_argument("--corpus", default=CORPUS_DEFAULT,
-                    help="blob source: the study corpus (default) or --text")
-    ap.add_argument("--text", default=None,
-                    help="plain-text blob source, overrides --corpus")
-    ap.add_argument("--reader-tp", type=float, default=None,
-                    help="the guarantee line in t/s - REQUIRED form: "
-                         "5.0 w/s / w/t_min(family) (addendum 44: the "
-                         "6.5 default is deleted, unanchored 0.75 "
-                         "inheritance; e.g. qwen w/t_min 0.49 -> 10.2)")
-    ap.add_argument("--kv", default=None,
-                    metavar="'layers,kv_heads,head_dim[,bytes_per_elem]'",
-                    help="architecture constants: enables the KV(D) tax "
-                         "column and, with >= 2 depths, the implied "
-                         "third-term bandwidth (linearity grade). "
-                         "Sliding-window models: pass window-capped "
-                         "constants yourself")
-    ap.add_argument("--json", default=None,
-                    help="dump path (default: <model>.depth-probe.json)")
+    ap.add_argument(
+        "--ctx",
+        type=int,
+        default=CTX_DEFAULT,
+        help="server n_ctx (default 4096, the protocol constant; depth + gen_tokens must fit)",
+    )
+    ap.add_argument(
+        "--corpus", default=CORPUS_DEFAULT, help="blob source: the study corpus (default) or --text"
+    )
+    ap.add_argument("--text", default=None, help="plain-text blob source, overrides --corpus")
+    ap.add_argument(
+        "--reader-tp",
+        type=float,
+        default=None,
+        help="the guarantee line in t/s - REQUIRED form: "
+        "5.0 w/s / w/t_min(family) (addendum 44: the "
+        "6.5 default is deleted, unanchored 0.75 "
+        "inheritance; e.g. qwen w/t_min 0.49 -> 10.2)",
+    )
+    ap.add_argument(
+        "--kv",
+        default=None,
+        metavar="'layers,kv_heads,head_dim[,bytes_per_elem]'",
+        help="architecture constants: enables the KV(D) tax "
+        "column and, with >= 2 depths, the implied "
+        "third-term bandwidth (linearity grade). "
+        "Sliding-window models: pass window-capped "
+        "constants yourself",
+    )
+    ap.add_argument("--json", default=None, help="dump path (default: <model>.depth-probe.json)")
     args = ap.parse_args()
 
     if not os.path.isfile(args.model):
@@ -263,18 +290,20 @@ def main():
     depths = sorted(set(args.depth) or [DEPTH_DEFAULT])
     for d in depths:
         if d + args.gen_tokens > args.ctx - DEPTH_HEADROOM:
-            sys.exit(f"depth {d} + {args.gen_tokens} gen tokens does not "
-                     f"fit ctx {args.ctx} with {DEPTH_HEADROOM} headroom "
-                     f"- lower --depth or raise --ctx (and note in the "
-                     "notebook if you leave the 4096 protocol constant)")
+            sys.exit(
+                f"depth {d} + {args.gen_tokens} gen tokens does not "
+                f"fit ctx {args.ctx} with {DEPTH_HEADROOM} headroom "
+                f"- lower --depth or raise --ctx (and note in the "
+                "notebook if you leave the 4096 protocol constant)"
+            )
     kv = parse_kv(args.kv) if args.kv else None
     size_gib = os.path.getsize(args.model) / (1 << 30)
 
     pool = load_pool(args.corpus, args.text)
-    print(f"=== depth probe: {os.path.basename(args.model)} "
-          f"({size_gib:.2f} GiB) ===")
-    print(f"depths {depths}, {args.samples} samples x "
-          f"{args.gen_tokens} tokens each, ctx {args.ctx}")
+    print(f"=== depth probe: {os.path.basename(args.model)} ({size_gib:.2f} GiB) ===")
+    print(
+        f"depths {depths}, {args.samples} samples x {args.gen_tokens} tokens each, ctx {args.ctx}"
+    )
 
     extra = ["-ngl", "99", "-c", str(args.ctx)]
     results = []
@@ -288,24 +317,23 @@ def main():
         # a clean slot and an honest prompt_n (Session 27, addendum 18)
         print(f"\n--- depth {d} ---")
         log_path = args.model + ".server.log"
-        proc, healthy = llama_server.start_server(args.model, args.port,
-                                                  extra, log_path=log_path)
+        proc, healthy = llama_server.start_server(args.model, args.port, extra, log_path=log_path)
         try:
             if not healthy:
                 sys.exit("server did not become healthy")
             blob, n_tok = build_blob(args.port, pool, d)
-            print(f"  blob built: {n_tok} tokens "
-                  f"(target {d}, tolerance {DEPTH_TOLERANCE})")
-            recs = probe_depth(args.port, blob, args.gen_tokens,
-                               args.samples)
+            print(f"  blob built: {n_tok} tokens (target {d}, tolerance {DEPTH_TOLERANCE})")
+            recs = probe_depth(args.port, blob, args.gen_tokens, args.samples)
             results.append(summarize(recs, d, args.reader_tp))
         finally:
             peak = llama_server.peak_rss_gib(proc)
             llama_server.stop_server(proc, args.port)
             if peak is not None:
-                print(f"  memory: peak RSS {peak:.2f} GiB at depth {d} "
-                      "(VmHWM; weights + KV(D) + buffers + runtime, "
-                      "addendum 36)")
+                print(
+                    f"  memory: peak RSS {peak:.2f} GiB at depth {d} "
+                    "(VmHWM; weights + KV(D) + buffers + runtime, "
+                    "addendum 36)"
+                )
 
     print("\n" + "=" * 72)
     print("DEPTH SUMMARY  (decode t/s at depth; the law's third term)")
@@ -316,31 +344,36 @@ def main():
     print(hdr)
     kv_gibs = {}
     for r in results:
-        row = (f"  {r['depth_target']:>6} {str(r['prompt_n']):>9} "
-               f"{r['worst']:>7.2f} {r['mean']:>7.2f}")
+        row = (
+            f"  {r['depth_target']:>6} {str(r['prompt_n']):>9} {r['worst']:>7.2f} {r['mean']:>7.2f}"
+        )
         if kv:
             d_eff = r["prompt_n"] or r["depth_target"]
             kvg = kv_gib(kv[0], kv[1], kv[2], d_eff, kv[3])
             kv_gibs[r["depth_target"]] = kvg
-            tax_ms = ((1000.0 / r["mean"]) * kvg / (size_gib + kvg)
-                      if r["mean"] else 0.0)
+            tax_ms = (1000.0 / r["mean"]) * kvg / (size_gib + kvg) if r["mean"] else 0.0
             row += f" {kvg:>10.3f} {tax_ms:>8.2f}"
         print(row)
 
     if kv and len(results) >= 2:
-        pts = [(size_gib + kv_gibs[r["depth_target"]], 1.0 / r["mean"])
-               for r in results]
+        pts = [(size_gib + kv_gibs[r["depth_target"]], 1.0 / r["mean"]) for r in results]
         (x1, y1), (x2, y2) = pts[0], pts[-1]
         if y2 != y1:
             bw = (x2 - x1) / (y2 - y1)
-            print(f"\n  third-term linearity: implied BW from the depth "
-                  f"pair = {bw:.1f} GiB/s ({1000.0 / bw:.2f} ms/GiB)")
-            print("  (the law's T14s constant is ~13.07 ms/GiB; a "
-                  "matching number grades the KV-tax arithmetic and the "
-                  "noise attribution together)")
+            print(
+                f"\n  third-term linearity: implied BW from the depth "
+                f"pair = {bw:.1f} GiB/s ({1000.0 / bw:.2f} ms/GiB)"
+            )
+            print(
+                "  (the law's T14s constant is ~13.07 ms/GiB; a "
+                "matching number grades the KV-tax arithmetic and the "
+                "noise attribution together)"
+            )
         else:
-            print("\n  third-term linearity: no speed change across "
-                  "depths - nothing to imply (check the samples above)")
+            print(
+                "\n  third-term linearity: no speed change across "
+                "depths - nothing to imply (check the samples above)"
+            )
 
     dump = args.json or (args.model + ".depth-probe.json")
     out = {

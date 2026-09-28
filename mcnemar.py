@@ -20,7 +20,7 @@ import os
 import sys
 from itertools import combinations
 
-ARC_NUM_DEFAULT = 1172   # full ARC-Challenge test split (author ruling 2026-09-23)
+ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 
 GUIDE = {
@@ -46,8 +46,7 @@ def fail(phase, rung, what, causes):
 
 
 def safe_label(label):
-    return "".join(ch if ch.isalnum() or ch in "-_." else "_"
-                   for ch in label)
+    return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in label)
 
 
 def arc_csv_path(arc_dir, label):
@@ -59,8 +58,7 @@ def csv_per_question(path, label, arc_num, arc_dir):
     missing or short. path may be None to resolve from label+arc_dir."""
     p = path if path else arc_csv_path(arc_dir, label)
     if not os.path.isfile(p):
-        fail(6, label, f"ARC CSV missing (expected {arc_num} questions)",
-             GUIDE[6])
+        fail(6, label, f"ARC CSV missing (expected {arc_num} questions)", GUIDE[6])
     per_q = {}
     try:
         with open(p, newline="", encoding="utf-8") as f:
@@ -69,12 +67,18 @@ def csv_per_question(path, label, arc_num, arc_dir):
     except Exception as e:
         fail(6, label, f"cannot read ARC CSV {p}: {e}", GUIDE[6])
     if len(per_q) != arc_num:
-        fail(6, label, f"ARC CSV short ({len(per_q)}/{arc_num} questions) - "
-             "rerun the ARC stage for this model", GUIDE[6])
+        fail(
+            6,
+            label,
+            f"ARC CSV short ({len(per_q)}/{arc_num} questions) - "
+            "rerun the ARC stage for this model",
+            GUIDE[6],
+        )
     return per_q
 
 
 # =========================================================== statistic
+
 
 def binom_two_sided(k, n, p=0.5):
     """Exact two-sided binomial p-value, computed in log space.
@@ -91,13 +95,17 @@ def binom_two_sided(k, n, p=0.5):
     log_p, log_q = math.log(p), math.log(1.0 - p)
 
     def log_pmf(i):
-        return (math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1)
-                + i * log_p + (n - i) * log_q)
+        return (
+            math.lgamma(n + 1)
+            - math.lgamma(i + 1)
+            - math.lgamma(n - i + 1)
+            + i * log_p
+            + (n - i) * log_q
+        )
 
     shift = log_pmf(k) + math.log(n + 1)  # keep exp() in range
     log_pk = log_pmf(k)
-    total = sum(math.exp(log_pmf(i) - shift) for i in range(n + 1)
-                if log_pmf(i) <= log_pk + 1e-9)
+    total = sum(math.exp(log_pmf(i) - shift) for i in range(n + 1) if log_pmf(i) <= log_pk + 1e-9)
     return min(1.0, math.exp(math.log(total) + shift))
 
 
@@ -119,9 +127,13 @@ def pairs_from_csvs(models, arc_num, arc_dir):
         b = sum(1 for q in common if models[m1][q] and not models[m2][q])
         c = sum(1 for q in common if not models[m1][q] and models[m2][q])
         diff = 100 * (b - c) / len(common) if common else 0.0
-        pairs[f"{m1}|{m2}"] = {"n_common": len(common), "only1": b,
-                              "only2": c, "diff_pp": diff,
-                              "p_exact": mcnemar_exact(b, c)}
+        pairs[f"{m1}|{m2}"] = {
+            "n_common": len(common),
+            "only1": b,
+            "only2": c,
+            "diff_pp": diff,
+            "p_exact": mcnemar_exact(b, c),
+        }
     return ranking, scores, pairs
 
 
@@ -130,18 +142,19 @@ def print_ranking(ranking, scores, pairs, arc_num):
     print("=" * 60)
     print(f"FINAL RANKING (ARC-Challenge, n={arc_num}, exact McNemar)")
     for i, m in enumerate(ranking, 1):
-        print(f"  {i}. {m}: {scores[m]}/{arc_num} = "
-              f"{100 * scores[m] / arc_num:.1f}%")
+        print(f"  {i}. {m}: {scores[m]}/{arc_num} = {100 * scores[m] / arc_num:.1f}%")
     print("-" * 60)
     print("consecutive-pair McNemar (does the rank order separate?)")
     for i in range(len(ranking) - 1):
         m1, m2 = ranking[i], ranking[i + 1]
         key = f"{m1}|{m2}" if f"{m1}|{m2}" in pairs else f"{m2}|{m1}"
         p = pairs[key]
-        print(f"  #{i + 1} vs #{i + 2}: {p['diff_pp']:+.2f} pp  "
-              f"(b={p['only1']}, c={p['only2']}, n={p['n_common']}), "
-              f"p = {p['p_exact']:.4f}"
-              f"{'  SEPARATED' if p['p_exact'] < 0.05 else '  (not separated)'}")
+        print(
+            f"  #{i + 1} vs #{i + 2}: {p['diff_pp']:+.2f} pp  "
+            f"(b={p['only1']}, c={p['only2']}, n={p['n_common']}), "
+            f"p = {p['p_exact']:.4f}"
+            f"{'  SEPARATED' if p['p_exact'] < 0.05 else '  (not separated)'}"
+        )
     print("=" * 60)
 
 
@@ -158,16 +171,25 @@ def rank(labels, arc_num, arc_dir):
 
 # =========================================================== main
 
+
 def main():
-    ap = argparse.ArgumentParser(
-        description="exact McNemar ranking from per-question ARC CSVs")
-    ap.add_argument("--labels", required=True,
-                    help="comma-separated model labels (CSV filenames "
-                         "are <safe_label>-arc-timing.csv)")
-    ap.add_argument("--arc-num", type=int, default=ARC_NUM_DEFAULT,
-                    help="ARC-Challenge questions (default: full 1172)")
-    ap.add_argument("--arc-models-dir", default=ARC_RESULTS_DIR_DEFAULT,
-                    help="directory holding the ARC timing CSVs")
+    ap = argparse.ArgumentParser(description="exact McNemar ranking from per-question ARC CSVs")
+    ap.add_argument(
+        "--labels",
+        required=True,
+        help="comma-separated model labels (CSV filenames are <safe_label>-arc-timing.csv)",
+    )
+    ap.add_argument(
+        "--arc-num",
+        type=int,
+        default=ARC_NUM_DEFAULT,
+        help="ARC-Challenge questions (default: full 1172)",
+    )
+    ap.add_argument(
+        "--arc-models-dir",
+        default=ARC_RESULTS_DIR_DEFAULT,
+        help="directory holding the ARC timing CSVs",
+    )
     args = ap.parse_args()
 
     labels = [x.strip() for x in args.labels.split(",") if x.strip()]

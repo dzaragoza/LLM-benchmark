@@ -104,15 +104,15 @@ import llama_server
 CORPUS_DEFAULT = "./live-corpus.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
 STALL_RATE_MAX = 0.05  # protocol v3.1: PASS iff <= 5% of turns catch up
-                          # reader (Brysbaert 2019). Protocol v2.1:
-                          # the anchor is words, not tokens.
+# reader (Brysbaert 2019). Protocol v2.1:
+# the anchor is words, not tokens.
 
 READER_REACTION_S = 0.45  # reader reaction time, s: 0.25 s simple visual RT
-                          # + 0.20 s saccade latency (Carpenter 1988;
-                          # addendum 31). Protocol v3.0: part of the
-                          # guarantee's verdict (the reader-wall test),
-                          # single-sourced here - session_replicate
-                          # imports it.
+# + 0.20 s saccade latency (Carpenter 1988;
+# addendum 31). Protocol v3.0: part of the
+# guarantee's verdict (the reader-wall test),
+# single-sourced here - session_replicate
+# imports it.
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
 DEPTH_HEADROOM = 64
@@ -121,11 +121,11 @@ ARENA_DIR = "./arena/data"
 SAMPLE_OUT = "./arena/english_sample.json"
 SEED = 1024  # pre-registered; part of the protocol
 THINK_ALLOWANCE = 2048  # thinking category: generation room on top
-                 # (raised 1024->2048 by author ruling 2026-09-24: Qwen3.5-4B
-                 #  measured 790-1440 natural thinking tokens/turn; at 1024 the
-                 #  allowance, 82% of turns ran out mid-thinking (answer_empty)
-                 #  - Session 25. Unrestricted-thinking ruling preserved: we never
-                 #  tell the model to stop, we just don't cut it off mid-sentence.)
+# (raised 1024->2048 by author ruling 2026-09-24: Qwen3.5-4B
+#  measured 790-1440 natural thinking tokens/turn; at 1024 the
+#  allowance, 82% of turns ran out mid-thinking (answer_empty)
+#  - Session 25. Unrestricted-thinking ruling preserved: we never
+#  tell the model to stop, we just don't cut it off mid-sentence.)
 
 GUIDE = {
     3: [
@@ -138,8 +138,7 @@ GUIDE = {
     ],
     4: [
         "dump unreadable: the .live-dump.json is malformed or empty",
-        "if the bench was interrupted, delete the dump and rerun "
-        "(phase 3 will redo it)",
+        "if the bench was interrupted, delete the dump and rerun (phase 3 will redo it)",
     ],
 }
 
@@ -161,14 +160,16 @@ def fail(phase, rung, what, causes):
 # =========================================================== corpus build
 # (from the former live-bench.py, verbatim protocol)
 
+
 def make_english_sample(n_sample=5000):
     import pyarrow.parquet as pq
 
-    files = sorted(glob.glob(os.path.join(ARENA_DIR, "**", "*.parquet"),
-                             recursive=True))
+    files = sorted(glob.glob(os.path.join(ARENA_DIR, "**", "*.parquet"), recursive=True))
     if not files:
-        sys.exit(f"No parquet found under {ARENA_DIR}. Download the "
-                 "lmsys-chat-1m dataset first (see README).")
+        sys.exit(
+            f"No parquet found under {ARENA_DIR}. Download the "
+            "lmsys-chat-1m dataset first (see README)."
+        )
     english = []
     for f in files:
         table = pq.read_table(f)
@@ -176,21 +177,21 @@ def make_english_sample(n_sample=5000):
             # lmsys-chat-1m schema: conversation_id, model, language, turn,
             # conversation: [{"role": "user"/"assistant", "content": ...}]
             if (row.get("language") or "").lower().startswith("english"):
-                english.append({
-                    "conversation": row["conversation"],
-                    "turn": row.get("turn"),
-                })
+                english.append(
+                    {
+                        "conversation": row["conversation"],
+                        "turn": row.get("turn"),
+                    }
+                )
     random.seed(SEED)
     random.shuffle(english)
     sample = english[:n_sample]
     with open(SAMPLE_OUT, "w") as f:
         json.dump(sample, f)
-    print(f"{len(english)} English conversations; wrote {len(sample)}-conv "
-          f"sample -> {SAMPLE_OUT}")
+    print(f"{len(english)} English conversations; wrote {len(sample)}-conv sample -> {SAMPLE_OUT}")
 
 
-def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
-                max_cap_tokens):
+def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns, max_cap_tokens):
     with open(arena_file) as f:
         items = json.load(f)
 
@@ -199,8 +200,7 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
     for conv in items:
         msgs = conv["conversation"]
         user_msgs = [m["content"] for m in msgs if m.get("role") == "user"]
-        asst_chars = [len(m["content"]) for m in msgs
-                      if m.get("role") == "assistant"]
+        asst_chars = [len(m["content"]) for m in msgs if m.get("role") == "assistant"]
         if not (min_turns <= len(user_msgs) <= max_turns):
             continue
         joined = " ".join(user_msgs)
@@ -220,8 +220,8 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
 
     # Deterministic order: stable sort by content hash, take N
     import hashlib
-    selected.sort(key=lambda c: hashlib.sha256(
-        json.dumps(c["user_turns"]).encode()).hexdigest())
+
+    selected.sort(key=lambda c: hashlib.sha256(json.dumps(c["user_turns"]).encode()).hexdigest())
     corpus = selected[:n_conversations]
 
     reply_chars.sort()
@@ -230,9 +230,11 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
 
     out = {
         "source": "LMSYS Chatbot Arena (lmsys-chat-1m), English sample, seed 1024",
-        "selection": (f"{len(corpus)} conversations, {min_turns}-{max_turns} "
-                      "user turns, English, no URLs, turns 1-4000 chars, "
-                      "deterministic sha256 order"),
+        "selection": (
+            f"{len(corpus)} conversations, {min_turns}-{max_turns} "
+            "user turns, English, no URLs, turns 1-4000 chars, "
+            "deterministic sha256 order"
+        ),
         "reply_length_p75_chars": p75,
         "answer_cap_tokens": cap_tokens,
         "temperature": 0,
@@ -250,6 +252,7 @@ def make_corpus(arena_file, out_file, n_conversations, min_turns, max_turns,
 
 # =========================================================== measurement
 
+
 def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
     """Per-conversation blob budget: the deepest turn must land at the
     reference depth without ever exceeding ctx (context shift would
@@ -262,8 +265,7 @@ def depth_budget(user_turns, cap_tokens, ctx, thinking=False):
     conv_side = 0
     for q in user_turns:
         conv_side += len(q) // 4
-        conv_side += (cap_tokens + THINK_ALLOWANCE) \
-            if thinking else cap_tokens
+        conv_side += (cap_tokens + THINK_ALLOWANCE) if thinking else cap_tokens
     # the noise measurement is protocol, not an afterthought: its
     # request (message + template wrappers + decode span) rides the
     # SAME worst-case-full history as the last turn, so its room is
@@ -286,8 +288,7 @@ def build_blob(port, pool, budget):
     return llama_server.trim_to_tokens(port, text, budget)
 
 
-def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
-                     reaction_s=READER_REACTION_S):
+def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT, reaction_s=READER_REACTION_S):
     """The guarantee's verdict, protocol v3.0 (author ruling, addendum
     55): simulate the reader on the per-word arrival stream - the
     registered addendum-30 collision model, exact form. The reader
@@ -301,8 +302,7 @@ def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
     final entry = stream end. Returns the collision record
     (catchup_events > 0 = FAIL)."""
     if not deltas or n_words == 0:
-        return {"catchup_events": 0, "catchup_s": 0.0,
-                "first_catchup_word_frac": None}
+        return {"catchup_events": 0, "catchup_s": 0.0, "first_catchup_word_frac": None}
     t_first = deltas[0]["t"]
     t_read = t_first + reaction_s
     pos = 0.0
@@ -334,15 +334,24 @@ def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
             else:
                 waiting_prev = False
             pos = min(p, pos + advance)
-    return {"catchup_events": events,
-            "catchup_s": round(total, 2),
-            "first_catchup_word_frac": round(first_frac, 3)
-            if first_frac is not None else None}
+    return {
+        "catchup_events": events,
+        "catchup_s": round(total, 2),
+        "first_catchup_word_frac": round(first_frac, 3) if first_frac is not None else None,
+    }
 
 
-def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
-                     thinking=False, no_thinking=False, blob=None,
-                     blob_tokens=0, reader_wps=None):
+def run_conversation(
+    port,
+    user_turns,
+    cap_tokens,
+    ctx_tokens,
+    thinking=False,
+    no_thinking=False,
+    blob=None,
+    blob_tokens=0,
+    reader_wps=None,
+):
     """Protocol v2: the conversation runs ON TOP of the depth prefill.
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
@@ -371,8 +380,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         history.append({"role": "user", "content": question})
         payload = {
             "messages": list(history),
-            "max_tokens": (cap_tokens + THINK_ALLOWANCE)
-                           if thinking else cap_tokens,
+            "max_tokens": (cap_tokens + THINK_ALLOWANCE) if thinking else cap_tokens,
             "temperature": 0,
             "stream": True,
         }
@@ -385,8 +393,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         meta = {}
         pieces, times, words = [], [], []
         wall_start = time.time()
-        for text, t_arr in llama_server.stream_completion(port, payload,
-                                                          meta=meta):
+        for text, t_arr in llama_server.stream_completion(port, payload, meta=meta):
             pieces.append(text)
             times.append(t_arr)
             words.append(len("".join(pieces).split()))
@@ -396,8 +403,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
 
         t = meta.get("timings", {})
         server_tps = t.get("predicted_per_second")
-        n_pred = t.get("predicted_n",
-                       meta.get("usage", {}).get("completion_tokens"))
+        n_pred = t.get("predicted_n", meta.get("usage", {}).get("completion_tokens"))
         prompt_ms = t.get("prompt_ms")
         prompt_n = t.get("prompt_n")
 
@@ -416,8 +422,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         # verdict since v3.0 - see the addendum-54 degeneracy note.
         answer_words = len(answer.split()) if answer.strip() else 0
         gen_span_s = ext_gen_s if (ext_gen_s and ext_gen_s > 0) else None
-        words_per_sec = (answer_words / gen_span_s
-                         if (answer_words and gen_span_s) else None)
+        words_per_sec = answer_words / gen_span_s if (answer_words and gen_span_s) else None
 
         # The verdict (protocol v3.0): simulate the reader on the
         # arrival stream - the registered addendum-30 collision
@@ -434,13 +439,12 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             for t_arr, w in zip(times[1:], words[1:], strict=True):
                 if w != deltas[-1]["w"]:
                     deltas.append({"t": round(t_arr - times[0], 4), "w": w})
-            collision = reader_wall_test(deltas, answer_words,
-                                          reader_wps or READER_WPS_DEFAULT,
-                                          READER_REACTION_S)
+            collision = reader_wall_test(
+                deltas, answer_words, reader_wps or READER_WPS_DEFAULT, READER_REACTION_S
+            )
         else:
             deltas = []
-            collision = {"catchup_events": 0, "catchup_s": 0.0,
-                         "first_catchup_word_frac": None}
+            collision = {"catchup_events": 0, "catchup_s": 0.0, "first_catchup_word_frac": None}
 
         reasoning = meta.get("reasoning") or ""
         rec = {
@@ -452,8 +456,7 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
             "gen_words": answer_words,
             "server_tps": server_tps,
             "server_wps": words_per_sec,
-            "words_per_token": ((answer_words / n_pred)
-                                if (answer_words and n_pred) else None),
+            "words_per_token": ((answer_words / n_pred) if (answer_words and n_pred) else None),
             "ext_tps": ext_tps,
             "wall_tps": (n_pred / wall_s) if (n_pred and wall_s) else None,
             "prompt_ms": prompt_ms,
@@ -470,35 +473,46 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         }
         results.append(rec)
         if reader_wps is not None and rec["reader_wall_fail"]:
-            print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
-                  f"hit the stream {collision['catchup_events']}x "
-                  f"(waited {collision['catchup_s']:.2f}s) - continuing "
-                  "(the verdict is the stall rate, protocol v3.1 - the "
-                  "conversation always runs to completion; early-fail is "
-                  "deleted, addendum 73)", flush=True)
+            print(
+                f"      turn {i + 1} FAILED THE READER WALL - the reader "
+                f"hit the stream {collision['catchup_events']}x "
+                f"(waited {collision['catchup_s']:.2f}s) - continuing "
+                "(the verdict is the stall rate, protocol v3.1 - the "
+                "conversation always runs to completion; early-fail is "
+                "deleted, addendum 73)",
+                flush=True,
+            )
     return results, history
 
 
-NOISE_PROMPT = ("Reply with a single paragraph about the weather "
-                 "(roughly sixty words).")
-NOISE_TOKENS = 128       # decode span per noise sample; small enough
-                         # to fit the worst-case-full history
-NOISE_MIN_ROOM = 24      # below this remaining budget, skip: the
-                         # history fills the context (Session 27,
-                         # addendum 16: 299 cap on a full history
-                         # -> prompt + n_predict over ctx -> 400,
-                         # which killed the whole run)
-NOISE_OVERHEAD = 96     # rendered noise message + template wrappers
-                         # + generation header, server-measured
-                         # prompt_n + this = the exact next-prompt size
-                         # (32 was too tight: qwen3.5's template adds
-                         # ~60+ rendered tokens of wrappers; conv 3 of
-                         # the addendum-21 run 400'd both samples)
+NOISE_PROMPT = "Reply with a single paragraph about the weather (roughly sixty words)."
+NOISE_TOKENS = 128  # decode span per noise sample; small enough
+# to fit the worst-case-full history
+NOISE_MIN_ROOM = 24  # below this remaining budget, skip: the
+# history fills the context (Session 27,
+# addendum 16: 299 cap on a full history
+# -> prompt + n_predict over ctx -> 400,
+# which killed the whole run)
+NOISE_OVERHEAD = 96  # rendered noise message + template wrappers
+# + generation header, server-measured
+# prompt_n + this = the exact next-prompt size
+# (32 was too tight: qwen3.5's template adds
+# ~60+ rendered tokens of wrappers; conv 3 of
+# the addendum-21 run 400'd both samples)
 
 
-def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
-                 thinking=False, no_thinking=False, samples=2,
-                 last_prompt_n=None, last_gen_tokens=None):
+def noise_sample(
+    port,
+    history,
+    cap_tokens,
+    ctx_tokens,
+    blob_tokens=0,
+    thinking=False,
+    no_thinking=False,
+    samples=2,
+    last_prompt_n=None,
+    last_gen_tokens=None,
+):
     """Same-depth noise samples: a short follow-up appended to the
     conversation's own history. The follow-up MUST ride the history:
     llama-server's slot cache reuses only the longest common token
@@ -530,12 +544,13 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
         # conservative fallback: max of the two readings (the blob
         # normally IS history[0]; if it is not, the plain chars/4
         # sum is the honest depth estimate)
-        est = max(blob_tokens + (hist_chars - blob_chars) // 4,
-                  hist_chars // 4)
+        est = max(blob_tokens + (hist_chars - blob_chars) // 4, hist_chars // 4)
     room = ctx_tokens - est
     if room < NOISE_MIN_ROOM:
-        print(f"      noise at depth: skipped (history fills the "
-              f"context: ~{est} of {ctx_tokens} tokens, room {room})")
+        print(
+            f"      noise at depth: skipped (history fills the "
+            f"context: ~{est} of {ctx_tokens} tokens, room {room})"
+        )
         return []
     noise_cap = max(8, min(NOISE_TOKENS, room - 8))
     msgs = list(history) + [{"role": "user", "content": NOISE_PROMPT}]
@@ -552,8 +567,7 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
         data = None
         for attempt in (1, 2, 3):
             try:
-                data = llama_server.post_json(
-                    port, "/v1/chat/completions", payload)
+                data = llama_server.post_json(port, "/v1/chat/completions", payload)
                 break
             except Exception as e:
                 if attempt < 3 and noise_cap > 8:
@@ -561,8 +575,7 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
                     # estimate was tight - halve and retry
                     noise_cap = max(8, noise_cap // 2)
                     payload["max_tokens"] = noise_cap
-                    print(f"      noise sample {i}: retrying with "
-                          f"max_tokens {noise_cap} ({e})")
+                    print(f"      noise sample {i}: retrying with max_tokens {noise_cap} ({e})")
                     continue
                 print(f"      noise sample {i} failed: {e}")
                 recs.append({"sample": i, "error": str(e)})
@@ -576,27 +589,36 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
         ans = (msg.get("content") or "").strip()
         ans_words = len(ans.split()) if ans else 0
         n_pred = t.get("predicted_n")
-        gen_span = ((data.get("timings", {}).get("predicted_ms") or 0)
-                    / 1000.0)
-        wps = (ans_words / gen_span
-               if (ans_words and gen_span > 0) else None)
-        recs.append({
-            "sample": i,
-            "prompt_n": t.get("prompt_n"),
-            "prompt_ms": pm,
-            "gen_tokens": n_pred,
-            "gen_words": ans_words,
-            "tps": tps,
-            "wps": wps,
-            "words_per_token": ((ans_words / n_pred)
-                                if (ans_words and n_pred) else None),
-        })
+        gen_span = (data.get("timings", {}).get("predicted_ms") or 0) / 1000.0
+        wps = ans_words / gen_span if (ans_words and gen_span > 0) else None
+        recs.append(
+            {
+                "sample": i,
+                "prompt_n": t.get("prompt_n"),
+                "prompt_ms": pm,
+                "gen_tokens": n_pred,
+                "gen_words": ans_words,
+                "tps": tps,
+                "wps": wps,
+                "words_per_token": ((ans_words / n_pred) if (ans_words and n_pred) else None),
+            }
+        )
     return recs
 
 
-def bench_model(model, corpus_file, port, ctx, repeats,
-               thinking=False, no_thinking=False, server_bin=None,
-               label=None, reader_wps=None, n_conversations=None):
+def bench_model(
+    model,
+    corpus_file,
+    port,
+    ctx,
+    repeats,
+    thinking=False,
+    no_thinking=False,
+    server_bin=None,
+    label=None,
+    reader_wps=None,
+    n_conversations=None,
+):
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
@@ -619,20 +641,16 @@ def bench_model(model, corpus_file, port, ctx, repeats,
     noise_records = []
     repeat_worsts = []
     mem_reports = []
-    log_path = os.path.join(os.path.dirname(model) or ".",
-                            os.path.basename(model) + ".server.log")
+    log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
     for rep in range(1, repeats + 1):
         print(f"  [rep {rep}/{repeats}] starting server...", flush=True)
         extra = ["-ngl", "99", "-c", str(ctx)]
         if thinking:
             extra += ["--reasoning-format", "deepseek"]
         if no_thinking:
-            extra += ["--chat-template-kwargs",
-                      '{"enable_thinking": false}']
+            extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
         mem_before = llama_server.system_memavailable_gib()
-        proc, healthy = llama_server.start_server(model, port, extra,
-                                                  server_bin,
-                                                  log_path=log_path)
+        proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
         try:
             if not healthy:
                 print("  ERROR: server did not become healthy; skipping")
@@ -640,17 +658,25 @@ def bench_model(model, corpus_file, port, ctx, repeats,
             pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
             conv_worsts = []
             for ci, conv in enumerate(conversations, 1):
-                budget = depth_budget(conv["user_turns"], cap_tokens, ctx,
-                                      thinking)
+                budget = depth_budget(conv["user_turns"], cap_tokens, ctx, thinking)
                 blob, blob_tokens = build_blob(port, pool, budget)
                 if blob is None:
-                    print(f"    conv {ci}: no blob budget left "
-                          f"(conversation alone fills the context - run "
-                          "at the shallower reference depth as-is)")
+                    print(
+                        f"    conv {ci}: no blob budget left "
+                        f"(conversation alone fills the context - run "
+                        "at the shallower reference depth as-is)"
+                    )
                 res, conv_history = run_conversation(
-                    port, conv["user_turns"], cap_tokens, ctx, thinking,
-                    no_thinking, blob, blob_tokens,
-                    reader_wps=reader_wps)
+                    port,
+                    conv["user_turns"],
+                    cap_tokens,
+                    ctx,
+                    thinking,
+                    no_thinking,
+                    blob,
+                    blob_tokens,
+                    reader_wps=reader_wps,
+                )
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
@@ -660,115 +686,146 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 cworst = min(tps) if tps else None
                 cmean = sum(tps) / len(tps) if tps else None
                 conv_worsts.append(cworst)
-                print(f"    conv {ci} (blob {blob_tokens} tok): turns t/s: "
-                      + ", ".join(f"{x:.1f}" for x in tps)
-                      + (f"   worst {cworst:.1f} (mean {cmean:.1f})"
-                         if cworst else ""))
-                print("      reader wall (catch-up events): "
-                      + ", ".join(str(e) for e in evts)
-                      + (f"   [reader waited "
-                         f"{max(cwait):.2f}s on the worst turn]"
-                         if max(cwait) > 0 else "   [reader never waited]"))
+                print(
+                    f"    conv {ci} (blob {blob_tokens} tok): turns t/s: "
+                    + ", ".join(f"{x:.1f}" for x in tps)
+                    + (f"   worst {cworst:.1f} (mean {cmean:.1f})" if cworst else "")
+                )
+                print(
+                    "      reader wall (catch-up events): "
+                    + ", ".join(str(e) for e in evts)
+                    + (
+                        f"   [reader waited {max(cwait):.2f}s on the worst turn]"
+                        if max(cwait) > 0
+                        else "   [reader never waited]"
+                    )
+                )
                 if wps:
-                    line = reader_wps if reader_wps is not None \
-                        else READER_WPS_DEFAULT
-                    print("      words/s (diagnostic): "
-                          + ", ".join(f"{x:.1f}" for x in wps)
-                          + f"   (reader line {line:g} w/s)")
+                    line = reader_wps if reader_wps is not None else READER_WPS_DEFAULT
+                    print(
+                        "      words/s (diagnostic): "
+                        + ", ".join(f"{x:.1f}" for x in wps)
+                        + f"   (reader line {line:g} w/s)"
+                    )
                 if thinking:
                     tk = [r["thinking_tokens_est"] for r in res]
                     empt = sum(r["answer_empty"] for r in res)
-                    print("      thinking tokens: "
-                          + ", ".join(str(x) for x in tk)
-                          + (f"   ({empt} empty answer(s))"
-                             if empt else ""))
-                if (not thinking and res
-                        and not any(r.get("gen_words") for r in res)):
-                    print("      WARNING: every answer this conversation "
-                          "was EMPTY - words/s cannot be measured. A "
-                          "hybrid model in default mode thinks first; "
-                          "pass --no-thinking (non-thinking) or "
-                          "--thinking (thinking, with the 2048 allowance)")
+                    print(
+                        "      thinking tokens: "
+                        + ", ".join(str(x) for x in tk)
+                        + (f"   ({empt} empty answer(s))" if empt else "")
+                    )
+                if not thinking and res and not any(r.get("gen_words") for r in res):
+                    print(
+                        "      WARNING: every answer this conversation "
+                        "was EMPTY - words/s cannot be measured. A "
+                        "hybrid model in default mode thinks first; "
+                        "pass --no-thinking (non-thinking) or "
+                        "--thinking (thinking, with the 2048 allowance)"
+                    )
                 try:
-                    noise = noise_sample(port, conv_history, cap_tokens,
-                                         ctx, blob_tokens, thinking,
-                                         no_thinking,
-                                         last_prompt_n=res[-1].get("prompt_n"),
-                                         last_gen_tokens=res[-1].get("gen_tokens"))
+                    noise = noise_sample(
+                        port,
+                        conv_history,
+                        cap_tokens,
+                        ctx,
+                        blob_tokens,
+                        thinking,
+                        no_thinking,
+                        last_prompt_n=res[-1].get("prompt_n"),
+                        last_gen_tokens=res[-1].get("gen_tokens"),
+                    )
                 except Exception as e:
-                    print(f"      noise collection failed for conv {ci}: "
-                          f"{e} (recorded, conversation kept)")
+                    print(
+                        f"      noise collection failed for conv {ci}: "
+                        f"{e} (recorded, conversation kept)"
+                    )
                     noise = [{"sample": 0, "error": str(e)}]
                 for r in noise:
                     noise_records.append({"model": label, "conv": ci, **r})
                 ntps = [r["tps"] for r in noise if r.get("tps")]
                 if ntps:
-                    print("      noise at depth: "
-                          + ", ".join(f"{x:.1f}" for x in ntps))
+                    print("      noise at depth: " + ", ".join(f"{x:.1f}" for x in ntps))
 
         finally:
             peak = llama_server.peak_rss_gib(proc)
-            cost = llama_server.memory_cost_gib(
-                mem_before, llama_server.system_memavailable_gib())
+            cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
             llama_server.stop_server(proc, port)
-            file_gib = os.path.getsize(model) / (1024 ** 3)
+            file_gib = os.path.getsize(model) / (1024**3)
             if peak is not None:
-                mem_reports.append({
-                    "rep": rep,
-                    "peak_rss_gib": peak,
-                    "mem_cost_gib": cost,
-                    **llama_server.parse_memory_log(log_path)})
-                note = (""
-                        if (peak >= file_gib or cost is None)
-                        else " - SUSPECT undercount (below the file size; "
-                             "see mem_cost_gib)")
-                print(f"    memory: peak RSS {peak:.2f} GiB"
-                      + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
-                      + " (weights + KV + buffers + runtime; VmHWM + "
-                      "MemAvailable delta, addendum 36/40)" + note,
-                      flush=True)
+                mem_reports.append(
+                    {
+                        "rep": rep,
+                        "peak_rss_gib": peak,
+                        "mem_cost_gib": cost,
+                        **llama_server.parse_memory_log(log_path),
+                    }
+                )
+                note = (
+                    ""
+                    if (peak >= file_gib or cost is None)
+                    else " - SUSPECT undercount (below the file size; see mem_cost_gib)"
+                )
+                print(
+                    f"    memory: peak RSS {peak:.2f} GiB"
+                    + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
+                    + " (weights + KV + buffers + runtime; VmHWM + "
+                    "MemAvailable delta, addendum 36/40)" + note,
+                    flush=True,
+                )
         wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
         if wall_hits:
-            print(f"  note: {wall_hits} wall-failing turn(s) recorded - "
-                  "the verdict is the stall rate (protocol v3.1, "
-                  "addendum 73; recomputed from deltas at analyze time)",
-                  flush=True)
+            print(
+                f"  note: {wall_hits} wall-failing turn(s) recorded - "
+                "the verdict is the stall rate (protocol v3.1, "
+                "addendum 73; recomputed from deltas at analyze time)",
+                flush=True,
+            )
         valid = [w for w in conv_worsts if w]
         if valid:
             rep_worst = min(valid)
             repeat_worsts.append(rep_worst)
             rep_mean_of_worsts = sum(valid) / len(valid)
-            print(f"  rep {rep}: conversation worsts -> "
-                  + ", ".join(f"{x:.1f}" for x in valid)
-                  + f"   [rep worst {rep_worst:.1f}, "
-                    f"avg-of-worsts {rep_mean_of_worsts:.1f}]")
+            print(
+                f"  rep {rep}: conversation worsts -> "
+                + ", ".join(f"{x:.1f}" for x in valid)
+                + f"   [rep worst {rep_worst:.1f}, "
+                f"avg-of-worsts {rep_mean_of_worsts:.1f}]"
+            )
 
     summary = None
     if repeat_worsts:
         worst = min(repeat_worsts)
         avg_worsts = sum(repeat_worsts) / len(repeat_worsts)
-        print(f"\n  {label}: WORST TURN = {worst:.1f} t/s "
-              f"(min of {len(repeat_worsts)} reps; "
-              f"avg-of-rep-worsts {avg_worsts:.1f})")
+        print(
+            f"\n  {label}: WORST TURN = {worst:.1f} t/s "
+            f"(min of {len(repeat_worsts)} reps; "
+            f"avg-of-rep-worsts {avg_worsts:.1f})"
+        )
         summary = (label, worst, avg_worsts)
     if noise_records:
         ntps = [r["tps"] for r in noise_records if r.get("tps")]
         if ntps:
             nw = min(ntps)
             nm = sum(ntps) / len(ntps)
-            print(f"  {label}: NOISE AT DEPTH: worst {nw:.2f}  mean {nm:.2f}"
-                  f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})")
+            print(
+                f"  {label}: NOISE AT DEPTH: worst {nw:.2f}  mean {nm:.2f}"
+                f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})"
+            )
     if mem_reports:
         peaks = [m["peak_rss_gib"] for m in mem_reports]
-        print(f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
-              f"across {len(peaks)} rep(s) - file "
-              f"{os.path.getsize(model) / (1024 ** 3):.2f} GiB, i.e. "
-              f"{max(peaks) - os.path.getsize(model) / (1024 ** 3):.2f} "
-              "GiB beyond the file (KV + buffers + runtime)")
+        print(
+            f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
+            f"across {len(peaks)} rep(s) - file "
+            f"{os.path.getsize(model) / (1024**3):.2f} GiB, i.e. "
+            f"{max(peaks) - os.path.getsize(model) / (1024**3):.2f} "
+            "GiB beyond the file (KV + buffers + runtime)"
+        )
     return all_turns, summary, mem_reports
 
 
 # =========================================================== dump + verdict
+
 
 def live_dump_name(path, thinking=False, no_thinking=False):
     """Mode-suffixed dump name: a thinking-mode dump must NEVER be reused
@@ -783,10 +840,20 @@ def live_dump_name(path, thinking=False, no_thinking=False):
     return path + ".live-dump.json"
 
 
-def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
-          port=PORT_DEFAULT, ctx=CTX_DEFAULT, repeats=REPEATS_DEFAULT,
-          dump_override=None, force=False, reader_wps=None,
-          conversations=None):
+def bench(
+    path,
+    corpus,
+    dry_run,
+    thinking=False,
+    no_thinking=False,
+    port=PORT_DEFAULT,
+    ctx=CTX_DEFAULT,
+    repeats=REPEATS_DEFAULT,
+    dump_override=None,
+    force=False,
+    reader_wps=None,
+    conversations=None,
+):
     """Phase 3: live-bench the model file; returns the dump path.
     force: re-measure even if a valid newer dump exists (the resume
     machinery is the pipeline default; --force is the re-measurement
@@ -800,12 +867,18 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
     label = os.path.basename(path)
     if not dry_run and not os.path.isfile(path):
-        fail(3, label, f"model file not found: {path}",
-             ["the file was moved or deleted since the state marked it "
-              "ready (rerun full_benchmark.py - it detects the missing "
-              "file and re-acquires it automatically)",
-              "wrong path: verify it exists (ls)",
-              "run from the repo root so ./models/... resolves"])
+        fail(
+            3,
+            label,
+            f"model file not found: {path}",
+            [
+                "the file was moved or deleted since the state marked it "
+                "ready (rerun full_benchmark.py - it detects the missing "
+                "file and re-acquires it automatically)",
+                "wrong path: verify it exists (ls)",
+                "run from the repo root so ./models/... resolves",
+            ],
+        )
 
     def dump_valid():
         if not os.path.isfile(dump):
@@ -815,47 +888,51 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
                 turns = json.load(f)
         except Exception:
             return False
-        return any(t.get("model") == label and t.get("server_tps")
-                   for t in turns)
+        return any(t.get("model") == label and t.get("server_tps") for t in turns)
 
     mem_sidecar = dump + ".mem.json"
-    if not force and dump_valid() and \
-            os.path.getmtime(dump) > os.path.getmtime(path):
-        print("  [3] reusing existing dump (newer than model file; "
-              "pass --force to re-measure)")
+    if not force and dump_valid() and os.path.getmtime(dump) > os.path.getmtime(path):
+        print("  [3] reusing existing dump (newer than model file; pass --force to re-measure)")
         if os.path.isfile(mem_sidecar):
             try:
                 with open(mem_sidecar) as f:
                     mem = json.load(f)
-                peaks = [m["peak_rss_gib"] for m in mem
-                         if m.get("peak_rss_gib")]
+                peaks = [m["peak_rss_gib"] for m in mem if m.get("peak_rss_gib")]
                 if peaks:
-                    print(f"    memory: peak RSS {max(peaks):.2f} GiB "
-                          "(from this dump's run; VmHWM, addendum 36)")
+                    print(
+                        f"    memory: peak RSS {max(peaks):.2f} GiB "
+                        "(from this dump's run; VmHWM, addendum 36)"
+                    )
             except Exception:
                 pass
         return dump
     if dry_run:
         return dump
-    turns, _, mem_reports = bench_model(path, corpus, port, ctx, repeats,
-                                       thinking, no_thinking, label=label,
-                                       reader_wps=reader_wps,
-                                       n_conversations=conversations,
-                                       )
+    turns, _, mem_reports = bench_model(
+        path,
+        corpus,
+        port,
+        ctx,
+        repeats,
+        thinking,
+        no_thinking,
+        label=label,
+        reader_wps=reader_wps,
+        n_conversations=conversations,
+    )
     with open(dump, "w") as f:
         json.dump(turns, f, indent=1)
     if mem_reports:
         with open(mem_sidecar, "w") as f:
             json.dump(mem_reports, f, indent=1)
     if not dump_valid():
-        fail(3, label, "live bench produced no usable dump "
-             "(see the output above)", GUIDE[3])
+        fail(3, label, "live bench produced no usable dump (see the output above)", GUIDE[3])
     return dump
 
 
-def analyze(path, thinking=False, no_thinking=False,
-            dump_override=None,
-            reader_wps=READER_WPS_DEFAULT):
+def analyze(
+    path, thinking=False, no_thinking=False, dump_override=None, reader_wps=READER_WPS_DEFAULT
+):
     """Phase 4: the guarantee verdict from the dump.
 
     Protocol v2.1 (author catch, Session 27): t/s is not w/s. The
@@ -882,14 +959,12 @@ def analyze(path, thinking=False, no_thinking=False,
             turns = json.load(f)
     except Exception as e:
         fail(4, label, f"cannot read dump: {e}", GUIDE[4])
-    mine = [t for t in turns
-            if t.get("model") == label and t.get("server_tps")]
+    mine = [t for t in turns if t.get("model") == label and t.get("server_tps")]
     if not mine:
         fail(4, label, "dump has no turns for this model", GUIDE[4])
 
     # measured words/token across the dump (v2.1 turns carry it)
-    ratios = [t["words_per_token"] for t in mine
-              if t.get("words_per_token")]
+    ratios = [t["words_per_token"] for t in mine if t.get("words_per_token")]
     wpt = (sum(ratios) / len(ratios)) if ratios else None
     wpt_measured = bool(ratios)
     # the w/t calibration view (addendum 58): per-turn w/t sorted,
@@ -905,23 +980,29 @@ def analyze(path, thinking=False, no_thinking=False,
     # without measured w/s) cannot be verdicted - re-bench instead.
     legacy = [t for t in mine if t.get("server_wps") is None]
     if legacy:
-        fail(4, label,
-             f"dump has {len(legacy)} turn(s) without measured w/s "
-             "(protocol-v1 data; the 0.75 words/token fallback is "
-             "deleted, addendum 44) - re-bench with --force to "
-             "measure words per second with the v2.1 instrument",
-             GUIDE[4])
+        fail(
+            4,
+            label,
+            f"dump has {len(legacy)} turn(s) without measured w/s "
+            "(protocol-v1 data; the 0.75 words/token fallback is "
+            "deleted, addendum 44) - re-bench with --force to "
+            "measure words per second with the v2.1 instrument",
+            GUIDE[4],
+        )
     # Protocol v3.0 (addendum 55): the verdict is the reader-wall
     # test, which needs the per-word arrival stream - a dump whose
     # turns carry no deltas (pre-v3.0) cannot be verdicted; re-bench.
     no_stream = [t for t in mine if "deltas" not in t]
     if no_stream:
-        fail(4, label,
-             f"dump has {len(no_stream)} turn(s) without per-word "
-             "arrival deltas (pre-v3.0 data; the verdict needs the "
-             "arrival stream, addenda 55/73) - re-bench with "
-             "--force to record the arrival stream",
-             GUIDE[4])
+        fail(
+            4,
+            label,
+            f"dump has {len(no_stream)} turn(s) without per-word "
+            "arrival deltas (pre-v3.0 data; the verdict needs the "
+            "arrival stream, addenda 55/73) - re-bench with "
+            "--force to record the arrival stream",
+            GUIDE[4],
+        )
 
     # Protocol v3.1 (addendum 73): the verdict is the STALL RATE -
     # the registered addendum-30 collision simulation on each
@@ -939,11 +1020,10 @@ def analyze(path, thinking=False, no_thinking=False,
     total_catchup_events = 0
     worst_catchup_s = 0.0
     for t in mine:
-        col = reader_wall_test(t.get("deltas") or [],
-                               t.get("gen_words") or 0,
-                               reader_wps, READER_REACTION_S)
-        t["catchup_events"], t["catchup_s"] = (
-            col["catchup_events"], col["catchup_s"])
+        col = reader_wall_test(
+            t.get("deltas") or [], t.get("gen_words") or 0, reader_wps, READER_REACTION_S
+        )
+        t["catchup_events"], t["catchup_s"] = (col["catchup_events"], col["catchup_s"])
         t["first_catchup_word_frac"] = col["first_catchup_word_frac"]
         t["reader_wall_fail"] = 1 if col["catchup_events"] else 0
         if col["catchup_events"]:
@@ -953,8 +1033,7 @@ def analyze(path, thinking=False, no_thinking=False,
     # Protocol v3.1 (addendum 73): the guarantee is the STALL RATE -
     # PASS iff at most STALL_RATE_MAX of turns have a catch-up event.
     stall_rate = len(wall_fails) / len(mine) if mine else 0.0
-    verdict = ("PASS (confident)" if stall_rate <= STALL_RATE_MAX
-               else "FAIL")
+    verdict = "PASS (confident)" if stall_rate <= STALL_RATE_MAX else "FAIL"
     fail_rate = round(stall_rate, 4)
 
     def turn_wps(t):
@@ -968,8 +1047,7 @@ def analyze(path, thinking=False, no_thinking=False,
     mean_wps = sum(turn_wps(t) for t in mine) / len(mine)
     if len(conv_worsts) > 1:
         mu = sum(conv_worsts) / len(conv_worsts)
-        sd = math.sqrt(sum((w - mu) ** 2 for w in conv_worsts)
-                       / (len(conv_worsts) - 1))
+        sd = math.sqrt(sum((w - mu) ** 2 for w in conv_worsts) / (len(conv_worsts) - 1))
         sigma = sd / math.sqrt(len(conv_worsts))
     else:
         sigma = 0.0
@@ -979,64 +1057,96 @@ def analyze(path, thinking=False, no_thinking=False,
     # verdict is settled above by the reader-wall test.
     worst_tps = min(t["server_tps"] for t in mine)
     mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
-    return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
-            "threshold": threshold, "verdict": verdict,
-            "stall_rate": fail_rate, "stall_rate_max": STALL_RATE_MAX,
-            "wall_fail_turns": len(wall_fails),
-            "catchup_events": total_catchup_events,
-            "worst_catchup_s": worst_catchup_s,
-            "reader_wps": reader_wps,
-            "words_per_token": wpt,
-            "words_per_token_measured": wpt_measured,
-            "worst_tps": worst_tps, "mean_tps": mean_tps,
-            "words_per_token_min": (min(ratios) if ratios else None),
-            "words_per_token_p05": wpt_p05,
-            "n_turns": len(mine), "n_convs": len(conv_worsts),
-            "dump": dump}
+    return {
+        "worst": worst_wps,
+        "mean": mean_wps,
+        "sigma": sigma,
+        "threshold": threshold,
+        "verdict": verdict,
+        "stall_rate": fail_rate,
+        "stall_rate_max": STALL_RATE_MAX,
+        "wall_fail_turns": len(wall_fails),
+        "catchup_events": total_catchup_events,
+        "worst_catchup_s": worst_catchup_s,
+        "reader_wps": reader_wps,
+        "words_per_token": wpt,
+        "words_per_token_measured": wpt_measured,
+        "worst_tps": worst_tps,
+        "mean_tps": mean_tps,
+        "words_per_token_min": (min(ratios) if ratios else None),
+        "words_per_token_p05": wpt_p05,
+        "n_turns": len(mine),
+        "n_convs": len(conv_worsts),
+        "dump": dump,
+    }
 
 
 # =========================================================== CLI
 
+
 def main():
     ap = argparse.ArgumentParser(
         description="speed gate: live-bench a model and grade the worst "
-                    "turn against the reader line (absorbs the former "
-                    "live-bench.py)")
+        "turn against the reader line (absorbs the former "
+        "live-bench.py)"
+    )
     ap.add_argument("--model", help=".gguf file to bench")
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument("--reader-wps", type=float, default=READER_WPS_DEFAULT,
-                    help=f"the k=1 guarantee line in WORDS per second "
-                         f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
-                         f"Brysbaert 2019 - match the fast reader; the "
-                         f"t/s line is this divided by words/token)")
-    ap.add_argument("--dump", default=None,
-                    help="live-dump path override (default: next to the "
-                         "model file, mode-suffixed)")
+    ap.add_argument(
+        "--reader-wps",
+        type=float,
+        default=READER_WPS_DEFAULT,
+        help=f"the k=1 guarantee line in WORDS per second "
+        f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
+        f"Brysbaert 2019 - match the fast reader; the "
+        f"t/s line is this divided by words/token)",
+    )
+    ap.add_argument(
+        "--dump",
+        default=None,
+        help="live-dump path override (default: next to the model file, mode-suffixed)",
+    )
     ap.add_argument("--port", type=int, default=PORT_DEFAULT)
     ap.add_argument("--ctx", type=int, default=CTX_DEFAULT)
-    ap.add_argument("--repeats", type=int, default=REPEATS_DEFAULT,
-                    help="qualifying tier default: 1 rep; use 3 for final "
-                         "podium numbers")
-    ap.add_argument("--conversations", type=int, default=None,
-                    help="bench only the first N conversations of the "
-                         "corpus (the w/t calibration pass, addendum "
-                         "58: more turns -> a registered per-family w/t "
-                         "anchor; the default None = all)")
-    ap.add_argument("--thinking", action="store_true",
-                    help="thinking mode (category protocol, rule 8)")
-    ap.add_argument("--no-thinking", action="store_true",
-                    help="hybrid model, non-thinking category (rule 8)")
+    ap.add_argument(
+        "--repeats",
+        type=int,
+        default=REPEATS_DEFAULT,
+        help="qualifying tier default: 1 rep; use 3 for final podium numbers",
+    )
+    ap.add_argument(
+        "--conversations",
+        type=int,
+        default=None,
+        help="bench only the first N conversations of the "
+        "corpus (the w/t calibration pass, addendum "
+        "58: more turns -> a registered per-family w/t "
+        "anchor; the default None = all)",
+    )
+    ap.add_argument(
+        "--thinking", action="store_true", help="thinking mode (category protocol, rule 8)"
+    )
+    ap.add_argument(
+        "--no-thinking", action="store_true", help="hybrid model, non-thinking category (rule 8)"
+    )
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--force", action="store_true",
-                    help="re-measure even if a valid newer dump exists "
-                         "(default: reuse it - the resume machinery)")
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="re-measure even if a valid newer dump exists "
+        "(default: reuse it - the resume machinery)",
+    )
     # corpus-building steps (from the former live-bench.py)
-    ap.add_argument("--make-sample", action="store_true",
-                    help="step 0 (once): English extraction from Arena "
-                         "parquet shards")
-    ap.add_argument("--make-corpus", action="store_true",
-                    help="step 1 (once): build the fixed corpus from "
-                         "english_sample.json")
+    ap.add_argument(
+        "--make-sample",
+        action="store_true",
+        help="step 0 (once): English extraction from Arena parquet shards",
+    )
+    ap.add_argument(
+        "--make-corpus",
+        action="store_true",
+        help="step 1 (once): build the fixed corpus from english_sample.json",
+    )
     ap.add_argument("--corpus-out", default=CORPUS_DEFAULT)
     ap.add_argument("--n-conversations", type=int, default=5)
     ap.add_argument("--min-turns", type=int, default=4)
@@ -1051,8 +1161,14 @@ def main():
         make_english_sample()
         return
     if args.make_corpus:
-        make_corpus(SAMPLE_OUT, args.corpus_out, args.n_conversations,
-                    args.min_turns, args.max_turns, args.max_cap_tokens)
+        make_corpus(
+            SAMPLE_OUT,
+            args.corpus_out,
+            args.n_conversations,
+            args.min_turns,
+            args.max_turns,
+            args.max_cap_tokens,
+        )
         return
 
     if not args.model:
@@ -1060,43 +1176,62 @@ def main():
     if not args.dry_run and not os.path.isfile(args.model):
         sys.exit(f"model file not found: {args.model}")
     if not args.dry_run and not os.path.isfile(args.corpus):
-        sys.exit(f"corpus not found at {args.corpus} - build it: "
-                 "python3 speed_gate.py --make-corpus")
+        sys.exit(
+            f"corpus not found at {args.corpus} - build it: python3 speed_gate.py --make-corpus"
+        )
 
-    dump = bench(args.model, args.corpus, args.dry_run, args.thinking,
-                 args.no_thinking, args.port, args.ctx, args.repeats,
-                 args.dump, args.force, args.reader_wps,
-                 conversations=args.conversations,
-                 )
+    dump = bench(
+        args.model,
+        args.corpus,
+        args.dry_run,
+        args.thinking,
+        args.no_thinking,
+        args.port,
+        args.ctx,
+        args.repeats,
+        args.dump,
+        args.force,
+        args.reader_wps,
+        conversations=args.conversations,
+    )
     if args.dry_run:
-        print(f"[4] would analyze (the reader-wall stall rate: a turn "
-              f"stalls iff the reader EVER hits the stream - PASS iff "
-              f"<= {STALL_RATE_MAX:.0%} of turns stall - reader "
-              f"{args.reader_wps:g} w/s, reaction "
-              f"{READER_REACTION_S}s, addendum 73)")
+        print(
+            f"[4] would analyze (the reader-wall stall rate: a turn "
+            f"stalls iff the reader EVER hits the stream - PASS iff "
+            f"<= {STALL_RATE_MAX:.0%} of turns stall - reader "
+            f"{args.reader_wps:g} w/s, reaction "
+            f"{READER_REACTION_S}s, addendum 73)"
+        )
         return
-    res = analyze(args.model, args.thinking, args.no_thinking,
-                  args.dump, args.reader_wps)
+    res = analyze(args.model, args.thinking, args.no_thinking, args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
-    print(f"[4] {res['verdict']} — the reader-wall stall rate: "
-          f"{res['wall_fail_turns']} of {res['n_turns']} turns stalled "
-          f"({res['stall_rate']:.1%}; PASS <= {res['stall_rate_max']:.0%}), "
-          f"{res['catchup_events']} catch-up event(s), "
-          f"worst wait {res['worst_catchup_s']:.2f}s "
-          f"(reader {args.reader_wps:g} w/s, reaction "
-          f"{READER_REACTION_S}s; addendum 73)")
-    print(f"    span diagnostics: worst {res['worst']:.2f} w/s "
-          f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}) - "
-          "NOT the verdict (addendum 54: spans of tiny answers "
-          "are overhead, not reading experience)")
-    print(f"    token-side view: worst {res['worst_tps']:.1f} t/s "
-          f"(mean {res['mean_tps']:.1f}); words/token "
-          f"{res['words_per_token']:.3f} (measured)")
-    print(f"    w/t calibration (addendum 58): n={res['n_turns']} turns, "
-          f"min {res['words_per_token_min']:.3f}, "
-          f"p05 {res['words_per_token_p05']:.3f}, "
-          f"mean {res['words_per_token']:.3f} - the family anchor "
-          "candidates (min/p05)")
+    print(
+        f"[4] {res['verdict']} — the reader-wall stall rate: "
+        f"{res['wall_fail_turns']} of {res['n_turns']} turns stalled "
+        f"({res['stall_rate']:.1%}; PASS <= {res['stall_rate_max']:.0%}), "
+        f"{res['catchup_events']} catch-up event(s), "
+        f"worst wait {res['worst_catchup_s']:.2f}s "
+        f"(reader {args.reader_wps:g} w/s, reaction "
+        f"{READER_REACTION_S}s; addendum 73)"
+    )
+    print(
+        f"    span diagnostics: worst {res['worst']:.2f} w/s "
+        f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}) - "
+        "NOT the verdict (addendum 54: spans of tiny answers "
+        "are overhead, not reading experience)"
+    )
+    print(
+        f"    token-side view: worst {res['worst_tps']:.1f} t/s "
+        f"(mean {res['mean_tps']:.1f}); words/token "
+        f"{res['words_per_token']:.3f} (measured)"
+    )
+    print(
+        f"    w/t calibration (addendum 58): n={res['n_turns']} turns, "
+        f"min {res['words_per_token_min']:.3f}, "
+        f"p05 {res['words_per_token_p05']:.3f}, "
+        f"mean {res['words_per_token']:.3f} - the family anchor "
+        "candidates (min/p05)"
+    )
 
 
 if __name__ == "__main__":

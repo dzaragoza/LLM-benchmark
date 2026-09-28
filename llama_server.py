@@ -33,8 +33,10 @@ def find_server():
     Windows builds ship llama-server.exe - pick the right name."""
     home = os.path.expanduser("~")
     exe = "llama-server.exe" if os.name == "nt" else "llama-server"
-    for d in (os.path.join(".", "llama-b10964-gpu"),
-              os.path.join(home, "technical_reports", "llama-b10964-gpu")):
+    for d in (
+        os.path.join(".", "llama-b10964-gpu"),
+        os.path.join(home, "technical_reports", "llama-b10964-gpu"),
+    ):
         p = os.path.join(d, exe)
         if os.path.isfile(p):
             return p
@@ -59,28 +61,26 @@ def wait_healthy(port, timeout=300, proc=None):
     return False
 
 
-def start_server(model_path, port, extra_args=None, server_bin=None,
-                 health_timeout=1800, log_path=None):
+def start_server(
+    model_path, port, extra_args=None, server_bin=None, health_timeout=1800, log_path=None
+):
     """Launch llama-server on a model. Returns (proc, healthy_bool).
     log_path (addendum 36): capture the server's stdout/stderr instead
     of discarding them - llama.cpp's startup banner carries its own
     memory accounting (model size, KV cache, compute buffers), which
     the memory report parses. The log is truncated per launch (the
     last launch's banner is the reported one)."""
-    cmd = [server_bin or find_server(), "-m", model_path,
-           "--port", str(port)]
+    cmd = [server_bin or find_server(), "-m", model_path, "--port", str(port)]
     if extra_args:
         cmd += list(extra_args)
     if log_path:
         log_fh = open(log_path, "wb")
         try:
-            proc = subprocess.Popen(cmd, stdout=log_fh,
-                                    stderr=subprocess.STDOUT)
+            proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
         finally:
             log_fh.close()
     else:
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     healthy = wait_healthy(port, health_timeout, proc)
     return proc, healthy
 
@@ -138,8 +138,10 @@ def parse_memory_log(log_path):
     the peak RSS (VmHWM) remains the authoritative total. Returns a
     dict: {keys...: GiB, 'banner_lines': [raw lines with sizes]}."""
     out = {"banner_lines": []}
-    pat = re.compile(r"([A-Za-z_0-9 .]*?)[:=]\s*([0-9]+(?:\.[0-9]+)?)"
-                     r"\s*(KiB|MiB|GiB)")
+    pat = re.compile(
+        r"([A-Za-z_0-9 .]*?)[:=]\s*([0-9]+(?:\.[0-9]+)?)"
+        r"\s*(KiB|MiB|GiB)"
+    )
     to_gib = {"KiB": 1 / (1024 * 1024), "MiB": 1 / 1024, "GiB": 1.0}
     try:
         with open(log_path, errors="replace") as f:
@@ -148,7 +150,7 @@ def parse_memory_log(log_path):
         return out
     for ln in lines:
         low = ln.lower()
-        if ("mib" not in low and "gib" not in low and "kib" not in low):
+        if "mib" not in low and "gib" not in low and "kib" not in low:
             continue
         out["banner_lines"].append(ln.rstrip())
         for label, val, unit in pat.findall(ln):
@@ -174,21 +176,21 @@ def stop_server(proc, port, warn_after=60):
     except subprocess.TimeoutExpired:
         if os.name == "nt":
             # Windows: kill the whole tree (children may hold the port).
-            subprocess.run(["taskkill", "/PID", str(proc.pid),
-                            "/T", "/F"], capture_output=True)
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True)
         else:
             proc.kill()
     deadline = time.time() + warn_after
     while time.time() < deadline:
         try:
-            with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/health", timeout=2):
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2):
                 pass
         except OSError:
             return True
         time.sleep(2)
-    print(f"    WARNING: port {port} still busy after {warn_after}s - "
-          "results may be invalid!", file=sys.stderr)
+    print(
+        f"    WARNING: port {port} still busy after {warn_after}s - results may be invalid!",
+        file=sys.stderr,
+    )
     return False
 
 
@@ -199,8 +201,7 @@ def post_json(port, endpoint, payload, timeout=1800):
     makes."""
     url = f"http://127.0.0.1:{port}{endpoint}"
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -259,8 +260,7 @@ def stream_completion(port, payload, timeout=1800, meta=None):
     law's server-side t/s and the exact token counts."""
     url = f"http://127.0.0.1:{port}/v1/chat/completions"
     data = json.dumps({**payload, "stream": True}).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         buf = b""
         for chunk in resp:
@@ -270,7 +270,7 @@ def stream_completion(port, payload, timeout=1800, meta=None):
                 for line in raw.decode("utf-8", "replace").splitlines():
                     if not line.startswith("data: "):
                         continue
-                    body = line[len("data: "):].strip()
+                    body = line[len("data: ") :].strip()
                     if body == "":
                         return
                     try:

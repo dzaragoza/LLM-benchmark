@@ -40,10 +40,12 @@ def require_hub():
     """Only callers that actually talk to the Hub need the dependency -
     importing this module for its file helpers must not exit."""
     if list_repo_files is None:
-        sys.exit("huggingface_hub is required: pip install -r "
-                 "requirements.txt (then activate the repo venv: "
-                 ".venv/bin/activate on Linux/macOS, "
-                 ".venv\\Scripts\\Activate.ps1 on Windows)")
+        sys.exit(
+            "huggingface_hub is required: pip install -r "
+            "requirements.txt (then activate the repo venv: "
+            ".venv/bin/activate on Linux/macOS, "
+            ".venv\\Scripts\\Activate.ps1 on Windows)"
+        )
 
 
 def fail(phase, rung, what, causes):
@@ -72,6 +74,7 @@ GUIDE = {
 
 # =========================================================== rung helpers
 
+
 def system_ram_gib():
     """Total system RAM in GiB (best effort, cross-platform).
     Linux: /proc/meminfo; macOS: sysctl; Windows: ctypes GlobalMemoryStatusEx.
@@ -86,28 +89,34 @@ def system_ram_gib():
         pass
     try:
         import subprocess
-        out = subprocess.run(["sysctl", "-n", "hw.memsize"],
-                             capture_output=True, text=True, timeout=10)
+
+        out = subprocess.run(
+            ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=10
+        )
         if out.returncode == 0:
-            return int(out.stdout.strip()) / (1024 ** 3)
+            return int(out.stdout.strip()) / (1024**3)
     except Exception:
         pass
     try:
         import ctypes
+
         class MEMORYSTATUSEX(ctypes.Structure):
-            _fields_ = [("dwLength", ctypes.c_ulong),
-                        ("dwMemoryLoad", ctypes.c_ulong),
-                        ("ullTotalPhys", ctypes.c_ulonglong),
-                        ("ullAvailPhys", ctypes.c_ulonglong),
-                        ("ullTotalPageFile", ctypes.c_ulonglong),
-                        ("ullAvailPageFile", ctypes.c_ulonglong),
-                        ("ullTotalVirtual", ctypes.c_ulonglong),
-                        ("ullAvailVirtual", ctypes.c_ulonglong),
-                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
         stat = MEMORYSTATUSEX()
         stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-        return stat.ullTotalPhys / (1024 ** 3)
+        return stat.ullTotalPhys / (1024**3)
     except Exception:
         return None
 
@@ -115,7 +124,7 @@ def system_ram_gib():
 def free_disk_gib(path="."):
     """Free disk space at `path` in GiB (None if undetectable)."""
     try:
-        return shutil.disk_usage(path).free / (1024 ** 3)
+        return shutil.disk_usage(path).free / (1024**3)
     except Exception:
         return None
 
@@ -127,6 +136,7 @@ def remote_file_sizes(repo):
     quant ratios or skips the feasibility check)."""
     try:
         from huggingface_hub import HfApi
+
         sizes = {}
         for entry in HfApi().list_repo_tree(repo, recursive=True):
             if getattr(entry, "size", None):
@@ -138,8 +148,15 @@ def remote_file_sizes(repo):
 
 # bits-per-weight of each ladder rung (llama.cpp quant formats) - the
 # conversion path scales linearly: rung_gib ~= fp16_gib * bits / 16
-RUNG_BITS = {"Q8_0": 8.5, "Q6_K": 6.6, "Q5_K_M": 5.7, "Q4_K_M": 4.8,
-             "Q4_0": 4.5, "Q3_K_M": 3.9, "Q2_K": 3.4}
+RUNG_BITS = {
+    "Q8_0": 8.5,
+    "Q6_K": 6.6,
+    "Q5_K_M": 5.7,
+    "Q4_K_M": 4.8,
+    "Q4_0": 4.5,
+    "Q3_K_M": 3.9,
+    "Q2_K": 3.4,
+}
 
 
 def estimate_rung_gib(rung, model_files, source_files, sizes):
@@ -150,30 +167,38 @@ def estimate_rung_gib(rung, model_files, source_files, sizes):
     is possible (the caller then does not skip - never a false skip)."""
     repo_file = find_rung_file(model_files, rung)
     if repo_file and repo_file in sizes:
-        return sizes[repo_file] / (1024 ** 3)
+        return sizes[repo_file] / (1024**3)
     bits = RUNG_BITS.get(rung)
     if bits is None:
         return None
     f16s = [sizes[f] for f in find_f16_files(source_files) if f in sizes]
     if f16s:
-        return sum(f16s) / (1024 ** 3) * bits / 16
-    sts = [s for f, s in sizes.items()
-           if f.lower().endswith(".safetensors")
-           and not f.lower().startswith("original/")]
+        return sum(f16s) / (1024**3) * bits / 16
+    sts = [
+        s
+        for f, s in sizes.items()
+        if f.lower().endswith(".safetensors") and not f.lower().startswith("original/")
+    ]
     if sts:
-        return sum(sts) / (1024 ** 3) * bits / 16
-    bins = [s for f, s in sizes.items()
-            if (f.lower().endswith("pytorch_model.bin")
-                or (f.lower().startswith("pytorch_model-")
-                    and f.lower().endswith(".bin")))]
+        return sum(sts) / (1024**3) * bits / 16
+    bins = [
+        s
+        for f, s in sizes.items()
+        if (
+            f.lower().endswith("pytorch_model.bin")
+            or (f.lower().startswith("pytorch_model-") and f.lower().endswith(".bin"))
+        )
+    ]
     if bins:
-        return sum(bins) / (1024 ** 3) * bits / 16
+        return sum(bins) / (1024**3) * bits / 16
     return None
+
 
 # system-RAM reserve for the OS + the KV cache at the 4096 reference
 # depth (addendum 35): a rung is feasible only if its file fits in
 # total RAM minus this reserve (the T14s: 32 - 4 = 28 GiB usable).
 RAM_RESERVE_GIB = 4.0
+
 
 def find_rung_file(names, rung):
     tok = rung.lower()
@@ -196,9 +221,9 @@ def find_f16_files(names):
             continue
         if "00001-of-" in low and ("f16" in low or "fp16" in low):
             prefix = low.split("00001-of-")[0]
-            shards.append([n for n in names
-                           if n.lower().startswith(prefix)
-                           and n.lower().endswith(".gguf")])
+            shards.append(
+                [n for n in names if n.lower().startswith(prefix) and n.lower().endswith(".gguf")]
+            )
         elif "f16" in low or "fp16" in low:
             singles.append(f)
     if shards:
@@ -206,7 +231,7 @@ def find_f16_files(names):
     for f in singles:
         if f.lower().endswith(("-f16.gguf", "-fp16.gguf")):
             return [f]
-    return ([singles[0]] if singles else [])
+    return [singles[0]] if singles else []
 
 
 def has_safetensors(names):
@@ -218,9 +243,10 @@ def has_pytorch_bin(names):
     pinned b10964 converter loads natively (conversion/base.py falls
     back to pytorch_model*.bin when no safetensors parts exist; addendum 81
     - the MiniCPM-2B/1B-sft-bf16 repos ship bin-only)."""
-    return any(f.lower().endswith("pytorch_model.bin")
-               or f.lower().startswith("pytorch_model-00001-of-")
-               for f in names)
+    return any(
+        f.lower().endswith("pytorch_model.bin") or f.lower().startswith("pytorch_model-00001-of-")
+        for f in names
+    )
 
 
 def resolve_f16_local(famdir):
@@ -243,8 +269,8 @@ def local_rung(famdir, rung):
 
 # =========================================================== phase 1
 
-def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
-            source_files, dry_run):
+
+def acquire(fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run):
     """Phase 1: make sure the rung file, or the data to create it,
     is on disk. Returns (path_or_None, plan).
     Memory shortcut (addendum 35): rungs whose estimated size cannot
@@ -263,30 +289,32 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
     if rung_est is not None and ram is not None:
         usable = ram - RAM_RESERVE_GIB
         if rung_est > usable:
-            print(f"  [1] {rung}: estimated {rung_est:.1f} GiB exceeds "
-                  f"usable RAM {usable:.1f} GiB (total {ram:.1f} GiB - "
-                  f"{RAM_RESERVE_GIB:g} reserve) - CANNOT RUN on this "
-                  "machine, skipping before download (addendum 35)")
+            print(
+                f"  [1] {rung}: estimated {rung_est:.1f} GiB exceeds "
+                f"usable RAM {usable:.1f} GiB (total {ram:.1f} GiB - "
+                f"{RAM_RESERVE_GIB:g} reserve) - CANNOT RUN on this "
+                "machine, skipping before download (addendum 35)"
+            )
             return None, "infeasible: exceeds system RAM"
     disk = free_disk_gib(famdir)
     if rung_est is not None and disk is not None:
         need = rung_est * 2 if rung_est else 0
         if disk < need:
-            print(f"  [1] {rung}: estimated {rung_est:.1f} GiB rung (worst "
-                  f"case {need:.1f} GiB with source) but only {disk:.1f} "
-                  "GiB free on disk - fix disk space; attempting anyway "
-                  "(local files may already exist)")
+            print(
+                f"  [1] {rung}: estimated {rung_est:.1f} GiB rung (worst "
+                f"case {need:.1f} GiB with source) but only {disk:.1f} "
+                "GiB free on disk - fix disk space; attempting anyway "
+                "(local files may already exist)"
+            )
     repo_file = find_rung_file(model_files, rung)
     if repo_file:
         if dry_run:
             return None, f"download {model_repo}/{repo_file}"
         try:
-            print(f"  [1] downloading {model_repo}/{repo_file} "
-                  "(output hidden; shown on error)")
+            print(f"  [1] downloading {model_repo}/{repo_file} (output hidden; shown on error)")
             hf_hub_download(model_repo, repo_file, local_dir=famdir)
         except Exception as e:
-            fail(1, rung, f"download of {model_repo}/{repo_file} failed: {e}",
-                 GUIDE[1])
+            fail(1, rung, f"download of {model_repo}/{repo_file} failed: {e}", GUIDE[1])
         p = local_rung(famdir, rung)
         if not p:
             fail(1, rung, "downloaded file not found afterwards", GUIDE[1])
@@ -297,66 +325,81 @@ def acquire(fam, famdir, rung, model_repo, model_files, source_repo,
     f16_names = find_f16_files(source_files)
     if f16_names:
         if dry_run:
-            return None, (f"download f16 from {source_repo} "
-                          f"({'+'.join(f16_names)}), quantize")
+            return None, (f"download f16 from {source_repo} ({'+'.join(f16_names)}), quantize")
         try:
             for name in f16_names:
-                print(f"  [1] downloading {source_repo}/{name} "
-                      "(output hidden; shown on error)")
+                print(f"  [1] downloading {source_repo}/{name} (output hidden; shown on error)")
                 hf_hub_download(source_repo, name, local_dir=famdir)
         except Exception as e:
-            fail(1, rung, f"f16 download from {source_repo} failed: {e}",
-                 GUIDE[1])
+            fail(1, rung, f"f16 download from {source_repo} failed: {e}", GUIDE[1])
         if not resolve_f16_local(famdir):
-            fail(1, rung, "f16 download finished but file is missing",
-                 GUIDE[1])
+            fail(1, rung, "f16 download finished but file is missing", GUIDE[1])
         return None, f"downloaded f16 from {source_repo}, quantize"
     if has_safetensors(source_files):
         st_dir = os.path.join(famdir, "safetensors-source")
-        if dry_run or (os.path.isdir(st_dir)
-                       and glob.glob(os.path.join(st_dir, "*.safetensors"))):
+        if dry_run or (os.path.isdir(st_dir) and glob.glob(os.path.join(st_dir, "*.safetensors"))):
             return None, f"safetensors from {source_repo}, convert + quantize"
         try:
-            print(f"  [1] downloading safetensors from {source_repo} "
-                  "(safetensors + configs only; once per family; "
-                  "output hidden; shown on error)")
+            print(
+                f"  [1] downloading safetensors from {source_repo} "
+                "(safetensors + configs only; once per family; "
+                "output hidden; shown on error)"
+            )
             snapshot_download(
-                source_repo, local_dir=st_dir,
-                allow_patterns=["*.safetensors", "*.json", "*.txt",
-                                "tokenizer.model", "tokenizer.model.v3"])
+                source_repo,
+                local_dir=st_dir,
+                allow_patterns=[
+                    "*.safetensors",
+                    "*.json",
+                    "*.txt",
+                    "tokenizer.model",
+                    "tokenizer.model.v3",
+                ],
+            )
         except Exception as e:
-            fail(1, rung, f"safetensors download from {source_repo} "
-                 f"failed: {e}", GUIDE[1])
+            fail(1, rung, f"safetensors download from {source_repo} failed: {e}", GUIDE[1])
         if not glob.glob(os.path.join(st_dir, "*.safetensors")):
-            fail(1, rung, "snapshot download finished, no safetensors found",
-                 GUIDE[1])
+            fail(1, rung, "snapshot download finished, no safetensors found", GUIDE[1])
         return None, f"safetensors from {source_repo}, convert + quantize"
     if has_pytorch_bin(source_files):
         st_dir = os.path.join(famdir, "safetensors-source")
-        if dry_run or (os.path.isdir(st_dir)
-                       and glob.glob(os.path.join(st_dir, "pytorch_model*.bin"))):
-            return None, (f"pytorch_model.bin from {source_repo}, "
-                          "convert + quantize")
+        if dry_run or (
+            os.path.isdir(st_dir) and glob.glob(os.path.join(st_dir, "pytorch_model*.bin"))
+        ):
+            return None, (f"pytorch_model.bin from {source_repo}, convert + quantize")
         try:
-            print(f"  [1] downloading pytorch_model.bin from {source_repo} "
-                  "(weights + configs; output hidden; shown on error)")
+            print(
+                f"  [1] downloading pytorch_model.bin from {source_repo} "
+                "(weights + configs; output hidden; shown on error)"
+            )
             snapshot_download(
-                source_repo, local_dir=st_dir,
-                allow_patterns=["pytorch_model*.bin", "*.json", "*.txt",
-                                "tokenizer.model", "tokenizer.model.v3"])
+                source_repo,
+                local_dir=st_dir,
+                allow_patterns=[
+                    "pytorch_model*.bin",
+                    "*.json",
+                    "*.txt",
+                    "tokenizer.model",
+                    "tokenizer.model.v3",
+                ],
+            )
         except Exception as e:
-            fail(1, rung, f"pytorch_model.bin download from {source_repo} "
-                 f"failed: {e}", GUIDE[1])
+            fail(1, rung, f"pytorch_model.bin download from {source_repo} failed: {e}", GUIDE[1])
         if not glob.glob(os.path.join(st_dir, "pytorch_model*.bin")):
-            fail(1, rung, "bin download finished, no pytorch_model*.bin found",
-                 GUIDE[1])
+            fail(1, rung, "bin download finished, no pytorch_model*.bin found", GUIDE[1])
         return None, f"pytorch_model.bin from {source_repo}, convert + quantize"
-    fail(1, rung, f"no {rung} file, no f16 GGUF, no safetensors, no "
-         f"pytorch_model.bin in {source_repo} - nothing to download or "
-         "quantize from", GUIDE[1])
+    fail(
+        1,
+        rung,
+        f"no {rung} file, no f16 GGUF, no safetensors, no "
+        f"pytorch_model.bin in {source_repo} - nothing to download or "
+        "quantize from",
+        GUIDE[1],
+    )
 
 
 # =========================================================== ARC questions
+
 
 def _http_get_json(url, params=None, timeout=60, retries=4):
     if params:
@@ -369,8 +412,10 @@ def _http_get_json(url, params=None, timeout=60, retries=4):
         except Exception as e:
             last_err = e
             wait = 5 * (attempt + 1)
-            print(f"    http get failed (attempt {attempt + 1}/{retries}): "
-                  f"{e} - retrying in {wait}s", file=sys.stderr)
+            print(
+                f"    http get failed (attempt {attempt + 1}/{retries}): {e} - retrying in {wait}s",
+                file=sys.stderr,
+            )
             time.sleep(wait)
     raise last_err
 
@@ -390,15 +435,25 @@ def load_questions(config, n):
         batch = min(100, n - offset)
         rows = _http_get_json(
             "https://datasets-server.huggingface.co/rows",
-            params={"dataset": "allenai/ai2_arc", "config": config,
-                    "split": "test", "offset": offset, "length": batch})
+            params={
+                "dataset": "allenai/ai2_arc",
+                "config": config,
+                "split": "test",
+                "offset": offset,
+                "length": batch,
+            },
+        )
         for row in rows["rows"]:
             item = row["row"]
-            qs.append({"q": item["question"],
-                       "choices": list(zip(item["choices"]["label"],
-                                           item["choices"]["text"],
-                                           strict=True)),
-                       "ans": item["answerKey"]})
+            qs.append(
+                {
+                    "q": item["question"],
+                    "choices": list(
+                        zip(item["choices"]["label"], item["choices"]["text"], strict=True)
+                    ),
+                    "ans": item["answerKey"],
+                }
+            )
     with open(cache_file, "w") as f:
         json.dump(qs, f)
     return qs

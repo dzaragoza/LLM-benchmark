@@ -79,11 +79,9 @@ def load_dumps(paths):
         turns = data if isinstance(data, list) else data.get("turns", [])
         turns = [t for t in turns if t.get("server_tps")]
         if not turns:
-            print(f"  warning: no turn timings in {p}, skipped",
-                  file=sys.stderr)
+            print(f"  warning: no turn timings in {p}, skipped", file=sys.stderr)
             continue
-        label = (data.get("label") if isinstance(data, dict) else None) \
-            or os.path.basename(p)
+        label = (data.get("label") if isinstance(data, dict) else None) or os.path.basename(p)
         dumps.append({"path": p, "label": label, "turns": turns})
     return dumps
 
@@ -92,8 +90,7 @@ def percentile(sorted_vals, q):
     """Nearest-rank percentile of a sorted list."""
     if not sorted_vals:
         return None
-    idx = max(0, min(len(sorted_vals) - 1,
-                     round(q / 100.0 * len(sorted_vals)) - 1))
+    idx = max(0, min(len(sorted_vals) - 1, round(q / 100.0 * len(sorted_vals)) - 1))
     return sorted_vals[idx]
 
 
@@ -112,8 +109,7 @@ def analyze_dump(dump, reader_wps):
 
     wps = [t["server_wps"] for t in turns if t.get("server_wps")]
     legacy = len(turns) - len(wps)
-    stall_reader = ((sum(1 for w in wps if w < reader_wps) / len(wps))
-                    if wps else None)
+    stall_reader = (sum(1 for w in wps if w < reader_wps) / len(wps)) if wps else None
 
     s_delay = 0.0
     convs = {}
@@ -159,65 +155,82 @@ def analyze_dump(dump, reader_wps):
 def main():
     ap = argparse.ArgumentParser(
         description="Andes-style streaming-lag analysis of live dumps "
-                    "(turn-granularity stall metrics vs the reader line)")
-    ap.add_argument("--dump", action="append", default=[],
-                    help="live dump file (repeatable); default: all "
-                         "*.live-dump*.json in cwd")
-    ap.add_argument("--reader-wps", type=float, default=READER_WPS,
-                    help=f"reader consumption speed in w/s (default "
-                         f"{READER_WPS:g} = 300 wpm, Brysbaert 2019 - the "
-                         f"study's single anchor; stall metrics use each "
-                         f"turn's MEASURED words/s, addendum 44)")
-    ap.add_argument("--json", default=None,
-                    help="write the per-dump metrics to this JSON file")
+        "(turn-granularity stall metrics vs the reader line)"
+    )
+    ap.add_argument(
+        "--dump",
+        action="append",
+        default=[],
+        help="live dump file (repeatable); default: all *.live-dump*.json in cwd",
+    )
+    ap.add_argument(
+        "--reader-wps",
+        type=float,
+        default=READER_WPS,
+        help=f"reader consumption speed in w/s (default "
+        f"{READER_WPS:g} = 300 wpm, Brysbaert 2019 - the "
+        f"study's single anchor; stall metrics use each "
+        f"turn's MEASURED words/s, addendum 44)",
+    )
+    ap.add_argument("--json", default=None, help="write the per-dump metrics to this JSON file")
     args = ap.parse_args()
 
     paths = args.dump or sorted(glob.glob("*.live-dump*.json"))
     if not paths:
-        sys.exit("no dumps found: pass --dump paths or run from a "
-                 "directory holding *.live-dump*.json")
+        sys.exit(
+            "no dumps found: pass --dump paths or run from a directory holding *.live-dump*.json"
+        )
     dumps = load_dumps(paths)
     if not dumps:
         sys.exit("no usable dumps (files missing or no turn timings)")
 
     print("=" * 72)
-    print(f"LAG ANALYSIS  (reader line {args.reader_wps:g} w/s = k=1 "
-          "guarantee, measured words/s)")
+    print(f"LAG ANALYSIS  (reader line {args.reader_wps:g} w/s = k=1 guarantee, measured words/s)")
     print("=" * 72)
 
     results = []
     for d in dumps:
         results.append(analyze_dump(d, args.reader_wps))
 
-    hdr = (f"  {'rung (dump)':28} {'turns':>5} {'mean':>5} {'min':>5} "
-           f"{'p50':>5} {'p95':>5} {'w/m':>5} {'stlR':>5} "
-           f"{'Sdel':>6} {'kv':>5}")
+    hdr = (
+        f"  {'rung (dump)':28} {'turns':>5} {'mean':>5} {'min':>5} "
+        f"{'p50':>5} {'p95':>5} {'w/m':>5} {'stlR':>5} "
+        f"{'Sdel':>6} {'kv':>5}"
+    )
     print(hdr)
     for r in results:
         kv = f"{r['kv_slope']:.2f}" if r["kv_slope"] is not None else "-"
-        print(f"  {r['label'][:28]:28} {r['turns']:5d} {r['mean']:5.1f} "
-              f"{r['min']:5.1f} {r['p50']:5.1f} {r['p95']:5.1f} "
-              f"{r['worst_over_mean']:5.2f} "
-              f"{r['stall_frac_reader']:5.1%} "
-              f"{r['s_delay_per_conv']:6.2f} {kv:>5}")
+        print(
+            f"  {r['label'][:28]:28} {r['turns']:5d} {r['mean']:5.1f} "
+            f"{r['min']:5.1f} {r['p50']:5.1f} {r['p95']:5.1f} "
+            f"{r['worst_over_mean']:5.2f} "
+            f"{r['stall_frac_reader']:5.1%} "
+            f"{r['s_delay_per_conv']:6.2f} {kv:>5}"
+        )
 
     print()
     print("  reading the table:")
     print("    w/m   = worst/mean turn t/s (addendum-6 pre-registration:")
     print("            predicted 0.75-0.90; < 0.75 needs a story)")
-    print("    stlR  = fraction of turns below the READER line in "
-          "measured words/s (k=1 guarantee: target ~0; addendum 44)")
-    print("    Sdel  = Andes-style lateness per conversation, in "
-          "reader-seconds")
-    print("    kv    = mean t_(n)/t_(n-1) within conversations (< 1.0 = "
-          "turns slow as context grows)")
+    print(
+        "    stlR  = fraction of turns below the READER line in "
+        "measured words/s (k=1 guarantee: target ~0; addendum 44)"
+    )
+    print("    Sdel  = Andes-style lateness per conversation, in reader-seconds")
+    print(
+        "    kv    = mean t_(n)/t_(n-1) within conversations (< 1.0 = turns slow as context grows)"
+    )
 
     if args.json:
         with open(args.json, "w") as f:
-            json.dump({
-                "reader_wps": args.reader_wps,
-                "dumps": results,
-            }, f, indent=1)
+            json.dump(
+                {
+                    "reader_wps": args.reader_wps,
+                    "dumps": results,
+                },
+                f,
+                indent=1,
+            )
         print(f"\nmetrics written to {args.json}")
 
 
