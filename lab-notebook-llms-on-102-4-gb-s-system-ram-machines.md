@@ -3486,3 +3486,15 @@ The author's ruling: "add typing and ty as pre commit hook." The addendum-90 def
 **Verified (the full chain, twice - commit and push hooks):** ruff check + format clean repo-wide; 32 tests pass; `ty check` 0 diagnostics with the requirements installed; the runtime exercise passes; dry-run output byte-identical to the addendum-90 baseline; NO state file created. The registered sweep commands unchanged (no CLI surface touched - signatures only).
 
 **Still deferred:** structured plans and `state_io.py` (the addendum-86 triggers).
+
+### Session 33, addendum 92 - the picker lists only machines that can run something
+
+The author's ruling: "Remove all memory configs that will not run any model." A machine configuration whose bandwidth cannot honestly run ANY measured candidate is not a choice - listing it invites a recommendation the data cannot back, the same honesty standard as the ceiling and the roster.
+
+**The criterion, derived from the data, not hard-coded.** The most bandwidth-forgiving candidate is the one with the highest measured w/s at the reference bandwidth (currently Qwen3.5-0.8B, 25.86 w/s at 102.4 GB/s). A config can run some model iff that candidate still clears the reader line when scaled to the config's bandwidth: min BW = READER x REF_BW / max(wps) = 5.0 x 102.4 / 25.86 = 19.8 GB/s. Configs below 19.8 GB/s are filtered out of the list. Because the threshold is computed from CANDIDATES at load time, roster changes update it automatically - a faster future candidate lowers the bar, a slower one raises it.
+
+**What fell out (the honest floor moved up a generation):** all DDR and DDR2 (peak 8.5 GB/s), all DDR3 single/dual below 1333 (DDR3-1333 dual = 21.3 GB/s survives), DDR4 single below 2666 (DDR4-2666 single = 21.3 GB/s is the new first entry; DDR4-2400 single = 19.2 GB/s filtered). The list went from every JEDEC configuration to 52 entries, starting at 21.3 GB/s. The default selection (DDR5-6400 dual = 51.2 GB/s) survives the filter.
+
+**Kept deliberately:** the "custom..." escape hatch is appended after the filter loop - a practitioner with a non-JEDEC config below the floor can still enter it and see for themselves that nothing fits; the filter is for the curated list, not a prohibition. A footnote under the filter input states the rule and shows the live threshold (populated from the same computed value, so it can never drift from the filter).
+
+**Verified:** the page's script executed headless (node) against the real CANDIDATES - MIN_RUN_BW = 19.8, 52 machines listed, first entry DDR4-2666 single 21.3 GB/s, default key "51.2|2" present. The full pre-commit chain (ruff -> format -> ty -> pytest) is unaffected by an HTML-only change; 32 tests pass.
