@@ -43,12 +43,13 @@ Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
   - The server's own timing (timings.predicted_per_second) is the
     authoritative metric; an external wall-clock cross-check (generation
     span = wall time minus prompt processing) is computed per turn
-  - THE RESULT IS THE WORST TURN across all depth-conditioned turns;
-    verdict (addendum 34): PASS only if EVERY conversation's worst
-    turn is at or above the reader line - a single sub-line
-    conversation is unrecoverable (the worst is a min), so the
-    rung FAILS outright and the bench aborts in flight; the lenient
-    2-sigma rescue is retired (sigma stays a reported diagnostic);
+  - THE RESULT IS THE STALL RATE across all depth-conditioned turns;
+    verdict (protocol v3.1, addendum 73): PASS iff at most
+    STALL_RATE_MAX (5%) of turns catch up the reader - the author's
+    distributional guarantee ("a fast reader will only catch up to
+    5% of the turns"); the per-turn test is the addendum-55
+    collision simulation, unchanged; early-fail is deleted (a
+    rate verdict needs its denominator);
     first PASS = selected - which, at the reader line, walks the
     ladder to the TOP rung that still guarantees the reader (the old
     floor-20 gate was a headroom judgment and rejected rungs the
@@ -102,6 +103,7 @@ import llama_server
 
 CORPUS_DEFAULT = "./live-corpus.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
+STALL_RATE_MAX = 0.05  # protocol v3.1: PASS iff <= 5% of turns catch up
                           # reader (Brysbaert 2019). Protocol v2.1:
                           # the anchor is words, not tokens.
 
@@ -340,7 +342,7 @@ def reader_wall_test(deltas, n_words, reader_wps=READER_WPS_DEFAULT,
 
 def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
                      thinking=False, no_thinking=False, blob=None,
-                     blob_tokens=0, reader_wps=None, early_abort=True):
+                     blob_tokens=0, reader_wps=None):
     """Protocol v2: the conversation runs ON TOP of the depth prefill.
     The blob is a prepended user turn, so the chat template wraps it,
     cache_prompt retains it turn-to-turn, and every generated turn is
@@ -349,17 +351,17 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
     Returns (turn records, final history) - the history feeds the
     same-depth noise samples, which must ride it: the slot cache
     reuses only the longest common token prefix.
-    Early-fail (addendum 34, protocol v3.0 form): the verdict is a
-    min, so the first wall-failing turn aborts the conversation.
-    Protocol v3.0: turns run STREAMING and the verdict is the
-    reader-wall test (addendum 55) - the registered addendum-30
-    collision simulation on the per-word arrival stream: the turn
-    fails iff the reader EVER hits the wall (any word late, not
-    just the last). The old span-based w/s stays as a diagnostic;
-    it is no longer the verdict (the addendum-54 tiny-answer
+    Protocol v3.1 (addendum 73): turns run STREAMING; a turn
+    stalls the reader iff the reader EVER hits the wall (any word
+    late, not just the last - the registered addendum-30 collision
+    simulation on the per-word arrival stream). Stalling turns are
+    flagged `reader_wall_fail` and carry their collision record in
+    the dump; the conversation ALWAYS runs to completion (the
+    verdict is the stall rate - aborting at the first stall would
+    truncate the denominator and bias the rate downward). The old
+    span-based w/s stays a diagnostic (the addendum-54 tiny-answer
     degeneracy: a 5-token answer's span is overhead, not reading
-    experience). Failing turns are flagged `reader_wall_fail` and
-    carry their collision record in the dump."""
+    experience)."""
     history = []
     results = []
     if blob:
@@ -468,18 +470,12 @@ def run_conversation(port, user_turns, cap_tokens, ctx_tokens,
         }
         results.append(rec)
         if reader_wps is not None and rec["reader_wall_fail"]:
-            if early_abort:
-                print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
-                      f"hit the stream {collision['catchup_events']}x "
-                      f"(waited {collision['catchup_s']:.2f}s) - the rung is "
-                      "unrecoverable (the verdict is a min); aborting the "
-                      "conversation early (addendum 34/55)", flush=True)
-                break
             print(f"      turn {i + 1} FAILED THE READER WALL - the reader "
                   f"hit the stream {collision['catchup_events']}x "
                   f"(waited {collision['catchup_s']:.2f}s) - continuing "
-                  "(--no-early-fail, the calibration pass samples the "
-                  "full turn distribution; addendum 58)", flush=True)
+                  "(the verdict is the stall rate, protocol v3.1 - the "
+                  "conversation always runs to completion; early-fail is "
+                  "deleted, addendum 73)", flush=True)
     return results, history
 
 
@@ -600,17 +596,16 @@ def noise_sample(port, history, cap_tokens, ctx_tokens, blob_tokens=0,
 
 def bench_model(model, corpus_file, port, ctx, repeats,
                thinking=False, no_thinking=False, server_bin=None,
-               label=None, reader_wps=None, n_conversations=None,
-               early_abort=True):
+               label=None, reader_wps=None, n_conversations=None):
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
     same-depth noise samples. Returns (all_turns, summary).
-    Early-fail (addendum 34): with reader_wps set, the first turn
-    measured below the reader line aborts its conversation and skips
-    the remaining conversations and reps - the verdict is a min and
-    cannot recover. Partial dumps are still written (the failing
-    turn is flagged); the verdict machinery grades them honestly."""
+    Protocol v3.1 (addendum 73): the verdict is the STALL RATE -
+    at most STALL_RATE_MAX of turns may catch up the reader - so
+    every conversation always runs to completion; early-fail is
+    deleted (aborting at the first stall would truncate the
+    denominator and bias the rate downward)."""
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
@@ -655,12 +650,9 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 res, conv_history = run_conversation(
                     port, conv["user_turns"], cap_tokens, ctx, thinking,
                     no_thinking, blob, blob_tokens,
-                    reader_wps=reader_wps,
-                    early_abort=early_abort)
+                    reader_wps=reader_wps)
                 for r in res:
                     all_turns.append({"model": label, "conv": ci, **r})
-                early_fail = (early_abort and
-                              any(r.get("reader_wall_fail") for r in res))
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
                 wps = [r["server_wps"] for r in res if r["server_wps"]]
                 evts = [r.get("catchup_events") or 0 for r in res]
@@ -713,12 +705,7 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                 if ntps:
                     print("      noise at depth: "
                           + ", ".join(f"{x:.1f}" for x in ntps))
-                if early_fail:
-                    print(f"    conv {ci}: early-fail - skipping the "
-                          f"remaining {len(conversations) - ci} "
-                          "conversation(s) and any further reps "
-                          "(the verdict is unrecoverable, addendum 34)")
-                    break
+
         finally:
             peak = llama_server.peak_rss_gib(proc)
             cost = llama_server.memory_cost_gib(
@@ -740,15 +727,12 @@ def bench_model(model, corpus_file, port, ctx, repeats,
                       + " (weights + KV + buffers + runtime; VmHWM + "
                       "MemAvailable delta, addendum 36/40)" + note,
                       flush=True)
-        if early_fail:
-            break
-        if early_fail is False and not early_abort:
-            wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
-            if wall_hits:
-                print(f"  note: {wall_hits} wall-failing turn(s) recorded "
-                      "without abort (--no-early-fail, addendum 58) - "
-                      "the verdict comes from analyze (recomputed from "
-                      "deltas; expect FAIL)", flush=True)
+        wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
+        if wall_hits:
+            print(f"  note: {wall_hits} wall-failing turn(s) recorded - "
+                  "the verdict is the stall rate (protocol v3.1, "
+                  "addendum 73; recomputed from deltas at analyze time)",
+                  flush=True)
         valid = [w for w in conv_worsts if w]
         if valid:
             rep_worst = min(valid)
@@ -802,14 +786,15 @@ def live_dump_name(path, thinking=False, no_thinking=False):
 def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
           port=PORT_DEFAULT, ctx=CTX_DEFAULT, repeats=REPEATS_DEFAULT,
           dump_override=None, force=False, reader_wps=None,
-          conversations=None, early_abort=True):
+          conversations=None):
     """Phase 3: live-bench the model file; returns the dump path.
     force: re-measure even if a valid newer dump exists (the resume
     machinery is the pipeline default; --force is the re-measurement
     path - e.g. after an instrument fix, when the existing dump
     predates the fix and its noise records are missing/wrong).
-    reader_wps (addendum 34): enables the in-flight early-fail - the
-    bench aborts as soon as a turn measures below the reader line.
+    reader_wps (addendum 34): enables the in-flight reader-wall
+    test on each turn (v3.1: the per-turn stall flags whose rate
+    is the verdict; the conversation is never aborted).
     conversations (addendum 58, the w/t calibration pass): bench only
     the first N conversations of the corpus (None = all)."""
     dump = dump_override or live_dump_name(path, thinking, no_thinking)
@@ -856,7 +841,7 @@ def bench(path, corpus, dry_run, thinking=False, no_thinking=False,
                                        thinking, no_thinking, label=label,
                                        reader_wps=reader_wps,
                                        n_conversations=conversations,
-                                       early_abort=early_abort)
+                                       )
     with open(dump, "w") as f:
         json.dump(turns, f, indent=1)
     if mem_reports:
@@ -933,22 +918,23 @@ def analyze(path, thinking=False, no_thinking=False,
     if no_stream:
         fail(4, label,
              f"dump has {len(no_stream)} turn(s) without per-word "
-             "arrival deltas (pre-v3.0 data; the verdict is the "
-             "reader-wall test, addendum 55) - re-bench with "
+             "arrival deltas (pre-v3.0 data; the verdict needs the "
+             "arrival stream, addenda 55/73) - re-bench with "
              "--force to record the arrival stream",
              GUIDE[4])
 
-    # Protocol v3.0 (addendum 55): the verdict is the reader-wall
-    # test - the registered addendum-30 collision simulation on
-    # each turn's arrival stream, RECOMPUTED HERE from the dump's
-    # raw deltas (so a dump can be re-graded post-hoc at any reader
+    # Protocol v3.1 (addendum 73): the verdict is the STALL RATE -
+    # the registered addendum-30 collision simulation on each
+    # turn's arrival stream, RECOMPUTED HERE from the dump's raw
+    # deltas (so a dump can be re-graded post-hoc at any reader
     # speed, like session_replicate's resim mode; the bench-time
-    # flags were computed with the same defaults). A turn fails iff
-    # the reader EVER hit the wall (any catch-up event); the rung
-    # passes iff no turn failed. The flat w/s comparison stays a
-    # diagnostic only: it manufactured fails on tiny answers (the
-    # addendum-54 degeneracy - the span of a 5-token answer is
-    # pipeline overhead, not reading experience).
+    # flags were computed with the same defaults). A turn stalls
+    # iff the reader EVER hit the wall (any catch-up event); the
+    # rung passes iff at most STALL_RATE_MAX of turns stalled. The
+    # flat w/s comparison stays a diagnostic only: it manufactured
+    # fails on tiny answers (the addendum-54 degeneracy - the span
+    # of a 5-token answer is pipeline overhead, not reading
+    # experience).
     wall_fails = []
     total_catchup_events = 0
     worst_catchup_s = 0.0
@@ -964,7 +950,12 @@ def analyze(path, thinking=False, no_thinking=False,
             wall_fails.append(t)
         total_catchup_events += col["catchup_events"]
         worst_catchup_s = max(worst_catchup_s, col["catchup_s"] or 0.0)
-    verdict = "FAIL" if wall_fails else "PASS (confident)"
+    # Protocol v3.1 (addendum 73): the guarantee is the STALL RATE -
+    # PASS iff at most STALL_RATE_MAX of turns have a catch-up event.
+    stall_rate = len(wall_fails) / len(mine) if mine else 0.0
+    verdict = ("PASS (confident)" if stall_rate <= STALL_RATE_MAX
+               else "FAIL")
+    fail_rate = round(stall_rate, 4)
 
     def turn_wps(t):
         return t["server_wps"]
@@ -990,6 +981,7 @@ def analyze(path, thinking=False, no_thinking=False,
     mean_tps = sum(t["server_tps"] for t in mine) / len(mine)
     return {"worst": worst_wps, "mean": mean_wps, "sigma": sigma,
             "threshold": threshold, "verdict": verdict,
+            "stall_rate": fail_rate, "stall_rate_max": STALL_RATE_MAX,
             "wall_fail_turns": len(wall_fails),
             "catchup_events": total_catchup_events,
             "worst_catchup_s": worst_catchup_s,
@@ -1030,11 +1022,6 @@ def main():
                          "corpus (the w/t calibration pass, addendum "
                          "58: more turns -> a registered per-family w/t "
                          "anchor; the default None = all)")
-    ap.add_argument("--no-early-fail", action="store_true",
-                    help="keep benching through reader-wall fails "
-                         "(the calibration pass samples the full turn "
-                         "distribution; the verdict is recomputed from "
-                         "deltas at analyze time and stays honest)")
     ap.add_argument("--thinking", action="store_true",
                     help="thinking mode (category protocol, rule 8)")
     ap.add_argument("--no-thinking", action="store_true",
@@ -1080,22 +1067,24 @@ def main():
                  args.no_thinking, args.port, args.ctx, args.repeats,
                  args.dump, args.force, args.reader_wps,
                  conversations=args.conversations,
-                 early_abort=not args.no_early_fail)
+                 )
     if args.dry_run:
-        print(f"[4] would analyze (the reader-wall test: a turn "
-              f"fails iff the reader EVER hits the stream - reader "
+        print(f"[4] would analyze (the reader-wall stall rate: a turn "
+              f"stalls iff the reader EVER hits the stream - PASS iff "
+              f"<= {STALL_RATE_MAX:.0%} of turns stall - reader "
               f"{args.reader_wps:g} w/s, reaction "
-              f"{READER_REACTION_S}s, addendum 55)")
+              f"{READER_REACTION_S}s, addendum 73)")
         return
     res = analyze(args.model, args.thinking, args.no_thinking,
                   args.dump, args.reader_wps)
     print(f"\nper-turn results written to {dump}")
-    print(f"[4] {res['verdict']} — the reader-wall test: "
-          f"{res['wall_fail_turns']} wall-failing turn(s), "
+    print(f"[4] {res['verdict']} — the reader-wall stall rate: "
+          f"{res['wall_fail_turns']} of {res['n_turns']} turns stalled "
+          f"({res['stall_rate']:.1%}; PASS <= {res['stall_rate_max']:.0%}), "
           f"{res['catchup_events']} catch-up event(s), "
           f"worst wait {res['worst_catchup_s']:.2f}s "
           f"(reader {args.reader_wps:g} w/s, reaction "
-          f"{READER_REACTION_S}s; addendum 55)")
+          f"{READER_REACTION_S}s; addendum 73)")
     print(f"    span diagnostics: worst {res['worst']:.2f} w/s "
           f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}) - "
           "NOT the verdict (addendum 54: spans of tiny answers "

@@ -42,16 +42,21 @@ Chain of derivation from the anchor:
     (the k=3 floor line is deleted, addendum 50 - an observation
      for the report, not a protocol constant)
 ```
-The guarantee (protocol v3.0, addendum 55): **the reader never hits
-the wall** - on every turn, simulating the registered reader (5.0 w/s,
-0.45 s reaction) on the turn's per-word arrival stream, the reader
-never catches up with printing while the answer is incomplete. The
-verdict is the addendum-30 collision simulation, exact form: a turn
-fails iff ANY word arrives after the reader is ready for it (any
-catch-up event, not just the last word). The old flat worst-turn w/s
-test is retired to a diagnostic - it manufactured fails on tiny
-answers (the addendum-54 degeneracy: the span of a 5-token answer is
-pipeline overhead, not reading experience).
+The guarantee (protocol v3.1, addendum 73): **the reader stalls on
+at most 5% of turns** - simulating the registered reader (5.0 w/s,
+0.45 s reaction) on each turn's per-word arrival stream, a turn
+stalls iff ANY word arrives after the reader is ready for it (the
+addendum-30 collision simulation, exact form, unchanged per-turn);
+the verdict is the STALL RATE: PASS iff wall-failing turns / total
+turns <= 0.05. The author's distributional ruling ("a fast reader
+will only catch up to 5% of the turns"); early-fail is deleted (a
+rate verdict needs its denominator - aborting at the first stall
+would bias the rate downward; the addendum-68 aborted run would
+have scored a false 1.1% PASS). At n=50 convs (267 turns) the pass
+edge is <= 13 stalls. The old flat worst-turn w/s test stays a
+diagnostic - it manufactured fails on tiny answers (the
+addendum-54 degeneracy: the span of a 5-token answer is pipeline
+overhead, not reading experience).
 
 ---
 
@@ -60,6 +65,7 @@ pipeline overhead, not reading experience).
 | Constant | Value | Where | Ruling / derivation |
 |---|---|---|---|
 | Reader line (k=1 guarantee) | 5.0 w/s | `speed_gate.py` READER_WPS_DEFAULT | Match the FAST reader: 300 wpm / 60. The canonical anchor. |
+| Stall-rate max (v3.1 guarantee) | 0.05 (5%) | `speed_gate.py` STALL_RATE_MAX | Author ruling (addendum 73): the guarantee is distributional - PASS iff at most 5% of turns have a catch-up event; "a fast reader will only catch up to 5% of the turns". At n=50 convs (267 turns) the pass edge is <= 13 stalls. Adjustable by the author as a parameter, not a derivation. |
 | Reader reaction time | 0.45 s | `speed_gate.py` READER_REACTION_S | Part of the guarantee since protocol v3.0 (addendum 55): the simulated reader starts reading 0.45 s after the first word arrives. Single-sourced here (session_replicate imports it); previously session_replicate's CLI default only. |
 | Fast-reader anchor | 300 wpm | `law_fit.py` READER_PROFILES | Cited: Brysbaert 2019 meta-analysis, silent reading, English non-fiction, adult mean. |
 | Floor (k=3 headroom) | (deleted, addendum 50) | - | Author ruling: "obsolete. We use w/s >= 5. Remove it if possible. It is an observation, not needed for the protocol. We can mention in the report, but it doesn't play any role in the benchmark." FLOOR_DEFAULT deleted from speed_gate/depth_probe; the --floor flags, the headroom verdict line, the stlD stall metric, and law_fit's floor-20 default all removed with it. The gate is the reader line alone. |
@@ -130,3 +136,4 @@ pipeline overhead, not reading experience).
 | 2026-09-28 | w/t anchors calibrated at n=50 convs / 267 turns per family (addendum 66): qwen p05 0.412 (UPDATE, −0.078), mistral 0.366 (validated), phi 0.418 (hold), llama 0.491 (grows; supersedes the 0.144 joke-turn row). Pooled anchor 0.33 → 0.366 (p05-based; the min-based rule retired — the min slides with n). HEADLINE on record: qwen Q5_K_M and mistral Q5_K_M FAIL the reader-wall test at n=50 (9 / 17 wall-failing turns, worst waits 6.34 / 6.59 s) — verdicts that PASSED on the 5-conv study corpus; no retroactive verdicts (pre-registered), the 5-conv verdict is on record as anti-conservative (addendum 23's warning made concrete). | 66 |
 | 2026-09-28 | The sentinel certificate pre-registered (addendum 67): the certificate form (one-sided tolerance bound, author-ruled s=2; cone issues iff W - 2sigma >= 5.0 AND eps <= 2sigma; existence iff eps <= W - 5.0), S = tokenizer class x size cone (probe-assigned; strong form tokenizer identity, weak form probe w/t within Delta/2 of a class center). Delta = 0.05 w/t registered [M] (borrowed from the addendum-59 grading band; exit plan = the qwen sentinel run, the study's first cross-member transfer measurement). Q8_0-only ruling for the certificate study: parameters self-select (bpw fixes size<->params; class ceiling intersected with the family grid picks the sentinel). Cones issued from cal-pass data: llama-class (0/267 events) and phi-class (0/267, thin margin); mistral-class NEGATIVE (no member passes at any shipped size); qwen-class pending the sentinel run (pre-registered: w/s p05 6.3 band [5.1, 7.5]; Delta graded by the 4B's p05 vs the 9B's 0.412). Gemma ruled out of scope for the machinery (excluded by measurement; debug logged open, low priority). | 67 |
 | 2026-09-28 | The qwen Q8 sentinel tail graded (addendum 69): Delta VALIDATED (4B p05 0.412 vs 0.412, gap 0.000 - the [M] exit plan fired; the band stays 0.05). Predictor 5-for-5 on its pre-registered bands (t/s [14.5,16.1] -> 14.6; events 0-12/267 -> 6; worst wait 1-5 s -> 3.36; w/s p05 [5.1,7.5] -> 6.4; w/t p05 0.412 -> 0.412). Cone verdict FAIL at s=2 on both tiers (event tier 6 wall-failing turns/267; quantile tier budget +0.21 PASSES, eps 1.29 vs 2sigma 1.22 fails by 0.07; the s-window [2.11, 2.34] exists but the author ruled s=2). The qwen-class Q8 roster on the 102.4 class is EMPTY (0.8B sub-band >= 10 w/s, 4B wall-FAIL) - the class-exclusive rule applied at Q8, measured. Unplanned: the w/t tail is substantially corpus-owned (4B min 0.189 = 9B min 0.189, same corpus, temp 0); "deterministic" is verdict-stable, not magnitude-stable (llama.cpp/Vulkan launch noise +-10-30% on single-turn magnitudes). The class band [5, 10) w/s (the author's upper-bound ruling; 10 asymptotic - the strict edge sits above 10 by the t_inf term) pre-registered with the 51.2-class replication predictions: halving factor 0.50 at 4.29 GiB (efficiency cancellation), ceiling ratio 2.25, band disjointness [2.12,5.27] vs [0.94,2.34] GiB. | 69 |
+| 2026-09-28 | Protocol v3.1 (addendum 73, author ruling, pre-run): the guarantee is the STALL RATE - PASS iff wall-failing turns / total turns <= 0.05 ("a fast reader will only catch up to 5% of the turns"); the per-turn collision test unchanged inside it. STALL_RATE_MAX = 0.05 registered [A] (speed_gate, single-sourced); at n=50 convs (267 turns) the pass edge is <= 13 stalls. Early-fail DELETED (a rate verdict needs its denominator - the aborted addendum-68 run would have scored a false 1.1% PASS; speed_gate loses --no-early-fail; full tails are now the only protocol, and full_benchmark inherits them by default). Recorded v3.0 verdicts stand as v3.0 verdicts; prospective v3.1 grades on record: the 4B sentinel (2.2%) and qwen Q5 9B (3.4%) would PASS v3.1, mistral Q5 (6.4%) stays FAIL. The addendum-71 overnight grading set updated prospectively (both 4B cells now predict PASS; no cell predicts v3.1 FAIL). | 73 |
