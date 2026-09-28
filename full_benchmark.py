@@ -466,6 +466,53 @@ def main():
         stamp("DRY RUN COMPLETE - READ-ONLY PRE-FLIGHT REPORT")
         print(f"  families checked : {len(args.families)}")
         print(f"  rung (ladder)    : {', '.join(ladder)}")
+        # Addendum 83: the run-time estimate. Per-cell costs from the
+        # run-1 measurement (the qwen overnight sweep, ~8.5 h for 7
+        # cells, acquisition-dominated), split by acquisition-plan
+        # class. Pre-registered brackets, converted to measurements as
+        # sweep 2's stamps land.
+        PLAN_COST_MIN = {
+            "local": 15,
+            "download": 30,
+            "f16_quantize": 45,
+            "convert_quantize": 60,
+            "unknown": 45,
+        }
+        plan_counts = {}
+        total_min = 0
+        for fst in state.get("families", {}).values():
+            for run in fst.get("runs", {}).values():
+                plan = run.get("plan", "") or ""
+                verdict = run.get("verdict", "") or ""
+                if not plan or verdict.startswith("FAIL (infeasible"):
+                    continue
+                if plan.startswith("local file"):
+                    cls = "local"
+                elif "f16 from" in plan:
+                    cls = "f16_quantize"
+                elif plan.startswith("download "):
+                    cls = "download"
+                elif ("safetensors from" in plan
+                      or "pytorch_model.bin from" in plan):
+                    cls = "convert_quantize"
+                else:
+                    cls = "unknown"
+                plan_counts[cls] = plan_counts.get(cls, 0) + 1
+                total_min += PLAN_COST_MIN[cls]
+        if plan_counts:
+            print("  run-time estimate (run-1 brackets by acquisition "
+                  "class):")
+            for cls in ("local", "download", "f16_quantize",
+                        "convert_quantize", "unknown"):
+                if cls in plan_counts:
+                    print(f"    {cls:16s} x{plan_counts[cls]:2d} "
+                          f"@ ~{PLAN_COST_MIN[cls]} min = "
+                          f"{plan_counts[cls] * PLAN_COST_MIN[cls]:4d} min")
+            lo = round(total_min / 60)
+            hi = round(total_min * 1.3 / 60)
+            print(f"    TOTAL: ~{lo}-{hi} h for {len(args.families)} "
+                  "families (bench 267 turns + ARC 1172 per cell; "
+                  "acquisition dominates)")
         if failed_families:
             print(f"  FAILED families  : {len(failed_families)} of "
                   f"{len(args.families)} - fix these BEFORE the real "

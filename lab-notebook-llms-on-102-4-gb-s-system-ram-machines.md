@@ -3343,3 +3343,19 @@ python3 full_benchmark.py --dry-run --ladder Q8_0 --corpus ./live-corpus-cal50.j
 
 nohup python3 full_benchmark.py --ladder Q8_0 --corpus ./live-corpus-cal50.json --no-thinking --force --git-commit --state-file benchmark-state-lineage2.json --results-file benchmark-results-lineage2.json --arc-results-dir arc-results-lineage2 Qwen/Qwen2.5-3B-Instruct-GGUF Qwen/Qwen3-4B-GGUF Qwen/Qwen2.5-1.5B-Instruct-GGUF Qwen/Qwen3-1.7B-GGUF Qwen/Qwen3.5-4B Qwen/Qwen3.5-0.8B Qwen/Qwen2.5-0.5B-Instruct-GGUF ibm-granite/granite-4.2-3b ibm-granite/granite-4.1-3b ibm-granite/granite-4.0-h-micro ibm-granite/granite-4.0-micro ibm-granite/granite-3.3-2b-instruct ibm-granite/granite-3.2-2b-instruct ibm-granite/granite-3.1-2b-instruct ibm-granite/granite-3.0-2b-instruct ibm-granite/granite-4.0-1b ibm-granite/granite-4.0-h-1b ibm-granite/granite-4.0-h-350m ibm-granite/granite-4.0-350m microsoft/phi-4-mini-instruct microsoft/Phi-3.5-mini-instruct microsoft/Phi-3-mini-4k-instruct microsoft/phi-2 microsoft/phi-1_5 microsoft/phi-1 openbmb/MiniCPM3-4B-GGUF openbmb/MiniCPM5-2B openbmb/MiniCPM-2B-sft-bf16 openbmb/MiniCPM5-1B openbmb/MiniCPM-1B-sft-bf16 openbmb/MiniCPM4-0.5B > overnight-lineage-2.log 2>&1 &
 ```
+
+### Session 33, addendum 83 — the author's ruling: the dry-run report gains a RUN-TIME ESTIMATE
+
+**The ruling.** "The output of dry-run should also give a run time estimate." Implemented in the pre-flight report: each family's acquisition plan (already stored in the in-memory state by phase 1) is classified and summed at run-1's measured per-cell brackets — the plan class IS the cost driver (acquisition dominates; bench 267 turns + ARC 1172 is the constant floor):
+
+| plan class | example | bracket |
+|---|---|---|
+| local | "local file" (rung file already on disk) | ~15 min |
+| download | "download repo/file-Q8_0.gguf" (rung GGUF direct) | ~30 min |
+| f16_quantize | "download f16 from ... , quantize" | ~45 min |
+| convert_quantize | "safetensors from ..." / "pytorch_model.bin from ..." | ~60 min |
+| unknown | anything else | ~45 min |
+
+The report prints the per-class counts and a TOTAL range (~1.0x–1.3x the sum, the run-1 bracket's observed spread). Infeasible cells (the addendum-35 guard) are EXCLUDED — they cost nothing, the sweep skips them before download. The brackets are pre-registered from run 1's measurement (~8.5 h / 7 cells, acquisition-dominated); sweep 2's own stamps convert them from brackets to measurements for sweep 3.
+
+**Sweep 2's expected estimate on the T14s:** 7 qwen local-file cells (files on disk from run 1) ~105 min, 2 granite-4.0-1b/h-1b + 2 h-micro/micro GGUF downloads... the tool computes it; the notebook's ~19–26 h figure stands as the manual pre-estimate. Verified: ruff clean; the mock-state test exercises all five plan classes and the infeasible exclusion (240 min for a 6-runnable mock); a classification-order bug caught and fixed in testing ("download f16 from" must classify f16_quantize BEFORE download).
