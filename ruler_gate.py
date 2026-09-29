@@ -169,6 +169,32 @@ def build_task(
         del out[haystack_idx]
 
 
+def report_server_ctx(log_path: str, wanted: int) -> int | None:
+    """Print the server's own context lines and return the actual n_ctx.
+    llama-server may silently run a SMALLER context than -c requested
+    (KV/memory budget) - the launch banner says so, but only if you read
+    it. The gate refuses to run a grid deeper than the real n_ctx:
+    every deep task would 400 and read as 0/5, which is a build
+    constraint, not a model result."""
+    import re as _re
+
+    actual = None
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        m = _re.search(r"n_ctx\s*=?\s*(\d+)", line)
+        if m:
+            actual = int(m.group(1))
+        if "n_ctx" in line or "reduce" in line.lower() or "context" in line.lower():
+            print(f"    [server] {line.strip()[:160]}")
+    if actual is not None:
+        print(f"    [server] actual n_ctx = {actual} (requested {wanted})")
+    return actual
+
+
 def show_task(prompt: str, answers: dict[str, str], needle_texts: list[str]) -> None:
     """Print the conversation for one task: the context window around
     each needle plus the tail with the query - so a human reads what
@@ -318,14 +344,26 @@ def main() -> None:
         )
     except OSError:
         pass
+    wanted_ctx = max(args.depths) + 2 * ANSWER_HEADROOM
+    log_path = os.path.join(args.results_dir, f"{label}-server.log")
     proc, healthy = llama_server.start_server(
         args.model,
         port=args.port,
-        extra_args=["-c", str(max(args.depths) + 2 * ANSWER_HEADROOM)],
+        extra_args=["-c", str(wanted_ctx)],
+        log_path=log_path,
     )
     if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
         llama_server.stop_server(proc, args.port)
         sys.exit("server did not come up - aborting before any results")
+    actual_ctx = report_server_ctx(log_path, wanted_ctx)
+    if actual_ctx is not None and actual_ctx < max(args.depths) + ANSWER_HEADROOM:
+        llama_server.stop_server(proc, args.port)
+        sys.exit(
+            f"server accepted -c {wanted_ctx} but runs n_ctx {actual_ctx} - "
+            f"the depth grid ({max(args.depths)}) cannot run. Read {log_path} "
+            "for the reason (silent context reduction: KV/memory budget, "
+            "build flags) and re-run with a grid that fits."
+        )
     print(
         f"ruler gate: {label} (niah, depths {args.depths}, "
         f"samples {args.samples}, needles {args.needles})"
