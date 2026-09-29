@@ -91,14 +91,16 @@ Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>
 // at the corpus p05, measured on the T14s (102.4 GB/s class). cost = whole-stack machine
 // cost GiB (MemAvailable delta), measured - used here as a conservative VRAM requirement.
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99, wps: 6.32,  arc: 90.4, family: "Qwen3.5" },
-  { name: "Qwen3-4B",             size: 3.99, cost: 12.30, wps: 7.10,  arc: 85.0, family: "Qwen3" },
-  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  wps: 9.72,  arc: 76.1, family: "Qwen2.5" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  wps: 14.86, arc: 73.5, family: "Qwen2.5" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  wps: 10.66, arc: 68.0, family: "Qwen3" },
-  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  wps: 25.86, arc: 61.3, family: "Qwen3.5" },
-  { name: "Qwen2.5-0.5B-Instruct",size: 0.63, cost: 1.06,  wps: 25.03, arc: 45.8, family: "Qwen2.5" }
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99, wps: 6.32,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
+  { name: "Qwen3-4B",             size: 3.99, cost: 12.30, wps: 7.10,  arc: 85.0, depth: null, family: "Qwen3" },
+  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  wps: 9.72,  arc: 76.1, depth: null, family: "Qwen2.5" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  wps: 14.86, arc: 73.5, depth: null, family: "Qwen2.5" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  wps: 10.66, arc: 68.0, depth: null, family: "Qwen3" },
+  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  wps: 25.86, arc: 61.3, depth: null, family: "Qwen3.5" }
 ];
+// depth = the ladder score (tokens, addendum 137f): the deepest rung passing BOTH the speed
+// gate and FWE, n=1 screening tier (addendum 137h). null = the ladder is still climbing
+// that member. Qwen2.5-0.5B is removed from the pool (the counting floor, addendum 136f).
 
 var REF_BW = 102.4;
 var READER = 5.0;
@@ -108,7 +110,7 @@ function $(id) { return document.getElementById(id); }
 // Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
 // each paired with the lowest memory bandwidth among cards found at that capacity
 // (the conservative w/s estimate for the tier). Only tiers that fit at least one
-// measured model are listed; the smallest whole-stack cost is ~1.06 GiB.
+// measured model are listed; the smallest whole-stack cost is ~6.11 GiB.
 var VRAM_TIERS = [
   { v: 1.5,  bw: 177.4 },   // GTX 480 (2010)
   { v: 2,    bw: 176.0 },   // Radeon HD 6970 (2010)
@@ -197,13 +199,14 @@ function pick() {
 
   var t = '<table><tr><th>model</th><th class="num">file GiB</th>' +
     '<th class="num">stack cost GiB</th><th class="num">fits ' + vram + ' GiB</th>' +
-    '<th class="num">est. w/s</th><th class="num">ARC</th></tr>';
+    '<th class="num">est. w/s</th><th class="num">ARC</th><th class="num">depth (tok)</th></tr>';
   rows.forEach(function (r) {
     t += "<tr><td>" + r.m.name + '</td><td class="num">' + r.m.size.toFixed(2) +
       '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
       (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
       '</td><td class="num">' + (r.w !== null ? r.w.toFixed(1) : "\u2014") +
-      '</td><td class="num">' + r.m.arc.toFixed(1) + "</td></tr>";
+      '</td><td class="num">' + r.m.arc.toFixed(1) + '</td><td class="num">' +
+      (r.m.depth === null ? "\u2014" : r.m.depth.toLocaleString()) + "</td></tr>";
   });
   $("tables").innerHTML = t + "</table>" +
     '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s with 95% confidence</strong>: below the reader line, a 300-wpm reader stalls on more than 5% of turns.</div>';
