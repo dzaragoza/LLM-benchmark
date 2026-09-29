@@ -78,7 +78,7 @@ def test_run_depth_csv_roundtrip(tmp_path, monkeypatch):
         return ("haystack ... needle", {"alpha": "12345"})
 
     monkeypatch.setattr(rg, "build_task", fake_build_task)
-    monkeypatch.setattr(rg, "ask", lambda port, prompt, max_tokens=64: "12345")
+    monkeypatch.setattr(rg, "ask", lambda port, prompt, max_tokens=64, no_thinking=True: "12345")
     csv_path = str(tmp_path / "m-4096-niah.csv")
     row = rg.run_depth(0, "m", 4096, 3, 4, csv_path)
     assert row == {"label": "m", "depth": 4096, "n": 3, "correct": 3, "acc": 1.0}
@@ -98,6 +98,8 @@ def test_run_depth_mixed_answers(tmp_path, monkeypatch):
 
     answers = iter(["11111", "wrong", "11111"])
     monkeypatch.setattr(rg, "build_task", fake_build_task)
-    monkeypatch.setattr(rg, "ask", lambda port, prompt, max_tokens=64: next(answers))
+    monkeypatch.setattr(
+        rg, "ask", lambda port, prompt, max_tokens=64, no_thinking=True: next(answers)
+    )
     row = rg.run_depth(0, "m", 4096, 3, 4, str(tmp_path / "m.csv"))
     assert row["correct"] == 2 and abs(row["acc"] - 2 / 3) < 1e-9
