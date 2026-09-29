@@ -4033,3 +4033,12 @@ THE HONEST CAVEAT, registered: context_length in the GGUF is the CONVERTER's cla
 
 COMMAND, unchanged (re-run as-is after git pull):
 `pkill -f llama-server; git pull; and time python3 ladder_bench.py <the seven lineage GGUF paths, addendum 137b>`
+
+### Session 33, addendum 137d - the ladder simplified per the author: six members, the 0.5B excluded, rungs only to the predicted value
+
+THE AUTHOR'S RULING, registered: "we are overcomplicating this. do only the ladder up to the predicted value. exclude qwen 0.5." Two simplifications: (1) the 0.5B LEAVES the roster - its depth score is already known without a run (the 136f counting floor is depth-independent: it fails FWE at the FIRST rung, so its ladder score is 0 by prior measurement; running it again spends wall time to relearn a registered result); (2) the ladder climbs only to the PREDICTED ceiling - the mechanical KV-budget value (addendum-130 form, 12 KiB/tok from usable RAM minus file size), which for the six remaining members sits at or below their trained windows anyway - the trained-window term never binds on this machine, so the rung list is the prediction's own ladder and nothing more.
+
+THE REGISTERED ROSTER, six members (the 137b lineage minus the 0.5B): Qwen3.5-4B, Qwen3-4B, Qwen2.5-3B, Qwen2.5-1.5B, Qwen3-1.7B, Qwen3.5-0.8B - all Q8_0, all v3.1 reader-PASS, the depth column now the only unknown per row.
+
+COMMAND, registered:
+`pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
