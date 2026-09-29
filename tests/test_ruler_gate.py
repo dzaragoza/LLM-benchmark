@@ -103,3 +103,40 @@ def test_run_depth_mixed_answers(tmp_path, monkeypatch):
     )
     row = rg.run_depth(0, "m", 4096, 3, 4, str(tmp_path / "m.csv"))
     assert row["correct"] == 2 and abs(row["acc"] - 2 / 3) < 1e-9
+
+
+def test_fwe_vocab_and_counts_follow_upstream_constants(monkeypatch):
+    """FWE (addendum 136b): vocab size = depth/50, rank-0 is the '...'
+    noise word, counts follow the Zeta law, the answer is ranks 1-3."""
+
+    monkeypatch.setattr(
+        rg.llama_server,
+        "tokenize",
+        lambda port, content, timeout=300: [0] * max(1, len(content) // 4),
+    )
+    monkeypatch.setattr(
+        rg.llama_server,
+        "trim_to_tokens",
+        lambda port, text, target, tolerance=8, max_iter=24: (text[: target * 4], target),
+    )
+    prompt, top_k = rg.build_fwe_task(port=0, depth_tokens=32768, seed=7)
+    vocab_size = max(20, 32768 // 50)
+    num_words = 32768 // rg.FWE_CODED_WORDLEN
+    norm = sum(1.0 / (i**rg.FWE_ALPHA) for i in range(1, vocab_size + 1))
+    counts = [int(num_words * (r + 1) ** -rg.FWE_ALPHA / norm) for r in range(vocab_size)]
+    for rank, word in enumerate(top_k):
+        assert word in prompt
+        assert prompt.count(word) >= counts[rank + 1] - 20
+    assert len(top_k) == rg.FWE_TOP_K
+    # strictly decreasing counts => the top-3 are unambiguous even after trims
+    assert counts[1] > counts[2] > counts[3] > counts[4]
+
+
+def test_fwe_scoring_all_or_nothing_with_partial_diagnostic():
+    ok, partial = rg.score_fwe("the top words are: alphaone", ["alphaone", "betatwo", "gammathree"])
+    assert ok is False and partial == 1
+    ok, partial = rg.score_fwe("alphaone betatwo gammathree", ["alphaone", "betatwo", "gammathree"])
+    assert ok is True and partial == 3
+    # parametric-word failure (the paper's signature): scores zero
+    ok, partial = rg.score_fwe("the a and of", ["alphaone", "betatwo", "gammathree"])
+    assert ok is False and partial == 0
