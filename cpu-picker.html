@@ -44,7 +44,7 @@
 <body>
 
 <h1>Local LLM picker &mdash; CPU/iGPU</h1>
-<div class="sub">The recommended Q8_0 model for your machine, by measured ARC, among the models the
+<div class="sub">The recommended Q8_0 model for your machine, among the models the
 study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172. The recommendation ranks by measured DEPTH (the FWE ladder score, addendum 137/137h: the deepest context at which the model both serves the reader and counts) &mdash; models still climbing show no score and rank last.
 Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 
@@ -71,13 +71,15 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 
 <div class="foot">
   <p><strong>How the recommendation is computed.</strong> Candidates are the seven qwen lineage
-  members of the overnight sweep, each measured with the <strong>v3.1 instrument</strong>
+  members of the overnight sweep, each admitted on the <strong>v3.1 corpus wall</strong>
   (stall-rate verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates
   0.0&ndash;2.6%, all PASS, 50 conversations / 267 turns each) &mdash; the only models the
   study has graded under the current protocol. A candidate is eligible iff (a) its
   <em>measured machine cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
-  instrument) fits your RAM, and (b) its predicted w/s at your bandwidth clears the 5.0 reader
-  line. Bandwidth scaling is the pre-registered halving form:
+  instrument, cold-cache at the scored rung once ladders land, addendum 137m) fits your RAM, and (b) its
+  predicted w/s at your bandwidth clears the 5.0 reader line. The w/s anchor is the WORST
+  TURN at the model's SCORED RUNG (the last depth passing the speed gate, addendum 137n).
+  Bandwidth scaling is the pre-registered halving form:
   w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4 &mdash; linear because at these sizes decode is
   bandwidth-dominated; for the smallest members (whose compute headroom makes the true loss
   smaller) it is conservative. The recommendation is the highest-DEPTH eligible candidate
@@ -90,24 +92,23 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
   Q8_0 configuration (measured wall FAIL), and Qwen3.5-9B Q8_0 is a measured wall FAIL; their
   selections live at Q5_K_M, out of scope here. Quant is out of scope for this study: this
   tool answers the Q8_0 question only.</p>
-  <p class="footnote">Caveats: w/s figures are the corpus p05 for this reader (300 wpm, 0.45 s
-  reaction) on the study corpus (50 conversations, 267 turns, temp 0) &mdash; a different
-  workload can move them. The halving factor 0.50 is pre-registered, not yet validated by the 51.2-class replication.
+  <p class="footnote">Caveats: w/s figures are the WORST TURN at each model's SCORED RUNG (the ladder's n=1 screen, addendum 137h/137n - one conversation at the ranked depth; the corpus p05 at ctx 4096 was the old anchor, superseded). Depth scores are n=1 screening ranks. The halving factor 0.50 is pre-registered, not yet validated by the 51.2-class replication.
   Machine-cost values are run-shaped: treat the fit boundary as soft within ~1 GiB.</p>
 </div>
 
 <script>
 "use strict";
-// Measured records (Q8_0, v3.1-passing). wps = words/s at the corpus p05, measured on
-// the T14s (102.4 GB/s class) with the v3.1 instrument. cost = machine cost GiB
+// Measured records (Q8_0, v3.1-admitted). wps = the WORST TURN at the model's SCORED
+// RUNG (the last depth passing the speed gate, addendum 137n) - null until that model's
+// ladder lands (addendum 137n). cost = machine cost GiB
 // (MemAvailable delta), measured. costEst is vestigial (no candidate is estimated).
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99,  costEst: false, wps: 6.32,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
-  { name: "Qwen3-4B",             size: 3.99, cost: 12.30, costEst: false, wps: 7.10,  arc: 85.0, depth: null, family: "Qwen3" },
-  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  costEst: false, wps: 9.72,  arc: 76.1, depth: null, family: "Qwen2.5" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  costEst: false, wps: 14.86, arc: 73.5, depth: null, family: "Qwen2.5" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  costEst: false, wps: 10.66, arc: 68.0, depth: null, family: "Qwen3" },
-  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  costEst: false, wps: 25.86, arc: 61.3, depth: null, family: "Qwen3.5" }
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99,  costEst: false, wps: 6.5,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
+  { name: "Qwen3-4B",             size: 3.99, cost: 12.30, costEst: false, wps: null,   arc: 85.0, depth: null, family: "Qwen3" },
+  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  costEst: false, wps: null,   arc: 76.1, depth: null, family: "Qwen2.5" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  costEst: false, wps: null,  arc: 73.5, depth: null, family: "Qwen2.5" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 8.82,  costEst: false, wps: null,  arc: 68.0, depth: null, family: "Qwen3" },
+  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 6.11,  costEst: false, wps: null,  arc: 61.3, depth: null, family: "Qwen3.5" }
 ];
 // depth = the ladder score (tokens, addendum 137f): the deepest rung at which the model
 // BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier (addendum 137h).
@@ -236,7 +237,7 @@ function pick() {
 
   var rows = CANDIDATES.map(function (m) {
     var wpred = m.wps * bw / REF_BW;
-    return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred >= READER };
+    return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
   }).sort(function (a, b) { return (b.m.depth || 0) - (a.m.depth || 0) || b.m.arc - a.m.arc; });
 
   var eligible = rows.filter(function (r) { return r.fits && r.passes; });
@@ -246,7 +247,7 @@ function pick() {
     html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (Q8_0)</h3>" +
       "<div><span class=\"arc\">" + (r.m.depth === null ? "\u2014" : r.m.depth.toLocaleString()) + " tokens</span> depth score (FWE ladder, n=1 screen)</div>" +
       "<div>" + r.m.arc.toFixed(1) + "% ARC-Challenge (n=1172)</div>" +
-      "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (v3.1 PASS on the measured class)</div>" +
+      "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (scored-rung worst turn, scaled)</div>" +
       "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 machine cost " + r.m.cost.toFixed(2) +
       " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + ram + " GiB</div></div>";
   } else {
@@ -272,14 +273,14 @@ function pick() {
       r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
       "</td><td class=\"num\">" +
       (r.m.depth === null ? "\u2014 (ladder climbing)" : r.m.depth.toLocaleString()) +
-      "</td><td class=\"num\">" + r.w.toFixed(2) +
+      "</td><td class=\"num\">" + (r.w === null ? "\u2014 (ladder climbing)" : r.w.toFixed(2)) +
       "</td><td class=\"" + (r.fits ? "ok" : "bad") + "\">" +
       (r.fits ? "yes" : "no") + "</td><td class=\"" + (r.passes ? "ok" : "bad") + "\">" +
       (r.passes ? "yes" : "no") + "</td></tr>";
   });
   t += "</table>";
   $("tables").innerHTML = t +
-    '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s with 95% confidence</strong>: below the reader line, a 300-wpm reader stalls on more than 5% of turns.</div>';
+    '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, addendum 137h - the 95%-confidence phrasing belonged to the retired n=23 tier).</div>';
 }
 buildMachineMenu();
 $("minbw").textContent = MIN_RUN_BW.toFixed(1);
