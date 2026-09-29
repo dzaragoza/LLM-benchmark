@@ -221,6 +221,10 @@ def run_depth(
             ok = score_answer(answer, answers[key])
             hits += ok
             w.writerow([i, depth, key, answers[key], answer, int(ok)])
+            print(
+                f"  task {i + 1}/{samples} @ {depth} tok: key {key} value {answers[key]} "
+                f"-> {'HIT' if ok else 'MISS'} ({answer.strip()[:48]!r})"
+            )
     return {"label": label, "depth": depth, "n": samples, "correct": hits, "acc": hits / samples}
 
 
@@ -243,9 +247,14 @@ def main() -> None:
 
     label = os.path.splitext(os.path.basename(args.model))[0]
     os.makedirs(args.results_dir, exist_ok=True)
-    proc = llama_server.start_server(args.model, port=args.port)
-    if proc is None or not llama_server.wait_healthy(args.port, proc=proc):
+    proc, healthy = llama_server.start_server(args.model, port=args.port)
+    if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
+        llama_server.stop_server(proc, args.port)
         sys.exit("server did not come up - aborting before any results")
+    print(
+        f"ruler gate: {label} (niah, depths {args.depths}, "
+        f"samples {args.samples}, needles {args.needles})"
+    )
     try:
         for depth in args.depths:
             csv_path = os.path.join(args.results_dir, f"{label}-{depth}-niah.csv")
