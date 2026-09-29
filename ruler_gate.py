@@ -41,6 +41,7 @@ import os
 import random
 import re
 import sys
+import urllib.error
 from typing import Any
 
 import llama_server
@@ -205,7 +206,15 @@ def ask(port: int, prompt: str, max_tokens: int = 64, no_thinking: bool = True) 
     }
     if no_thinking:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
-    data = llama_server.post_json(port, "/v1/chat/completions", payload)
+    try:
+        data = llama_server.post_json(port, "/v1/chat/completions", payload)
+    except urllib.error.HTTPError as e:
+        body = b""
+        try:
+            body = e.read()[:500]
+        except Exception:
+            pass
+        raise ValueError(f"HTTP {e.code} from the server: {body.decode('utf-8', 'replace')}") from e
     msg = data["choices"][0]["message"]
     return msg.get("content") or msg.get("reasoning_content") or ""
 
@@ -245,7 +254,12 @@ def run_depth(
             key = list(answers)[0]
             if show:
                 show_task(prompt, answers, [make_needle(k, answers[k]) for k in answers])
-            answer = ask(port, prompt, no_thinking=no_thinking)
+            try:
+                answer = ask(port, prompt, no_thinking=no_thinking)
+            except ValueError as e:
+                print(f"  task {i + 1}/{samples} @ {depth} tok: FAILED - {e}")
+                w.writerow([i, depth, key, answers[key], f"ERROR: {e}", ""])
+                continue
             ok = score_answer(answer, answers[key])
             hits += ok
             w.writerow([i, depth, key, answers[key], answer, int(ok)])
