@@ -59,6 +59,82 @@ WORD_BANK = (
 NEEDLE_TEMPLATE = "One of the special magic numbers for {key} is: {value}."
 ANSWER_HEADROOM = 128
 QUERY_TEMPLATE = "What is the special magic number for {key}? Answer with the number only."
+
+# --- FWE (frequent-words extraction, RULER's aggregation Challenge tier,
+# addendum 136b) --- upstream constants: NVIDIA/RULER
+# scripts/data/synthetic/freq_words_extraction.py @ main, verbatim:
+# coded_wordlen 6, vocab_size = depth/50 (when -1), alpha 2.0 (zeta),
+# rank-0 word is the '...' noise word, answer = ranks 1-3, query asks for
+# the THREE most frequent words, tokens_to_generate 50.
+FWE_TEMPLATE = (
+    "Read the following coded text and track the frequency of each coded "
+    "word. Find the three most frequently appeared coded words. {context}\n"
+    "Question: Do not provide any explanation. Please ignore the dots "
+    "'....'. What are the three most frequently appeared words in the "
+    "above coded text?"
+)
+FWE_CODED_WORDLEN = 6
+FWE_ALPHA = 2.0
+FWE_TOP_K = 3
+FWE_GEN_TOKENS = 50
+
+
+def zeta(alpha: float, k: int) -> float:
+    """Riemann zeta, the normalizer of the Zipf/Zeta count law (scipy's
+    zeta is upstream's; stdlib-only here - k stays small so the tail
+    cutoff loses nothing material)."""
+    return sum(1.0 / (i**alpha) for i in range(1, k + 1))
+
+
+def build_fwe_task(
+    port: int,
+    depth_tokens: int,
+    seed: int,
+) -> tuple[str, list[str]]:
+    """One FWE task at ~depth_tokens: returns (prompt, top_k_words).
+
+    Faithful to upstream's generate_input_output: a synthetic vocab of
+    depth/50 six-letter words, counts drawn from the Zeta law
+    count(w_rank) = num_words * rank^-alpha / zeta(alpha), rank 0 the
+    '...' noise word, rank 1-3 the answer, the whole list shuffled and
+    joined with spaces. The prompt is trimmed to the token budget the
+    same way the niah haystack is (trim_to_tokens); trims slice from the
+    END, preserving the head's instruction - and a trim never changes
+    the answer, because counts scale with rank, not position.
+    """
+    import string
+
+    rng = random.Random(seed)
+    vocab_size = max(20, depth_tokens // 50)
+    vocab: list[str] = []
+    seen: set[str] = set()
+    while len(vocab) < vocab_size:
+        w = "".join(rng.choices(string.ascii_lowercase, k=FWE_CODED_WORDLEN))
+        if w not in seen:
+            seen.add(w)
+            vocab.append(w)
+    vocab[0] = "..."
+    num_words = depth_tokens // FWE_CODED_WORDLEN
+    norm = zeta(FWE_ALPHA, len(vocab))
+    counts = [int(num_words * (r + 1) ** -FWE_ALPHA / norm) for r in range(len(vocab))]
+    words: list[str] = []
+    for w, c in zip(vocab, counts, strict=True):
+        words.extend([w] * c)
+    rng.shuffle(words)
+    body = " ".join(words)
+    prompt_full = FWE_TEMPLATE.format(context=body)
+    prompt, n_tok = llama_server.trim_to_tokens(port, prompt_full, depth_tokens - ANSWER_HEADROOM)
+    return prompt, vocab[1 : 1 + FWE_TOP_K]
+
+
+def score_fwe(answer: str, top_k: list[str]) -> tuple[bool, int]:
+    """Upstream scores FWE as the hit-count of expected words in the
+    reply; the study's verdict form (registered 136b) is all-or-nothing
+    per task, with the per-word count returned as the diagnostic."""
+    found = [w for w in top_k if w in re.sub(r"\s+", "", answer)]
+    return len(found) == len(top_k), len(found)
+
+
 KEYS = (
     "alpha",
     "bravo",
@@ -247,6 +323,57 @@ def ask(port: int, prompt: str, max_tokens: int = 64, no_thinking: bool = True) 
     return msg.get("content") or msg.get("reasoning_content") or ""
 
 
+def run_fwe_depth(
+    port: int,
+    label: str,
+    depth: int,
+    samples: int,
+    csv_path: str,
+    seed0: int = 1024,
+    no_thinking: bool = True,
+    show: bool = False,
+) -> dict[str, Any]:
+    """FWE cells: same shape as run_depth (CSV cache, per-task rows,
+    ERROR rows continue the sweep), verdict all-or-nothing per task
+    with the per-word partial credit as the diagnostic (registered
+    136b)."""
+    if os.path.exists(csv_path):
+        with open(csv_path, encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        if len(rows) >= samples and all(r.get("correct") is not None for r in rows):
+            hits = sum(r["correct"] == "1" for r in rows[:samples])
+            return {
+                "label": label,
+                "depth": depth,
+                "n": len(rows[:samples]),
+                "correct": hits,
+                "acc": hits / samples,
+            }
+    hits = 0
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
+        for i in range(samples):
+            prompt, top_k = build_fwe_task(port, depth, seed=seed0 + i)
+            if show:
+                print(f"    --- task prompt head: {prompt[:160]!r}")
+                print(f"    expected top-{FWE_TOP_K}: {top_k}")
+            try:
+                answer = ask(port, prompt, max_tokens=FWE_GEN_TOKENS, no_thinking=no_thinking)
+            except ValueError as e:
+                print(f"  task {i + 1}/{samples} @ {depth} tok: FAILED - {e}")
+                w.writerow([i, depth, ";".join(top_k), "", f"ERROR: {e}", ""])
+                continue
+            ok, partial = score_fwe(answer, top_k)
+            hits += ok
+            w.writerow([i, depth, ";".join(top_k), partial, answer, int(ok)])
+            print(
+                f"  task {i + 1}/{samples} @ {depth} tok: {partial}/{len(top_k)} words "
+                f"-> {'HIT' if ok else 'MISS'} ({answer.strip()[:48]!r})"
+            )
+    return {"label": label, "depth": depth, "n": samples, "correct": hits, "acc": hits / samples}
+
+
 def run_depth(
     port: int,
     label: str,
@@ -310,6 +437,13 @@ def main() -> None:
     )
     p.add_argument("--samples", type=int, default=5, help="tasks per depth")
     p.add_argument("--needles", type=int, default=4, help="needles per haystack")
+    p.add_argument(
+        "--task",
+        choices=["niah", "fwe"],
+        default="niah",
+        help="task family: niah (retrieval floor) or fwe (aggregation, "
+        "RULER's Challenge tier, addendum 136b)",
+    )
     p.add_argument("--port", type=int, default=8200)
     p.add_argument("--results-dir", default="ruler-results")
     p.add_argument("--seed", type=int, default=1024)
@@ -386,23 +520,35 @@ def main() -> None:
             "build flags) and re-run with a grid that fits."
         )
     print(
-        f"ruler gate: {label} (niah, depths {args.depths}, "
+        f"ruler gate: {label} ({args.task}, depths {args.depths}, "
         f"samples {args.samples}, needles {args.needles})"
     )
     try:
         for depth in args.depths:
-            csv_path = os.path.join(args.results_dir, f"{label}-{depth}-niah.csv")
-            row = run_depth(
-                args.port,
-                label,
-                depth,
-                args.samples,
-                args.needles,
-                csv_path,
-                seed0=args.seed,
-                no_thinking=not args.thinking,
-                show=args.show,
-            )
+            csv_path = os.path.join(args.results_dir, f"{label}-{depth}-{args.task}.csv")
+            if args.task == "fwe":
+                row = run_fwe_depth(
+                    args.port,
+                    label,
+                    depth,
+                    args.samples,
+                    csv_path,
+                    seed0=args.seed,
+                    no_thinking=not args.thinking,
+                    show=args.show,
+                )
+            else:
+                row = run_depth(
+                    args.port,
+                    label,
+                    depth,
+                    args.samples,
+                    args.needles,
+                    csv_path,
+                    seed0=args.seed,
+                    no_thinking=not args.thinking,
+                    show=args.show,
+                )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
                 f"correct (acc {row['acc']:.0%})"
