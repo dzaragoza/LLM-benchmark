@@ -129,6 +129,9 @@ def main() -> None:
     for model in args.models:
         label = os.path.splitext(os.path.basename(model))[0]
         print(f"\n=== ladder: {label} ===")
+        if not os.path.exists(model):
+            print(f"  SKIP: file not found ({model}) - fix the path and re-run")
+            continue
         ceiling = mechanical_ceiling(model)
         if args.max_rung:
             ceiling = min(ceiling, args.max_rung)
