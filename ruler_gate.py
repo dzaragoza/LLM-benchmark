@@ -55,6 +55,7 @@ WORD_BANK = (
 )
 
 NEEDLE_TEMPLATE = "One of the special magic numbers for {key} is: {value}."
+ANSWER_HEADROOM = 128
 QUERY_TEMPLATE = "What is the special magic number for {key}? Answer with the number only."
 KEYS = (
     "alpha",
@@ -125,7 +126,7 @@ def build_task(
     fixed = sum(len(llama_server.tokenize(port, t)) for t in needle_texts) + len(
         llama_server.tokenize(port, query)
     )
-    budget = depth_tokens - fixed
+    budget = depth_tokens - fixed - ANSWER_HEADROOM
     if budget < 200:
         raise ValueError(
             f"depth {depth_tokens} leaves only {budget} haystack tokens "
@@ -247,7 +248,20 @@ def main() -> None:
 
     label = os.path.splitext(os.path.basename(args.model))[0]
     os.makedirs(args.results_dir, exist_ok=True)
-    proc, healthy = llama_server.start_server(args.model, port=args.port)
+    try:
+        llama_server.post_json(args.port, "/health", {})
+    except Exception:
+        pass
+    else:
+        sys.exit(
+            f"port {args.port} already answers /health - a server is running there "
+            "(a stale ruler/llama-server?). Kill it or pass --port to use another."
+        )
+    proc, healthy = llama_server.start_server(
+        args.model,
+        port=args.port,
+        extra_args=["-c", str(max(args.depths) + 2 * ANSWER_HEADROOM)],
+    )
     if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
         llama_server.stop_server(proc, args.port)
         sys.exit("server did not come up - aborting before any results")
