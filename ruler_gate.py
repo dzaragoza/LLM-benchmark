@@ -185,7 +185,7 @@ def report_server_ctx(log_path: str, wanted: int) -> int | None:
     except OSError:
         return None
     for line in lines:
-        m = _re.search(r"n_ctx\s*=?\s*(\d+)", line)
+        m = _re.search(r"n_ctx_slot\s*=\s*(\d+)", line) or _re.search(r"n_ctx\s*=\s*(\d+)", line)
         if m:
             actual = int(m.group(1))
         if "n_ctx" in line or "reduce" in line.lower() or "context" in line.lower():
@@ -349,14 +349,21 @@ def main() -> None:
     proc, healthy = llama_server.start_server(
         args.model,
         port=args.port,
-        extra_args=["-c", str(wanted_ctx)],
+        extra_args=["-c", str(wanted_ctx), "--parallel", "1"],
         log_path=log_path,
     )
     if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
         llama_server.stop_server(proc, args.port)
         sys.exit("server did not come up - aborting before any results")
     actual_ctx = report_server_ctx(log_path, wanted_ctx)
-    if actual_ctx is not None and actual_ctx < max(args.depths) + ANSWER_HEADROOM:
+    if actual_ctx is None:
+        llama_server.stop_server(proc, args.port)
+        sys.exit(
+            f"could not read n_ctx from {log_path} - the banner parse is "
+            "uncertain and the gate refuses to bench blind. Paste the "
+            "server log so the parser learns this build's banner format."
+        )
+    if actual_ctx < max(args.depths) + ANSWER_HEADROOM:
         llama_server.stop_server(proc, args.port)
         sys.exit(
             f"server accepted -c {wanted_ctx} but runs n_ctx {actual_ctx} - "
