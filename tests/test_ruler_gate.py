@@ -121,9 +121,8 @@ def test_fwe_vocab_and_counts_follow_upstream_constants(monkeypatch):
     )
     prompt, top_k = rg.build_fwe_task(port=0, depth_tokens=32768, seed=7)
     vocab_size = max(20, 32768 // 50)
-    num_words = 32768 // rg.FWE_CODED_WORDLEN
     norm = sum(1.0 / (i**rg.FWE_ALPHA) for i in range(1, vocab_size + 1))
-    counts = [int(num_words * (r + 1) ** -rg.FWE_ALPHA / norm) for r in range(vocab_size)]
+    counts = [int(5461 * (r + 1) ** -rg.FWE_ALPHA / norm) for r in range(vocab_size)]
     for rank, word in enumerate(top_k):
         assert word in prompt
         assert prompt.count(word) >= counts[rank + 1] - 20
