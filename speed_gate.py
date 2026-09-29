@@ -915,7 +915,7 @@ def bench(
             ],
         )
 
-    def dump_valid():
+    def dump_valid() -> bool:
         if not os.path.isfile(dump):
             return False
         try:
@@ -1081,7 +1081,7 @@ def analyze(
     verdict = "PASS (confident)" if stall_rate <= STALL_RATE_MAX else "FAIL"
     fail_rate = round(stall_rate, 4)
 
-    def turn_wps(t):
+    def turn_wps(t: dict[str, Any]) -> float:
         return t["server_wps"]
 
     convs = {}

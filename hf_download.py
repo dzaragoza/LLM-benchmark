@@ -27,7 +27,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 # Quiet downloads (author ruling, addendum 38): hub progress bars are
 # hidden; failures still surface through fail() with the full error.
@@ -294,10 +294,21 @@ def acquire(
     fit in system RAM (minus the OS/KV reserve) are skipped BEFORE any
     download - no time spent on rungs the machine cannot run at all.
     Disk is checked the same way (source files can be 2x the rung)."""
-    require_hub()
-    assert (
-        hf_hub_download is not None and snapshot_download is not None
-    )  # require_hub exits when the hub is missing
+    if not dry_run:
+        # the hub is a REAL-run dependency only: every download branch
+        # below returns before touching the network when dry_run - the
+        # addendum-108 contract is that a dry run benches nothing and
+        # downloads nothing, so it must not require the dependency
+        # either (the old unconditional assert fired on hub-less
+        # machines even though nothing would have been downloaded)
+        require_hub()
+        assert hf_hub_download is not None and snapshot_download is not None
+    # typed handles: every call site below is behind a dry_run return
+    # or the assert above, so the callable invariant holds at runtime;
+    # the cast documents it for the type checker without a nonzero-cost
+    # runtime assert at each call site
+    hub_get = cast("Any", hf_hub_download)
+    snap_get = cast("Any", snapshot_download)
     os.makedirs(famdir, exist_ok=True)
     if local_rung(famdir, rung):
         return local_rung(famdir, rung), "local file"
@@ -332,7 +343,7 @@ def acquire(
             return None, f"download {model_repo}/{repo_file}"
         try:
             print(f"  [1] downloading {model_repo}/{repo_file} (output hidden; shown on error)")
-            hf_hub_download(model_repo, repo_file, local_dir=famdir)
+            hub_get(model_repo, repo_file, local_dir=famdir)
         except Exception as e:
             fail(1, rung, f"download of {model_repo}/{repo_file} failed: {e}", GUIDE[1])
         p = local_rung(famdir, rung)
@@ -349,7 +360,7 @@ def acquire(
         try:
             for name in f16_names:
                 print(f"  [1] downloading {source_repo}/{name} (output hidden; shown on error)")
-                hf_hub_download(source_repo, name, local_dir=famdir)
+                hub_get(source_repo, name, local_dir=famdir)
         except Exception as e:
             fail(1, rung, f"f16 download from {source_repo} failed: {e}", GUIDE[1])
         if not resolve_f16_local(famdir):
@@ -365,7 +376,7 @@ def acquire(
                 "(safetensors + configs only; once per family; "
                 "output hidden; shown on error)"
             )
-            snapshot_download(
+            snap_get(
                 source_repo,
                 local_dir=st_dir,
                 allow_patterns=[
@@ -392,7 +403,7 @@ def acquire(
                 f"  [1] downloading pytorch_model.bin from {source_repo} "
                 "(weights + configs; output hidden; shown on error)"
             )
-            snapshot_download(
+            snap_get(
                 source_repo,
                 local_dir=st_dir,
                 allow_patterns=[
