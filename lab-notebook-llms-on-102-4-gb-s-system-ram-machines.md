@@ -4082,3 +4082,11 @@ THE PATHS, registered from the study's own results file (`benchmark-results-line
 `pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B-GGUF/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
 
 (The 137g command's `<correct-path>` placeholder is superseded by this list; the roster itself is unchanged - the 137d six.)
+
+### Session 33, addendum 137g-note-2 - Qwen3.5-4B drops from the run command (already scored)
+
+THE AUTHOR'S CATCH, registered: the 137g-note command still listed Qwen3.5-4B - already measured (137f: SCORE 65,536, speed-cliffed at 131k, stall rate 0.75, FWE still 3/3 at 65,280). Under 137g rules a re-run would reproduce the same score minus three shallow rungs of wall time - wall time spent relearning a registered result. The RUN COMMAND is the remaining FIVE members:
+
+`pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B-GGUF/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
+
+(The lineage roster is unchanged - seven members with the 0.5B at score 0 (136f) and the 3.5-4B at 65,536 (137f) already on the table; this pass fills the five empty cells. Note the 137f 4B score was measured under 137d rules with rungs from 1024 - its 65,536 stands because the ladder stopped at the speed gate's own 131k FAIL, which no rung-rule change can move.)
