@@ -140,6 +140,32 @@ def memory_cost_gib(before: float | None, after: float | None) -> float | None:
     return before - after
 
 
+def drop_file_cache(path: str) -> bool:
+    """Evict the file's clean pages from the page cache (addendum 137m):
+    os.posix_fadvise POSIX_FADV_DONTNEED on the whole file. This makes
+    the next launch's MemAvailable delta an honest cold-cache machine
+    cost - the mmap'd weights pages must be faulted in again, so the
+    delta prices the whole stack (weights + KV + buffers), not the
+    warm-cache marginal cost the ladder's back-to-back relaunches
+    would otherwise read (the 137k artifact). No root needed (unlike
+    /proc/sys/vm/drop_caches); returns True if the fadvise call
+    succeeded, False if unavailable (costs stay caveated).
+    """
+    fd = None
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        fd = os.open(path, os.O_RDONLY)
+        rc = libc.posix_fadvise(fd, 0, 0, 4)  # POSIX_FADV_DONTNEED = 4 on Linux
+        return rc == 0
+    except Exception:
+        return False
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def parse_memory_log(log_path: str) -> dict[str, Any] | None:
     """Best-effort parse of llama.cpp's own memory accounting from the
     captured server log (addendum 36). The banner format moves between

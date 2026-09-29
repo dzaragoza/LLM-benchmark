@@ -46,7 +46,10 @@ def speed_pass(
     a screen, not a podium number). bench_model launches the server
     itself (banner guard included); the verdict is the REAL analyze()
     on a temp dump - the phase-4 code path, not a re-implementation."""
-    turns, _, _ = speed_gate.bench_model(
+    dropped = llama_server.drop_file_cache(model)
+    if not dropped:
+        print("    note: cache drop unavailable - cost may read warm (137k)")
+    turns, _, mem_reports = speed_gate.bench_model(
         model,
         corpus,
         port,
@@ -63,6 +66,11 @@ def speed_pass(
     with open(dump, "w") as f:
         json.dump(turns, f)
     verdict = speed_gate.analyze(model, no_thinking=True, dump_override=dump)
+    cost = next(
+        (m["mem_cost_gib"] for m in mem_reports if m.get("mem_cost_gib") is not None),
+        None,
+    )
+    verdict["mem_cost_gib"] = cost
     return verdict.get("stall_rate", 1.0) <= speed_gate.STALL_RATE_MAX, verdict
 
 
@@ -78,6 +86,7 @@ def fwe_pass(
     if os.path.exists(csv_path):
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
+    llama_server.drop_file_cache(model)
     proc, healthy = llama_server.start_server(
         model,
         port=port,
@@ -119,6 +128,8 @@ def main() -> None:
         while True:
             ok_s, sv = speed_pass(model, rung, args.corpus, args.port, args.results_dir)
             print(f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'}", flush=True)
+            if sv.get("mem_cost_gib") is not None:
+                print(f"    cold machine cost @ rung: {sv['mem_cost_gib']:.2f} GiB")
             if not ok_s:
                 print(f"    speed verdict: {json.dumps(sv)[:200]}")
                 break
