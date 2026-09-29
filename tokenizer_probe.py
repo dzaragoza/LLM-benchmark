@@ -49,7 +49,7 @@ import os
 import sys
 from typing import Any
 
-CORPUS_DEFAULT = "./live-corpus.json"
+CORPUS_DEFAULT = "./live-corpus-cal50.json"
 
 
 def count_words(text: str) -> int:

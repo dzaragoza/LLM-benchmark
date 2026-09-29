@@ -9,7 +9,7 @@ to the gate instead of hand-assembled:
 
   - same server launch flags as the gate (no_thinking template kwarg)
   - same depth_budget() blob for conv 1 (the gate's own arithmetic)
-  - same conversation, verbatim from live-corpus.json
+  - same conversation, verbatim from live-corpus-cal50.json
   - every turn replayed non-streaming exactly as the gate ran it
     (so the timing record matches the dump), and then
   - the conversation runs a SECOND time, STREAMING to the terminal:
@@ -61,7 +61,7 @@ from speed_gate import (
     depth_budget,
 )
 
-CORPUS_DEFAULT = "./live-corpus.json"
+CORPUS_DEFAULT = "./live-corpus-cal50.json"
 PORT_DEFAULT = 8079
 
 

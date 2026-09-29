@@ -58,7 +58,7 @@ from typing import Any, NoReturn
 import llama_server
 from law_fit import kv_gib
 
-CORPUS_DEFAULT = "./live-corpus.json"
+CORPUS_DEFAULT = "./live-corpus-cal50.json"
 PORT_DEFAULT = 8078
 CTX_DEFAULT = 4096
 DEPTH_DEFAULT = 4000
