@@ -6,9 +6,9 @@ is the DEEPEST dyadic rung at which it BOTH serves the reader (speed
 gate, the guarantee) AND counts (FWE, quality-at-depth) -- reduced
 rules: n=1 per gate per rung, the author's screening speed tier.
 
-Per model, the ladder climbs 1024, 2048, ... up to
-the PREDICTED ceiling (the author's 137d ruling: the mechanical
-KV-budget value is the only cap):
+Per model, the ladder climbs 8192, 16384, ... with NO ceiling
+term (the author's 137g ruling: the speed gate is the deciding
+factor - the ladder doubles until the reader wall stops it):
   1. speed gate at ctx = rung (n=1 conversation, the fastest honest
      shape: real blob prefill, real turns, real reader wall)
   2. if the speed gate passes: FWE at depth = rung - headroom (n=1)
@@ -18,11 +18,10 @@ KV-budget value is the only cap):
 
 The speed gate and ruler gate are used AS LIBRARIES (their own
 launch, banner guard, preflight, budgeting); nothing is re-implemented
-here. The ceiling is the PREDICTED mechanical value (the author's 137d
-ruling): the KV budget at 12 KiB/tok from usable RAM minus file
-size (the addendum-130 form), capped by RAM
-(llama_server.system_memavailable_gib). The trained-window term
-and its GGUF reader are REMOVED (addendum 137e).
+here. There is no predicted or trained ceiling: the rungs double
+from 8192 without limit and the SPEED GATE alone decides where the
+ladder stops (the server's own memory manager refuses a launch that
+does not fit - the honest mechanical wall, measured not predicted).
 """
 
 from __future__ import annotations
@@ -36,25 +35,7 @@ import llama_server
 import ruler_gate
 import speed_gate
 
-RUNG_BASE = 1024
-
-
-def mechanical_ceiling(model: str) -> int:
-    """The KV-budget ceiling at the reader line (addendum-130 form):
-    size_gib + kv_gib(depth) must fit usable RAM, at the worst-known
-    KV rate for this study's families (12 KiB/tok, addendum 133) -
-    the author's 137d ruling: the PREDICTED value is the only cap."""
-    file_gib = os.path.getsize(model) / (1024**3)
-    ram = llama_server.system_memavailable_gib() or 4.0
-    usable = ram - 0.4  # the standing OS reserve
-    # KV at the worst-known rate for this study's families (12 KiB/tok,
-    # the dense-0.5B and hybrid-0.8B coincide, addendum 133); a larger
-    # model's denser KV only makes the ceiling SMALLER, which stops
-    # the ladder EARLIER - the conservative direction for a screen.
-    kv_per_tok_gib = 12 * 1024 / (1024**3)
-    depth_kv_budget = max(0.0, usable - file_gib - 0.3)
-    ceiling = int(depth_kv_budget / kv_per_tok_gib)
-    return max(RUNG_BASE, ceiling)
+RUNG_BASE = 8192
 
 
 def speed_pass(
@@ -121,7 +102,7 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8210)
     p.add_argument("--results-dir", default="ladder-results")
     p.add_argument("--seed", type=int, default=1024)
-    p.add_argument("--max-rung", type=int, default=None, help="cap the ladder (debug)")
+    p.add_argument("--max-rung", type=int, default=None, help="stop after this rung (debug)")
     args = p.parse_args()
 
     os.makedirs(args.results_dir, exist_ok=True)
@@ -132,22 +113,10 @@ def main() -> None:
         if not os.path.exists(model):
             print(f"  SKIP: file not found ({model}) - fix the path and re-run")
             continue
-        ceiling = mechanical_ceiling(model)
-        if args.max_rung:
-            ceiling = min(ceiling, args.max_rung)
-        rungs = []
-        r = RUNG_BASE
-        while r <= ceiling:
-            rungs.append(r)
-            r *= 2
-        deduped: list[int] = []
-        for rung in rungs:
-            if rung not in deduped:
-                deduped.append(rung)
-        rungs = deduped
-        print(f"  predicted ceiling {ceiling}, rungs {rungs}")
+        print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
         score = 0
-        for rung in rungs:
+        rung = RUNG_BASE
+        while True:
             ok_s, sv = speed_pass(model, rung, args.corpus, args.port, args.results_dir)
             print(f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'}", flush=True)
             if not ok_s:
@@ -162,6 +131,9 @@ def main() -> None:
             if not ok_f:
                 break
             score = rung
+            if args.max_rung and rung >= args.max_rung:
+                break
+            rung *= 2
         print(f"  {label}: SCORE = {score} tokens (last rung passing both)")
         table.append({"model": label, "score": score})
     print("\n=== ladder table ===")
