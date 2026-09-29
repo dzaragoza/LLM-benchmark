@@ -91,7 +91,7 @@ Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>
 // at the corpus p05, measured on the T14s (102.4 GB/s class). cost = whole-stack machine
 // cost GiB (MemAvailable delta), measured - used here as a conservative VRAM requirement.
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 12.99, wps: 6.32,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.70,  wps: 6.32,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
   { name: "Qwen3-4B",             size: 3.99, cost: 12.30, wps: 7.10,  arc: 85.0, depth: null, family: "Qwen3" },
   { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 5.11,  wps: 9.72,  arc: 76.1, depth: null, family: "Qwen2.5" },
   { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.59,  wps: 14.86, arc: 73.5, depth: null, family: "Qwen2.5" },
@@ -184,10 +184,11 @@ function pick() {
   var host = $("result");
   var eligible = rows.filter(function (r) { return r.fits; });
   if (eligible.length) {
-    var best = eligible.reduce(function (a, r) { return r.m.arc > a.m.arc ? r : a; });
+    var best = eligible.reduce(function (a, r) { return (r.m.depth || 0) > (a.m.depth || 0) || ((r.m.depth || 0) === (a.m.depth || 0) && r.m.arc > a.m.arc) ? r : a; });
     host.innerHTML =
       '<div class="verdict"><h3>Recommended: ' + best.m.name + ' Q8_0</h3>' +
-      '<div><span class="arc">' + best.m.arc.toFixed(1) + "</span> ARC-Challenge (n=1172)</div>" +
+      '<div><span class="arc">' + (best.m.depth === null ? "\u2014" : best.m.depth.toLocaleString()) + " tokens</span> depth score (FWE ladder, n=1 screen)</div>" +
+      "<div>" + best.m.arc.toFixed(1) + "% ARC-Challenge (n=1172)</div>" +
       "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 whole-stack cost " + best.m.cost.toFixed(2) +
       " GiB of your " + vram + " GiB VRAM (conservative: CPU-side measured cost)</div></div>";
   } else {
