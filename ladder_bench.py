@@ -7,7 +7,8 @@ gate, the guarantee) AND counts (FWE, quality-at-depth) -- reduced
 rules: n=1 per gate per rung, the author's screening speed tier.
 
 Per model, the ladder climbs 1024, 2048, ... up to
-min(mechanical ceiling, model max context):
+the PREDICTED ceiling (the author's 137d ruling: the mechanical
+KV-budget value is the only cap):
   1. speed gate at ctx = rung (n=1 conversation, the fastest honest
      shape: real blob prefill, real turns, real reader wall)
   2. if the speed gate passes: FWE at depth = rung - headroom (n=1)
@@ -17,10 +18,11 @@ min(mechanical ceiling, model max context):
 
 The speed gate and ruler gate are used AS LIBRARIES (their own
 launch, banner guard, preflight, budgeting); nothing is re-implemented
-here. Model max context comes from the GGUF metadata via a dry
-server launch (the banner's n_ctx_train), the mechanical ceiling
-from the KV budget at the reader line (law_fit.kv_gib, the
-addendum-130 formula), capped by RAM (llama_server.system_memavailable_gib).
+here. The ceiling is the PREDICTED mechanical value (the author's 137d
+ruling): the KV budget at 12 KiB/tok from usable RAM minus file
+size (the addendum-130 form), capped by RAM
+(llama_server.system_memavailable_gib). The trained-window term
+and its GGUF reader are REMOVED (addendum 137e).
 """
 
 from __future__ import annotations
@@ -28,10 +30,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from typing import Any
 
-import gguf_meta
 import llama_server
 import ruler_gate
 import speed_gate
@@ -39,24 +39,11 @@ import speed_gate
 RUNG_BASE = 1024
 
 
-def gguf_max_context(model: str, port: int, arch: str) -> int:
-    """Model max context: read context_length straight from the GGUF
-    metadata header (no server launch needed; the probe-launch banner
-    parse failed on the author's build - addendum 137c)."""
-    n = gguf_meta.gguf_context_length(model)
-    if n is None:
-        sys.exit(f"ladder: could not read context_length from the GGUF metadata of {model}")
-    return n
-
-
-def mechanical_ceiling(model: str, n_train: int) -> int:
+def mechanical_ceiling(model: str) -> int:
     """The KV-budget ceiling at the reader line (addendum-130 form):
-    size_gib + kv_gib(depth) must fit usable RAM. Conservative: the
-    KV per-token term is read from the file size doubling heuristic
-    when config is unknown -- but the ladder NEVER exceeds n_train
-    (the trained window is the hard wall, addendum 132), so the
-    mechanical term only matters when it binds BELOW the trained
-    window (tiny RAM, big model)."""
+    size_gib + kv_gib(depth) must fit usable RAM, at the worst-known
+    KV rate for this study's families (12 KiB/tok, addendum 133) -
+    the author's 137d ruling: the PREDICTED value is the only cap."""
     file_gib = os.path.getsize(model) / (1024**3)
     ram = llama_server.system_memavailable_gib() or 4.0
     usable = ram - 0.4  # the standing OS reserve
@@ -67,7 +54,7 @@ def mechanical_ceiling(model: str, n_train: int) -> int:
     kv_per_tok_gib = 12 * 1024 / (1024**3)
     depth_kv_budget = max(0.0, usable - file_gib - 0.3)
     ceiling = int(depth_kv_budget / kv_per_tok_gib)
-    return max(RUNG_BASE, min(n_train, ceiling))
+    return max(RUNG_BASE, ceiling)
 
 
 def speed_pass(
@@ -99,12 +86,11 @@ def speed_pass(
 
 
 def fwe_pass(
-    model: str, rung: int, results_dir: str, seed: int, port: int, arch: str
+    model: str, rung: int, results_dir: str, seed: int, port: int
 ) -> tuple[bool, dict[str, Any]]:
     """One FWE cell at depth=rung-2x headroom, n=1, on its own server
     launch at exactly the rung's ctx (ruler_gate's launch shape: one
-    slot, banner guard, no override - the ladder never exceeds the
-    trained window, so the metadata cap is never fought)."""
+    slot, banner guard)."""
     label = os.path.splitext(os.path.basename(model))[0]
     depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
     csv_path = os.path.join(results_dir, f"{label}-{depth}-fwe.csv")
@@ -143,8 +129,7 @@ def main() -> None:
     for model in args.models:
         label = os.path.splitext(os.path.basename(model))[0]
         print(f"\n=== ladder: {label} ===")
-        n_train = gguf_max_context(model, args.port, "qwen2")
-        ceiling = mechanical_ceiling(model, n_train)
+        ceiling = mechanical_ceiling(model)
         if args.max_rung:
             ceiling = min(ceiling, args.max_rung)
         rungs = []
@@ -152,16 +137,12 @@ def main() -> None:
         while r <= ceiling:
             rungs.append(r)
             r *= 2
-        # keep the shave honest: a rung whose wanted ctx (rung + 2 x
-        # ANSWER_HEADROOM) exceeds n_train is replaced by n_train - the
-        # headroom (the 134b discipline)
-        rungs = [min(rung, n_train - 2 * ruler_gate.ANSWER_HEADROOM) for rung in rungs]
         deduped: list[int] = []
         for rung in rungs:
             if rung not in deduped:
                 deduped.append(rung)
         rungs = deduped
-        print(f"  trained ctx {n_train}, mechanical ceiling {ceiling}, rungs {rungs}")
+        print(f"  predicted ceiling {ceiling}, rungs {rungs}")
         score = 0
         for rung in rungs:
             ok_s, sv = speed_pass(model, rung, args.corpus, args.port, args.results_dir)
@@ -169,7 +150,7 @@ def main() -> None:
             if not ok_s:
                 print(f"    speed verdict: {json.dumps(sv)[:200]}")
                 break
-            ok_f, fv = fwe_pass(model, rung, args.results_dir, args.seed, args.port, "qwen2")
+            ok_f, fv = fwe_pass(model, rung, args.results_dir, args.seed, args.port)
             print(
                 f"    fwe @ depth {fv['depth']}: "
                 f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'}",
@@ -179,7 +160,7 @@ def main() -> None:
                 break
             score = rung
         print(f"  {label}: SCORE = {score} tokens (last rung passing both)")
-        table.append({"model": label, "trained_ctx": n_train, "score": score})
+        table.append({"model": label, "score": score})
     print("\n=== ladder table ===")
     for row in sorted(table, key=lambda r: -r["score"]):
         print(f"  {row['model']}: {row['score']} tokens")
