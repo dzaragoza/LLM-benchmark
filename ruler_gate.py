@@ -114,16 +114,36 @@ def build_fwe_task(
             seen.add(w)
             vocab.append(w)
     vocab[0] = "..."
-    num_words = depth_tokens // FWE_CODED_WORDLEN
     norm = zeta(FWE_ALPHA, len(vocab))
-    counts = [int(num_words * (r + 1) ** -FWE_ALPHA / norm) for r in range(len(vocab))]
-    words: list[str] = []
-    for w, c in zip(vocab, counts, strict=True):
-        words.extend([w] * c)
-    rng.shuffle(words)
-    body = " ".join(words)
-    prompt_full = FWE_TEMPLATE.format(context=body)
-    prompt, n_tok = llama_server.trim_to_tokens(port, prompt_full, depth_tokens - ANSWER_HEADROOM)
+    budget = depth_tokens - ANSWER_HEADROOM
+    # Token-budget by construction, not by character arithmetic (the
+    # 136d bug: coded words are gibberish to the tokenizer - ~2-3
+    # tokens per 6-letter word - so `depth // 6` words ran every cell
+    # at ~40-50% of the requested depth and the whole feel run was
+    # void). Probe with /tokenize and scale the word count like
+    # upstream's incremental loop: measure a fixed sample, extrapolate
+    # linearly, then trim-verify - one probe per task, not per guess.
+    probe_words = 2000
+    probe = " ".join(
+        "".join(rng.choices(string.ascii_lowercase, k=FWE_CODED_WORDLEN))
+        for _ in range(probe_words)
+    )
+    probe_n = len(llama_server.tokenize(port, probe))
+    tokens_per_word = max(1.0, probe_n / probe_words)
+    num_words = int(budget / tokens_per_word)
+    while True:
+        counts = [int(num_words * (r + 1) ** -FWE_ALPHA / norm) for r in range(len(vocab))]
+        words: list[str] = []
+        for w, c in zip(vocab, counts, strict=True):
+            words.extend([w] * c)
+        rng.shuffle(words)
+        body = " ".join(words)
+        prompt_full = FWE_TEMPLATE.format(context=body)
+        prompt, n_tok = llama_server.trim_to_tokens(port, prompt_full, budget)
+        if n_tok >= budget * 0.9:
+            break
+        # the trim came in short (probe noise) - grow the word list and retry
+        num_words = int(num_words * budget / max(1, n_tok))
     return prompt, vocab[1 : 1 + FWE_TOP_K]
 
 
