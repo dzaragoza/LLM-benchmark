@@ -4022,3 +4022,14 @@ THE REGISTERED READING, pre-run: the lineages table ranks by SPEED bands and ARC
 COMMAND, registered (the full seven-member roster, one pass):
 `pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen3-1.7B/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3-4B/Qwen3-4B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf`
 (path spellings to be corrected to the author's local tree at launch; the roster, not the spelling, is the registered contract).
+
+### Session 33, addendum 137c - the first ladder launch fails at the probe: n_ctx_train is not in the author's banner; the trained-window cap moves to the GGUF metadata header
+
+THE FAILURE (the author's first seven-model run, T14s): the Qwen3.5-4B ladder aborted in 2.2 s - "ladder: could not read n_ctx_train from ...ladder-probe.log". The addendum-137 probe launched the server at -c 4096 and grepped the log for n_ctx_train; the author's llama.cpp build does not print it (the banner carries n_ctx_slot and load lines, the ruler/speed gates' own guard fields - but not the trained window). The probe design was wrong: it depended on a banner line this build does not emit, so the ladder could not even start.
+
+THE FIX, registered: the trained-window cap now comes from the GGUF FILE ITSELF - `gguf_meta.py`, a minimal header-only reader (magic, version, metadata KV list walked with struct; no server launch, no log parse, no dependency). It reads the `<arch>.context_length` metadata key (uint32/uint64/int forms, string forms with K/M suffixes, any architecture), the value llama-server itself loads as n_ctx_train. Four tests pin the parser (array-valued entries skipped correctly, string "128K", uint64, missing-key -> None). `ladder_bench.gguf_max_context` is now a pure function of the file; the probe launch, its log, and the n_ctx_train grep are DELETED (one less server launch per model - the ladder is also faster).
+
+THE HONEST CAVEAT, registered: context_length in the GGUF is the CONVERTER's claim, which llama-server may still cap lower (the -c cap, the KV budget) - but the ladder never launches above min(mechanical ceiling, this value) and every per-rung launch keeps the standing banner guard (actual n_ctx < requested = refuse), so a wrong metadata value can only SHRINK the honest rung, never let a task overflow. The metadata is the same source llama.cpp reads for its own default; a mismatch would surface as the guard refusing, not as a silent deep-run 400-fest.
+
+COMMAND, unchanged (re-run as-is after git pull):
+`pkill -f llama-server; git pull; and time python3 ladder_bench.py <the seven lineage GGUF paths, addendum 137b>`

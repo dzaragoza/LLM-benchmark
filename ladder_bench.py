@@ -31,6 +31,7 @@ import os
 import sys
 from typing import Any
 
+import gguf_meta
 import llama_server
 import ruler_gate
 import speed_gate
@@ -38,33 +39,14 @@ import speed_gate
 RUNG_BASE = 1024
 
 
-def gguf_max_context(model: str, port: int, arch: str) -> tuple[int, str]:
-    """Model max context: launch the server once and read n_ctx_train
-    from the banner (the metadata value; --override-kv lifted to a
-    sentinel so the cap cannot silently clamp the probe)."""
-    log_path = model + ".ladder-probe.log"
-    proc, healthy = llama_server.start_server(
-        model,
-        port=port,
-        extra_args=["-c", "4096", "--parallel", "1"],
-        log_path=log_path,
-    )
-    n_train: int | None = None
-    try:
-        if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            sys.exit("ladder: probe server did not come up")
-        import re
-
-        with open(log_path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                m = re.search(r"n_ctx_train\s*=?\s*(\d+)", line)
-                if m:
-                    n_train = int(m.group(1))
-    finally:
-        llama_server.stop_server(proc, port)
-    if n_train is None:
-        sys.exit(f"ladder: could not read n_ctx_train from {log_path}")
-    return n_train, log_path
+def gguf_max_context(model: str, port: int, arch: str) -> int:
+    """Model max context: read context_length straight from the GGUF
+    metadata header (no server launch needed; the probe-launch banner
+    parse failed on the author's build - addendum 137c)."""
+    n = gguf_meta.gguf_context_length(model)
+    if n is None:
+        sys.exit(f"ladder: could not read context_length from the GGUF metadata of {model}")
+    return n
 
 
 def mechanical_ceiling(model: str, n_train: int) -> int:
@@ -161,7 +143,7 @@ def main() -> None:
     for model in args.models:
         label = os.path.splitext(os.path.basename(model))[0]
         print(f"\n=== ladder: {label} ===")
-        n_train, _ = gguf_max_context(model, args.port, "qwen2")
+        n_train = gguf_max_context(model, args.port, "qwen2")
         ceiling = mechanical_ceiling(model, n_train)
         if args.max_rung:
             ceiling = min(ceiling, args.max_rung)
