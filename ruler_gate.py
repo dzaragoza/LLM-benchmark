@@ -42,6 +42,7 @@ import random
 import re
 import sys
 import urllib.error
+import urllib.request
 from typing import Any
 
 import llama_server
@@ -133,7 +134,8 @@ def build_task(
             f"depth {depth_tokens} leaves only {budget} haystack tokens "
             f"after {n_needles} needles + query - raise the depth"
         )
-    paragraphs = haystack_paragraphs(rng, 4096)
+    n_sentences = max(4096, (budget * 3) // 2 // 10)
+    paragraphs = haystack_paragraphs(rng, n_sentences)
     haystack, n_hay = llama_server.trim_to_tokens(port, "\n".join(paragraphs), budget)
     del n_hay
     lines = haystack.split("\n")
@@ -302,14 +304,20 @@ def main() -> None:
     label = os.path.splitext(os.path.basename(args.model))[0]
     os.makedirs(args.results_dir, exist_ok=True)
     try:
-        llama_server.post_json(args.port, "/health", {})
-    except Exception:
-        pass
-    else:
+        with urllib.request.urlopen(f"http://127.0.0.1:{args.port}/health", timeout=2):
+            pass
         sys.exit(
             f"port {args.port} already answers /health - a server is running there "
-            "(a stale ruler/llama-server?). Kill it or pass --port to use another."
+            "(a stale ruler/llama-server? pkill -f llama-server, or pass --port). "
+            "Refusing to bench against it: the model and its ctx would be the wrong ones."
         )
+    except urllib.error.HTTPError:
+        sys.exit(
+            f"port {args.port} answers with an HTTP error but SOMETHING is there - "
+            "a stale server. pkill -f llama-server, or pass --port."
+        )
+    except OSError:
+        pass
     proc, healthy = llama_server.start_server(
         args.model,
         port=args.port,
