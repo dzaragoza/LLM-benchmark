@@ -166,6 +166,25 @@ def build_task(
         del out[haystack_idx]
 
 
+def show_task(prompt: str, answers: dict[str, str], needle_texts: list[str]) -> None:
+    """Print the conversation for one task: the context window around
+    each needle plus the tail with the query - so a human reads what
+    the model read. The full haystack is repetitive by construction;
+    the windows carry the information (needle position in context)."""
+    n = len(prompt)
+    print(f"    --- task prompt ({n} chars) ---")
+    for text in needle_texts:
+        i = prompt.find(text)
+        if i < 0:
+            print(f"    [needle not found: {text}]")
+            continue
+        lo, hi = max(0, i - 120), min(n, i + len(text) + 120)
+        window = prompt[lo:hi].replace("\n", " ")
+        print(f"    @ {i:6}/{n}  ...{window}...")
+    tail = prompt[-260:].replace("\n", " ")
+    print(f"    [tail] ...{tail}")
+
+
 def score_answer(answer: str, value: str) -> bool:
     """Substring scoring, RULER's niah rule: the value appears in the
     model's reply (whitespace-tolerant)."""
@@ -200,6 +219,7 @@ def run_depth(
     csv_path: str,
     seed0: int = 1024,
     no_thinking: bool = True,
+    show: bool = False,
 ) -> dict[str, Any]:
     """Run `samples` tasks at one depth, append per-task rows to the
     CSV, return the summary row. Idempotence follows the ARC pattern:
@@ -223,6 +243,8 @@ def run_depth(
         for i in range(samples):
             prompt, answers = build_task(port, depth, needles, seed=seed0 + i)
             key = list(answers)[0]
+            if show:
+                show_task(prompt, answers, [make_needle(k, answers[k]) for k in answers])
             answer = ask(port, prompt, no_thinking=no_thinking)
             ok = score_answer(answer, answers[key])
             hits += ok
@@ -249,6 +271,12 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8200)
     p.add_argument("--results-dir", default="ruler-results")
     p.add_argument("--seed", type=int, default=1024)
+    p.add_argument(
+        "--show",
+        action="store_true",
+        help="print each task's conversation: the haystack window around "
+        "every needle and the query tail (what the model actually read)",
+    )
     p.add_argument(
         "--thinking",
         action="store_true",
@@ -292,6 +320,7 @@ def main() -> None:
                 csv_path,
                 seed0=args.seed,
                 no_thinking=not args.thinking,
+                show=args.show,
             )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
