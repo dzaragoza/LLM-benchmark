@@ -711,7 +711,7 @@ def bench_model(
                     reader_wps=reader_wps,
                 )
                 for r in res:
-                    all_turns.append({"model": label, "conv": ci, **r})
+                    all_turns.append({"model": label, "conv": ci, "ctx": ctx, **r})
                 tps = [r["server_tps"] for r in res if r["server_tps"]]
                 wps = [r["server_wps"] for r in res if r["server_wps"]]
                 evts = [r.get("catchup_events") or 0 for r in res]
@@ -775,7 +775,7 @@ def bench_model(
                     )
                     noise = [{"sample": 0, "error": str(e)}]
                 for r in noise:
-                    noise_records.append({"model": label, "conv": ci, **r})
+                    noise_records.append({"model": label, "conv": ci, "ctx": ctx, **r})
                 ntps = [r["tps"] for r in noise if r.get("tps")]
                 if ntps:
                     print("      noise at depth: " + ", ".join(f"{x:.1f}" for x in ntps))
@@ -923,7 +923,13 @@ def bench(
                 turns = json.load(f)
         except Exception:
             return False
-        return any(t.get("model") == label and t.get("server_tps") for t in turns)
+        mine = [t for t in turns if t.get("model") == label and t.get("server_tps")]
+        if not mine:
+            return False
+        ctxs = {t.get("ctx") for t in mine}
+        if ctx != CTX_DEFAULT and ctx not in ctxs:
+            return False
+        return True
 
     mem_sidecar = dump + ".mem.json"
     if not force and dump_valid() and os.path.getmtime(dump) > os.path.getmtime(path):
