@@ -4074,3 +4074,11 @@ THE REGISTERED CONSEQUENCE for scores already measured: Qwen3.5-4B's 137f score 
 
 COMMAND, registered (unchanged roster, 137d six members):
 `pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B/<correct-path>.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
+
+### Session 33, addendum 137g-note - the corrected roster paths (the author: "you know the names of the models, check the notebook")
+
+THE PATHS, registered from the study's own results file (`benchmark-results-lineage2.json`, the full-benchmark state's canonical model paths): Qwen3-4B lives at `./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf` (the `-GGUF` directory suffix, the first-party repo name - the 137f crash was the missing suffix), and Qwen3-1.7B likewise at `./models/Qwen3-1.7B-GGUF/Qwen3-1.7B-Q8_0.gguf`. The corrected six-member command (137g rules - rungs double from 8192, the speed gate the only decider):
+
+`pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B-GGUF/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
+
+(The 137g command's `<correct-path>` placeholder is superseded by this list; the roster itself is unchanged - the 137d six.)
