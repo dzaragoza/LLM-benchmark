@@ -76,7 +76,7 @@ FWE_TEMPLATE = (
 FWE_CODED_WORDLEN = 6
 FWE_ALPHA = 2.0
 FWE_TOP_K = 3
-FWE_GEN_TOKENS = 50
+FWE_GEN_TOKENS = 128
 
 
 def zeta(alpha: float, k: int) -> float:
