@@ -4042,3 +4042,14 @@ THE REGISTERED ROSTER, six members (the 137b lineage minus the 0.5B): Qwen3.5-4B
 
 COMMAND, registered:
 `pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
+
+### Session 33, addendum 137e - the GGUF metadata reader removed entirely; the predicted ceiling is the only cap
+
+THE SECOND FAILURE (the author's re-run): the 137c GGUF-header reader crashed on the real Qwen3.5-4B file - struct.error past the 2 MiB header-read cap (the file's metadata section is larger than the cap; the walk ran off the buffer). Two instrument attempts at the trained window (banner grep, then header parse) both failed on the author's real files - the author's ruling follows: REMOVE the trained-window term and its reader code altogether.
+
+THE SIMPLIFICATION, registered (completing the 137d ruling): `gguf_meta.py` and its 4 tests are DELETED; `ladder_bench.py` has no gguf/n_train code path at all. The ladder climbs dyadic rungs 1024.. to the PREDICTED mechanical ceiling only (addendum-130 KV-budget form at 12 KiB/tok from usable RAM minus file size). The 134b shave is deleted with it (it was a trained-window artifact). The per-rung launches keep the standing banner guard (actual n_ctx < requested = refuse), so if a rung ever exceeds what the server will actually honor, the guard catches it - the trained-window term was redundant machinery for a cap the prediction already sits under on this machine.
+
+INSTRUMENT LESSON, registered: two bespoke parsers for one input is two failures; the cap they served is not needed under the 137d reduced rules. When a trained-window cap is eventually wanted (the n=23 podium tier), read it from the server's own props endpoint at an existing launch - never a bespoke file parser.
+
+COMMAND, unchanged (the 137d six-member roster):
+`pkill -f llama-server; git pull; and time python3 ladder_bench.py ./models/Qwen3.5-4B/Qwen3.5-4B-Q8_0.gguf ./models/Qwen3-4B/Qwen3-4B-Q8_0.gguf ./models/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q8_0.gguf ./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q8_0.gguf ./models/Qwen3-1.7B/Qwen3-1.7B-Q8_0.gguf ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf`
