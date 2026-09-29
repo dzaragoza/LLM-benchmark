@@ -314,6 +314,13 @@ def main() -> None:
     p.add_argument("--results-dir", default="ruler-results")
     p.add_argument("--seed", type=int, default=1024)
     p.add_argument(
+        "--arch",
+        default="qwen2",
+        help="GGUF architecture key for --override-kv (llama-server caps the "
+        "slot at the metadata context_length; overriding it IS the "
+        "addendum-130 experiment - attention beyond trained context)",
+    )
+    p.add_argument(
         "--show",
         action="store_true",
         help="print each task's conversation: the haystack window around "
@@ -349,7 +356,14 @@ def main() -> None:
     proc, healthy = llama_server.start_server(
         args.model,
         port=args.port,
-        extra_args=["-c", str(wanted_ctx), "--parallel", "1"],
+        extra_args=[
+            "-c",
+            str(wanted_ctx),
+            "--parallel",
+            "1",
+            "--override-kv",
+            f"{args.arch}.context_length=int:{wanted_ctx}",
+        ],
         log_path=log_path,
     )
     if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
