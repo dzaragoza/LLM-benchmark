@@ -172,19 +172,23 @@ def score_answer(answer: str, value: str) -> bool:
     return value in re.sub(r"\s+", "", answer)
 
 
-def ask(port: int, prompt: str, max_tokens: int = 64) -> str:
-    """One completion through the same endpoint the speed gate uses."""
-    data = llama_server.post_json(
-        port,
-        "/v1/chat/completions",
-        {
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": 0,
-            "stream": False,
-        },
-    )
-    return data["choices"][0]["message"]["content"] or ""
+def ask(port: int, prompt: str, max_tokens: int = 64, no_thinking: bool = True) -> str:
+    """One completion through the same endpoint the speed gate uses.
+    Default no_thinking=True: hybrid models (qwen3/3.5-class) burn the
+    whole token budget on reasoning_content otherwise - the answer
+    arrives empty, the same trap the speed gate's --no-thinking mode
+    exists for. A thinking answer is accepted from either field."""
+    payload: dict[str, Any] = {
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0,
+        "stream": False,
+    }
+    if no_thinking:
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    data = llama_server.post_json(port, "/v1/chat/completions", payload)
+    msg = data["choices"][0]["message"]
+    return msg.get("content") or msg.get("reasoning_content") or ""
 
 
 def run_depth(
@@ -195,6 +199,7 @@ def run_depth(
     needles: int,
     csv_path: str,
     seed0: int = 1024,
+    no_thinking: bool = True,
 ) -> dict[str, Any]:
     """Run `samples` tasks at one depth, append per-task rows to the
     CSV, return the summary row. Idempotence follows the ARC pattern:
@@ -218,7 +223,7 @@ def run_depth(
         for i in range(samples):
             prompt, answers = build_task(port, depth, needles, seed=seed0 + i)
             key = list(answers)[0]
-            answer = ask(port, prompt)
+            answer = ask(port, prompt, no_thinking=no_thinking)
             ok = score_answer(answer, answers[key])
             hits += ok
             w.writerow([i, depth, key, answers[key], answer, int(ok)])
@@ -244,6 +249,12 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8200)
     p.add_argument("--results-dir", default="ruler-results")
     p.add_argument("--seed", type=int, default=1024)
+    p.add_argument(
+        "--thinking",
+        action="store_true",
+        help="let hybrid models think (default: enable_thinking False, "
+        "the study's non-thinking mode - reasoning burns the budget)",
+    )
     args = p.parse_args()
 
     label = os.path.splitext(os.path.basename(args.model))[0]
@@ -273,7 +284,14 @@ def main() -> None:
         for depth in args.depths:
             csv_path = os.path.join(args.results_dir, f"{label}-{depth}-niah.csv")
             row = run_depth(
-                args.port, label, depth, args.samples, args.needles, csv_path, seed0=args.seed
+                args.port,
+                label,
+                depth,
+                args.samples,
+                args.needles,
+                csv_path,
+                seed0=args.seed,
+                no_thinking=not args.thinking,
             )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
