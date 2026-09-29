@@ -103,6 +103,7 @@ import time
 from typing import Any, NoReturn
 
 import llama_server
+from ruler_gate import report_server_ctx
 
 CORPUS_DEFAULT = "./live-corpus.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
@@ -659,7 +660,7 @@ def bench_model(
     log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
     for rep in range(1, repeats + 1):
         print(f"  [rep {rep}/{repeats}] starting server...", flush=True)
-        extra = ["-ngl", "99", "-c", str(ctx)]
+        extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
         if thinking:
             extra += ["--reasoning-format", "deepseek"]
         if no_thinking:
@@ -669,6 +670,23 @@ def bench_model(
         try:
             if not healthy:
                 print("  ERROR: server did not become healthy; skipping")
+                continue
+            actual_ctx = report_server_ctx(log_path, ctx)
+            if actual_ctx is None:
+                print(
+                    "  ERROR: could not read n_ctx from the server banner - "
+                    "the gate refuses to bench blind (addendum 130e); "
+                    f"see {log_path}"
+                )
+                continue
+            if actual_ctx < ctx:
+                print(
+                    f"  ERROR: server accepted -c {ctx} but runs n_ctx "
+                    f"{actual_ctx} (slots/cap silently reduced it, "
+                    "addendum 130e/130f) - the depth budget would "
+                    "overflow and every deep turn would 400; see "
+                    f"{log_path}"
+                )
                 continue
             pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
             conv_worsts = []
