@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""ladder_bench.py -- the depth-ladder orchestrator (addendum 137).
+"""ladder_bench.py -- the depth-ladder orchestrator (PROTOCOL v4).
 
-The ranking instrument for the addendum-136 frontier: a model's score
-is the DEEPEST dyadic rung at which it BOTH serves the reader (speed
-gate, the guarantee) AND counts (FWE, quality-at-depth) -- reduced
-rules: n=1 per gate per rung, the author's screening speed tier.
+The ranking instrument: a model's score is the DEEPEST dyadic rung at
+which it BOTH serves the reader (speed gate, the guarantee) AND counts
+(FWE, quality-at-depth) -- reduced rules: n=1 per gate per rung, the
+author's screening speed tier (addendum 137h: PERMANENT for the
+ladder).
 
-Per model, the ladder climbs 8192, 16384, ... with NO ceiling
-term (the author's 137g ruling: the speed gate is the deciding
-factor - the ladder doubles until the reader wall stops it):
+Per model, the ladder climbs 8192, 16384, ... with NO ceiling term
+(the author's 137g ruling: the speed gate is the deciding factor - the
+ladder doubles until the reader wall stops it):
   1. speed gate at ctx = rung (n=1 conversation, the fastest honest
      shape: real blob prefill, real turns, real reader wall)
   2. if the speed gate passes: FWE at depth = rung - headroom (n=1)
@@ -16,12 +17,15 @@ factor - the ladder doubles until the reader wall stops it):
      fails -> the ladder STOPS (the author's rule: the score is the
      LAST rung both passed)
 
-The speed gate and ruler gate are used AS LIBRARIES (their own
-launch, banner guard, preflight, budgeting); nothing is re-implemented
-here. There is no predicted or trained ceiling: the rungs double
-from 8192 without limit and the SPEED GATE alone decides where the
-ladder stops (the server's own memory manager refuses a launch that
-does not fit - the honest mechanical wall, measured not predicted).
+Session 34 (addendum 4): the ladder machinery is MERGED into
+full_benchmark.py - the new way of working is one command that
+acquires (download/convert) then LADDERS then optionally ARC. This
+module stays the ladder's implementation library (run_ladder); its
+CLI remains for direct ladder runs on already-acquired files.
+
+Wall time is measured and printed per rung (the Linux `time` command
+is retired, session 34 addendum 3): [Ns] on each gate line and a
+per-model total in minutes on the score line.
 """
 
 from __future__ import annotations
@@ -38,36 +42,6 @@ import speed_gate
 import tee_output
 
 RUNG_BASE = 8192
-
-
-def dry_run(args: argparse.Namespace) -> int:
-    """The preflight the author asked for (session 34): verify every
-    model path and the corpus BEFORE any server work, print the plan
-    (rungs, corpus, ports), exit non-zero on any missing file. Never
-    burns a launch on a bad command line."""
-    missing = 0
-    for model in args.models:
-        if not os.path.exists(model):
-            print(f"DRY-RUN FAIL: model not found: {model}")
-            missing += 1
-        else:
-            print(f"ok: {model} ({os.path.getsize(model) / 1024**3:.2f} GiB)")
-    if not os.path.exists(args.corpus):
-        print(f"DRY-RUN FAIL: corpus not found: {args.corpus}")
-        missing += 1
-    else:
-        print(f"ok: corpus {args.corpus}")
-    if missing:
-        print(f"dry run: {missing} missing file(s) - nothing launched")
-        return 1
-    rungs = []
-    r = RUNG_BASE
-    while not args.max_rung or r <= args.max_rung:
-        rungs.append(r)
-        r *= 2
-    print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
-    print("per-rung wall time printed (the time command is retired, session 34)")
-    return 0
 
 
 def speed_pass(
@@ -127,13 +101,134 @@ def fwe_pass(
     )
     try:
         if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            return False, {"error": "fwe server did not come up"}
+            return False, {"error": "fwe server did not come up", "depth": depth}
         row = ruler_gate.run_fwe_depth(
             port, label, depth, 1, csv_path, seed0=seed, no_thinking=True
         )
     finally:
         llama_server.stop_server(proc, port)
     return row["acc"] == 1.0, row
+
+
+def run_ladder(
+    model: str,
+    corpus: str,
+    port: int = 8210,
+    results_dir: str = "ladder-results",
+    seed: int = 1024,
+    max_rung: int | None = None,
+) -> dict[str, Any]:
+    """One model's PROTOCOL v4 ladder (addendum 137p). Returns
+    {"model", "score", "wall_min", "rungs": [{rung, speed_pass,
+    speed_worst_wps, fwe_pass, fwe_correct, mem_cost_gib, speed_s,
+    fwe_s}]}. The scored rung's speed_worst_wps is the 137n w/s
+    anchor; its mem_cost_gib is the 137m cold cost anchor."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    print(f"\n=== ladder: {label} ===")
+    os.makedirs(results_dir, exist_ok=True)
+    if not os.path.exists(model):
+        print(f"  SKIP: file not found ({model}) - fix the path and re-run")
+        return {
+            "model": label,
+            "score": None,
+            "wall_min": 0.0,
+            "rungs": [],
+            "error": "file not found",
+        }
+    print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
+    score = 0
+    rung = RUNG_BASE
+    rungs: list[dict[str, Any]] = []
+    model_t0 = time.monotonic()
+    while True:
+        t0 = time.monotonic()
+        ok_s, sv = speed_pass(model, rung, corpus, port, results_dir)
+        t_speed = time.monotonic() - t0
+        print(
+            f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'} [{t_speed:.0f}s]",
+            flush=True,
+        )
+        cost = sv.get("mem_cost_gib")
+        if cost is not None:
+            print(f"    cold machine cost @ rung: {cost:.2f} GiB")
+        cell = {
+            "rung": rung,
+            "speed_pass": ok_s,
+            "speed_worst_wps": sv.get("worst"),
+            "mem_cost_gib": cost,
+            "speed_s": t_speed,
+        }
+        if not ok_s:
+            print(f"    speed verdict: {json.dumps(sv)[:200]}")
+            rungs.append(cell)
+            break
+        t0 = time.monotonic()
+        ok_f, fv = fwe_pass(model, rung, results_dir, seed, port)
+        t_fwe = time.monotonic() - t0
+        print(
+            f"    fwe @ depth {fv['depth']}: "
+            f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'} [{t_fwe:.0f}s]",
+            flush=True,
+        )
+        cell["fwe_pass"] = ok_f
+        cell["fwe_correct"] = fv.get("correct")
+        cell["fwe_s"] = t_fwe
+        rungs.append(cell)
+        if not ok_f:
+            break
+        score = rung
+        if max_rung and rung >= max_rung:
+            break
+        rung *= 2
+    wall_min = (time.monotonic() - model_t0) / 60.0
+    print(
+        f"  {label}: SCORE = {score} tokens (last rung passing both) "
+        f"[{wall_min:.1f} min wall, measured]"
+    )
+    return {"model": label, "score": score, "wall_min": wall_min, "rungs": rungs}
+
+
+def scored_row(ladder: dict[str, Any]) -> dict[str, Any]:
+    """The 137n/137m picker row from a run_ladder result: the scored
+    rung's (depth, worst-span w/s, cold cost), or unranked."""
+    score = ladder.get("score") or 0
+    for cell in ladder.get("rungs", []):
+        if cell["rung"] == score and score:
+            return {
+                "depth": score,
+                "worst_wps": cell.get("speed_worst_wps"),
+                "cold_cost_gib": cell.get("mem_cost_gib"),
+            }
+    return {"depth": score, "worst_wps": None, "cold_cost_gib": None}
+
+
+def dry_run(args: argparse.Namespace) -> int:
+    """The preflight (session 34): verify every model path and the
+    corpus BEFORE any server work, print the plan, exit non-zero on
+    any missing file. Never burns a launch on a bad command line."""
+    missing = 0
+    for model in args.models:
+        if not os.path.exists(model):
+            print(f"DRY-RUN FAIL: model not found: {model}")
+            missing += 1
+        else:
+            print(f"ok: {model} ({os.path.getsize(model) / 1024**3:.2f} GiB)")
+    if not os.path.exists(args.corpus):
+        print(f"DRY-RUN FAIL: corpus not found: {args.corpus}")
+        missing += 1
+    else:
+        print(f"ok: corpus {args.corpus}")
+    if missing:
+        print(f"dry run: {missing} missing file(s) - nothing launched")
+        return 1
+    rungs = []
+    r = RUNG_BASE
+    while not args.max_rung or r <= args.max_rung:
+        rungs.append(r)
+        r *= 2
+    print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
+    print("per-rung wall time printed (the time command is retired, session 34)")
+    return 0
 
 
 def main() -> None:
@@ -155,54 +250,14 @@ def main() -> None:
     if args.dry_run:
         raise SystemExit(dry_run(args))
 
-    os.makedirs(args.results_dir, exist_ok=True)
     table = []
     for model in args.models:
-        label = os.path.splitext(os.path.basename(model))[0]
-        print(f"\n=== ladder: {label} ===")
-        if not os.path.exists(model):
-            print(f"  SKIP: file not found ({model}) - fix the path and re-run")
-            continue
-        print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
-        score = 0
-        rung = RUNG_BASE
-        model_t0 = time.monotonic()
-        while True:
-            t0 = time.monotonic()
-            ok_s, sv = speed_pass(model, rung, args.corpus, args.port, args.results_dir)
-            t_speed = time.monotonic() - t0
-            print(
-                f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'} [{t_speed:.0f}s]",
-                flush=True,
-            )
-            if sv.get("mem_cost_gib") is not None:
-                print(f"    cold machine cost @ rung: {sv['mem_cost_gib']:.2f} GiB")
-            if not ok_s:
-                print(f"    speed verdict: {json.dumps(sv)[:200]}")
-                break
-            t0 = time.monotonic()
-            ok_f, fv = fwe_pass(model, rung, args.results_dir, args.seed, args.port)
-            t_fwe = time.monotonic() - t0
-            print(
-                f"    fwe @ depth {fv['depth']}: "
-                f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'} "
-                f"[{t_fwe:.0f}s]",
-                flush=True,
-            )
-            if not ok_f:
-                break
-            score = rung
-            if args.max_rung and rung >= args.max_rung:
-                break
-            rung *= 2
-        model_t = time.monotonic() - model_t0
-        print(
-            f"  {label}: SCORE = {score} tokens (last rung passing both) "
-            f"[{model_t / 60:.1f} min wall, measured - the time command retired, session 34]"
+        ladder = run_ladder(
+            model, args.corpus, args.port, args.results_dir, args.seed, args.max_rung
         )
-        table.append({"model": label, "score": score})
+        table.append({"model": ladder["model"], "score": ladder["score"]})
     print("\n=== ladder table ===")
-    for row in sorted(table, key=lambda r: -r["score"]):
+    for row in sorted(table, key=lambda r: -(r["score"] or 0)):
         print(f"  {row['model']}: {row['score']} tokens")
 
 

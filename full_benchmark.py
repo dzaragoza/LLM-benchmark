@@ -88,6 +88,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import arc_eval
 import convert_quant
 import hf_download
+import ladder_bench
 import llama_server
 import mcnemar
 import speed_gate
@@ -300,13 +301,35 @@ def process_family(
                 "phases 1-2 invalidated; will re-acquire"
             )
 
-    hf_download.require_hub()
-    assert list_repo_files is not None  # require_hub exits when the hub is missing
-    try:
-        model_files = list_repo_files(model_repo)
-        source_files = model_files if source_repo == model_repo else list_repo_files(source_repo)
-    except Exception as e:
-        fail(1, "-", f"cannot list repo files for {model_repo}: {e}", GUIDE[1])
+    # Session 34 (addendum 4): the LOCAL SHORTCUT. If the rung file is
+    # already on disk, acquisition is DONE - no hub listing needed (the
+    # author's models/ tree is the common case; the v4 WoW runs local
+    # files). The hub is only a real dependency when the file must be
+    # downloaded or converted.
+    local_path = local_rung(famdir, RUNG)
+    if local_path and 1 not in (fst["runs"].get(RUNG, {}).get("phases_done", [])):
+        run = fst["runs"].setdefault(RUNG, {"phases_done": []})
+        run["plan"] = "local file"
+        run["file"] = local_path
+        if 1 not in run["phases_done"]:
+            run["phases_done"].append(1)
+        if 2 not in run["phases_done"]:
+            run["phases_done"].append(2)
+        save_state(state_path, state)
+        print(f"  [1] local rung file found - no download needed  ({local_path})")
+        print(f"  [2] rung file ready  ({local_path})")
+    model_files: list[str] = []
+    source_files: list[str] = []
+    if not local_path:
+        hf_download.require_hub()
+        assert list_repo_files is not None  # require_hub exits when the hub is missing
+        try:
+            model_files = list_repo_files(model_repo)
+            source_files = (
+                model_files if source_repo == model_repo else list_repo_files(source_repo)
+            )
+        except Exception as e:
+            fail(1, "-", f"cannot list repo files for {model_repo}: {e}", GUIDE[1])
 
     for rung in [RUNG]:
         run = fst["runs"].get(rung, {"phases_done": []})
@@ -339,64 +362,58 @@ def process_family(
             print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
             stamp("      phase 2 done (create)")
         path = run.get("file") or local_rung(famdir, rung)
-        if dry_run and not path:
-            print(f"  [3] would live-bench the {rung} file")
+        if dry_run:
+            print(f"  [3] would run the PROTOCOL v4 ladder on {path or 'the rung file'}")
             print(
-                f"  [4] would analyze (the reader-wall test: a turn "
-                f"fails iff the reader EVER hits the stream - reader "
-                f"{reader_wps:g} w/s, reaction "
-                f"{speed_gate.READER_REACTION_S}s, addendum 55)"
+                "  [4] would record the ladder score (the deepest rung passing both; "
+                "scored-rung w/s + cold cost per addendum 137n/137m)"
             )
             continue
         assert path is not None  # real runs: phases 1-2 guarantee it
-        if 3 not in run["phases_done"]:
-            dump = speed_gate.bench(
-                path, corpus, dry_run, thinking, no_thinking, force=force, reader_wps=reader_wps
+        # Session 34 (addendum 4): the 50-conv corpus wall is REPLACED
+        # by the PROTOCOL v4 ladder as the family's bench. Per rung:
+        # speed gate (n=1) then FWE (n=1); both pass -> score advances;
+        # either fails -> the ladder stops. The verdict is the ladder
+        # SCORE (0 = the counting floor / speed cliff at the base
+        # rung). The corpus-wall phases 3-4 are retired (the author:
+        # "we don't do 50 conv turns. We do run fwe as in ladder-bench").
+        if 3 not in run["phases_done"] or force:
+            ladder = ladder_bench.run_ladder(
+                path,
+                corpus,
+                port=state.get("ladder_port", 8210),
+                results_dir=os.path.join(models_dir, "ladder-results"),
+                seed=state.get("ladder_seed", 1024),
             )
+            run["ladder"] = ladder
             run["phases_done"].append(3)
             save_state(state_path, state)
-            print(f"  [3] live bench ok  (dump: {os.path.basename(dump)})")
-            stamp("      phase 3 done (bench)")
+            print(f"  [3] ladder ok  (score: {ladder['score']} tokens)")
+            stamp("      phase 3 done (ladder)")
         if 4 not in run["phases_done"]:
-            res = speed_gate.analyze(path, thinking, no_thinking, reader_wps=reader_wps)
-            run.update(res)
-            run["phases_done"].append(4)
-            save_state(state_path, state)
-            print(
-                f"  [4] {res['verdict']} — reader-wall stall rate: "
-                f"{res['wall_fail_turns']} of {res['n_turns']} turns "
-                f"stalled ({res['stall_rate']:.1%}; PASS <= "
-                f"{res['stall_rate_max']:.0%}), "
-                f"{res['catchup_events']} catch-up event(s), "
-                f"worst wait {res['worst_catchup_s']:.2f}s "
-                f"(addendum 73; the span diagnostics: worst "
-                f"{res['worst']:.2f} w/s, mean {res['mean']:.2f}, "
-                f"sigma {res['sigma']:.2f})"
-            )
-            print(
-                f"      token-side: worst {res['worst_tps']:.1f} t/s, "
-                f"words/token {res['words_per_token']:.3f} (measured)"
-            )
-            mem_sidecar = dump + ".mem.json"
-            if os.path.isfile(mem_sidecar):
-                try:
-                    with open(mem_sidecar) as f:
-                        mem = json.load(f)
-                    peaks = [m["peak_rss_gib"] for m in mem if m.get("peak_rss_gib")]
-                    if peaks:
-                        print(
-                            f"      memory: peak RSS {max(peaks):.2f} "
-                            "GiB (weights + KV + buffers + runtime; "
-                            "VmHWM, addendum 36)"
-                        )
-                except Exception:
-                    pass
-            stamp("      phase 4 done (analyze)")
-        if str(run["verdict"]).startswith("PASS"):
+            # phase 4: the scored-rung row (the 137n/137m anchors)
+            ladder = run.get("ladder")
+            if ladder:
+                row = ladder_bench.scored_row(ladder)
+                run["verdict"] = f"PASS (ladder score {ladder['score']} tokens)"
+                run["rung"] = rung
+                run["score"] = ladder["score"]
+                run["worst"] = row["worst_wps"]
+                run["mem_cost_gib"] = row["cold_cost_gib"]
+                run["phases_done"].append(4)
+                save_state(state_path, state)
+                worst_txt = "n/a" if row["worst_wps"] is None else f"{row['worst_wps']:.1f}"
+                cost_txt = "n/a" if row["cold_cost_gib"] is None else f"{row['cold_cost_gib']:.2f}"
+                print(
+                    f"  [4] scored-rung row: depth {row['depth']} tokens, "
+                    f"worst {worst_txt} w/s, cold cost {cost_txt} GiB"
+                )
+                stamp("      phase 4 done (scored row)")
+        if str(run.get("verdict", "")).startswith("PASS"):
             fst["selected"] = rung
             run["rung"] = rung
             save_state(state_path, state)
-            print(f"  SELECTED {rung} for {fam}")
+            print(f"  SELECTED {rung} for {fam} (ladder score {run.get('score')} tokens)")
             break
 
 
@@ -474,6 +491,14 @@ def build_parser() -> argparse.ArgumentParser:
         "past the ignores (addendum 78, item 5)",
     )
     ap.add_argument(
+        "--arc",
+        action="store_true",
+        help="session 34 (addendum 4): run the ARC-Challenge phase "
+        "and the McNemar ranking after the ladders - OPTIONAL "
+        "(the ladder is the bench; ARC is a tiebreak at the author's "
+        "discretion)",
+    )
+    ap.add_argument(
         "--no-thinking",
         action="store_true",
         help="hybrid models, non-thinking category: "
@@ -503,15 +528,22 @@ def main() -> None:
 
     failed_families = sweep_families(args, state)
 
+    # Session 34 (addendum 4): the ladder is the bench; the scored
+    # table prints from the ladder results in state. ARC and the
+    # McNemar ranking are OPTIONAL after FWE (--arc).
+
     if args.dry_run:
         sys.exit(preflight_report(args, state, failed_families))
 
     roster, selections, arc_jobs = prepare_phase56(args, state)
     report_roster_notes(args, state, roster, failed_families)
-    run_arc_phase(args, state, arc_jobs)
-    run_ranking(args, state, selections)
+    print_ladder_table(state)
+    if args.arc:
+        run_arc_phase(args, state, arc_jobs)
+        run_ranking(args, state, selections)
+    else:
+        print("\n--arc not given - skipping the ARC phase and the ranking (session 34 addendum 4)")
     write_results(args, state)
-    print_wt_table(state)
 
     # ---- addendum 78, item 5: the git tail - commit and push every
     # artifact the study needs (state, results, per-turn dumps, mem
@@ -672,6 +704,44 @@ def report_roster_notes(
         stamp("families failed this run (isolated; state preserved):")
         for spec, err in failed_families:
             print(f"  {spec}: {err}")
+
+
+def print_ladder_table(state: dict[str, Any]) -> None:
+    """The v4 ladder table (session 34, addendum 4): every benched
+    family's ladder score with its scored-rung row (the 137n/137m
+    anchors), sorted by depth - the ranking output of the merged
+    full benchmark."""
+    rows = []
+    for fam, fst in state["families"].items():
+        for rung, run in fst.get("runs", {}).items():
+            lad = run.get("ladder")
+            if lad is None:
+                continue
+            row = ladder_bench.scored_row(lad)
+            rows.append(
+                (
+                    lad["score"] or 0,
+                    fam,
+                    rung,
+                    row["worst_wps"],
+                    row["cold_cost_gib"],
+                    lad["wall_min"],
+                )
+            )
+    if not rows:
+        print("\nno ladder results in state - nothing benched yet")
+        return
+    print()
+    print("=" * 60)
+    stamp("PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)")
+    for score, fam, _rung, wps, cost, wall in sorted(rows, key=lambda r: (-r[0], r[1])):
+        wps_txt = "n/a" if wps is None else f"{wps:.1f}"
+        cost_txt = "n/a" if cost is None else f"{cost:.2f}"
+        print(
+            f"  {fam:36s} score {score:>7,} tokens | "
+            f"scored-rung worst {wps_txt:>5s} w/s | cold {cost_txt:>5s} GiB | "
+            f"{wall:.1f} min"
+        )
 
 
 def run_arc_phase(
