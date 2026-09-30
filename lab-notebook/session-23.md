@@ -1,0 +1,23 @@
+## Session 23 — 2026-09-24 (thinking-model category: rulings, tooling, predictions)
+
+**Author idea & rulings (via structured Q&A, now pre-registered in the README):** thinking models get their own category, judged by the same criteria as non-thinking models — worst-turn speed gate (floor 20, 2σ lenient rule) and strict full ARC (n=1172) — but never mixed into the non-thinking ranking. The thinking latency is NOT gated: the user actively chose a thinking model, so the wait is an informed choice and we put no measurement burden on it. What we do measure descriptively: reasoning tokens (`reasoning_content`, `--reasoning-format deepseek`) and their estimated share of generated tokens per turn. Thinking is unrestricted (no reasoning budget); the completion cap becomes answer cap + 1024 (`THINK_ALLOWANCE`); turns that burn the whole budget reasoning are flagged `answer_empty` in the dump.
+
+**Roster:** applying the roster rules minus the no-thinking rule, plus "must be a thinking model", leaves exactly one candidate, and the one-family rule caps it at one: `Qwen/Qwen3-1.7B-GGUF` (Ollama `qwen3:1.7b`, 37.8M pulls, row 7 of the pre-registered snapshot). Single-model case study: no McNemar within the category; ARC is directly cross-comparable because the raw-prompt single-token protocol never engages thinking.
+
+**Tooling pushed (all decoded byte counts author-verified on pull):**
+- `live-bench.py` thinking patches — commit `94ed5827`, 17,218 bytes: THINK_ALLOWANCE=1024, `--thinking` flag, `--reasoning-format deepseek` server launch, `reasoning_chars`/`thinking_tokens_est`/`answer_empty` capture, per-turn thinking print.
+- `full-benchmark.py` thinking + Windows patches — commit `9c149101`, 35,066 bytes, sha256 `2e8c4c6c76c76e8a4498373be232780f2483dced561140e17f250467cc0b7859`: `--thinking` threads through phase 3 (live bench) and phase 5 (ARC); Windows `llama-server.exe` resolution, `taskkill /PID /T /F` escalation, platform-neutral GPU-stack guide. Remote verification limited by the 32,793-char fetch truncation — first 24,576 decoded bytes confirmed (`--thinking` + taskkill present), full check is the author's wc -c + sha256sum ritual.
+- `README.md` thinking-category section — commit `f9dcdc8c`, 13,529 bytes decoded, sha256 `90617643d7693e6ba840e78228d6094268c18cd6f1e212972dde3584a8261230`: ruling (4 points), roster derivation (37.8M pulls, row 7 cross-referenced), single-model case-study note, separate-state command (`--thinking --state-file benchmark-state-thinking.json --results-file benchmark-results-thinking.json "Qwen/Qwen3-1.7B-GGUF"`), rule-3 cross-pointer added to the roster rules. Verified by pinned-commit re-fetch: section, command, pointer, single License anchor all present.
+- `.gitignore` — commits `24a25c1b` + fix `d0ebc2e8` (194 bytes): now ignores `benchmark-state*.json`, `benchmark-results*.json`, `arc-results/`, `arc-ARC-Challenge-test-*.json` (machine-local artifacts were polluting clones; `benchmark-state.json` itself was already deleted from the repo).
+
+**Tooling bug logged:** the first .gitignore push concatenated `models/` + the new pattern onto one broken line (`models/benchmark-state*.json`) — the fetched blob had no trailing newline and the splice assumed one. Caught by re-reading the push result, fixed in `d0ebc2e8`, verified by pinned re-fetch (194 bytes, 14 clean lines). Prediction ("direct small-text push is safe") held; the process failure was in the merge, not the transport.
+
+**Pre-registered predictions (Qwen3-1.7b, thinking category, floor 20):**
+1. **Selection rung:** Q4_K_M (Q8_0 ~1.85 GiB → ~14 t/s FAIL; Q6_K ~1.5 → ~17 FAIL; Q5_K_M ~1.3 → ~20 borderline; Q4_K_M ~1.1 GiB → ~23 PASS). Honest uncertainty: Q5_K_M may squeak past the 2σ-lenient threshold — if so the ladder stops one rung earlier than predicted.
+2. **Thinking share:** 30–60% of generated tokens are reasoning on live-bench turns (single model, wide band — first thinking measurement of the study, no prior to anchor on).
+3. **Budget overruns:** <10% of turns flagged `answer_empty` at the 300+1024 cap.
+4. **ARC (n=1172, raw protocol):** 55–65% — thinking never engages, so this grades the model "as a normal 1.7B" and sits directly comparable to the non-thinking category.
+5. **Gate interaction note:** reasoning tokens generate at the same t/s as answer tokens, so the worst-turn metric is reasoning-agnostic in principle — prediction 1 implicitly assumes this holds on Windows/Vulkan.
+
+**Next:** author runs the Windows fresh-clone README test (the actual deliverable: can a stranger replicate the study?), then the non-thinking roster, then this category; grade all predictions when the numbers land.
+
