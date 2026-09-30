@@ -17,6 +17,13 @@ ladder doubles until the reader wall stops it):
      fails -> the ladder STOPS (the author's rule: the score is the
      LAST rung both passed)
 
+Session 34 (addendum 6): if the doubling overshoots the model's
+TRAINED WINDOW, the window itself becomes the final rung (the author:
+"if we hit the training window let's use it for the rung. The sweep is
+doubling ladder, but intermediate values are fine") - one probe launch
+at a huge -c reads the server's cap off the banner, and the grid
+gains one non-dyadic top rung (e.g. 8192, 16384, 32768, 40960).
+
 Session 34 (addendum 4): the ladder machinery is MERGED into
 full_benchmark.py - the new way of working is one command that
 acquires (download/convert) then LADDERS then optionally ARC. This
@@ -33,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -110,6 +118,38 @@ def fwe_pass(
     return row["acc"] == 1.0, row
 
 
+def trained_window(model: str, port: int = 8210, log_dir: str = ".") -> int | None:
+    """The model's trained context window, measured the honest way: one
+    server launch at a huge -c lets the server cap to n_ctx_train and
+    the banner reports it (session 34, addendum 6). Returns None when
+    the probe fails (the ladder then doubles without a window cap -
+    the speed gate alone decides, the pre-6 behavior)."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    log_path = os.path.join(log_dir, f"{label}-window-probe.log")
+    proc, healthy = llama_server.start_server(
+        model, port=port, extra_args=["-c", "1048576", "--parallel", "1"], log_path=log_path
+    )
+    window = None
+    try:
+        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            return None
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                log = f.read()
+        except OSError:
+            return None
+        m = re.search(r"training context of the model \((\d+)\)", log)
+        if m is None:
+            m = re.search(r"n_ctx_train\s*=?\s*(\d+)", log)
+        if m is None:
+            m = re.search(r"n_ctx_slot\s*=\s*(\d+)", log)
+        if m:
+            window = int(m.group(1))
+    finally:
+        llama_server.stop_server(proc, port)
+    return window
+
+
 def run_ladder(
     model: str,
     corpus: str,
@@ -136,6 +176,9 @@ def run_ladder(
             "error": "file not found",
         }
     print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
+    window = trained_window(model, port, results_dir)
+    if window:
+        print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
     score = 0
     rung = RUNG_BASE
     rungs: list[dict[str, Any]] = []
@@ -179,7 +222,12 @@ def run_ladder(
         score = rung
         if max_rung and rung >= max_rung:
             break
-        rung *= 2
+        nxt = rung * 2
+        if window and nxt >= window:
+            if rung >= window:
+                break  # the window rung already scored - nothing above it
+            nxt = window  # the window becomes the final (non-dyadic) rung
+        rung = nxt
     wall_min = (time.monotonic() - model_t0) / 60.0
     print(
         f"  {label}: SCORE = {score} tokens (last rung passing both) "
@@ -227,6 +275,7 @@ def dry_run(args: argparse.Namespace) -> int:
         rungs.append(r)
         r *= 2
     print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
+    print("the top rung caps to the model's trained window when doubling overshoots (addendum 6)")
     print("per-rung wall time printed (the time command is retired, session 34)")
     return 0
 
