@@ -24,6 +24,12 @@ doubling ladder, but intermediate values are fine") - one probe launch
 at a huge -c reads the server's cap off the banner, and the grid
 gains one non-dyadic top rung (e.g. 8192, 16384, 32768, 40960).
 
+Session 34 (addendum 7): HALF RUNGS - the step is x1.5, not x2 (the
+author: "let's do the ladder in half rungs, I think it will help
+discriminate better"). Grid: 8192, 12288, 18432, 27648, 41472, ...
+The window still caps the top (a window below the next 1.5x step
+becomes the final rung).
+
 Session 34 (addendum 4): the ladder machinery is MERGED into
 full_benchmark.py - the new way of working is one command that
 acquires (download/convert) then LADDERS then optionally ARC. This
@@ -50,6 +56,7 @@ import speed_gate
 import tee_output
 
 RUNG_BASE = 8192
+RUNG_STEP = 1.5  # half rungs in log space: 8k, 12k, 18k, 27k, 41k... (session 34, addendum 7)
 
 
 def speed_pass(
@@ -222,11 +229,13 @@ def run_ladder(
         score = rung
         if max_rung and rung >= max_rung:
             break
-        nxt = rung * 2
+        nxt = int(round(rung * RUNG_STEP))
+        if nxt <= rung:
+            break  # integer rounding collapsed the step - nothing above
         if window and nxt >= window:
             if rung >= window:
                 break  # the window rung already scored - nothing above it
-            nxt = window  # the window becomes the final (non-dyadic) rung
+            nxt = window  # the window becomes the final rung (addendum 6)
         rung = nxt
     wall_min = (time.monotonic() - model_t0) / 60.0
     print(
@@ -273,9 +282,11 @@ def dry_run(args: argparse.Namespace) -> int:
     r = RUNG_BASE
     while not args.max_rung or r <= args.max_rung:
         rungs.append(r)
-        r *= 2
+        r = int(round(r * RUNG_STEP))
     print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
-    print("the top rung caps to the model's trained window when doubling overshoots (addendum 6)")
+    print(
+        "half rungs: x1.5 steps (addendum 7); the top rung caps to the trained window (addendum 6)"
+    )
     print("per-rung wall time printed (the time command is retired, session 34)")
     return 0
 
