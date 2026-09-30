@@ -1338,3 +1338,58 @@ options:
                         thinking disabled (chat-template kwargs
                         enable_thinking=false; first-turn dump check confirms
                         no reasoning appears)
+
+===== 2026-09-30T16:41:18 | full_benchmark.py --help =====
+usage: full_benchmark.py [-h] [--corpus CORPUS] [--reader-wps READER_WPS]
+                         [--models-dir MODELS_DIR] [--state-file STATE_FILE]
+                         [--results-file RESULTS_FILE] [--rung RUNG]
+                         [--roster ROSTER] [--dry-run] [--force] [--thinking]
+                         [--no-git] [--min-rung MIN_RUNG] [--no-thinking]
+                         families [families ...]
+
+end-to-end benchmark: acquire each family's Q8_0 rung and run the protocol v4
+ladder - the depth-scored ladder table is the ranking
+
+positional arguments:
+  families              family specs: "model_repo" or "model_repo=source_repo"
+
+options:
+  -h, --help            show this help message and exit
+  --corpus CORPUS
+  --reader-wps READER_WPS
+                        the k=1 guarantee line in WORDS per second: worst turn
+                        at the reference depth must never fall below this
+                        (default 5.0 w/s = 300 wpm, Brysbaert 2019 - match the
+                        fast reader)
+  --models-dir MODELS_DIR
+  --state-file STATE_FILE
+  --results-file RESULTS_FILE
+  --rung RUNG           the quant to benchmark (default Q8_0; e.g. Q4_K_M -
+                        session 34's context-over-parameters test)
+  --roster ROSTER       restrict the run's notes to these families (comma-
+                        separated, as named in the family specs); the state
+                        file accumulates across studies (addendum 41/56)
+  --dry-run             READ-ONLY pre-flight (addendum 79): lists every repo,
+                        verifies tooling, runs the RAM/disk feasibility checks
+                        and reports each family's acquisition plan WITHOUT
+                        downloading, converting, benching or touching the
+                        state file. THE WAY OF WORKING: always run the command
+                        with --dry-run first, read the pre-flight report, then
+                        issue it without.
+  --force               redo families that already have a selection
+  --thinking            thinking-model category: benchmark with thinking
+                        enabled (same worst-turn gate; reasoning measured
+                        descriptively). Use separate --state-file/--results-
+                        file for this category.
+  --no-git              skip the git tail (session 34 addendum 15: the commit-
+                        and-push of the run's artifacts is now DEFAULT - the
+                        git interface is layer 3, like the hub and llama.cpp;
+                        the old --git-commit opt-in is superseded)
+  --min-rung MIN_RUNG   session 34 (addendum 9/10): the ladder's first rung
+                        (default: the protocol v4 base 8192); stored in the
+                        state as ladder_min_rung so every subsequent run of
+                        the family climbs the same grid
+  --no-thinking         hybrid models, non-thinking category: run with
+                        thinking disabled (chat-template kwargs
+                        enable_thinking=false; first-turn dump check confirms
+                        no reasoning appears)

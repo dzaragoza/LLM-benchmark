@@ -82,6 +82,7 @@ def test_band_pred_form():
     assert 0.156 == pytest.approx(2 * 0.078)
 
 
-def test_fixed_rung_is_q8_0():
-    """Addendum 86: the rung walk is gone; one fixed rung exists."""
-    assert fb.RUNG == "Q8_0"
+def test_default_rung_is_q8_0():
+    """Addendum 86: the rung WALK is gone; one rung per run, default Q8_0
+    (session 34: --rung overrides it - the Q4 context-over-parameters test)."""
+    assert fb.RUNG_DEFAULT == "Q8_0"
