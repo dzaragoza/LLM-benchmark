@@ -142,4 +142,36 @@ def test_dry_run_no_local_file_does_not_assert(tmp_path, monkeypatch, capsys):
         force=False,
     )
     out = capsys.readouterr().out
-    assert "[3] would live-bench" in out
+    assert "[3] would run the PROTOCOL v4 ladder" in out
+
+
+def test_local_rung_shortcut_skips_the_hub(tmp_path, capsys, monkeypatch):
+    """Session 34 (addendum 4): a rung file already on disk means
+    acquisition is DONE - phases 1-2 marked from the local file, no
+    require_hub call, no repo listing. The hub is only a dependency
+    when the file must be acquired remotely."""
+
+    famdir = tmp_path / "Qwen-X"
+    famdir.mkdir()
+    (famdir / "Qwen-X-Q8_0.gguf").write_bytes(b"fake")
+    (tmp_path / "corpus.json").write_text("{}")
+    state = {"families": {}}
+
+    def _hub_must_not_run() -> None:
+        raise AssertionError("hub required")
+
+    monkeypatch.setattr(fb.hf_download, "require_hub", _hub_must_not_run)
+    fb.process_family(
+        "X/Qwen-X",
+        corpus=str(tmp_path / "corpus.json"),
+        models_dir=str(tmp_path),
+        state=state,
+        state_path=str(tmp_path / "state.json"),
+        dry_run=True,
+        force=False,
+    )
+    run = state["families"]["Qwen-X"]["runs"]["Q8_0"]
+    assert 1 in run["phases_done"] and 2 in run["phases_done"]
+    assert run["plan"] == "local file"
+    out = capsys.readouterr().out
+    assert "no download needed" in out
