@@ -100,6 +100,7 @@ import os
 import random
 import sys
 import time
+import urllib.error
 from typing import Any, NoReturn
 
 import llama_server
@@ -698,17 +699,45 @@ def bench_model(
                     f"(conversation alone fills the context - run "
                     "at the shallower reference depth as-is)"
                 )
-            res, conv_history = run_conversation(
-                port,
-                conv["user_turns"],
-                cap_tokens,
-                ctx,
-                thinking,
-                no_thinking,
-                blob,
-                blob_tokens,
-                reader_wps=reader_wps,
-            )
+            try:
+                res, conv_history = run_conversation(
+                    port,
+                    conv["user_turns"],
+                    cap_tokens,
+                    ctx,
+                    thinking,
+                    no_thinking,
+                    blob,
+                    blob_tokens,
+                    reader_wps=reader_wps,
+                )
+            except urllib.error.HTTPError as e:
+                # session 34 (addendum 31): the rung is below the
+                # conversation's floor - the conversation alone (plus
+                # template + answer room) exceeds ctx and llama-server
+                # rejects the whole prompt with 400. This is STRUCTURAL,
+                # not a model verdict: the family must not die on it
+                # (the addendum-29 acquisition deaths: granite-4.0-350m
+                # and phi-1_5 died on the FIRST turn's 400).
+                if e.code == 400 and blob is None:
+                    print(
+                        f"    conv {ci}: HTTP 400 with no blob budget - "
+                        f"the rung ({ctx}) is below the conversation "
+                        "floor (structural, not a model verdict)"
+                    )
+                    return (
+                        [
+                            {
+                                "turn": 0,
+                                "ctx": ctx,
+                                "error": "rung below conversation floor",
+                                "http_error": 400,
+                            }
+                        ],
+                        None,
+                        mem_reports,
+                    )
+                raise
             for r in res:
                 all_turns.append({"model": label, "conv": ci, "ctx": ctx, **r})
             tps = [r["server_tps"] for r in res if r["server_tps"]]
