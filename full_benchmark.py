@@ -1,76 +1,43 @@
 #!/usr/bin/env python3
 """full_benchmark.py -- the end-to-end benchmark orchestrator.
 
-One command, four stages, one final output: the RANKING of the selected
-models by strict ARC-Challenge score, with exact McNemar separation
-tests on every consecutive rank gap. This script owns the orchestration
-only - state/resume, the fixed Q8_0 rung (addendum 86: the rung walk is
-removed), and the final results file. Each stage lives in its own dedicated script (split from this
-file 2026-09-24; same protocol, same state, byte-identical behavior):
+One command: acquire each family's Q8_0 GGUF (fixed rung, addendum 86),
+then run the PROTOCOL v4 ladder (speed gate + FWE per rung, addendum 4)
+and print the depth-scored ladder table - the study's ranking. This
+script owns the orchestration only - state/resume and the final results
+file. Each stage lives in its own dedicated script:
 
-  hf_download.py  STAGE A phase 1: every Hugging Face interaction -
-                  premade rung file, f16 GGUF, or safetensors snapshot.
-  convert_quant.py STAGE A phase 2: everything that touches llama.cpp
-                  conversion tooling - safetensors -> f16, f16 -> rung.
-  speed_gate.py   STAGE A phases 3-4: the speed gate - the
-                  llama-server bench interface, mode-suffixed dumps,
-                  verdict (protocol v3.1: the reader-wall stall
-                  rate - the streaming gate simulates the reader on
-                  each turn's per-word arrival stream; a turn
-                  stalls iff the reader ever hits the wall; PASS
-                  iff <= 5% of turns stall, addendum 73).
-  arc_eval.py     STAGE B (phase 5): strict ARC-Challenge on every
-                  benched model (raw protocol, logprob letter scoring).
-  mcnemar.py      STAGE C (phase 6): pairwise exact McNemar; the final
-                  ranking with separation verdicts.
+  hf_download.py  every Hugging Face interaction - premade rung file,
+                  f16 GGUF, or safetensors snapshot.
+  convert_quant.py  everything that touches llama.cpp conversion tooling
+                  - safetensors -> f16, f16 -> rung.
+  speed_gate.py   the speed gate - the llama-server bench interface,
+                  dumps, and the protocol v3.1 stall-rate verdict.
+  ruler_gate.py   the FWE (frequent-words-extraction) cell.
 
-  STAGE A (phases 1-4, per family, fixed Q8_0 rung - addendum 86):
+  STAGE A (phases 1-4, per family, fixed Q8_0 rung):
     1. DOWNLOAD - premade rung file or the data to create it later.
     2. CREATE   - convert safetensors -> f16, quantize f16 -> rung.
-    3. BENCH    - speed_gate.py, 1 rep, worst-turn metric.
-    4. ANALYZE  - verdict (protocol v3.1, addendum 73): the
-                  reader-wall stall rate - the gate streams every
-                  turn and simulates the reader (reader_wps after
-                  REACTION_S); PASS iff at most 5% of turns stall
-                  the reader (a stall is counted, never aborted
-                  for - the rate needs its denominator); PASS =
-                  selected.
-  STAGE B (phase 5): strict ARC-Challenge on EVERY BENCHED model -
-    PASS or FAIL verdict, selected or not (addendum 86: ARC always,
-    the only skip is an already-complete CSV). FULL test split, 1172
-    questions; logprob letter scoring, temperature 0; per-question
-    CSVs in --arc-results-dir; the RANKING uses the selected models.
-  STAGE C (phase 6): pairwise exact McNemar; final output = ranking.
+    3. LADDER   - protocol v4: gallop 2x from the min rung, then binary
+                  search to 1024-token resolution (speed gate + FWE at
+                  every rung, the ceiling matrix 3.1/3.2/3.3, window
+                  from the launch banners).
+    4. SCORE    - the scored-rung row (worst-turn w/s + cold cost).
 
-Everything is IDEMPOTENT and RESUMABLE: ./benchmark-state.json is
-rewritten after every phase; rerun the same command to resume. Files
-are never re-downloaded/re-quantized; complete ARC CSVs are never
-re-run. Every failure stops the script with reader guidance.
+Everything is IDEMPOTENT and RESUMABLE: the state file is rewritten
+after every phase; rerun the same command to resume. Files are never
+re-downloaded/re-quantized. Every failure stops the script with reader
+guidance.
 
-Supersedes select-quant.py + strict-arc.py + paired-arc.py (removed
-2026-09-23 by author ruling; their final commits remain in git history).
-The ARC protocol is IDENTICAL to strict-arc.py: raw /v1/completions
-prompt, max_tokens=1, temperature=0, top-20 logprobs, port 8081,
--ngl 99, -c 2048, -t 8.
+ARC is RETIRED (session 34, addendum 22: the FWE ladder "demolishes arc
+as a measurement" - the depth score is the ranking; arc_eval.py and
+mcnemar.py are removed with it).
 
-Thinking-model category (author ruling 2026-09-24): benchmarked
-separately with --thinking (the SAME worst-turn gate and ARC protocol;
-reasoning tokens are measured descriptively - latency spent thinking
-is the user's informed choice and is NOT gated). Keep the category in
-its own --state-file/--results-file so rankings stay separate.
-
-Usage (from the repo root):
-    python3 full_benchmark.py --dry-run "Qwen/Qwen2.5-3B-Instruct-GGUF" ...
-    python3 full_benchmark.py "Qwen/Qwen2.5-3B-Instruct-GGUF" \\
-        "microsoft/Phi-3-mini-4k-instruct-gguf" \\
-        "meta-llama/Llama-3.2-3B-Instruct" \\
-        "google/gemma-3-4b-it-qat-q4_0-gguf=google/gemma-3-4b-it"
-
-  Hybrid non-thinking mode (--no-thinking): for hybrid models in the
-  non-thinking category - benchmarks with thinking disabled
-  (chat_template_kwargs enable_thinking=false; first-turn dump check
-  confirms no reasoning appears).
+Hybrid non-thinking mode (--no-thinking): for hybrid models in the
+non-thinking category - benchmarks with thinking disabled
+(chat_template_kwargs enable_thinking=false).
 """
+
 
 from __future__ import annotations
 
@@ -86,11 +53,9 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import arc_eval
 import convert_quant
 import hf_download
 import llama_server
-import mcnemar
 import ruler_gate
 import speed_gate
 import tee_output
@@ -158,7 +123,6 @@ def speed_pass(
         corpus,
         port,
         rung,
-        1,
         False,
         True,
         n_conversations=1,
@@ -483,24 +447,15 @@ RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # (quant out of scope, MODEL-SELECTION.md note). One fixed rung.
 RUNG = "Q8_0"
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
-ARC_NUM_DEFAULT = arc_eval.ARC_NUM_DEFAULT
-ARC_RESULTS_DIR_DEFAULT = arc_eval.ARC_RESULTS_DIR_DEFAULT
-ARC_PORT = arc_eval.ARC_PORT
 SERVER_BIN = llama_server.find_server()
 
 local_rung = hf_download.local_rung
 list_repo_files = hf_download.list_repo_files
-safe_label = arc_eval.safe_label
-arc_csv_path = arc_eval.arc_csv_path
-arc_csv_valid = arc_eval.arc_csv_valid
-load_questions = hf_download.load_questions
 GUIDE = {}
 GUIDE[1] = hf_download.GUIDE[1]
 GUIDE[2] = convert_quant.GUIDE[2]
 GUIDE[3] = speed_gate.GUIDE[3]
 GUIDE[4] = speed_gate.GUIDE[4]
-GUIDE[5] = arc_eval.GUIDE[5]
-GUIDE[6] = mcnemar.GUIDE[6]
 fail = hf_download.fail
 
 
@@ -562,30 +517,6 @@ def estimate_runtime(state: dict[str, Any]) -> tuple[dict[str, int], int]:
             counts[cls] = counts.get(cls, 0) + 1
             total += PLAN_COST_MIN[cls]
     return counts, total
-
-
-# =========================================================== arc jobs
-# Addendum 86: ARC runs on EVERY benched family (PASS or FAIL
-# verdict) with a file; the only skip is an already-complete CSV
-# (inside arc_eval.arc_run). Extracted from main() for the test suite
-# (addendum 87). Pure: state -> [(family, rung, run), ...].
-
-
-def collect_arc_jobs(
-    state: dict[str, Any], roster: list[str] | None = None
-) -> list[tuple[str, str, dict[str, Any]]]:
-    jobs = []
-    for fam, fst in state.get("families", {}).items():
-        if roster is not None and fam not in roster:
-            continue
-        for rung, run in fst.get("runs", {}).items():
-            if (
-                run.get("file")
-                and run.get("verdict")
-                and not str(run["verdict"]).startswith("FAIL (infeasible")
-            ):
-                jobs.append((fam, rung, run))
-    return jobs
 
 
 # =========================================================== state
@@ -709,91 +640,88 @@ def process_family(
         except Exception as e:
             fail(1, "-", f"cannot list repo files for {model_repo}: {e}", GUIDE[1])
 
-    for rung in [RUNG]:
-        run = fst["runs"].get(rung, {"phases_done": []})
-        fst["runs"][rung] = run
-        if str(run.get("verdict", "")).startswith("PASS"):
-            break
-        if run.get("verdict") == "FAIL":
-            continue
-        print(f"\n  rung {rung}:")
-        if 1 not in run["phases_done"]:
-            path, plan = hf_download.acquire(
-                fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run
-            )
-            run["plan"] = plan
-            run["phases_done"].append(1)
-            save_state(state_path, state)
-            if plan.startswith("infeasible"):
-                run["verdict"] = "FAIL (infeasible: exceeds system RAM)"
-                run["rung"] = rung
-                save_state(state_path, state)
-                continue
-            print(f"  [1] downloads ok  (plan: {plan})")
-            stamp("      phase 1 done (acquire)")
-        if 2 not in run["phases_done"]:
-            path = convert_quant.create(fam, famdir, rung, run.get("plan", ""), dry_run)
-            if path:
-                run["file"] = path
-            run["phases_done"].append(2)
-            save_state(state_path, state)
-            print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
-            stamp("      phase 2 done (create)")
-        path = run.get("file") or local_rung(famdir, rung)
-        if dry_run:
-            print(f"  [3] would run the PROTOCOL v4 ladder on {path or 'the rung file'}")
-            print(
-                "  [4] would record the ladder score (the deepest rung passing both; "
-                "scored-rung w/s + cold cost per addendum 137n/137m)"
-            )
-            continue
-        assert path is not None  # real runs: phases 1-2 guarantee it
-        # Session 34 (addendum 4): the 50-conv corpus wall is REPLACED
-        # by the PROTOCOL v4 ladder as the family's bench. Per rung:
-        # speed gate (n=1) then FWE (n=1); both pass -> score advances;
-        # either fails -> the ladder stops. The verdict is the ladder
-        # SCORE (0 = the counting floor / speed cliff at the base
-        # rung). The corpus-wall phases 3-4 are retired (the author:
-        # "we don't do 50 conv turns. We do run fwe as in ladder-bench").
-        if 3 not in run["phases_done"] or force:
-            ladder = run_ladder(
-                path,
-                corpus,
-                port=state.get("ladder_port", 8210),
-                results_dir=os.path.join(models_dir, "ladder-results"),
-                seed=state.get("ladder_seed", 1024),
-                min_rung=state.get("ladder_min_rung", RUNG_BASE),
-            )
-            run["ladder"] = ladder
-            run["phases_done"].append(3)
-            save_state(state_path, state)
-            print(f"  [3] ladder ok  (score: {ladder['score']} tokens)")
-            stamp("      phase 3 done (ladder)")
-        if 4 not in run["phases_done"]:
-            # phase 4: the scored-rung row (the 137n/137m anchors)
-            ladder = run.get("ladder")
-            if ladder:
-                row = scored_row(ladder)
-                run["verdict"] = f"PASS (ladder score {ladder['score']} tokens)"
-                run["rung"] = rung
-                run["score"] = ladder["score"]
-                run["worst"] = row["worst_wps"]
-                run["mem_cost_gib"] = row["cold_cost_gib"]
-                run["phases_done"].append(4)
-                save_state(state_path, state)
-                worst_txt = "n/a" if row["worst_wps"] is None else f"{row['worst_wps']:.1f}"
-                cost_txt = "n/a" if row["cold_cost_gib"] is None else f"{row['cold_cost_gib']:.2f}"
-                print(
-                    f"  [4] scored-rung row: depth {row['depth']} tokens, "
-                    f"worst {worst_txt} w/s, cold cost {cost_txt} GiB"
-                )
-                stamp("      phase 4 done (scored row)")
-        if str(run.get("verdict", "")).startswith("PASS"):
-            fst["selected"] = rung
+    rung = RUNG
+    run = fst["runs"].get(rung, {"phases_done": []})
+    fst["runs"][rung] = run
+    if str(run.get("verdict", "")).startswith("PASS") or run.get("verdict") == "FAIL":
+        return
+    print(f"\n  rung {rung}:")
+    if 1 not in run["phases_done"]:
+        path, plan = hf_download.acquire(
+            fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run
+        )
+        run["plan"] = plan
+        run["phases_done"].append(1)
+        save_state(state_path, state)
+        print(f"  [1] downloads ok  (plan: {plan})")
+        stamp("      phase 1 done (acquire)")
+        if plan.startswith("infeasible"):
+            run["verdict"] = "FAIL (infeasible: exceeds system RAM)"
             run["rung"] = rung
             save_state(state_path, state)
-            print(f"  SELECTED {rung} for {fam} (ladder score {run.get('score')} tokens)")
-            break
+            return
+    if 2 not in run["phases_done"]:
+        path = convert_quant.create(fam, famdir, rung, run.get("plan", ""), dry_run)
+        if path:
+            run["file"] = path
+        run["phases_done"].append(2)
+        save_state(state_path, state)
+        print(f"  [2] rung file ready  ({run.get('file', 'dry run')})")
+        stamp("      phase 2 done (create)")
+    path = run.get("file") or local_rung(famdir, rung)
+    if dry_run:
+        print(f"  [3] would run the PROTOCOL v4 ladder on {path or 'the rung file'}")
+        print(
+            "  [4] would record the ladder score (the deepest rung passing both; "
+            "scored-rung w/s + cold cost per addendum 137n/137m)"
+        )
+        return
+    assert path is not None  # real runs: phases 1-2 guarantee it
+    # Session 34 (addendum 4): the 50-conv corpus wall is REPLACED
+    # by the PROTOCOL v4 ladder as the family's bench. Per rung:
+    # speed gate (n=1) then FWE (n=1); both pass -> score advances;
+    # either fails -> the ladder stops. The verdict is the ladder
+    # SCORE (0 = the counting floor / speed cliff at the base
+    # rung). The corpus-wall phases 3-4 are retired (the author:
+    # "we don't do 50 conv turns. We do run fwe as in ladder-bench").
+    if 3 not in run["phases_done"] or force:
+        ladder = run_ladder(
+            path,
+            corpus,
+            port=state.get("ladder_port", 8210),
+            results_dir=os.path.join(models_dir, "ladder-results"),
+            seed=state.get("ladder_seed", 1024),
+            min_rung=state.get("ladder_min_rung", RUNG_BASE),
+        )
+        run["ladder"] = ladder
+        run["phases_done"].append(3)
+        save_state(state_path, state)
+        print(f"  [3] ladder ok  (score: {ladder['score']} tokens)")
+        stamp("      phase 3 done (ladder)")
+    if 4 not in run["phases_done"]:
+        # phase 4: the scored-rung row (the 137n/137m anchors)
+        ladder = run.get("ladder")
+        if ladder:
+            row = scored_row(ladder)
+            run["verdict"] = f"PASS (ladder score {ladder['score']} tokens)"
+            run["rung"] = rung
+            run["score"] = ladder["score"]
+            run["worst"] = row["worst_wps"]
+            run["mem_cost_gib"] = row["cold_cost_gib"]
+            run["phases_done"].append(4)
+            save_state(state_path, state)
+            worst_txt = "n/a" if row["worst_wps"] is None else f"{row['worst_wps']:.1f}"
+            cost_txt = "n/a" if row["cold_cost_gib"] is None else f"{row['cold_cost_gib']:.2f}"
+            print(
+                f"  [4] scored-rung row: depth {row['depth']} tokens, "
+                f"worst {worst_txt} w/s, cold cost {cost_txt} GiB"
+            )
+            stamp("      phase 4 done (scored row)")
+    if str(run.get("verdict", "")).startswith("PASS"):
+        fst["selected"] = rung
+        run["rung"] = rung
+        save_state(state_path, state)
+        print(f"  SELECTED {rung} for {fam} (ladder score {run.get('score')} tokens)")
 
 
 # =========================================================== main
@@ -801,8 +729,9 @@ def process_family(
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="end-to-end benchmark: quant selection, strict full "
-        "ARC, exact-McNemar ranking - one final output"
+        description="end-to-end benchmark: acquire each family's Q8_0 "
+        "rung and run the protocol v4 ladder - the depth-scored "
+        "ladder table is the ranking"
     )
     ap.add_argument(
         "families", nargs="+", help='family specs: "model_repo" or "model_repo=source_repo"'
@@ -821,22 +750,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
-        "--arc-num",
-        type=int,
-        default=ARC_NUM_DEFAULT,
-        help="ARC-Challenge questions (default: full 1172)",
-    )
-    ap.add_argument("--arc-results-dir", default=ARC_RESULTS_DIR_DEFAULT)
-    ap.add_argument("--arc-config", default="ARC-Challenge", choices=["ARC-Challenge", "ARC-Easy"])
-    ap.add_argument(
         "--roster",
         default=None,
-        help="restrict phases 5-6 and the ranking to these "
-        "families (comma-separated, as named in the "
-        "family specs); the state file accumulates "
-        "across studies - without this flag the "
-        "ranking defaults to the families named in "
-        "this run's command line (addendum 41/56)",
+        help="restrict the run's notes to these families "
+        "(comma-separated, as named in the family specs); "
+        "the state file accumulates across studies "
+        "(addendum 41/56)",
     )
     ap.add_argument(
         "--dry-run",
@@ -868,14 +787,6 @@ def build_parser() -> argparse.ArgumentParser:
         "commit-and-push of the run's artifacts is now DEFAULT - "
         "the git interface is layer 3, like the hub and llama.cpp; "
         "the old --git-commit opt-in is superseded)",
-    )
-    ap.add_argument(
-        "--arc",
-        action="store_true",
-        help="session 34 (addendum 4): run the ARC-Challenge phase "
-        "and the McNemar ranking after the ladders - OPTIONAL "
-        "(the ladder is the bench; ARC is a tiebreak at the author's "
-        "discretion)",
     )
     ap.add_argument(
         "--min-rung",
@@ -921,20 +832,14 @@ def main() -> None:
     failed_families = sweep_families(args, state)
 
     # Session 34 (addendum 4): the ladder is the bench; the scored
-    # table prints from the ladder results in state. ARC and the
-    # McNemar ranking are OPTIONAL after FWE (--arc).
-
+    # table prints from the ladder results in state (ARC and the
+    # McNemar ranking are retired - addendum 22).
     if args.dry_run:
         sys.exit(preflight_report(args, state, failed_families))
-
-    roster, selections, arc_jobs = prepare_phase56(args, state)
+    roster = prepare_roster(args)
     report_roster_notes(args, state, roster, failed_families)
     print_ladder_table(state)
-    if args.arc:
-        run_arc_phase(args, state, arc_jobs)
-        run_ranking(args, state, selections)
-    else:
-        print("\n--arc not given - skipping the ARC phase and the ranking (session 34 addendum 4)")
+    write_results(args, state)
     write_results(args, state)
 
     # ---- addendum 78, item 5 / session 34 addendum 15: the git tail -
@@ -1032,8 +937,8 @@ def preflight_report(
             hi = round(total_min * 1.3 / 60)
             print(
                 f"    TOTAL: ~{lo}-{hi} h for {len(args.families)} "
-                "families (bench 267 turns + ARC 1172 per cell; "
-                "acquisition dominates)"
+                "families (acquisition dominates; the v4 ladder "
+                "cost scales with how deep each model climbs)"
             )
         if failed_families:
             print(
@@ -1057,24 +962,11 @@ def preflight_report(
     return 0
 
 
-def prepare_phase56(
-    args: argparse.Namespace, state: dict[str, Any]
-) -> tuple[list[str], dict[str, dict[str, Any]], list[tuple[str, str, dict[str, Any]]]]:
-    """Roster, selections, and the ARC job list (addendum 86)."""
-    # ---- phases 5-6: full ARC on selected models, then the ranking
-    roster = (
-        [f.strip() for f in args.roster.split(",")]
-        if args.roster
-        else [os.path.basename(s.partition("=")[0].rstrip("/")) for s in args.families]
-    )
-    selections = {}
-    for fam, fst in state["families"].items():
-        if roster is not None and fam not in roster:
-            continue
-        if fst.get("selected") and fst["runs"][fst["selected"]].get("file"):
-            selections[fam] = fst["runs"][fst["selected"]]
-    arc_jobs = collect_arc_jobs(state, roster)
-    return roster, selections, arc_jobs
+def prepare_roster(args: argparse.Namespace) -> list[str]:
+    """The run's roster: the families named in this command (addendum 41/56)."""
+    if args.roster:
+        return [f.strip() for f in args.roster.split(",")]
+    return [os.path.basename(s.partition("=")[0].rstrip("/")) for s in args.families]
 
 
 def report_roster_notes(
@@ -1144,79 +1036,6 @@ def print_ladder_table(state: dict[str, Any]) -> None:
         )
 
 
-def run_arc_phase(
-    args: argparse.Namespace,
-    state: dict[str, Any],
-    arc_jobs: list[tuple[str, str, dict[str, Any]]],
-) -> None:
-    """Phase 5: full ARC on every benched model (addendum 86)."""
-    if arc_jobs:
-        print()
-        print("=" * 60)
-        stamp(
-            f"PHASE 5: full {args.arc_config} on every benched model "
-            f"({len(arc_jobs)} family rung(s), {args.arc_num} "
-            "questions each - addendum 86: ARC always, the only skip "
-            "is an already-complete CSV)"
-        )
-        questions = load_questions(args.arc_config, args.arc_num)
-        for fam, rung, run in arc_jobs:
-            label = f"{fam} {rung}"
-
-            def on_scored(lbl, score, _state=state, _sp=args.state_file):
-                _state.setdefault("arc", {})[lbl] = {
-                    "csv": arc_csv_path(args.arc_results_dir, lbl),
-                    "score": score,
-                }
-                save_state(_sp, _state)
-
-            try:
-                arc_eval.arc_run(
-                    label,
-                    run["file"],
-                    questions,
-                    args.arc_num,
-                    args.arc_results_dir,
-                    on_scored,
-                    False,
-                )
-                stamp(f"ARC done: {label}")
-            except SystemExit as e:
-                stamp(f"ARC FAILED: {label} ({e}; recorded; the sweep continues - addendum 78)")
-            except Exception as e:
-                stamp(f"ARC FAILED: {label} - {e!r} (recorded; the sweep continues - addendum 78)")
-    else:
-        print("\nno benched family rungs yet - skipping ARC phase")
-
-
-def run_ranking(
-    args: argparse.Namespace,
-    state: dict[str, Any],
-    selections: dict[str, dict[str, Any]],
-) -> None:
-    """Phase 6: exact-McNemar ranking over the SELECTED models."""
-    # ---- phase 6: the McNemar ranking over the SELECTED models
-    rank_labels = [f"{fam} {state['families'][fam]['selected']}" for fam in selections]
-    if rank_labels:
-        print()
-        stamp(f"PHASE 6: exact-McNemar ranking of the selected models ({len(rank_labels)})")
-        try:
-            ranking, scores, pairs = mcnemar.rank(rank_labels, args.arc_num, args.arc_results_dir)
-            state["ranking"] = {
-                "arc_num": args.arc_num,
-                "scores": {m: scores[m] for m in ranking},
-                "order": ranking,
-                "pairs": pairs,
-            }
-            save_state(args.state_file, state)
-        except SystemExit as e:
-            stamp(f"RANKING FAILED ({e}; recorded; the sweep continues)")
-        except Exception as e:
-            stamp(f"RANKING FAILED - {e!r} (recorded; the sweep continues)")
-    else:
-        print("\nno family has a selection yet - skipping the ranking")
-
-
 def write_results(args: argparse.Namespace, state: dict[str, Any]) -> None:
     """The results file: everything for later analysis."""
     # ---- results file: everything for later analysis
@@ -1233,7 +1052,7 @@ def write_results(args: argparse.Namespace, state: dict[str, Any]) -> None:
                 "selected": (dict(fst["runs"][sel], rung=sel) if sel else None),
             }
         )
-    doc = {"selection": results, "arc": state.get("arc", {}), "ranking": state.get("ranking")}
+    doc = {"selection": results}
     with open(args.results_file, "w") as f:
         json.dump(doc, f, indent=1)
     print(f"\nresume state -> {args.state_file}")
@@ -1266,7 +1085,7 @@ def print_wt_table(state: dict[str, Any]) -> None:
 
 
 def git_tail(args: argparse.Namespace) -> None:
-    stamp("committing artifacts to git (state, results, dumps, mem sidecars, ARC CSVs)")
+    stamp("committing artifacts to git (state, results, dumps, mem sidecars)")
     paths = [args.state_file, args.results_file, "results.txt"]
     # per-turn dumps + mem sidecars: the grading instrument's raw data
     # (p05, Delta, stall attribution, gen_words, memory shape) - small
@@ -1284,8 +1103,6 @@ def git_tail(args: argparse.Namespace) -> None:
         + glob.glob("ladder-results/*")
         + glob.glob("ruler-results/*")
     )
-    if os.path.isdir(args.arc_results_dir):
-        paths.append(args.arc_results_dir)
     existing = [p for p in paths if os.path.exists(p)]
     if not existing:
         stamp("nothing to commit - no artifacts found")
@@ -1301,7 +1118,7 @@ def git_tail(args: argparse.Namespace) -> None:
     msg = (
         f"benchmark artifacts {time.strftime('%Y-%m-%d %H:%M')} "
         "(addendum 78 auto-commit): state, results, per-turn dumps, "
-        "mem sidecars, ARC CSVs"
+        "mem sidecars, ladder dumps"
     )
     r = subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True)
     if r.returncode != 0:

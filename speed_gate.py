@@ -55,7 +55,6 @@ Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
     ladder to the TOP rung that still guarantees the reader (the old
     floor-20 gate was a headroom judgment and rejected rungs the
     guarantee admits).
-  - Qualifying tier: 1 rep (default). Final/podium numbers: --repeats 3.
 
 Thinking-model category (author ruling 2026-09-24): the SAME worst-turn
 gate applies (thinking tokens are generated at the same t/s); latency
@@ -122,7 +121,6 @@ READER_REACTION_S = 0.45  # reader reaction time, s: 0.25 s simple visual RT
 PORT_DEFAULT = 8077
 CTX_DEFAULT = 4096
 DEPTH_HEADROOM = 64
-REPEATS_DEFAULT = 1
 ARENA_DIR = "./arena/data"
 SAMPLE_OUT = "./arena/english_sample.json"
 SEED = 1024  # pre-registered; part of the protocol
@@ -629,7 +627,6 @@ def bench_model(
     corpus_file: str,
     port: int,
     ctx: int,
-    repeats: int,
     thinking: bool = False,
     no_thinking: bool = False,
     server_bin: str | None = None,
@@ -657,185 +654,171 @@ def bench_model(
     print(f"\n=== {label} ===")
     all_turns = []
     noise_records = []
-    repeat_worsts = []
     mem_reports = []
     log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
-    for rep in range(1, repeats + 1):
-        print(f"  [rep {rep}/{repeats}] starting server...", flush=True)
-        extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
-        if thinking:
-            extra += ["--reasoning-format", "deepseek"]
-        if no_thinking:
-            extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
-        mem_before = llama_server.system_memavailable_gib()
-        proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
-        try:
-            if not healthy:
-                print("  ERROR: server did not become healthy; skipping")
-                continue
-            actual_ctx = report_server_ctx(log_path, ctx)
-            if actual_ctx is None:
+    print("  starting server...", flush=True)
+    extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
+    if thinking:
+        extra += ["--reasoning-format", "deepseek"]
+    if no_thinking:
+        extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
+    mem_before = llama_server.system_memavailable_gib()
+    proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
+    try:
+        if not healthy:
+            print("  ERROR: server did not become healthy; skipping")
+            return all_turns, None, mem_reports
+        actual_ctx = report_server_ctx(log_path, ctx)
+        if actual_ctx is None:
+            print(
+                "  ERROR: could not read n_ctx from the server banner - "
+                "the gate refuses to bench blind (addendum 130e); "
+                f"see {log_path}"
+            )
+            return all_turns, None, mem_reports
+        if actual_ctx < ctx:
+            print(
+                f"  ERROR: server accepted -c {ctx} but runs n_ctx "
+                f"{actual_ctx} (slots/cap silently reduced it, "
+                "addendum 130e/130f) - the depth budget would "
+                "overflow and every deep turn would 400; see "
+                f"{log_path}"
+            )
+            return all_turns, None, mem_reports
+        pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
+        conv_worsts = []
+        for ci, conv in enumerate(conversations, 1):
+            budget = depth_budget(conv["user_turns"], cap_tokens, ctx, thinking)
+            blob, blob_tokens = build_blob(port, pool, budget)
+            if blob is None:
                 print(
-                    "  ERROR: could not read n_ctx from the server banner - "
-                    "the gate refuses to bench blind (addendum 130e); "
-                    f"see {log_path}"
+                    f"    conv {ci}: no blob budget left "
+                    f"(conversation alone fills the context - run "
+                    "at the shallower reference depth as-is)"
                 )
-                continue
-            if actual_ctx < ctx:
+            res, conv_history = run_conversation(
+                port,
+                conv["user_turns"],
+                cap_tokens,
+                ctx,
+                thinking,
+                no_thinking,
+                blob,
+                blob_tokens,
+                reader_wps=reader_wps,
+            )
+            for r in res:
+                all_turns.append({"model": label, "conv": ci, "ctx": ctx, **r})
+            tps = [r["server_tps"] for r in res if r["server_tps"]]
+            wps = [r["server_wps"] for r in res if r["server_wps"]]
+            evts = [r.get("catchup_events") or 0 for r in res]
+            cwait = [r.get("catchup_s") or 0.0 for r in res]
+            cworst = min(tps) if tps else None
+            cmean = sum(tps) / len(tps) if tps else None
+            conv_worsts.append(cworst)
+            print(
+                f"    conv {ci} (blob {blob_tokens} tok): turns t/s: "
+                + ", ".join(f"{x:.1f}" for x in tps)
+                + (f"   worst {cworst:.1f} (mean {cmean:.1f})" if cworst else "")
+            )
+            print(
+                "      reader wall (catch-up events): "
+                + ", ".join(str(e) for e in evts)
+                + (
+                    f"   [reader waited {max(cwait):.2f}s on the worst turn]"
+                    if max(cwait) > 0
+                    else "   [reader never waited]"
+                )
+            )
+            if wps:
+                line = reader_wps if reader_wps is not None else READER_WPS_DEFAULT
                 print(
-                    f"  ERROR: server accepted -c {ctx} but runs n_ctx "
-                    f"{actual_ctx} (slots/cap silently reduced it, "
-                    "addendum 130e/130f) - the depth budget would "
-                    "overflow and every deep turn would 400; see "
-                    f"{log_path}"
+                    "      words/s (diagnostic): "
+                    + ", ".join(f"{x:.1f}" for x in wps)
+                    + f"   (reader line {line:g} w/s)"
                 )
-                continue
-            pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
-            conv_worsts = []
-            for ci, conv in enumerate(conversations, 1):
-                budget = depth_budget(conv["user_turns"], cap_tokens, ctx, thinking)
-                blob, blob_tokens = build_blob(port, pool, budget)
-                if blob is None:
-                    print(
-                        f"    conv {ci}: no blob budget left "
-                        f"(conversation alone fills the context - run "
-                        "at the shallower reference depth as-is)"
-                    )
-                res, conv_history = run_conversation(
+            if thinking:
+                tk = [r["thinking_tokens_est"] for r in res]
+                empt = sum(r["answer_empty"] for r in res)
+                print(
+                    "      thinking tokens: "
+                    + ", ".join(str(x) for x in tk)
+                    + (f"   ({empt} empty answer(s))" if empt else "")
+                )
+            if not thinking and res and not any(r.get("gen_words") for r in res):
+                print(
+                    "      WARNING: every answer this conversation "
+                    "was EMPTY - words/s cannot be measured. A "
+                    "hybrid model in default mode thinks first; "
+                    "pass --no-thinking (non-thinking) or "
+                    "--thinking (thinking, with the 2048 allowance)"
+                )
+            try:
+                noise = noise_sample(
                     port,
-                    conv["user_turns"],
+                    conv_history,
                     cap_tokens,
                     ctx,
+                    blob_tokens,
                     thinking,
                     no_thinking,
-                    blob,
-                    blob_tokens,
-                    reader_wps=reader_wps,
+                    last_prompt_n=res[-1].get("prompt_n"),
+                    last_gen_tokens=res[-1].get("gen_tokens"),
                 )
-                for r in res:
-                    all_turns.append({"model": label, "conv": ci, "ctx": ctx, **r})
-                tps = [r["server_tps"] for r in res if r["server_tps"]]
-                wps = [r["server_wps"] for r in res if r["server_wps"]]
-                evts = [r.get("catchup_events") or 0 for r in res]
-                cwait = [r.get("catchup_s") or 0.0 for r in res]
-                cworst = min(tps) if tps else None
-                cmean = sum(tps) / len(tps) if tps else None
-                conv_worsts.append(cworst)
+            except Exception as e:
                 print(
-                    f"    conv {ci} (blob {blob_tokens} tok): turns t/s: "
-                    + ", ".join(f"{x:.1f}" for x in tps)
-                    + (f"   worst {cworst:.1f} (mean {cmean:.1f})" if cworst else "")
+                    f"      noise collection failed for conv {ci}: "
+                    f"{e} (recorded, conversation kept)"
                 )
-                print(
-                    "      reader wall (catch-up events): "
-                    + ", ".join(str(e) for e in evts)
-                    + (
-                        f"   [reader waited {max(cwait):.2f}s on the worst turn]"
-                        if max(cwait) > 0
-                        else "   [reader never waited]"
-                    )
-                )
-                if wps:
-                    line = reader_wps if reader_wps is not None else READER_WPS_DEFAULT
-                    print(
-                        "      words/s (diagnostic): "
-                        + ", ".join(f"{x:.1f}" for x in wps)
-                        + f"   (reader line {line:g} w/s)"
-                    )
-                if thinking:
-                    tk = [r["thinking_tokens_est"] for r in res]
-                    empt = sum(r["answer_empty"] for r in res)
-                    print(
-                        "      thinking tokens: "
-                        + ", ".join(str(x) for x in tk)
-                        + (f"   ({empt} empty answer(s))" if empt else "")
-                    )
-                if not thinking and res and not any(r.get("gen_words") for r in res):
-                    print(
-                        "      WARNING: every answer this conversation "
-                        "was EMPTY - words/s cannot be measured. A "
-                        "hybrid model in default mode thinks first; "
-                        "pass --no-thinking (non-thinking) or "
-                        "--thinking (thinking, with the 2048 allowance)"
-                    )
-                try:
-                    noise = noise_sample(
-                        port,
-                        conv_history,
-                        cap_tokens,
-                        ctx,
-                        blob_tokens,
-                        thinking,
-                        no_thinking,
-                        last_prompt_n=res[-1].get("prompt_n"),
-                        last_gen_tokens=res[-1].get("gen_tokens"),
-                    )
-                except Exception as e:
-                    print(
-                        f"      noise collection failed for conv {ci}: "
-                        f"{e} (recorded, conversation kept)"
-                    )
-                    noise = [{"sample": 0, "error": str(e)}]
-                for r in noise:
-                    noise_records.append({"model": label, "conv": ci, "ctx": ctx, **r})
-                ntps = [r["tps"] for r in noise if r.get("tps")]
-                if ntps:
-                    print("      noise at depth: " + ", ".join(f"{x:.1f}" for x in ntps))
+                noise = [{"sample": 0, "error": str(e)}]
+            for r in noise:
+                noise_records.append({"model": label, "conv": ci, "ctx": ctx, **r})
+            ntps = [r["tps"] for r in noise if r.get("tps")]
+            if ntps:
+                print("      noise at depth: " + ", ".join(f"{x:.1f}" for x in ntps))
 
-        finally:
-            peak = llama_server.peak_rss_gib(proc)
-            cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
-            llama_server.stop_server(proc, port)
-            file_gib = os.path.getsize(model) / (1024**3)
-            if peak is not None:
-                mem_reports.append(
-                    {
-                        "rep": rep,
-                        "peak_rss_gib": peak,
-                        "mem_cost_gib": cost,
-                        **(llama_server.parse_memory_log(log_path) or {}),
-                    }
-                )
-                note = (
-                    ""
-                    if (peak >= file_gib or cost is None)
-                    else " - SUSPECT undercount (below the file size; see mem_cost_gib)"
-                )
-                print(
-                    f"    memory: peak RSS {peak:.2f} GiB"
-                    + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
-                    + " (weights + KV + buffers + runtime; VmHWM + "
-                    "MemAvailable delta, addendum 36/40)" + note,
-                    flush=True,
-                )
-        wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
-        if wall_hits:
+    finally:
+        peak = llama_server.peak_rss_gib(proc)
+        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
+        llama_server.stop_server(proc, port)
+        file_gib = os.path.getsize(model) / (1024**3)
+        if peak is not None:
+            mem_reports.append(
+                {
+                    "rep": 1,
+                    "peak_rss_gib": peak,
+                    "mem_cost_gib": cost,
+                    **(llama_server.parse_memory_log(log_path) or {}),
+                }
+            )
+            note = (
+                ""
+                if (peak >= file_gib or cost is None)
+                else " - SUSPECT undercount (below the file size; see mem_cost_gib)"
+            )
             print(
-                f"  note: {wall_hits} wall-failing turn(s) recorded - "
-                "the verdict is the stall rate (protocol v3.1, "
-                "addendum 73; recomputed from deltas at analyze time)",
+                f"    memory: peak RSS {peak:.2f} GiB"
+                + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
+                + " (weights + KV + buffers + runtime; VmHWM + "
+                "MemAvailable delta, addendum 36/40)" + note,
                 flush=True,
             )
-        valid = [w for w in conv_worsts if w]
-        if valid:
-            rep_worst = min(valid)
-            repeat_worsts.append(rep_worst)
-            rep_mean_of_worsts = sum(valid) / len(valid)
-            print(
-                f"  rep {rep}: conversation worsts -> "
-                + ", ".join(f"{x:.1f}" for x in valid)
-                + f"   [rep worst {rep_worst:.1f}, "
-                f"avg-of-worsts {rep_mean_of_worsts:.1f}]"
-            )
-
+    wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
+    if wall_hits:
+        print(
+            f"  note: {wall_hits} wall-failing turn(s) recorded - "
+            "the verdict is the stall rate (protocol v3.1, "
+            "addendum 73; recomputed from deltas at analyze time)",
+            flush=True,
+        )
+    valid = [w for w in conv_worsts if w]
     summary = None
-    if repeat_worsts:
-        worst = min(repeat_worsts)
-        avg_worsts = sum(repeat_worsts) / len(repeat_worsts)
+    if valid:
+        worst = min(valid)
+        avg_worsts = sum(valid) / len(valid)
         print(
             f"\n  {label}: WORST TURN = {worst:.1f} t/s "
-            f"(min of {len(repeat_worsts)} reps; "
-            f"avg-of-rep-worsts {avg_worsts:.1f})"
+            f"(worst turn; avg-of-worsts {avg_worsts:.1f})"
         )
         summary = (label, worst, avg_worsts)
     if noise_records:
@@ -853,7 +836,7 @@ def bench_model(
         ]
         print(
             f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
-            f"across {len(peaks)} rep(s) - file "
+            f"- file "
             f"{os.path.getsize(model) / (1024**3):.2f} GiB, i.e. "
             f"{max(peaks) - os.path.getsize(model) / (1024**3):.2f} "
             "GiB beyond the file (KV + buffers + runtime)"
@@ -885,7 +868,6 @@ def bench(
     no_thinking: bool = False,
     port: int = PORT_DEFAULT,
     ctx: int = CTX_DEFAULT,
-    repeats: int = REPEATS_DEFAULT,
     dump_override: str | None = None,
     force: bool = False,
     reader_wps: float | None = None,
@@ -956,7 +938,6 @@ def bench(
         corpus,
         port,
         ctx,
-        repeats,
         thinking,
         no_thinking,
         label=label,
@@ -1157,12 +1138,6 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=PORT_DEFAULT)
     ap.add_argument("--ctx", type=int, default=CTX_DEFAULT)
     ap.add_argument(
-        "--repeats",
-        type=int,
-        default=REPEATS_DEFAULT,
-        help="qualifying tier default: 1 rep; use 3 for final podium numbers",
-    )
-    ap.add_argument(
         "--conversations",
         type=int,
         default=None,
@@ -1236,7 +1211,6 @@ def main() -> None:
         args.no_thinking,
         args.port,
         args.ctx,
-        args.repeats,
         args.dump,
         args.force,
         args.reader_wps,

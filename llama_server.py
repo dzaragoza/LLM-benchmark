@@ -5,7 +5,7 @@ Every script that needs a running llama-server goes through this
 module; none of them launches or kills the server process itself:
 
   - speed_gate.py   the worst-turn speed gate (live conversations)
-  - arc_eval.py     the strict ARC-Challenge evaluation
+  - ruler_gate.py   the RULER depth tasks (fwe - the depth score)
 
 It owns: binary resolution (repo-relative first, pre-reorg HOME
 fallback, llama-server.exe on Windows), server launch with a custom
