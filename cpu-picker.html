@@ -105,7 +105,6 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 var CANDIDATES = [
   { name: "Qwen3.5-4B",           size: 4.29, cost: 6.45,  costEst: false, wps: 8.0,  arc: 90.4, depth: 32768, family: "Qwen3.5" },
   { name: "Qwen3-4B",             size: 3.99, cost: 6.73,  costEst: false, wps: 6.7,  arc: 85.0, depth: 16384, family: "Qwen3" },
-  { name: "Qwen2.5-3B-Instruct",  size: 3.37, cost: 3.68,  costEst: false, wps: null,   arc: 76.1, depth: 0, family: "Qwen2.5" },
   { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.36,  costEst: false, wps: 22.6,  arc: 73.5, depth: 16384, family: "Qwen2.5" },
   { name: "Qwen3-1.7B",           size: 1.71, cost: 5.57,  costEst: false, wps: 7.7,  arc: 68.0, depth: 32768, family: "Qwen3" },
   { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.31,  costEst: false, wps: 21.3,  arc: 61.3, depth: 65536, family: "Qwen3.5" }
@@ -113,7 +112,9 @@ var CANDIDATES = [
 // depth = the v4 ladder score (tokens, addendum 138): the deepest rung at which the model
 // BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier (addendum 137h).
 // null = the ladder is still climbing that member; 0 = the counting floor (the 8k base
-// rung fails FWE, addendum 138). Qwen2.5-0.5B is removed from the pool (counting floor, 136f).
+// rung fails FWE, addendum 138). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
+// 136f) and Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - the
+// benchmark is not changed to fit a model; a refusing model is out).
 var CLASSES = [25.6, 51.2, 102.4];
 var REF_BW = 102.4, READER = 5.0;
 
