@@ -943,7 +943,7 @@ def main() -> None:
     # benchmark. layer 3 is the right place to have a git interface,
     # same as the hugging face interface and the llama-cpp interface");
     # --no-git opts out.
-    if not args.no_git and not args.dry_run:
+    if not args.no_git:
         tee_output.uninstall()  # results.txt is complete - stop writing before it is committed
         git_tail(args)
     stamp("run complete")
