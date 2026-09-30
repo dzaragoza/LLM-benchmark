@@ -70,7 +70,7 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 <div id="tables"></div>
 
 <div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the seven qwen lineage
+  <p><strong>How the recommendation is computed.</strong> Candidates are the measured members of the five studied lineages (qwen, granite, MiniCPM, Phi - session 34 addendum 33's f4k grid joins the qwen lineage
   members of the overnight sweep, each admitted on the <strong>v3.1 corpus wall</strong>
   (stall-rate verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates
   0.0&ndash;2.6%, all PASS, 50 conversations / 267 turns each) &mdash; the only models the
@@ -103,16 +103,29 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 // ladder lands (addendum 137n). cost = machine cost GiB
 // (MemAvailable delta), measured. costEst is vestigial (no candidate is estimated).
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2, depth: 65536, family: "Qwen3.5" },
-  { name: "Qwen3-4B",             size: 3.99, cost: 5.73,  costEst: false, wps: 5.9, depth: 16384, family: "Qwen3" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992, family: "Qwen2.5" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7, depth: 34816, family: "Qwen3" },
-  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.53,  costEst: false, wps: 21.3, depth: 105472, family: "Qwen3.5" }
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2,  depth: 65536,  family: "Qwen3.5" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992,  family: "Qwen2.5" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7,  depth: 34816,  family: "Qwen3" },
+  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.53,  costEst: false, wps: 21.3, depth: 105472, family: "Qwen3.5" },
+  { name: "granite-4.1-3b",       size: 3.37, cost: 4.64,  costEst: false, wps: 7.1,  depth: 16384,  family: "Granite" },
+  { name: "granite-3.2-2b",       size: 2.51, cost: 3.73,  costEst: false, wps: 13.1, depth: 15360,  family: "Granite" },
+  { name: "granite-3.1-2b",       size: 2.51, cost: 3.63,  costEst: false, wps: 13.1, depth: 12288,  family: "Granite" },
+  { name: "MiniCPM5-2B",          size: 2.50, cost: 2.86,  costEst: false, wps: 19.9, depth: 12288,  family: "MiniCPM" },
+  { name: "Qwen3-4B",             size: 3.98, cost: 5.52,  costEst: false, wps: 6.6,  depth: 8192,   family: "Qwen3" },
+  { name: "Phi-3.5-mini",         size: 3.78, cost: 6.52,  costEst: false, wps: 5.7,  depth: 7168,   family: "Phi" },
+  { name: "MiniCPM-1B-sft",       size: 1.35, cost: 1.39,  costEst: false, wps: 21.1, depth: 4096,    family: "MiniCPM" },
+  { name: "MiniCPM-2B-sft",       size: 2.70, cost: 4.52,  costEst: false, wps: 13.4, depth: 4096,    family: "MiniCPM" },
+  { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  costEst: false, wps: 10.7, depth: 4096,    family: "Granite" },
+  { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  costEst: false, wps: 12.4, depth: 4096,    family: "Granite" }
 ];
-// depth = the v4 ladder score (tokens, addendum 138): the deepest rung at which the model
-// BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier (addendum 137h).
-// null = the ladder is still climbing that member; 0 = the counting floor (the 8k base
-// rung fails FWE, addendum 138). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
+// depth = the v4.3 ladder score (tokens, addendum 138): the deepest rung at which the
+// model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier
+// (addendum 137h), floor 4096 (addendum 32, the corpus structural floor). The
+// granite/MiniCPM/Phi rows are the lineage-2 families measured on the f4k grid
+// (session 34, addendum 33); their w/s anchor is the deepest SPEED-MEASURED rung
+// (fwe-only binary-search midpoints launch no speed server, refinement 1.5).
+// Qwen3-4B's 8,192 supersedes its old 16,384 (the 5-7.5 w/s band fires at 8192 on
+// the f4k grid, addendum 33). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
 // 136f) and Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - the
 // benchmark is not changed to fit a model; a refusing model is out).
 var CLASSES = [25.6, 51.2, 102.4];
@@ -260,7 +273,7 @@ function pick() {
         " w/s \u2014 below the 5.0 reader line. These machines are served by classes below the study's floor tier; no recommendation is honest here.</div></div>";
     } else {
       html += "<div class=\"verdict none\"><h3>No measured model fits " + ram +
-        " GiB of RAM</h3><div>The smallest measured member (Qwen3.5-0.8B) needs 2.53 GiB of machine cost (cold, scored rung).</div></div>";
+        " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of machine cost (cold, scored rung).</div></div>";
     }
   }
   $("result").innerHTML = html;
