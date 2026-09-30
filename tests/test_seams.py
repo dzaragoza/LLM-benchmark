@@ -253,8 +253,8 @@ def test_run_ladder_window_from_the_banner_is_the_ceiling(tmp_path, monkeypatch)
         min_rung=16384,
     )
     assert ladder["failed"] is False
-    assert ladder["score"] == 18944
-    assert [c["rung"] for c in ladder["rungs"]] == [16384, 32768, 18432, 19456, 18944]
+    assert ladder["score"] == 18432
+    assert [c["rung"] for c in ladder["rungs"]] == [16384, 32768, 18432, 19456]
 
 
 def test_run_ladder_speed_fail_keeps_speed_in_the_search(tmp_path, monkeypatch):
@@ -321,7 +321,7 @@ def test_run_ladder_fwe_fail_drops_speed_in_the_search(tmp_path, monkeypatch):
     )
     assert ladder["score"] == 24576
     benched = [c["rung"] for c in ladder["rungs"]]
-    assert benched == [16384, 32768, 24576, 28672, 26624, 25600, 25088]
+    assert benched == [16384, 32768, 24576, 28672, 26624, 25600]
     assert ladder["failed"] is False
 
 
