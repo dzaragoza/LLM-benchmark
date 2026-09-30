@@ -1780,3 +1780,1124 @@ all data     -> benchmark-results-failed1k.json
   The state file was NOT modified and no files were downloaded (addendum 79).
   If the report is clean, issue the SAME command without
   --dry-run to start the real run.
+
+===== 2026-09-30T21:20:16 | full_benchmark.py ibm-granite/granite-3.0-2b-instruct ibm-granite/granite-3.1-2b-instruct ibm-granite/granite-3.2-2b-instruct ibm-granite/granite-4.0-1b ibm-granite/granite-4.0-350m ibm-granite/granite-4.0-h-350m ibm-granite/granite-4.0-micro ibm-granite/granite-4.2-3b microsoft/Phi-3-mini-4k-instruct microsoft/Phi-3.5-mini-instruct microsoft/phi-1 microsoft/phi-1_5 microsoft/phi-2 openbmb/MiniCPM-1B-sft-bf16 openbmb/MiniCPM-2B-sft-bf16 openbmb/MiniCPM3-4B-GGUF openbmb/MiniCPM4-0.5B openbmb/MiniCPM5-1B openbmb/MiniCPM5-2B Qwen3-4B-GGUF ibm-granite/granite-4.1-3b --state-file benchmark-state-f4k.json --results-file benchmark-results-f4k.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-09-30T21:20:16 +0m] family: granite-3.0-2b-instruct
+  model repo : ibm-granite/granite-3.0-2b-instruct
+  source repo: ibm-granite/granite-3.0-2b-instruct
+  folder     : ./models/granite-3.0-2b-instruct
+  [1] local rung file found - no download needed  (./models/granite-3.0-2b-instruct/granite-3.0-2b-instruct-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-3.0-2b-instruct/granite-3.0-2b-instruct-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-3.0-2b-instruct-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-3.0-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.022.058 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 24.8, 25.0, 24.7, 24.4   worst 24.4 (mean 24.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 19.6, 17.0, 16.4, 12.4   (reader line 5 w/s)
+      noise at depth: 24.3, 24.3
+    memory: mapped census 4.49 GiB mapped, 0.11 GiB resident (file 0.10 + anon 0.01; smaps, addendum 23), machine cost 2.63 GiB (MemAvailable delta)
+
+  granite-3.0-2b-instruct-Q8_0.gguf: WORST TURN = 24.4 t/s (worst turn; avg-of-worsts 24.4)
+  granite-3.0-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 24.31  mean 24.32  worst/mean 1.000  (n=2)
+  granite-3.0-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.11 GiB - file 2.61 GiB, i.e. -2.50 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [52s]
+    cold machine cost @ rung: 2.63 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('1. swucem\n2. nysskz\n3. tvjzpa')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [8s]
+
+=== granite-3.0-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.881.942 W llama_context: n_ctx_seq (8192) > n_ctx_train (4096) -- possible training context overflow
+    [server] 0.01.054.039 W srv    load_model: the slot context (8192) exceeds the training context of the model (4096) - capping
+    [server] 0.01.112.246 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 8192)
+  ERROR: server accepted -c 8192 but runs n_ctx 4096 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/granite-3.0-2b-instruct/granite-3.0-2b-instruct-Q8_0.gguf.server.log
+    memory: mapped census 4.18 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 3.27 GiB (MemAvailable delta)
+    trained window 4,096 caps the requested -c 8,192
+  rung 8192: speed FAIL [2s]
+    speed verdict: {"error": "capped to the window", "window_cap": 4096}
+    trained window 4,096 caps the requested -c 8,192 - the window is the ceiling
+  binary search between 4096 (pass) and 4096 (fail) - fwe only
+  granite-3.0-2b-instruct-Q8_0: SCORE = 4096 tokens (last rung passing both) [1.0 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-09-30T21:21:18 +1m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 12.4 w/s, cold cost 2.63 GiB
+[2026-09-30T21:21:18 +1m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-3.0-2b-instruct (ladder score 4096 tokens)
+
+============================================================
+[2026-09-30T21:21:18 +1m] family: granite-3.1-2b-instruct
+  model repo : ibm-granite/granite-3.1-2b-instruct
+  source repo: ibm-granite/granite-3.1-2b-instruct
+  folder     : ./models/granite-3.1-2b-instruct
+  [1] local rung file found - no download needed  (./models/granite-3.1-2b-instruct/granite-3.1-2b-instruct-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-3.1-2b-instruct/granite-3.1-2b-instruct-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-3.1-2b-instruct-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-3.1-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.063.136 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 25.1, 24.7, 24.4, 24.2   worst 24.2 (mean 24.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 16.7, 15.8, 15.9, 15.9   (reader line 5 w/s)
+      noise at depth: 24.0, 24.1
+    memory: mapped census 4.49 GiB mapped, 0.11 GiB resident (file 0.10 + anon 0.01; smaps, addendum 23), machine cost 2.68 GiB (MemAvailable delta)
+
+  granite-3.1-2b-instruct-Q8_0.gguf: WORST TURN = 24.2 t/s (worst turn; avg-of-worsts 24.2)
+  granite-3.1-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 24.04  mean 24.04  worst/mean 1.000  (n=2)
+  granite-3.1-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.11 GiB - file 2.51 GiB, i.e. -2.40 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [64s]
+    cold machine cost @ rung: 2.68 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('1. nysskz - 100 occurrences\n2. swucem - 95 occur')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [8s]
+
+=== granite-3.1-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.126.257 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6664 tok): turns t/s: 21.1, 20.8, 20.7, 20.6   worst 20.6 (mean 20.8)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.7, 13.6, 13.1, 14.8   (reader line 5 w/s)
+      noise at depth: 20.2, 20.4
+    memory: mapped census 4.81 GiB mapped, 0.12 GiB resident (file 0.10 + anon 0.02; smaps, addendum 23), machine cost 3.31 GiB (MemAvailable delta)
+
+  granite-3.1-2b-instruct-Q8_0.gguf: WORST TURN = 20.6 t/s (worst turn; avg-of-worsts 20.6)
+  granite-3.1-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 20.17  mean 20.27  worst/mean 0.995  (n=2)
+  granite-3.1-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 2.51 GiB, i.e. -2.39 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [66s]
+    cold machine cost @ rung: 3.31 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('To find the three most frequently appeared coded')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [23s]
+
+=== granite-3.1-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.250.956 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14859 tok): turns t/s: 16.7, 16.3, 16.4, 16.3   worst 16.3 (mean 16.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.5, 10.6, 10.6, 10.0   (reader line 5 w/s)
+      noise at depth: 16.0, 16.2
+    memory: mapped census 5.45 GiB mapped, 0.14 GiB resident (file 0.10 + anon 0.03; smaps, addendum 23), machine cost 3.84 GiB (MemAvailable delta)
+
+  granite-3.1-2b-instruct-Q8_0.gguf: WORST TURN = 16.3 t/s (worst turn; avg-of-worsts 16.3)
+  granite-3.1-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 16.02  mean 16.09  worst/mean 0.995  (n=2)
+  granite-3.1-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 2.51 GiB, i.e. -2.37 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [131s]
+    cold machine cost @ rung: 3.84 GiB
+  task 1/1 @ 16128 tok: 2/3 words -> MISS ('After analyzing the coded text, I have identifie')
+    fwe census: 0.13 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 16128: 0/1 -> FAIL [53s]
+  binary search between 8192 (pass) and 16384 (fail) - fwe only
+  task 1/1 @ 12032 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 12032: 1/1 -> PASS [35s]
+  task 1/1 @ 14080 tok: 2/3 words -> MISS ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 14080: 0/1 -> FAIL [43s]
+  task 1/1 @ 13056 tok: 1/3 words -> MISS ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 13056: 0/1 -> FAIL [39s]
+  granite-3.1-2b-instruct-Q8_0: SCORE = 12288 tokens (last rung passing both) [7.7 min wall, measured]
+  [3] ladder ok  (score: 12288 tokens)
+[2026-09-30T21:29:00 +9m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 12288 tokens, worst n/a w/s, cold cost 3.63 GiB
+[2026-09-30T21:29:00 +9m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-3.1-2b-instruct (ladder score 12288 tokens)
+
+============================================================
+[2026-09-30T21:29:00 +9m] family: granite-3.2-2b-instruct
+  model repo : ibm-granite/granite-3.2-2b-instruct
+  source repo: ibm-granite/granite-3.2-2b-instruct
+  folder     : ./models/granite-3.2-2b-instruct
+  [1] local rung file found - no download needed  (./models/granite-3.2-2b-instruct/granite-3.2-2b-instruct-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-3.2-2b-instruct/granite-3.2-2b-instruct-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-3.2-2b-instruct-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-3.2-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.030.273 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 24.6, 24.4, 24.2, 24.0   worst 24.0 (mean 24.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 15.7, 15.0, 14.4, 14.9   (reader line 5 w/s)
+      noise at depth: 23.8, 23.8
+    memory: mapped census 4.49 GiB mapped, 0.11 GiB resident (file 0.10 + anon 0.01; smaps, addendum 23), machine cost 3.14 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q8_0.gguf: WORST TURN = 24.0 t/s (worst turn; avg-of-worsts 24.0)
+  granite-3.2-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 23.77  mean 23.78  worst/mean 1.000  (n=2)
+  granite-3.2-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.11 GiB - file 2.51 GiB, i.e. -2.40 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [63s]
+    cold machine cost @ rung: 3.14 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('1. nysskz - 100 occurrences\n2. swucem - 95 occur')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [9s]
+
+=== granite-3.2-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.120.207 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6664 tok): turns t/s: 20.8, 20.6, 20.4, 20.2   worst 20.2 (mean 20.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.7, 13.1, 13.1, 13.1   (reader line 5 w/s)
+      noise at depth: 20.1, 20.1
+    memory: mapped census 4.81 GiB mapped, 0.12 GiB resident (file 0.10 + anon 0.02; smaps, addendum 23), machine cost 2.72 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q8_0.gguf: WORST TURN = 20.2 t/s (worst turn; avg-of-worsts 20.2)
+  granite-3.2-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 20.11  mean 20.11  worst/mean 1.000  (n=2)
+  granite-3.2-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 2.51 GiB, i.e. -2.39 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [86s]
+    cold machine cost @ rung: 2.72 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('To find the three most frequently appearing code')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [21s]
+
+=== granite-3.2-2b-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.245.984 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14859 tok): turns t/s: 16.9, 16.7, 16.6, 16.5   worst 16.5 (mean 16.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.0, 10.1, 9.4, 10.4   (reader line 5 w/s)
+      noise at depth: 16.4, 16.5
+    memory: mapped census 5.45 GiB mapped, 0.14 GiB resident (file 0.10 + anon 0.03; smaps, addendum 23), machine cost 3.74 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q8_0.gguf: WORST TURN = 16.5 t/s (worst turn; avg-of-worsts 16.5)
+  granite-3.2-2b-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 16.37  mean 16.41  worst/mean 0.997  (n=2)
+  granite-3.2-2b-instruct-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 2.51 GiB, i.e. -2.37 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [130s]
+    cold machine cost @ rung: 3.74 GiB
+  task 1/1 @ 16128 tok: 2/3 words -> MISS ('To find the three most frequently appearing code')
+    fwe census: 0.13 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 16128: 0/1 -> FAIL [52s]
+  binary search between 8192 (pass) and 16384 (fail) - fwe only
+  task 1/1 @ 12032 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 12032: 1/1 -> PASS [34s]
+  task 1/1 @ 14080 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 14080: 1/1 -> PASS [42s]
+  task 1/1 @ 15104 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 15104: 1/1 -> PASS [46s]
+  granite-3.2-2b-instruct-Q8_0: SCORE = 15360 tokens (last rung passing both) [8.0 min wall, measured]
+  [3] ladder ok  (score: 15360 tokens)
+[2026-09-30T21:37:02 +17m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 15360 tokens, worst n/a w/s, cold cost 3.73 GiB
+[2026-09-30T21:37:02 +17m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-3.2-2b-instruct (ladder score 15360 tokens)
+
+============================================================
+[2026-09-30T21:37:02 +17m] family: granite-4.0-1b
+  model repo : ibm-granite/granite-4.0-1b
+  source repo: ibm-granite/granite-4.0-1b
+  folder     : ./models/granite-4.0-1b
+  [1] local rung file found - no download needed  (./models/granite-4.0-1b/granite-4.0-1b-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.0-1b/granite-4.0-1b-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.0-1b-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.0-1b-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.904.293 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 35.9, 35.8, 35.8, 35.9   worst 35.8 (mean 35.9)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 0.1, 0.1, 0.1, 0.1   (reader line 5 w/s)
+      noise at depth: 35.8, 35.6
+    memory: mapped census 3.68 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 1.91 GiB (MemAvailable delta)
+
+  granite-4.0-1b-Q8_0.gguf: WORST TURN = 35.8 t/s (worst turn; avg-of-worsts 35.8)
+  granite-4.0-1b-Q8_0.gguf: NOISE AT DEPTH: worst 35.60  mean 35.72  worst/mean 0.997  (n=2)
+  granite-4.0-1b-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 1.62 GiB, i.e. -1.49 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed FAIL [44s]
+    cold machine cost @ rung: 1.91 GiB
+    speed verdict: {"worst": 0.11989529739949571, "mean": 0.12016219307765366, "sigma": 0.0, "threshold": 5.0, "verdict": "PASS (confident)", "stall_rate": 0.0, "stall_rate_max": 0.05, "wall_fail_turns": 0, "catchup_eve
+  granite-4.0-1b-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  granite-4.0-1b-Q8_0: SCORE = 0 tokens (last rung passing both) [0.7 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:37:47 +18m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:37:47 +18m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.0-1b (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:37:47 +18m] family: granite-4.0-350m
+  model repo : ibm-granite/granite-4.0-350m
+  source repo: ibm-granite/granite-4.0-350m
+  folder     : ./models/granite-4.0-350m
+  [1] local rung file found - no download needed  (./models/granite-4.0-350m/granite-4.0-350m-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.0-350m/granite-4.0-350m-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.0-350m-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.0-350m-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.497.277 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 121.9, 119.5, 116.8, 116.2   worst 116.2 (mean 118.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 58.4, 56.8, 55.5, 55.2   (reader line 5 w/s)
+      noise at depth: 109.3, 113.8
+    memory: mapped census 2.06 GiB mapped, 0.12 GiB resident (file 0.11 + anon 0.01; smaps, addendum 23), machine cost 0.28 GiB (MemAvailable delta)
+
+  granite-4.0-350m-Q8_0.gguf: WORST TURN = 116.2 t/s (worst turn; avg-of-worsts 116.2)
+  granite-4.0-350m-Q8_0.gguf: NOISE AT DEPTH: worst 109.30  mean 111.56  worst/mean 0.980  (n=2)
+  granite-4.0-350m-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 0.35 GiB, i.e. -0.23 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [14s]
+    cold machine cost @ rung: 0.28 GiB
+  task 1/1 @ 3840 tok: 0/3 words -> MISS ('The three most frequently appeared coded words a')
+    fwe census: 0.12 GiB resident (file 0.11 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [2s]
+  granite-4.0-350m-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  granite-4.0-350m-Q8_0: SCORE = 0 tokens (last rung passing both) [0.3 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:38:03 +18m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:38:03 +18m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.0-350m (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:38:03 +18m] family: granite-4.0-h-350m
+  model repo : ibm-granite/granite-4.0-h-350m
+  source repo: ibm-granite/granite-4.0-h-350m
+  folder     : ./models/granite-4.0-h-350m
+  [1] local rung file found - no download needed  (./models/granite-4.0-h-350m/granite-4.0-h-350m-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.0-h-350m/granite-4.0-h-350m-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.0-h-350m-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.0-h-350m-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.489.544 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 75.5, 102.2, 88.8, 88.5   worst 75.5 (mean 88.8)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 62.3, 55.4, 11.8, 11.9   (reader line 5 w/s)
+      noise at depth: 95.8, 96.2
+    memory: mapped census 2.23 GiB mapped, 0.38 GiB resident (file 0.26 + anon 0.11; smaps, addendum 23), machine cost 0.40 GiB (MemAvailable delta)
+
+  granite-4.0-h-350m-Q8_0.gguf: WORST TURN = 75.5 t/s (worst turn; avg-of-worsts 75.5)
+  granite-4.0-h-350m-Q8_0.gguf: NOISE AT DEPTH: worst 95.77  mean 95.97  worst/mean 0.998  (n=2)
+  granite-4.0-h-350m-Q8_0.gguf: MEMORY: peak RSS 0.38 GiB - file 0.34 GiB, i.e. 0.04 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [4s]
+    cold machine cost @ rung: 0.40 GiB
+  task 1/1 @ 3840 tok: 0/3 words -> MISS ('<|im_end|>')
+    fwe census: 0.16 GiB resident (file 0.12 + anon 0.05; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [3s]
+  granite-4.0-h-350m-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  granite-4.0-h-350m-Q8_0: SCORE = 0 tokens (last rung passing both) [0.1 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:38:10 +18m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:38:10 +18m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.0-h-350m (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:38:10 +18m] family: granite-4.0-micro
+  model repo : ibm-granite/granite-4.0-micro
+  source repo: ibm-granite/granite-4.0-micro
+  folder     : ./models/granite-4.0-micro
+  [1] local rung file found - no download needed  (./models/granite-4.0-micro/granite-4.0-micro-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.0-micro/granite-4.0-micro-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.0-micro-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.0-micro-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.672.597 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 18.8, 18.9, 18.6, 18.5   worst 18.5 (mean 18.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.0, 13.7, 14.5, 14.6   (reader line 5 w/s)
+      noise at depth: 18.3, 18.5
+    memory: mapped census 5.52 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 3.59 GiB (MemAvailable delta)
+
+  granite-4.0-micro-Q8_0.gguf: WORST TURN = 18.5 t/s (worst turn; avg-of-worsts 18.5)
+  granite-4.0-micro-Q8_0.gguf: NOISE AT DEPTH: worst 18.34  mean 18.43  worst/mean 0.995  (n=2)
+  granite-4.0-micro-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 3.37 GiB, i.e. -3.24 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [48s]
+    cold machine cost @ rung: 3.59 GiB
+  task 1/1 @ 3840 tok: 2/3 words -> MISS ('nysskz\nswucem\ncucjiw\n<|im_end|>')
+    fwe census: 0.12 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [10s]
+  granite-4.0-micro-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  granite-4.0-micro-Q8_0: SCORE = 0 tokens (last rung passing both) [1.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:39:07 +19m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:39:07 +19m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.0-micro (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:39:07 +19m] family: granite-4.2-3b
+  model repo : ibm-granite/granite-4.2-3b
+  source repo: ibm-granite/granite-4.2-3b
+  folder     : ./models/granite-4.2-3b
+  [1] local rung file found - no download needed  (./models/granite-4.2-3b/granite-4.2-3b-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.2-3b/granite-4.2-3b-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.2-3b-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.2-3b-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.585.723 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2575 tok): turns t/s: 18.9, 18.9, 18.6, 18.1   worst 18.1 (mean 18.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.1, 10.7, 10.7, 11.0   (reader line 5 w/s)
+      noise at depth: 18.4, 18.4
+    memory: mapped census 5.52 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 3.68 GiB (MemAvailable delta)
+
+  granite-4.2-3b-Q8_0.gguf: WORST TURN = 18.1 t/s (worst turn; avg-of-worsts 18.1)
+  granite-4.2-3b-Q8_0.gguf: NOISE AT DEPTH: worst 18.39  mean 18.40  worst/mean 0.999  (n=2)
+  granite-4.2-3b-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 3.63 GiB, i.e. -3.50 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [59s]
+    cold machine cost @ rung: 3.68 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('<think></think>swucem\nnysskz\ntvjzpa')
+    fwe census: 0.12 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [10s]
+
+=== granite-4.2-3b-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.496.194 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6663 tok): turns t/s: 17.0, 16.8, 16.7, 16.5   worst 16.5 (mean 16.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 9.9, 10.8, 10.2, 10.6   (reader line 5 w/s)
+      noise at depth: 16.5, 16.6
+    memory: mapped census 5.84 GiB mapped, 0.14 GiB resident (file 0.12 + anon 0.02; smaps, addendum 23), machine cost 3.99 GiB (MemAvailable delta)
+
+  granite-4.2-3b-Q8_0.gguf: WORST TURN = 16.5 t/s (worst turn; avg-of-worsts 16.5)
+  granite-4.2-3b-Q8_0.gguf: NOISE AT DEPTH: worst 16.51  mean 16.53  worst/mean 0.998  (n=2)
+  granite-4.2-3b-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 3.63 GiB, i.e. -3.49 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [86s]
+    cold machine cost @ rung: 3.99 GiB
+  task 1/1 @ 7936 tok: 0/3 words -> MISS ('<think></think>I cannot complete this task becau')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 7936: 0/1 -> FAIL [29s]
+  binary search between 4096 (pass) and 8192 (fail) - fwe only
+  task 1/1 @ 5888 tok: 0/3 words -> MISS ('<think></think>To solve this task, we are asked ')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 5888: 0/1 -> FAIL [22s]
+  task 1/1 @ 4864 tok: 0/3 words -> MISS ('<think></think>We are asked to:\n\n- Track the fre')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 4864: 0/1 -> FAIL [19s]
+  granite-4.2-3b-Q8_0: SCORE = 4096 tokens (last rung passing both) [3.8 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-09-30T21:42:53 +23m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 10.7 w/s, cold cost 3.68 GiB
+[2026-09-30T21:42:53 +23m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.2-3b (ladder score 4096 tokens)
+
+============================================================
+[2026-09-30T21:42:53 +23m] family: Phi-3-mini-4k-instruct
+  model repo : microsoft/Phi-3-mini-4k-instruct
+  source repo: microsoft/Phi-3-mini-4k-instruct
+  folder     : ./models/Phi-3-mini-4k-instruct
+  [1] local rung file found - no download needed  (./models/Phi-3-mini-4k-instruct/Phi-3-mini-4k-instruct-Q8_0.gguf)
+  [2] rung file ready  (./models/Phi-3-mini-4k-instruct/Phi-3-mini-4k-instruct-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: Phi-3-mini-4k-instruct-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Phi-3-mini-4k-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.860.076 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 14.8, 14.6, 14.3, 13.9   worst 13.9 (mean 14.4)
+      reader wall (catch-up events): 1, 3, 4, 3   [reader waited 14.75s on the worst turn]
+      words/s (diagnostic): 0.0, 1.7, 7.3, 5.5   (reader line 5 w/s)
+      noise at depth: 13.6, 13.6
+    memory: mapped census 6.80 GiB mapped, 0.10 GiB resident (file 0.09 + anon 0.01; smaps, addendum 23), machine cost 5.35 GiB (MemAvailable delta)
+  note: 4 wall-failing turn(s) recorded - the verdict is the stall rate (protocol v3.1, addendum 73; recomputed from deltas at analyze time)
+
+  Phi-3-mini-4k-instruct-Q8_0.gguf: WORST TURN = 13.9 t/s (worst turn; avg-of-worsts 13.9)
+  Phi-3-mini-4k-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 13.61  mean 13.61  worst/mean 1.000  (n=2)
+  Phi-3-mini-4k-instruct-Q8_0.gguf: MEMORY: peak RSS 0.10 GiB - file 3.78 GiB, i.e. -3.68 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed FAIL [96s]
+    cold machine cost @ rung: 5.35 GiB
+    speed verdict: {"worst": 0.049682904972980536, "mean": 3.6589629168580253, "sigma": 0.0, "threshold": 5.0, "verdict": "FAIL", "stall_rate": 1.0, "stall_rate_max": 0.05, "wall_fail_turns": 4, "catchup_events": 11, "w
+  Phi-3-mini-4k-instruct-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  Phi-3-mini-4k-instruct-Q8_0: SCORE = 0 tokens (last rung passing both) [1.6 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:44:28 +24m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:44:28 +24m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Phi-3-mini-4k-instruct (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:44:28 +24m] family: Phi-3.5-mini-instruct
+  model repo : microsoft/Phi-3.5-mini-instruct
+  source repo: microsoft/Phi-3.5-mini-instruct
+  folder     : ./models/Phi-3.5-mini-instruct
+  [1] local rung file found - no download needed  (./models/Phi-3.5-mini-instruct/Phi-3.5-mini-instruct-Q8_0.gguf)
+  [2] rung file ready  (./models/Phi-3.5-mini-instruct/Phi-3.5-mini-instruct-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: Phi-3.5-mini-instruct-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Phi-3.5-mini-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.652.538 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 14.8, 14.4, 14.0, 13.7   worst 13.7 (mean 14.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 8.8, 8.1, 9.0, 8.3   (reader line 5 w/s)
+      noise at depth: 13.4, 13.4
+    memory: mapped census 6.80 GiB mapped, 0.10 GiB resident (file 0.09 + anon 0.01; smaps, addendum 23), machine cost 5.38 GiB (MemAvailable delta)
+
+  Phi-3.5-mini-instruct-Q8_0.gguf: WORST TURN = 13.7 t/s (worst turn; avg-of-worsts 13.7)
+  Phi-3.5-mini-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 13.39  mean 13.39  worst/mean 1.000  (n=2)
+  Phi-3.5-mini-instruct-Q8_0.gguf: MEMORY: peak RSS 0.10 GiB - file 3.78 GiB, i.e. -3.68 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [110s]
+    cold machine cost @ rung: 5.38 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('1. nysskz\n2. swucem\n3. tvjzpa\n4. cucjiw\n5. eilpo')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [20s]
+
+=== Phi-3.5-mini-instruct-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.798.189 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6669 tok): turns t/s: 10.8, 10.5, 10.3, 10.2   worst 10.2 (mean 10.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.6, 6.9, 5.7, 7.1   (reader line 5 w/s)
+      noise at depth: 10.1, 10.1
+    memory: mapped census 8.31 GiB mapped, 0.12 GiB resident (file 0.09 + anon 0.03; smaps, addendum 23), machine cost 6.85 GiB (MemAvailable delta)
+
+  Phi-3.5-mini-instruct-Q8_0.gguf: WORST TURN = 10.2 t/s (worst turn; avg-of-worsts 10.2)
+  Phi-3.5-mini-instruct-Q8_0.gguf: NOISE AT DEPTH: worst 10.06  mean 10.06  worst/mean 1.000  (n=2)
+  Phi-3.5-mini-instruct-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 3.78 GiB, i.e. -3.66 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS (ceiling) [147s]
+    cold machine cost @ rung: 6.85 GiB
+  task 1/1 @ 7936 tok: 2/3 words -> MISS ('To find the three most frequently appeared coded')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.02; smaps)
+    fwe @ depth 7936: 0/1 -> FAIL [46s]
+  binary search between 4096 (pass) and 8192 (fail) - fwe only
+  task 1/1 @ 5888 tok: 3/3 words -> HIT ('nysskz, swucem, tvjzpa\n\n### Explanation:\nBy coun')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.01; smaps)
+    fwe @ depth 5888: 1/1 -> PASS [27s]
+  task 1/1 @ 6912 tok: 3/3 words -> HIT ('To track the frequency of each coded word, we ne')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.01; smaps)
+    fwe @ depth 6912: 1/1 -> PASS [38s]
+  Phi-3.5-mini-instruct-Q8_0: SCORE = 7168 tokens (last rung passing both) [6.5 min wall, measured]
+  [3] ladder ok  (score: 7168 tokens)
+[2026-09-30T21:50:56 +31m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 7168 tokens, worst n/a w/s, cold cost 6.52 GiB
+[2026-09-30T21:50:56 +31m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Phi-3.5-mini-instruct (ladder score 7168 tokens)
+
+============================================================
+[2026-09-30T21:50:56 +31m] family: phi-1
+  model repo : microsoft/phi-1
+  source repo: microsoft/phi-1
+  folder     : ./models/phi-1
+  [1] local rung file found - no download needed  (./models/phi-1/phi-1-Q8_0.gguf)
+  [2] rung file ready  (./models/phi-1/phi-1-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: phi-1-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== phi-1-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.530.480 W llama_context: n_ctx_seq (4096) > n_ctx_train (2048) -- possible training context overflow
+    [server] 0.00.683.690 W srv    load_model: the slot context (4096) exceeds the training context of the model (2048) - capping
+    [server] 0.00.730.127 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 2048, kv_unified = 'false'
+    [server] actual n_ctx = 2048 (requested 4096)
+  ERROR: server accepted -c 4096 but runs n_ctx 2048 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/phi-1/phi-1-Q8_0.gguf.server.log
+    memory: mapped census 3.02 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 1.90 GiB (MemAvailable delta)
+    trained window 2,048 caps the requested -c 4,096
+  rung 4096: speed FAIL [1s]
+    speed verdict: {"error": "capped to the window", "window_cap": 2048}
+    trained window 2,048 caps the requested -c 4,096 - the window is the ceiling
+  phi-1-Q8_0: FAILED - the ceiling (2,048) is at or below the 4,096 start rung; the model is out pending investigation
+  phi-1-Q8_0: SCORE = 0 tokens (last rung passing both) [0.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:50:57 +31m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:50:57 +31m]       phase 4 done (scored row)
+  SELECTED Q8_0 for phi-1 (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:50:57 +31m] family: phi-1_5
+  model repo : microsoft/phi-1_5
+  source repo: microsoft/phi-1_5
+  folder     : ./models/phi-1_5
+  [1] local rung file found - no download needed  (./models/phi-1_5/phi-1_5-Q8_0.gguf)
+  [2] rung file ready  (./models/phi-1_5/phi-1_5-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: phi-1_5-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== phi-1_5-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.486.845 W llama_context: n_ctx_seq (4096) > n_ctx_train (2048) -- possible training context overflow
+    [server] 0.00.629.731 W srv    load_model: the slot context (4096) exceeds the training context of the model (2048) - capping
+    [server] 0.00.677.221 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 2048, kv_unified = 'false'
+    [server] actual n_ctx = 2048 (requested 4096)
+  ERROR: server accepted -c 4096 but runs n_ctx 2048 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/phi-1_5/phi-1_5-Q8_0.gguf.server.log
+    memory: mapped census 3.02 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 1.84 GiB (MemAvailable delta)
+    trained window 2,048 caps the requested -c 4,096
+  rung 4096: speed FAIL [1s]
+    speed verdict: {"error": "capped to the window", "window_cap": 2048}
+    trained window 2,048 caps the requested -c 4,096 - the window is the ceiling
+  phi-1_5-Q8_0: FAILED - the ceiling (2,048) is at or below the 4,096 start rung; the model is out pending investigation
+  phi-1_5-Q8_0: SCORE = 0 tokens (last rung passing both) [0.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:50:59 +31m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:50:59 +31m]       phase 4 done (scored row)
+  SELECTED Q8_0 for phi-1_5 (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:50:59 +31m] family: phi-2
+  model repo : microsoft/phi-2
+  source repo: microsoft/phi-2
+  folder     : ./models/phi-2
+  [1] local rung file found - no download needed  (./models/phi-2/phi-2-Q8_0.gguf)
+  [2] rung file ready  (./models/phi-2/phi-2-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: phi-2-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== phi-2-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.832.579 W llama_context: n_ctx_seq (4096) > n_ctx_train (2048) -- possible training context overflow
+    [server] 0.01.131.157 W srv    load_model: the slot context (4096) exceeds the training context of the model (2048) - capping
+    [server] 0.01.223.953 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 2048, kv_unified = 'false'
+    [server] actual n_ctx = 2048 (requested 4096)
+  ERROR: server accepted -c 4096 but runs n_ctx 2048 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/phi-2/phi-2-Q8_0.gguf.server.log
+    memory: mapped census 4.96 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 3.78 GiB (MemAvailable delta)
+    trained window 2,048 caps the requested -c 4,096
+  rung 4096: speed FAIL [2s]
+    speed verdict: {"error": "capped to the window", "window_cap": 2048}
+    trained window 2,048 caps the requested -c 4,096 - the window is the ceiling
+  phi-2-Q8_0: FAILED - the ceiling (2,048) is at or below the 4,096 start rung; the model is out pending investigation
+  phi-2-Q8_0: SCORE = 0 tokens (last rung passing both) [0.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:51:00 +31m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:51:00 +31m]       phase 4 done (scored row)
+  SELECTED Q8_0 for phi-2 (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:51:00 +31m] family: MiniCPM-1B-sft-bf16
+  model repo : openbmb/MiniCPM-1B-sft-bf16
+  source repo: openbmb/MiniCPM-1B-sft-bf16
+  folder     : ./models/MiniCPM-1B-sft-bf16
+
+  rung Q8_0:
+  [1] downloads ok  (plan: quantize from local f16)
+[2026-09-30T21:51:00 +31m]       phase 1 done (acquire)
+  [2] quantizing MiniCPM-1B-sft-bf16-f16.gguf -> Q8_0 (output hidden; shown on error)
+  [2] rung file ready  (./models/MiniCPM-1B-sft-bf16/MiniCPM-1B-sft-bf16-Q8_0.gguf)
+[2026-09-30T21:51:03 +31m]       phase 2 done (create)
+
+=== ladder: MiniCPM-1B-sft-bf16-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM-1B-sft-bf16-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.769.424 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2570 tok): turns t/s: 33.5, 36.9, 36.6, 36.2   worst 33.5 (mean 35.8)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 21.1, 25.8, 27.2, 27.4   (reader line 5 w/s)
+      noise at depth: 35.9, 35.9
+    memory: mapped census 3.43 GiB mapped, 0.12 GiB resident (file 0.10 + anon 0.02; smaps, addendum 23), machine cost 1.39 GiB (MemAvailable delta)
+
+  MiniCPM-1B-sft-bf16-Q8_0.gguf: WORST TURN = 33.5 t/s (worst turn; avg-of-worsts 33.5)
+  MiniCPM-1B-sft-bf16-Q8_0.gguf: NOISE AT DEPTH: worst 35.88  mean 35.89  worst/mean 1.000  (n=2)
+  MiniCPM-1B-sft-bf16-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 1.35 GiB, i.e. -1.23 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [20s]
+    cold machine cost @ rung: 1.39 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('Based on the given code, the three most frequent')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [7s]
+
+=== MiniCPM-1B-sft-bf16-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.610.725 W llama_context: n_ctx_seq (8192) > n_ctx_train (4096) -- possible training context overflow
+    [server] 0.00.813.281 W srv    load_model: the slot context (8192) exceeds the training context of the model (4096) - capping
+    [server] 0.00.863.375 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 8192)
+  ERROR: server accepted -c 8192 but runs n_ctx 4096 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/MiniCPM-1B-sft-bf16/MiniCPM-1B-sft-bf16-Q8_0.gguf.server.log
+    memory: mapped census 3.15 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 1.73 GiB (MemAvailable delta)
+    trained window 4,096 caps the requested -c 8,192
+  rung 8192: speed FAIL [1s]
+    speed verdict: {"error": "capped to the window", "window_cap": 4096}
+    trained window 4,096 caps the requested -c 8,192 - the window is the ceiling
+  binary search between 4096 (pass) and 4096 (fail) - fwe only
+  MiniCPM-1B-sft-bf16-Q8_0: SCORE = 4096 tokens (last rung passing both) [0.5 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-09-30T21:51:31 +31m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 21.1 w/s, cold cost 1.39 GiB
+[2026-09-30T21:51:31 +31m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM-1B-sft-bf16 (ladder score 4096 tokens)
+
+============================================================
+[2026-09-30T21:51:31 +31m] family: MiniCPM-2B-sft-bf16
+  model repo : openbmb/MiniCPM-2B-sft-bf16
+  source repo: openbmb/MiniCPM-2B-sft-bf16
+  folder     : ./models/MiniCPM-2B-sft-bf16
+
+  rung Q8_0:
+  [1] downloads ok  (plan: quantize from local f16)
+[2026-09-30T21:51:32 +31m]       phase 1 done (acquire)
+  [2] quantizing MiniCPM-2B-sft-bf16-f16.gguf -> Q8_0 (output hidden; shown on error)
+  [2] rung file ready  (./models/MiniCPM-2B-sft-bf16/MiniCPM-2B-sft-bf16-Q8_0.gguf)
+[2026-09-30T21:51:36 +31m]       phase 2 done (create)
+
+=== ladder: MiniCPM-2B-sft-bf16-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM-2B-sft-bf16-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.440.044 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2575 tok): turns t/s: 18.7, 18.7, 18.3, 18.1   worst 18.1 (mean 18.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 15.3, 14.1, 14.1, 13.4   (reader line 5 w/s)
+      noise at depth: 18.3, 18.1
+    memory: mapped census 5.95 GiB mapped, 0.13 GiB resident (file 0.11 + anon 0.02; smaps, addendum 23), machine cost 4.52 GiB (MemAvailable delta)
+
+  MiniCPM-2B-sft-bf16-Q8_0.gguf: WORST TURN = 18.1 t/s (worst turn; avg-of-worsts 18.1)
+  MiniCPM-2B-sft-bf16-Q8_0.gguf: NOISE AT DEPTH: worst 18.11  mean 18.21  worst/mean 0.995  (n=2)
+  MiniCPM-2B-sft-bf16-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 2.70 GiB, i.e. -2.57 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [32s]
+    cold machine cost @ rung: 4.52 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('Based on the frequency of each coded word, the m')
+    fwe census: 0.12 GiB resident (file 0.11 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [15s]
+
+=== MiniCPM-2B-sft-bf16-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.052.481 W llama_context: n_ctx_seq (8192) > n_ctx_train (4096) -- possible training context overflow
+    [server] 0.01.637.321 W srv    load_model: the slot context (8192) exceeds the training context of the model (4096) - capping
+    [server] 0.01.763.536 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 8192)
+  ERROR: server accepted -c 8192 but runs n_ctx 4096 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/MiniCPM-2B-sft-bf16/MiniCPM-2B-sft-bf16-Q8_0.gguf.server.log
+    memory: mapped census 6.80 GiB mapped, 0.10 GiB resident (file 0.10 + anon 0.00; smaps, addendum 23), machine cost 5.93 GiB (MemAvailable delta)
+    trained window 4,096 caps the requested -c 8,192
+  rung 8192: speed FAIL [2s]
+    speed verdict: {"error": "capped to the window", "window_cap": 4096}
+    trained window 4,096 caps the requested -c 8,192 - the window is the ceiling
+  binary search between 4096 (pass) and 4096 (fail) - fwe only
+  MiniCPM-2B-sft-bf16-Q8_0: SCORE = 4096 tokens (last rung passing both) [0.8 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-09-30T21:52:26 +32m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 13.4 w/s, cold cost 4.52 GiB
+[2026-09-30T21:52:26 +32m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM-2B-sft-bf16 (ladder score 4096 tokens)
+
+============================================================
+[2026-09-30T21:52:26 +32m] family: MiniCPM3-4B-GGUF
+  model repo : openbmb/MiniCPM3-4B-GGUF
+  source repo: openbmb/MiniCPM3-4B-GGUF
+  folder     : ./models/MiniCPM3-4B-GGUF
+  [1] local rung file found - no download needed  (./models/MiniCPM3-4B-GGUF/MiniCPM3-4B-GGUF-Q8_0.gguf)
+  [2] rung file ready  (./models/MiniCPM3-4B-GGUF/MiniCPM3-4B-GGUF-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: MiniCPM3-4B-GGUF-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM3-4B-GGUF-Q8_0.gguf ===
+  starting server...
+    [server] 0.02.194.209 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2570 tok): turns t/s: 10.8, 11.3, 11.1, 10.9   worst 10.8 (mean 11.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 7.1, 8.4, 8.0, 4.2   (reader line 5 w/s)
+      noise at depth: 10.9, 11.0
+    memory: mapped census 8.89 GiB mapped, 0.12 GiB resident (file 0.11 + anon 0.01; smaps, addendum 23), machine cost 7.14 GiB (MemAvailable delta)
+
+  MiniCPM3-4B-GGUF-Q8_0.gguf: WORST TURN = 10.8 t/s (worst turn; avg-of-worsts 10.8)
+  MiniCPM3-4B-GGUF-Q8_0.gguf: NOISE AT DEPTH: worst 10.90  mean 10.94  worst/mean 0.997  (n=2)
+  MiniCPM3-4B-GGUF-Q8_0.gguf: MEMORY: peak RSS 0.12 GiB - file 4.03 GiB, i.e. -3.91 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed FAIL [43s]
+    cold machine cost @ rung: 7.14 GiB
+    speed verdict: {"worst": 4.231827896240971, "mean": 6.908817076795277, "sigma": 0.0, "threshold": 5.0, "verdict": "PASS (confident)", "stall_rate": 0.0, "stall_rate_max": 0.05, "wall_fail_turns": 0, "catchup_events"
+  MiniCPM3-4B-GGUF-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  MiniCPM3-4B-GGUF-Q8_0: SCORE = 0 tokens (last rung passing both) [0.7 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:53:10 +33m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:53:10 +33m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM3-4B-GGUF (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:53:10 +33m] family: MiniCPM4-0.5B
+  model repo : openbmb/MiniCPM4-0.5B
+  source repo: openbmb/MiniCPM4-0.5B
+  folder     : ./models/MiniCPM4-0.5B
+  [1] local rung file found - no download needed  (./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q8_0.gguf)
+  [2] rung file ready  (./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: MiniCPM4-0.5B-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM4-0.5B-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.358.951 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2570 tok): turns t/s: 104.2, 113.7, 113.4, 91.9   worst 91.9 (mean 105.8)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 58.5, 87.4, 86.0, 59.9   (reader line 5 w/s)
+      noise at depth: 116.9, 110.6
+    memory: mapped census 2.03 GiB mapped, 0.11 GiB resident (file 0.09 + anon 0.02; smaps, addendum 23), machine cost 0.17 GiB (MemAvailable delta)
+
+  MiniCPM4-0.5B-Q8_0.gguf: WORST TURN = 91.9 t/s (worst turn; avg-of-worsts 91.9)
+  MiniCPM4-0.5B-Q8_0.gguf: NOISE AT DEPTH: worst 110.56  mean 113.75  worst/mean 0.972  (n=2)
+  MiniCPM4-0.5B-Q8_0.gguf: MEMORY: peak RSS 0.11 GiB - file 0.43 GiB, i.e. -0.32 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [4s]
+    cold machine cost @ rung: 0.17 GiB
+  task 1/1 @ 3840 tok: 0/3 words -> MISS ('')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [2s]
+  MiniCPM4-0.5B-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  MiniCPM4-0.5B-Q8_0: SCORE = 0 tokens (last rung passing both) [0.1 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:53:15 +33m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:53:15 +33m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM4-0.5B (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:53:15 +33m] family: MiniCPM5-1B
+  model repo : openbmb/MiniCPM5-1B
+  source repo: openbmb/MiniCPM5-1B
+  folder     : ./models/MiniCPM5-1B
+  [1] local rung file found - no download needed  (./models/MiniCPM5-1B/MiniCPM5-1B-Q8_0.gguf)
+  [2] rung file ready  (./models/MiniCPM5-1B/MiniCPM5-1B-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: MiniCPM5-1B-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM5-1B-Q8_0.gguf ===
+  starting server...
+    [server] 0.00.718.777 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2572 tok): turns t/s: 68.3, 67.7, 66.8, 67.2   worst 66.8 (mean 67.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 17.4, 22.9, 22.6, 33.5   (reader line 5 w/s)
+      noise at depth: 67.2, 67.2
+    memory: mapped census 2.68 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 1.18 GiB (MemAvailable delta)
+
+  MiniCPM5-1B-Q8_0.gguf: WORST TURN = 66.8 t/s (worst turn; avg-of-worsts 66.8)
+  MiniCPM5-1B-Q8_0.gguf: NOISE AT DEPTH: worst 67.15  mean 67.19  worst/mean 0.999  (n=2)
+  MiniCPM5-1B-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 1.07 GiB, i.e. -0.95 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [25s]
+    cold machine cost @ rung: 1.18 GiB
+  task 1/1 @ 3840 tok: 0/3 words -> MISS ('**Read the following code coded text and track t')
+    fwe census: 0.12 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [5s]
+  MiniCPM5-1B-Q8_0: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  MiniCPM5-1B-Q8_0: SCORE = 0 tokens (last rung passing both) [0.5 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-09-30T21:53:45 +33m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-09-30T21:53:45 +33m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM5-1B (ladder score 0 tokens)
+
+============================================================
+[2026-09-30T21:53:45 +33m] family: MiniCPM5-2B
+  model repo : openbmb/MiniCPM5-2B
+  source repo: openbmb/MiniCPM5-2B
+  folder     : ./models/MiniCPM5-2B
+  [1] local rung file found - no download needed  (./models/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf)
+  [2] rung file ready  (./models/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: MiniCPM5-2B-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM5-2B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.119.650 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2572 tok): turns t/s: 28.7, 28.7, 28.4, 28.4   worst 28.4 (mean 28.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 23.1, 23.6, 23.0, 23.1   (reader line 5 w/s)
+      noise at depth: 28.2, 28.4
+    memory: mapped census 4.23 GiB mapped, 0.14 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 2.30 GiB (MemAvailable delta)
+
+  MiniCPM5-2B-Q8_0.gguf: WORST TURN = 28.4 t/s (worst turn; avg-of-worsts 28.4)
+  MiniCPM5-2B-Q8_0.gguf: NOISE AT DEPTH: worst 28.17  mean 28.26  worst/mean 0.997  (n=2)
+  MiniCPM5-2B-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 2.50 GiB, i.e. -2.36 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [49s]
+    cold machine cost @ rung: 2.30 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('<think>\nWe need to read the coded text and track')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [11s]
+
+=== MiniCPM5-2B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.158.846 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6667 tok): turns t/s: 26.5, 26.3, 26.1, 26.1   worst 26.1 (mean 26.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 21.3, 19.9, 20.4, 20.8   (reader line 5 w/s)
+      noise at depth: 26.0, 25.9
+    memory: mapped census 4.40 GiB mapped, 0.15 GiB resident (file 0.12 + anon 0.02; smaps, addendum 23), machine cost 2.79 GiB (MemAvailable delta)
+
+  MiniCPM5-2B-Q8_0.gguf: WORST TURN = 26.1 t/s (worst turn; avg-of-worsts 26.1)
+  MiniCPM5-2B-Q8_0.gguf: NOISE AT DEPTH: worst 25.87  mean 25.93  worst/mean 0.998  (n=2)
+  MiniCPM5-2B-Q8_0.gguf: MEMORY: peak RSS 0.15 GiB - file 2.50 GiB, i.e. -2.35 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [55s]
+    cold machine cost @ rung: 2.79 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('<think>\nWe have a large block of coded text. The')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [19s]
+
+=== MiniCPM5-2B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.230.122 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14862 tok): turns t/s: 22.8, 22.7, 22.7, 22.4   worst 22.4 (mean 22.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 18.8, 18.0, 18.8, 18.0   (reader line 5 w/s)
+      noise at depth: 22.5, 22.5
+    memory: mapped census 4.75 GiB mapped, 0.16 GiB resident (file 0.13 + anon 0.04; smaps, addendum 23), machine cost 3.06 GiB (MemAvailable delta)
+
+  MiniCPM5-2B-Q8_0.gguf: WORST TURN = 22.4 t/s (worst turn; avg-of-worsts 22.4)
+  MiniCPM5-2B-Q8_0.gguf: NOISE AT DEPTH: worst 22.48  mean 22.48  worst/mean 1.000  (n=2)
+  MiniCPM5-2B-Q8_0.gguf: MEMORY: peak RSS 0.16 GiB - file 2.50 GiB, i.e. -2.33 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [95s]
+    cold machine cost @ rung: 3.06 GiB
+  task 1/1 @ 16128 tok: 0/3 words -> MISS ('<think>\nWe are given a large block of text that ')
+    fwe census: 0.15 GiB resident (file 0.13 + anon 0.02; smaps)
+    fwe @ depth 16128: 0/1 -> FAIL [45s]
+  binary search between 8192 (pass) and 16384 (fail) - fwe only
+  task 1/1 @ 12032 tok: 3/3 words -> HIT ('<think>\nWe need to read the given coded text and')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 12032: 1/1 -> PASS [31s]
+  task 1/1 @ 14080 tok: 0/3 words -> MISS ('<think>\nWe are given a large block of text that ')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.02; smaps)
+    fwe @ depth 14080: 0/1 -> FAIL [37s]
+  task 1/1 @ 13056 tok: 0/3 words -> MISS ('<think>\nWe are given a large block of text that ')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.02; smaps)
+    fwe @ depth 13056: 0/1 -> FAIL [34s]
+  MiniCPM5-2B-Q8_0: SCORE = 12288 tokens (last rung passing both) [6.3 min wall, measured]
+  [3] ladder ok  (score: 12288 tokens)
+[2026-09-30T22:00:01 +40m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 12288 tokens, worst n/a w/s, cold cost 2.86 GiB
+[2026-09-30T22:00:01 +40m]       phase 4 done (scored row)
+  SELECTED Q8_0 for MiniCPM5-2B (ladder score 12288 tokens)
+
+============================================================
+[2026-09-30T22:00:01 +40m] family: Qwen3-4B-GGUF
+  model repo : Qwen3-4B-GGUF
+  source repo: Qwen3-4B-GGUF
+  folder     : ./models/Qwen3-4B-GGUF
+  [1] local rung file found - no download needed  (./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf)
+  [2] rung file ready  (./models/Qwen3-4B-GGUF/Qwen3-4B-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: Qwen3-4B-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3-4B-Q8_0.gguf ===
+  starting server...
+    [server] 0.02.115.031 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 15.6, 15.5, 15.3, 15.1   worst 15.1 (mean 15.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 9.1, 9.5, 8.8, 9.3   (reader line 5 w/s)
+      noise at depth: 15.0, 15.0
+    memory: mapped census 6.54 GiB mapped, 0.14 GiB resident (file 0.13 + anon 0.01; smaps, addendum 23), machine cost 5.05 GiB (MemAvailable delta)
+
+  Qwen3-4B-Q8_0.gguf: WORST TURN = 15.1 t/s (worst turn; avg-of-worsts 15.1)
+  Qwen3-4B-Q8_0.gguf: NOISE AT DEPTH: worst 14.97  mean 14.98  worst/mean 1.000  (n=2)
+  Qwen3-4B-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 3.99 GiB, i.e. -3.85 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [97s]
+    cold machine cost @ rung: 5.05 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('nysskz, swucem, tvjzpa')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [12s]
+
+=== Qwen3-4B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.954.430 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6669 tok): turns t/s: 13.7, 13.5, 13.3, 13.2   worst 13.2 (mean 13.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 8.6, 8.4, 7.3, 6.6   (reader line 5 w/s)
+      noise at depth: 13.2, 13.2
+    memory: mapped census 7.12 GiB mapped, 0.15 GiB resident (file 0.13 + anon 0.02; smaps, addendum 23), machine cost 5.52 GiB (MemAvailable delta)
+
+  Qwen3-4B-Q8_0.gguf: WORST TURN = 13.2 t/s (worst turn; avg-of-worsts 13.2)
+  Qwen3-4B-Q8_0.gguf: NOISE AT DEPTH: worst 13.15  mean 13.16  worst/mean 1.000  (n=2)
+  Qwen3-4B-Q8_0.gguf: MEMORY: peak RSS 0.15 GiB - file 3.99 GiB, i.e. -3.83 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS (ceiling) [131s]
+    cold machine cost @ rung: 5.52 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('To determine the three most frequently appeared ')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [44s]
+  Qwen3-4B-Q8_0: SCORE = 8192 tokens (last rung passing both) [4.7 min wall, measured]
+  [3] ladder ok  (score: 8192 tokens)
+[2026-09-30T22:04:45 +44m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 8192 tokens, worst 6.6 w/s, cold cost 5.52 GiB
+[2026-09-30T22:04:45 +44m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Qwen3-4B-GGUF (ladder score 8192 tokens)
+
+============================================================
+[2026-09-30T22:04:45 +44m] family: granite-4.1-3b
+  model repo : ibm-granite/granite-4.1-3b
+  source repo: ibm-granite/granite-4.1-3b
+  folder     : ./models/granite-4.1-3b
+  [1] local rung file found - no download needed  (./models/granite-4.1-3b/granite-4.1-3b-Q8_0.gguf)
+  [2] rung file ready  (./models/granite-4.1-3b/granite-4.1-3b-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: granite-4.1-3b-Q8_0 ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.1-3b-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.397.094 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 18.7, 18.8, 18.6, 18.2   worst 18.2 (mean 18.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 14.8, 10.2, 10.1, 13.4   (reader line 5 w/s)
+      noise at depth: 18.5, 18.5
+    memory: mapped census 5.52 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 3.67 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q8_0.gguf: WORST TURN = 18.2 t/s (worst turn; avg-of-worsts 18.2)
+  granite-4.1-3b-Q8_0.gguf: NOISE AT DEPTH: worst 18.47  mean 18.49  worst/mean 0.999  (n=2)
+  granite-4.1-3b-Q8_0.gguf: MEMORY: peak RSS 0.13 GiB - file 3.37 GiB, i.e. -3.24 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [45s]
+    cold machine cost @ rung: 3.67 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('nysskz\nswucem\ntvjzpa')
+    fwe census: 0.12 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [10s]
+
+=== granite-4.1-3b-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.477.393 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6669 tok): turns t/s: 16.7, 16.7, 16.6, 16.5   worst 16.5 (mean 16.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.1, 8.6, 9.3, 12.1   (reader line 5 w/s)
+      noise at depth: 16.5, 16.5
+    memory: mapped census 5.84 GiB mapped, 0.14 GiB resident (file 0.12 + anon 0.02; smaps, addendum 23), machine cost 4.00 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q8_0.gguf: WORST TURN = 16.5 t/s (worst turn; avg-of-worsts 16.5)
+  granite-4.1-3b-Q8_0.gguf: NOISE AT DEPTH: worst 16.50  mean 16.51  worst/mean 0.999  (n=2)
+  granite-4.1-3b-Q8_0.gguf: MEMORY: peak RSS 0.14 GiB - file 3.37 GiB, i.e. -3.23 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [62s]
+    cold machine cost @ rung: 4.00 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('To determine the three most frequently appeared ')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [28s]
+
+=== granite-4.1-3b-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.585.678 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14855 tok): turns t/s: 13.8, 13.8, 13.7, 13.5   worst 13.5 (mean 13.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.8, 7.8, 7.1, 9.5   (reader line 5 w/s)
+      noise at depth: 13.7, 13.7
+    memory: mapped census 6.48 GiB mapped, 0.16 GiB resident (file 0.12 + anon 0.04; smaps, addendum 23), machine cost 4.64 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q8_0.gguf: WORST TURN = 13.5 t/s (worst turn; avg-of-worsts 13.5)
+  granite-4.1-3b-Q8_0.gguf: NOISE AT DEPTH: worst 13.68  mean 13.69  worst/mean 0.999  (n=2)
+  granite-4.1-3b-Q8_0.gguf: MEMORY: peak RSS 0.16 GiB - file 3.37 GiB, i.e. -3.21 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS (ceiling) [110s]
+    cold machine cost @ rung: 4.64 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('To find the three most frequently appeared coded')
+    fwe census: 0.14 GiB resident (file 0.12 + anon 0.02; smaps)
+    fwe @ depth 16128: 1/1 -> PASS [70s]
+  granite-4.1-3b-Q8_0: SCORE = 16384 tokens (last rung passing both) [5.4 min wall, measured]
+  [3] ladder ok  (score: 16384 tokens)
+[2026-09-30T22:10:11 +50m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 16384 tokens, worst 7.1 w/s, cold cost 4.64 GiB
+[2026-09-30T22:10:11 +50m]       phase 4 done (scored row)
+  SELECTED Q8_0 for granite-4.1-3b (ladder score 16384 tokens)
+
+============================================================
+[2026-09-30T22:10:11 +50m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  granite-4.1-3b                       score  16,384 tokens | scored-rung worst   7.1 w/s | cold  4.64 GiB | 5.4 min
+  granite-3.2-2b-instruct              score  15,360 tokens | scored-rung worst   n/a w/s | cold  3.73 GiB | 8.0 min
+  MiniCPM5-2B                          score  12,288 tokens | scored-rung worst   n/a w/s | cold  2.86 GiB | 6.3 min
+  granite-3.1-2b-instruct              score  12,288 tokens | scored-rung worst   n/a w/s | cold  3.63 GiB | 7.7 min
+  Qwen3-4B-GGUF                        score   8,192 tokens | scored-rung worst   6.6 w/s | cold  5.52 GiB | 4.7 min
+  Phi-3.5-mini-instruct                score   7,168 tokens | scored-rung worst   n/a w/s | cold  6.52 GiB | 6.5 min
+  MiniCPM-1B-sft-bf16                  score   4,096 tokens | scored-rung worst  21.1 w/s | cold  1.39 GiB | 0.5 min
+  MiniCPM-2B-sft-bf16                  score   4,096 tokens | scored-rung worst  13.4 w/s | cold  4.52 GiB | 0.8 min
+  granite-3.0-2b-instruct              score   4,096 tokens | scored-rung worst  12.4 w/s | cold  2.63 GiB | 1.0 min
+  granite-4.2-3b                       score   4,096 tokens | scored-rung worst  10.7 w/s | cold  3.68 GiB | 3.8 min
+  MiniCPM3-4B-GGUF                     score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.7 min  FAILED (below the start rung - investigate)
+  MiniCPM4-0.5B                        score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.1 min  FAILED (below the start rung - investigate)
+  MiniCPM5-1B                          score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.5 min  FAILED (below the start rung - investigate)
+  Phi-3-mini-4k-instruct               score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 1.6 min  FAILED (below the start rung - investigate)
+  granite-4.0-1b                       score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.7 min  FAILED (below the start rung - investigate)
+  granite-4.0-350m                     score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.3 min  FAILED (below the start rung - investigate)
+  granite-4.0-h-350m                   score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.1 min  FAILED (below the start rung - investigate)
+  granite-4.0-micro                    score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 1.0 min  FAILED (below the start rung - investigate)
+  phi-1                                score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.0 min  FAILED (below the start rung - investigate)
+  phi-1_5                              score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.0 min  FAILED (below the start rung - investigate)
+  phi-2                                score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.0 min  FAILED (below the start rung - investigate)
+
+resume state -> benchmark-state-f4k.json
+all data     -> benchmark-results-f4k.json
+
+resume state -> benchmark-state-f4k.json
+all data     -> benchmark-results-f4k.json
