@@ -504,10 +504,7 @@ def test_code_edit_new_blocks_compose_in_one_transaction(tmp_path):
     body, delete the loop header, fix the caller - all or nothing."""
     p = tmp_path / "mod.py"
     p.write_text(
-        "def bench():\n"
-        "    for rep in range(1, 2):\n"
-        "        do_work(rep)\n"
-        "        return rep\n"
+        "def bench():\n    for rep in range(1, 2):\n        do_work(rep)\n        return rep\n"
     )
     code_edit.edit(
         str(p),
@@ -624,3 +621,22 @@ def test_code_edit_edit_many_rejects_duplicate_paths(tmp_path):
         raised = "duplicate" in str(e)
     assert raised
     assert p.read_text() == "x = 1\n"
+
+
+def test_check_requirements_passes_when_all_importable(capsys, monkeypatch):
+    monkeypatch.setattr(fb, "REQ_PACKAGES", ["json"])  # stdlib: always importable
+    fb.check_requirements()
+    out = capsys.readouterr().out
+    assert "python :" in out
+
+
+def test_check_requirements_fails_loud_when_a_package_is_missing(capsys, monkeypatch):
+    monkeypatch.setattr(fb, "REQ_PACKAGES", ["definitely-not-a-real-package-xyz"])
+    try:
+        fb.check_requirements()
+        raised = False
+    except SystemExit as e:
+        raised = "pip install -r requirements.txt" in str(
+            e
+        ) and "definitely-not-a-real-package-xyz" in str(e)
+    assert raised

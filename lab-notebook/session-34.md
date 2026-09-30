@@ -146,3 +146,10 @@ THE MECHANISM (already in the tree, addendum 23 follow-on): `--rung` takes any s
 THE QUEUE (the author's plan, on record): (1) the lineage-2 run finishes; (2) each model re-measured directly at its optimal rung with the smaps census live (resident_gib becomes the authoritative memory number for the pickers); (3) the Q4 run at Q4_K_M.
 
 THE BASELINE TO BEAT: Qwen3.5-0.8B Q8_0, scored 105,472 tok at 2.53 GiB cold (addendum 21). The Q4 question is whether a 0.8B-class model at ~0.45 GiB of weights reaches comparable or better depth+s cost - and whether the 4B-class models, freed from ~4.3 GiB of weight reads, climb past 65,536.
+
+
+### Session 34, addendum 25 - the requirements preflight: the dry run now checks the venv
+
+THE FAILURE (the author: "we need a check in dry run that the python requirements are installed. I had to restart our latest run because I forgot to enable the venv"): a run started outside the study venv dies mid-run - the interpreter is wrong, the packages are missing, and the wall clock is lost. The old check_tooling verified only the binaries (corpus, llama-quantize, the converter, llama-server) and only on REAL runs - a dry run said nothing about Python.
+
+THE FIX: check_requirements() runs in BOTH modes, first thing in main() - before the state file is touched, before any download or bench. It prints the interpreter's own path (so the wrong-venv case is visible at a glance: `python : /usr/local/bin/python3` vs the venv's `.venv/bin/python`) and then import-checks every requirements.txt package the run needs (huggingface_hub, transformers, torch, safetensors, numpy, gguf, sentencepiece, protobuf, pandas, pyarrow, hf_transfer). Any miss is a hard stop with the fix in the message: "activate the study venv and/or: pip install -r requirements.txt". The preflight's own smoke test: the sandbox run of the dry run caught exactly this - its system python lacks all eleven packages and the check stopped it in one line instead of a mid-run crash. 2 tests cover the pass case and the loud fail.
