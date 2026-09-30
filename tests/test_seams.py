@@ -175,3 +175,26 @@ def test_local_rung_shortcut_skips_the_hub(tmp_path, capsys, monkeypatch):
     assert run["plan"] == "local file"
     out = capsys.readouterr().out
     assert "no download needed" in out
+
+
+def test_run_ladder_caps_start_rung_to_the_window(tmp_path, monkeypatch):
+    """Session 34 (addendum 12): the trained window is the ceiling for
+    the WHOLE ladder, the start rung included - a model whose window is
+    below --min-rung runs at the window, never above it."""
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    monkeypatch.setattr(fb, "trained_window", lambda m, p=8210, d=".": 8192)
+    monkeypatch.setattr(
+        fb, "speed_pass", lambda m, r, c, p, d: (True, {"worst": 9.0, "mem_cost_gib": 2.0})
+    )
+    monkeypatch.setattr(
+        fb, "fwe_pass", lambda m, r, d, s, p: (True, {"depth": r - 256, "correct": 1, "n": 1})
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=16384,
+    )
+    assert [c["rung"] for c in ladder["rungs"]] == [8192]
+    assert ladder["score"] == 8192
