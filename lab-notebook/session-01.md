@@ -20,4 +20,3 @@
 4. K-quant speed penalty (7–11%) shrinks or vanishes on matrix-core iGPUs
 5. One formula across tiers: ~2× t/s at equal file size vs study #1, ±15%
 6. **Champion configuration (detail in report draft §2.1):** 3B-class, Q5_0, ~2.2–2.5 GiB file, ~20–24 t/s live, strict-ARC 74–79%, 2024-gen non-thinking instruct family (e.g. Qwen2.5-3B). Verification rule: bench tg128 ≥ 52. Weakest links: ARC band (harness-transfer wildcard) and encoding availability.
-

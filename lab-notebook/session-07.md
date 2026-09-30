@@ -819,4 +819,3 @@ Consecutive-pair McNemar: #1 vs #2 +8.70 pp p=4.2e-12 SEPARATED; #2 vs #3 +2.82 
 - Gemma note: PTQ Q6_K from first-party f16 lands 73.3% — respectable; the QAT Q4_0 special-case annotation stands but the family no longer depends on it.
 
 **Pipeline provenance (final):** every selected rung traces to model-author weights → pinned llama.cpp b10964 toolchain (converter + quantizer) → local files in ./models/<family>/ → embedded ARC protocol → exact McNemar. One command reproduces everything end-to-end (idempotent, resumable).
-

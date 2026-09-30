@@ -128,4 +128,3 @@ python3 -m py_compile live-bench.py full-benchmark.py
 git add live-bench.py full-benchmark.py README.md; git commit -m "decode: --no-thinking build"; git push
 ```
 Then measurements (unchanged plan): first-turn dump checks, phi4-mini addendum run, qwen3.5:4b non-thinking run, thinking-category run.
-

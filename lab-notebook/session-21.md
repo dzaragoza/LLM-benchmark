@@ -15,4 +15,3 @@
 5. Windows-specific risk: llama-server.exe lingering on port 8081/8077 between runs — patched, but watch for the "port still busy" warning on the first run.
 
 **Author's remaining ritual: T14s pull + decode all three .b64 files (full-benchmark.py 34,305 B / live-bench.py 15,196 B / README.md 8,389 B), py_compile, sha256 check, commit decoded text files, then fresh clone + README-following on the Windows box.** ✅ DONE — all three decoded files committed byte-exact (author's wc + sha256 verified), README shows clean on GitHub.
-

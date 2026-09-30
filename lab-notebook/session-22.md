@@ -25,4 +25,3 @@
 3. **Ranking prediction:** qwen2.5-1.5b ≫ smollm2-1.7b ≈ gemma3-1b > llama3.2-1b; #1 separated from #2 (p < 0.05); the middle pair likely not separated; the tail possibly separated. Study #1's champion family is predicted to repeat at its home tier against popularity-matched rivals.
 4. **Family-beats-quant corollary:** smollm2-1.7b@Q4_K_M (~4.5 bpw, more params) vs gemma3-1b@Q8_0 (~8 bpw, fewer params) — whichever wins informs whether the family>quant rule extends across parameter counts.
 5. **Tooling risks (updated):** llama3.2-1B-GGUF is gated — if phase 1 fails on it, accept that repo's license and rerun (GUIDE[1] covers it). SmolLM2 is the only family requiring the full safetensors→f16→quantize path on this roster — its phase 1–2 are the longest (≈3.4 GB snapshot + conversion); watch converter memory. The Qwen3 thinking-burn caveat is retired with the model.
-

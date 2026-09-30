@@ -38,7 +38,6 @@ non-thinking category - benchmarks with thinking disabled
 (chat_template_kwargs enable_thinking=false).
 """
 
-
 from __future__ import annotations
 
 import argparse
@@ -98,6 +97,8 @@ def _banner_window(log_path: str) -> int | None:
     if m is None:
         return None
     return int(m.group(1))
+
+
 # midpoint rungs: 8k, 12k, 16k, 24k, 32k, 48k, 64k (addendum 7 corrected)
 RUNG_MIDPOINT = True
 
@@ -136,9 +137,7 @@ def speed_pass(
     window_cap = _banner_window(server_log)
     if not turns:
         if window_cap is not None and window_cap < rung:
-            print(
-                f"    trained window {window_cap:,} caps the requested -c {rung:,}"
-            )
+            print(f"    trained window {window_cap:,} caps the requested -c {rung:,}")
             return False, {"error": "capped to the window", "window_cap": window_cap}
         return False, {"error": "no turns measured", "window_cap": window_cap}
     label = os.path.splitext(os.path.basename(model))[0]
@@ -1023,9 +1022,7 @@ def print_ladder_table(state: dict[str, Any]) -> None:
     print()
     print("=" * 60)
     stamp("PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)")
-    for score, fam, _rung, wps, cost, wall, failed in sorted(
-        rows, key=lambda r: (-r[0], r[1])
-    ):
+    for score, fam, _rung, wps, cost, wall, failed in sorted(rows, key=lambda r: (-r[0], r[1])):
         wps_txt = "n/a" if wps is None else f"{wps:.1f}"
         cost_txt = "n/a" if cost is None else f"{cost:.2f}"
         flag = "  FAILED (below the start rung - investigate)" if failed else ""

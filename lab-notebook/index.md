@@ -24,4 +24,3 @@
 - [Session 25 — 2026-09-24 (first thinking-category measurement: Qwen3.5-4B)](session-25.md)
 - [Session 27 — 2026-09-26 (protocol v2: the depth-prefill gate; the reader guarantee replaces the floor)](session-27.md)
 - [Session 34](session-34.md)
-

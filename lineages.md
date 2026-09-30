@@ -117,7 +117,7 @@ the seven members at or above 5 w/s.
 | Qwen3-1.7B | 1.7B | 1.71 (M) | **68.0** | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — | **34,816** (v4.3 binary search to 512-token resolution: speed PASS at 32,768 (worst 7.7), speed FAIL at 65,536; FWE flickers above the score - 0/1 at 35,840 and 35,328, 1/1 at 34,816) |
 | Qwen2.5-1.5B-Instruct | 1.5B | 1.76 (M) | **73.5** | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — | **20,992** (v4.3 binary search: FWE 0/1 at 32,768 and every midpoint above 20,992; 1/1 at 20,992 - a counting-quality edge, not the wall) |
 | Qwen3.5-0.8B | 0.8B | 0.86 (M) | **61.3** | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) | **105,472** (v4.3 binary search to 512-token resolution: speed PASS through 131,072 (worst 15.2), FWE flickers - 0/1 at 130,816...102,400 passes, 114,688 and 106,496 fail, 1/1 at 105,472, 0/1 at 105,984) |
-| Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) | **OUT** (counting floor — 136f) | 0 (counting floor, 136f) |
+| Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) | **OUT** — 0 (counting floor, 136f) |
 
 † **The sentinel row, honestly stated (addenda 69/73):** the 4B is
 the predicted in-band member (5.92, dead in [5–10]) whose measured

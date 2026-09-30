@@ -115,4 +115,3 @@ Method: top-8 Ollama families by pulls (llama3.1 119.7M, deepseek-r1 93M, llama3
 (`-hf repo:tag` resolves the quant by filename pattern; first-party Qwen repo per the provenance rule. Note: `-t 8` was study #1's protocol on a 8-core CPU; the 7840U has 8 cores/16 threads so the flag carries over unchanged — but for the CPU run, consider also `-t 16` as a secondary check since SMT may matter for memory streaming.)
 
 **Unnumbered prediction 7 (on record before the run): Vulkan wins generation on this machine.** Study #1: CPU beat Vulkan by 31% on generation (Vega era, no matrix cores, CPU had full bus access). This machine: CPU streaming ceiling ~60–67 GB/s (STREAM/clpeak) vs iGPU ~82 GB/s (clpeak) — the iGPU is now the better memory-streaming engine. Prediction: Vulkan tg128 > CPU tg128 for Qwen2.5-3B Q4_K_M. Grade with the paired run above.
-
