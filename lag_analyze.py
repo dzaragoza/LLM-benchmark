@@ -57,6 +57,8 @@ import os
 import sys
 from typing import Any
 
+import tee_output
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from speed_gate import READER_WPS_DEFAULT
@@ -156,6 +158,7 @@ def analyze_dump(dump: dict[str, Any], reader_wps: float) -> dict[str, Any]:
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="Andes-style streaming-lag analysis of live dumps "
         "(turn-granularity stall metrics vs the reader line)"

@@ -23,6 +23,8 @@ import sys
 from itertools import combinations
 from typing import Any, NoReturn
 
+import tee_output
+
 ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
 ARC_RESULTS_DIR_DEFAULT = "./arc-results"
 
@@ -182,6 +184,7 @@ def rank(
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(description="exact McNemar ranking from per-question ARC CSVs")
     ap.add_argument(
         "--labels",
