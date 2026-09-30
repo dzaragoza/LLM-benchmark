@@ -21,7 +21,7 @@
   .verdict { border: 2px solid #2a7; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
   .verdict.none { border-color: #b33; }
   .verdict h3 { margin: 0 0 0.3rem; font-size: 1.15rem; }
-  .verdict .arc { font-size: 2rem; font-weight: bold; }
+  .verdict .depth { font-size: 2rem; font-weight: bold; }
   table { border-collapse: collapse; width: 100%; margin: 0.6rem 0 1rem; font-size: 0.85rem; font-family: Verdana, Arial, sans-serif; }
   th, td { border: 1px solid #bbb; padding: 0.3rem 0.5rem; text-align: left; }
   th { background: rgba(127,127,127,0.12); }
@@ -45,7 +45,7 @@
 
 <h1>Local LLM picker &mdash; CPU/iGPU</h1>
 <div class="sub">The recommended Q8_0 model for your machine, among the models the
-study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50, ARC-Challenge n=1172. The recommendation ranks by measured DEPTH (the FWE ladder score, addendum 137/137h: the deepest context at which the model both serves the reader and counts) &mdash; models still climbing show no score and rank last.
+study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50. The recommendation ranks by measured DEPTH (the FWE ladder score, addendum 137/137h: the deepest context at which the model both serves the reader and counts) &mdash; models still climbing show no score and rank last.
 Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 
 <div class="panel">
@@ -103,11 +103,11 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 // ladder lands (addendum 137n). cost = machine cost GiB
 // (MemAvailable delta), measured. costEst is vestigial (no candidate is estimated).
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2,  arc: 90.4, depth: 65536, family: "Qwen3.5" },
-  { name: "Qwen3-4B",             size: 3.99, cost: 5.73,  costEst: false, wps: 5.9,  arc: 85.0, depth: 16384, family: "Qwen3" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3,  arc: 73.5, depth: 20992, family: "Qwen2.5" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7,  arc: 68.0, depth: 34816, family: "Qwen3" },
-  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.53,  costEst: false, wps: 21.3,  arc: 61.3, depth: 105472, family: "Qwen3.5" }
+  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2, depth: 65536, family: "Qwen3.5" },
+  { name: "Qwen3-4B",             size: 3.99, cost: 5.73,  costEst: false, wps: 5.9, depth: 16384, family: "Qwen3" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992, family: "Qwen2.5" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7, depth: 34816, family: "Qwen3" },
+  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.53,  costEst: false, wps: 21.3, depth: 105472, family: "Qwen3.5" }
 ];
 // depth = the v4 ladder score (tokens, addendum 138): the deepest rung at which the model
 // BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier (addendum 137h).
@@ -239,15 +239,14 @@ function pick() {
   var rows = CANDIDATES.map(function (m) {
     var wpred = m.wps * bw / REF_BW;
     return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
-  }).sort(function (a, b) { return (b.m.depth || 0) - (a.m.depth || 0) || b.m.arc - a.m.arc; });
+  }).sort(function (a, b) { return (b.m.depth || 0) - (a.m.depth || 0); });
 
   var eligible = rows.filter(function (r) { return r.fits && r.passes; });
   var html = "";
   if (eligible.length) {
     var r = eligible[0];
     html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (Q8_0)</h3>" +
-      "<div><span class=\"arc\">" + (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "counting floor" : r.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
-      "<div>" + r.m.arc.toFixed(1) + "% ARC-Challenge (n=1172)</div>" +
+      "<div><span class=\"depth\">" + (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "counting floor" : r.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
       "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (scored-rung worst turn, scaled)</div>" +
       "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 machine cost " + r.m.cost.toFixed(2) +
       " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + ram + " GiB</div></div>";
@@ -266,11 +265,11 @@ function pick() {
   }
   $("result").innerHTML = html;
 
-  var t = "<table><tr><th>model (Q8_0)</th><th class=\"num\">ARC %</th><th class=\"num\">file GiB</th>" +
+  var t = "<table><tr><th>model (Q8_0)</th><th class=\"num\">file GiB</th>" +
     "<th class=\"num\">machine cost GiB</th>" +
     "<th class=\"num\">depth score (tok)</th><th class=\"num\">w/s @ you</th><th>fits RAM</th><th>clears reader</th></tr>";
   rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + "</td><td class=\"num\">" + r.m.arc.toFixed(1) + "</td><td class=\"num\">" +
+    t += "<tr><td>" + r.m.name + "</td><td class=\"num\">" + "</td><td class=\"num\">" +
       r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
       "</td><td class=\"num\">" +
       (r.m.depth === null ? "\u2014 (ladder climbing)" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) +

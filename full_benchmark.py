@@ -398,7 +398,7 @@ def run_ladder(
         rung = rung * 2
 
     score = floor
-    # ---- STAGE 2: the binary search to the true value (512 resolution).
+    # ---- STAGE 2: the binary search to the true value (1024 resolution).
     # Speed is measured at a midpoint only when the ceiling was a <5
     # fail (refinement 3.1); a 5-7.5 ceiling, an FWE ceiling, or a
     # window ceiling all had speed pass at or below their rung.
@@ -406,9 +406,9 @@ def run_ladder(
         lo, hi = floor, ceiling  # lo passes both, hi fails (or is capped)
         mode = "speed+fwe" if measure_speed else "fwe only"
         print(f"  binary search between {lo} (pass) and {hi} (fail) - {mode}")
-        while hi - lo > 512:
+        while hi - lo > 1024:
             mid = (lo + hi) // 2
-            mid = (mid // 512) * 512  # keep rungs on 512-token boundaries
+            mid = (mid // 1024) * 1024  # keep rungs on 1024-token boundaries
             if mid <= lo or mid >= hi:
                 break
             if measure_speed:
@@ -944,6 +944,7 @@ def main() -> None:
     # same as the hugging face interface and the llama-cpp interface");
     # --no-git opts out.
     if not args.no_git and not args.dry_run:
+        tee_output.uninstall()  # results.txt is complete - stop writing before it is committed
         git_tail(args)
     stamp("run complete")
 

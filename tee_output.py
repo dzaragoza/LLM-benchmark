@@ -32,6 +32,16 @@ class _Tee:
         return False
 
 
+_ORIG_STDOUT = sys.stdout
+_ORIG_STDERR = sys.stderr
+
+
+def uninstall() -> None:
+    """Stop writing to results.txt (restore the original stdout/stderr)."""
+    sys.stdout = _ORIG_STDOUT
+    sys.stderr = _ORIG_STDERR
+
+
 def install(path: str = "./results.txt") -> None:
     """Duplicate stdout and stderr into `path` (append); no-op if not writable."""
     try:
