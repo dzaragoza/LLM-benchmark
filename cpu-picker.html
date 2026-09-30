@@ -45,7 +45,13 @@
 
 <h1>Local LLM picker &mdash; CPU/iGPU</h1>
 <div class="sub">The recommended Q8_0 model for your machine, among the models the
-study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50. The recommendation ranks by measured DEPTH (the FWE ladder score, addendum 137/137h: the deepest context at which the model both serves the reader and counts) &mdash; models still climbing show no score and rank last.
+study scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at
+&ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the score is the
+deepest context passing both). Lab notebook study &mdash; measured on a T14s
+(102.4 GB/s class), live-corpus cal-50. The recommendation ranks by measured DEPTH
+(the v4.3 ladder score, session 34 addendum 33: the deepest context at which the model
+both serves the reader and counts; n=1 everywhere, floor 4,096 &mdash; the corpus
+structural floor, addendum 32).
 Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 
 <div class="panel">
@@ -70,38 +76,37 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 <div id="tables"></div>
 
 <div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the measured members of the five studied lineages (qwen, granite, MiniCPM, Phi - session 34 addendum 33's f4k grid joins the qwen lineage
-  members of the overnight sweep, each admitted on the <strong>v3.1 corpus wall</strong>
-  (stall-rate verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates
-  0.0&ndash;2.6%, all PASS, 50 conversations / 267 turns each) &mdash; the only models the
-  study has graded under the current protocol. A candidate is eligible iff (a) its
-  <em>measured machine cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
-  instrument, cold-cache at the scored rung once ladders land, addendum 137m) fits your RAM, and (b) its
-  predicted w/s at your bandwidth clears the 5.0 reader line. The w/s anchor is the WORST
-  TURN at the model's SCORED RUNG (the last depth passing the speed gate, addendum 137n).
-  Bandwidth scaling is the pre-registered halving form:
-  w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4 &mdash; linear because at these sizes decode is
-  bandwidth-dominated; for the smallest members (whose compute headroom makes the true loss
-  smaller) it is conservative. The recommendation is the highest-DEPTH eligible candidate
-  (the FWE ladder score; measured scores only - unmeasured members rank last and cannot be
-  recommended until their ladder lands).</p>
-  <p><strong>Excluded on instrument grounds, not on measurement:</strong> Phi-4-mini Q8_0 and
-  Llama-3.2-3B Q8_0 passed the reader wall at n=50 (0/267 wall events each) but under the
-  v3.0-era instrument (the addendum-66 calibration pass, before protocol v3.1 existed) &mdash;
-  they are pending a v3.1 re-bench and are therefore not in the pool. Mistral-7B has no passing
-  Q8_0 configuration (measured wall FAIL), and Qwen3.5-9B Q8_0 is a measured wall FAIL; their
-  selections live at Q5_K_M, out of scope here. Quant is out of scope for this study: this
-  tool answers the Q8_0 question only.</p>
-  <p class="footnote">Caveats: w/s figures are the WORST TURN at each model's SCORED RUNG (the ladder's n=1 screen, addendum 137h/137n - one conversation at the ranked depth; the corpus p05 at ctx 4096 was the old anchor, superseded). Depth scores are n=1 screening ranks. The halving factor 0.50 is pre-registered, not yet validated by the 51.2-class replication.
-  Machine-cost values are run-shaped: treat the fit boundary as soft within ~1 GiB.</p>
+  <p><strong>How the recommendation is computed.</strong> Candidates are the
+  measured members of the studied lineages (qwen, granite, MiniCPM, Phi), each scored under
+  protocol v4.3 (session 34, addendum 33): a depth-scored ladder that starts at the
+  4,096-token floor (addendum 32) and doubles the context rung until the model fails &mdash;
+  the deepest rung at which it BOTH serves the reader (speed gate: n=1 conversation,
+  worst-turn &ge; 5 w/s, &le; 5% stall rate) AND counts (FWE: n=1, 3/3 coded words) is the
+  score, refined to 1,024-token resolution by binary search. A candidate is eligible iff
+  (a) its <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers + runtime,
+  MemAvailable-delta instrument, cold-cache at the scored rung) fits your RAM, and (b) its
+  predicted w/s at your bandwidth clears the 5.0 reader line. The w/s anchor is the worst
+  turn at the model's deepest speed-measured rung. Bandwidth scaling is the pre-registered
+  halving form: w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4 &mdash; linear
+  because at these sizes decode is bandwidth-dominated; for the smallest members it is
+  conservative. The recommendation is the highest-depth eligible candidate.
+  <p><strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting floor
+  &mdash; it cannot do FWE at any measured depth); Qwen2.5-3B-Instruct is out (task
+  refusal; the benchmark is not changed to fit a model). Models scoring zero under v4.3
+  rank last and cannot be recommended. Quant: this tool answers the Q8_0 question only
+  &mdash; the Q4_K_M run (addendum 24) is being prepared.
+  <p class="footnote">Caveats: w/s figures are the worst turn at each model's deepest
+  speed-measured rung (the v4.3 ladder's n=1 screen &mdash; one conversation at the ranked
+  depth). Depth scores are n=1 screening ranks (session 34, addendum 33). The bandwidth law
+  is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the
+  fit boundary as soft within ~1 GiB.
 </div>
 
 <script>
 "use strict";
-// Measured records (Q8_0, v3.1-admitted). wps = the WORST TURN at the model's SCORED
-// RUNG (the last depth passing the speed gate, addendum 137n) - null until that model's
-// ladder lands (addendum 137n). cost = machine cost GiB
-// (MemAvailable delta), measured. costEst is vestigial (no candidate is estimated).
+// Measured records (Q8_0, v4.3-scored). wps = the WORST TURN at the model's deepest
+// speed-measured rung (session 34, addendum 33). cost = minimum RAM (whole-stack machine
+// cost, MemAvailable delta, cold-cache at the scored rung), measured.
 var CANDIDATES = [
   { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2,  depth: 65536,  family: "Qwen3.5" },
   { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992,  family: "Qwen2.5" },
@@ -118,9 +123,9 @@ var CANDIDATES = [
   { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  costEst: false, wps: 10.7, depth: 4096,    family: "Granite" },
   { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  costEst: false, wps: 12.4, depth: 4096,    family: "Granite" }
 ];
-// depth = the v4.3 ladder score (tokens, addendum 138): the deepest rung at which the
-// model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 screening tier
-// (addendum 137h), floor 4096 (addendum 32, the corpus structural floor). The
+// depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
+// which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
+// floor 4096 (addendum 32, the corpus structural floor). The
 // granite/MiniCPM/Phi rows are the lineage-2 families measured on the f4k grid
 // (session 34, addendum 33); their w/s anchor is the deepest SPEED-MEASURED rung
 // (fwe-only binary-search midpoints launch no speed server, refinement 1.5).
@@ -261,7 +266,7 @@ function pick() {
     html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (Q8_0)</h3>" +
       "<div><span class=\"depth\">" + (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "counting floor" : r.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
       "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (scored-rung worst turn, scaled)</div>" +
-      "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 machine cost " + r.m.cost.toFixed(2) +
+      "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 minimum RAM " + r.m.cost.toFixed(2) +
       " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + ram + " GiB</div></div>";
   } else {
     var fitting = rows.filter(function (r) { return r.fits; });
@@ -273,16 +278,16 @@ function pick() {
         " w/s \u2014 below the 5.0 reader line. These machines are served by classes below the study's floor tier; no recommendation is honest here.</div></div>";
     } else {
       html += "<div class=\"verdict none\"><h3>No measured model fits " + ram +
-        " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of machine cost (cold, scored rung).</div></div>";
+        " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of minimum RAM (cold, scored rung).</div></div>";
     }
   }
   $("result").innerHTML = html;
 
-  var t = "<table><tr><th>model (Q8_0)</th><th class=\"num\">file GiB</th>" +
-    "<th class=\"num\">machine cost GiB</th>" +
+  var t = "<table><tr><th>model</th><th>quant</th><th class=\"num\">file GiB</th>" +
+    "<th class=\"num\">minimum RAM GiB</th>" +
     "<th class=\"num\">depth score (tok)</th><th class=\"num\">w/s @ you</th><th>fits RAM</th><th>clears reader</th></tr>";
   rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + "</td><td class=\"num\">" +
+    t += "<tr><td>" + r.m.name + "</td><td>Q8_0</td><td class=\"num\">" +
       r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
       "</td><td class=\"num\">" +
       (r.m.depth === null ? "\u2014 (ladder climbing)" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) +
@@ -293,7 +298,7 @@ function pick() {
   });
   t += "</table>";
   $("tables").innerHTML = t +
-    '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, addendum 137h - the 95%-confidence phrasing belonged to the retired n=23 tier).</div>';
+    '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
 }
 buildMachineMenu();
 $("minbw").textContent = MIN_RUN_BW.toFixed(1);

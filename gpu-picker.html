@@ -40,7 +40,11 @@
 
 <h1>Local LLM picker &mdash; GPU</h1>
 <div class="sub">The recommended Q8_0 model for your GPU, among the models the
-study measured passing protocol v3.1 (&le; 5% of turns stall a 300-wpm reader). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50.
+study scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at
+&ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the score is the
+deepest context passing both; n=1 everywhere, floor 4,096 &mdash; the corpus structural
+floor, addendum 32). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class),
+live-corpus cal-50.
 Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>.</div>
 
 <div class="panel">
@@ -48,13 +52,13 @@ Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>
   <input type="search" id="gfilter" placeholder="type to filter, e.g. 16" oninput="renderList()" style="width:20rem;max-width:100%">
   <div class="footnote" style="margin-top:0.3rem">Distinct GPU VRAM capacities of the last ~30 years of cards;
     only tiers that fit at least one measured model are listed (the smallest needs
-    <span id="mincost"></span>&nbsp;GiB of whole-stack cost). The estimated w/s column uses the
+    <span id="mincost"></span>&nbsp;GiB of minimum RAM). The estimated w/s column uses the
     lowest-bandwidth card found at each capacity &mdash; conservative for anything faster.</div>
   <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
   <label for="vram">Your GPU's VRAM (GiB)</label>
   <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
   <div class="footnote" style="margin-top:0.3rem">VRAM fit uses the
-    <strong>whole measured stack cost</strong> (weights + KV + buffers + runtime), conservatively taken
+    <strong>measured minimum RAM</strong> (weights + KV + buffers + runtime), conservatively taken
     from the CPU-side instrument &mdash; the GPU stack is expected to need less, so a fit here is a lower
     bound on what the card can hold.</div>
   <div class="readout" id="bwout"></div>
@@ -64,32 +68,37 @@ Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>
 <div id="tables"></div>
 
 <div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the measured members of the studied lineages (qwen, granite, MiniCPM, Phi - session 34 addendum 33's f4k grid joins the qwen lineage
-  members of the overnight sweep, each admitted on the <strong>v3.1 corpus wall</strong> (stall-rate
-  verdict: PASS iff &le; 5% of turns stall the reader; measured stall rates 0.0&ndash;2.6%, all PASS,
-  50 conversations / 267 turns each) &mdash; the same pool as the
-  <a href="cpu-picker.html">system-RAM lineage picker</a>. A candidate is eligible iff
-  (a) its <em>measured whole-stack cost</em> (weights + KV + buffers + runtime, MemAvailable-delta
-  instrument) fits the card's VRAM &mdash; conservative, since the CPU-side cost is an upper bound on
-  the GPU-side one &mdash; and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader
-  line, evaluated at each capacity's lowest-bandwidth card (conservative for anything
-  faster). Eligibility is the VRAM fit; the w/s column shows the reader-line margin.</p>
-  <p><strong>Two extrapolations, both flagged.</strong> The cost criterion carries the CPU measurement
-  onto the GPU unchanged (conservative by design; the first GPU-side calibration run should replace
-  it), and the linear bandwidth law is validated only on system RAM &mdash; on GPU, compute and kernel
-  overheads can make the true w/s <em>higher</em> than predicted for small models (the law stays
-  conservative) or the decode path can behave differently. Treat GPU recommendations as provisional
-  until the study re-benches at least one candidate on a GPU.</p>
+  <p><strong>How the recommendation is computed.</strong> Candidates are the measured members of the
+  studied lineages (qwen, granite, MiniCPM, Phi), each scored under protocol v4.3 (session
+  34, addendum 33): a depth-scored ladder from the 4,096-token floor, doubling rungs, score
+  = the deepest rung passing BOTH the speed gate (n=1, worst-turn &ge; 5 w/s, &le; 5% stall)
+  AND FWE (n=1, 3/3 coded words), refined to 1,024-token resolution &mdash; the same pool as
+  the <a href="cpu-picker.html">system-RAM picker</a>. A candidate is eligible iff
+  (a) its <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers + runtime,
+  MemAvailable-delta instrument, cold-cache at the scored rung) fits the card's VRAM &mdash;
+  conservative, since the CPU-side cost is an upper bound on the GPU-side one &mdash; and
+  (b) its predicted w/s at the card's bandwidth clears the 5.0 reader line, evaluated at
+  each capacity's lowest-bandwidth card (conservative for anything faster). Eligibility is
+  the VRAM fit; the w/s column shows the reader-line margin.</p></p>
+  <p><strong>Two extrapolations, both flagged.</strong> The minimum-RAM criterion carries the CPU
+  measurement onto the GPU unchanged (conservative by design; the first GPU-side
+  calibration run should replace it), and the linear bandwidth law is validated only on
+  system RAM &mdash; on GPU, compute and kernel overheads can make the true w/s
+  <em>higher</em> than predicted for small models (the law stays conservative) or the
+  decode path can behave differently. Treat GPU recommendations as provisional until the
+  study re-benches at least one candidate on a GPU.</p></p>
   <p class="footnote">VRAM figures are nominal card capacity; a small fraction is consumed by the
-  display/OS. Bandwidth figures are the card's theoretical peak (memory type &times; bus). Quant is out
-  of scope for this study: this tool answers the Q8_0 question only.</p>
+  display/OS. Bandwidth figures are the card's theoretical peak (memory type &times; bus).
+  Quant: this tool answers the Q8_0 question only &mdash; the Q4_K_M run (addendum 24) is
+  being prepared.</p></p>
 </div>
 
 <script>
 "use strict";
-// Measured records (Q8_0, v3.1-admitted) - identical to cpu-picker.html. wps = the WORST
-// TURN at the model's SCORED RUNG (addendum 137n) - null until that ladder lands. cost = whole-stack machine
-// cost GiB (MemAvailable delta), measured - used here as a conservative VRAM requirement.
+// Measured records (Q8_0, v4.3-scored) - identical to cpu-picker.html. wps = the WORST
+// TURN at the model's deepest speed-measured rung (session 34, addendum 33). cost = minimum
+// RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
+// measured - used here as a conservative VRAM requirement.
 var CANDIDATES = [
   { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  wps: 6.2,  depth: 65536,  family: "Qwen3.5" },
   { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  wps: 18.3, depth: 20992,  family: "Qwen2.5" },
@@ -106,13 +115,12 @@ var CANDIDATES = [
   { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  wps: 10.7, depth: 4096,    family: "Granite" },
   { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  wps: 12.4, depth: 4096,    family: "Granite" }
 ];
-// depth = the v4 ladder score (tokens, addendum 138): the deepest rung passing BOTH the speed
-// gate and FWE, n=1 screening tier (addendum 137h). null = the ladder is still climbing
-// that member; 0 = the counting floor (the 8k base rung fails FWE, addendum 138).
-// OUT OF THE POOL: Qwen2.5-0.5B (the counting floor, addendum 136f) and
-// Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - a refusing model
-// is out; the benchmark is not changed to fit a model).
-
+// depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
+// which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
+// floor 4096 (addendum 32, the corpus structural floor). 0 = a measured zero on the f4k
+// grid (the 4096 base rung fails). OUT OF THE POOL: Qwen2.5-0.5B (counting floor) and
+// Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - a refusing model is out; the
+// benchmark is not changed to fit a model).
 var REF_BW = 102.4;
 var READER = 5.0;
 
@@ -121,7 +129,7 @@ function $(id) { return document.getElementById(id); }
 // Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
 // each paired with the lowest memory bandwidth among cards found at that capacity
 // (the conservative w/s estimate for the tier). Only tiers that fit at least one
-// measured model are listed; the smallest whole-stack cost is ~2.53 GiB (Qwen3.5-0.8B, cold at its scored rung).
+// measured model are listed; the smallest minimum RAM is ~2.53 GiB (Qwen3.5-0.8B, cold at its scored rung).
 var VRAM_TIERS = [
   { v: 1.5,  bw: 177.4 },   // GTX 480 (2010)
   { v: 2,    bw: 176.0 },   // Radeon HD 6970 (2010)
@@ -198,21 +206,21 @@ function pick() {
     var best = eligible.reduce(function (a, r) { return (r.m.depth || 0) > (a.m.depth || 0) ? r : a; });
     host.innerHTML =
       '<div class="verdict"><h3>Recommended: ' + best.m.name + ' Q8_0</h3>' +
-      '<div><span class="depth">' + (best.m.depth === null ? "\u2014" : (best.m.depth === 0 ? "counting floor" : best.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
-      "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 whole-stack cost " + best.m.cost.toFixed(2) +
-      " GiB of your " + vram + " GiB VRAM (conservative: CPU-side measured cost)</div></div>";
+      '<div><span class="depth">' + (best.m.depth === null ? "\u2014" : (best.m.depth === 0 ? "counting floor" : best.m.depth.toLocaleString())) + " depth score (v4.3 ladder, n=1 screen)</div>" +
+      "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 minimum RAM " + best.m.cost.toFixed(2) +
+      " GiB of your " + vram + " GiB VRAM (conservative: CPU-side measured minimum RAM)</div></div>";
   } else {
     var cheapest = CANDIDATES.reduce(function (a, c) { return c.cost < a.cost ? c : a; });
     host.innerHTML = '<div class="verdict none"><h3>No measured model qualifies</h3><div>' +
-      "no measured model's whole-stack cost fits " + vram + " GiB (smallest needs " +
+      "no measured model's minimum RAM fits " + vram + " GiB (smallest needs " +
       cheapest.cost.toFixed(2) + " GiB).</div></div>";
   }
 
-  var t = '<table><tr><th>model</th><th class="num">file GiB</th>' +
-    '<th class="num">stack cost GiB</th><th class="num">fits ' + vram + ' GiB</th>' +
-    '<th class="num">est. w/s</th><th class="num">depth (tok)</th></tr>';
+  var t = "<table><tr><th>model</th><th>quant</th><th class=\"num\">file GiB</th>" +
+    "<th class=\"num\">minimum RAM GiB</th><th class=\"num\">fits " + vram + " GiB</th>" +
+    "<th class=\"num\">est. w/s</th><th class=\"num\">depth (tok)</th></tr>";
   rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + '</td><td class="num">' + r.m.size.toFixed(2) +
+    t += "<tr><td>" + r.m.name + "</td><td>Q8_0</td>" + '<td class="num">' + r.m.size.toFixed(2) +
       '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
       (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
       '</td><td class="num">' + (r.w !== null && r.w !== undefined ? r.w.toFixed(1) : "\u2014") +
@@ -220,7 +228,7 @@ function pick() {
       (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) + "</td></tr>";
   });
   $("tables").innerHTML = t + "</table>" +
-    '<div class="footnote">Legend: <strong>file GiB</strong> = Q8_0 GGUF size; <strong>stack cost GiB</strong> = measured whole-stack memory (weights + KV + buffers + runtime); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, addendum 137h).</div>';
+    '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
 }
 
 $("mincost").textContent = MIN_COST.toFixed(2);
