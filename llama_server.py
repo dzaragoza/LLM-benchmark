@@ -96,11 +96,13 @@ def start_server(
 
 
 def peak_rss_gib(proc: Any) -> float | None:
-    """Peak resident set size (VmHWM) of the server process, in GiB -
-    the kernel's own accounting of everything the launch took: model
-    weights + KV cache + compute buffers + runtime overhead. This is
-    the honest "can it run here" number, and the quantity the memory
-    shortcut's estimates are validated against. Linux only
+    """Peak resident set size (VmHWM) of the server process, in GiB.
+    DIAGNOSTIC ONLY (session 34, addendum 23): llama.cpp mmaps the
+    weights, and mmap'd file-backed pages are shared with the page
+    cache - the kernel may evict and re-fault them during the run, so
+    the per-process peak UNDERCOUNTS the whole stack at deep ctx
+    (registered pattern: peak RSS 0.27 GiB < a 0.63 GiB file). The
+    authoritative number is mapped_memory_gib(). Linux only
     (/proc); returns None elsewhere or after the process is gone.
     MUST be called before stop_server terminates the process."""
     try:
@@ -111,6 +113,72 @@ def peak_rss_gib(proc: Any) -> float | None:
     except Exception:
         return None
     return None
+
+
+def mapped_memory_gib(proc: Any) -> dict[str, float | None] | None:
+    """The server's mapped-memory census from /proc/<pid>/smaps
+    (session 34, addendum 23 - the VmHWM undercount fix).
+
+    Sums the VMA size of every mapping and the RSS (pages actually
+    resident) split by backing:
+      mapped_gib    total address-space mapped (the launch's claim)
+      resident_gib  pages resident RIGHT NOW (sum of VMA Rss)
+      file_gib      resident pages of file-backed VMAs (the weights,
+                    via mmap - immune to the VmHWM peak-eviction quirk:
+                    a resident page counts, whether or not the peak
+                    caught it)
+      anon_gib      resident pages of anonymous VMAs (KV cache,
+                    compute buffers, runtime heap)
+    resident_gib is the honest "can it run here" number: the pages
+    the machine must actually hold with the model in use, counted
+    from the memory map rather than a single high-water mark. Best
+    read LATE in the run (deep turns faulted the whole blob in);
+    MUST be called before stop_server terminates the process.
+    Linux-exclusive (/proc/<pid>/smaps with per-VMA Rss, kernel 2.6.32+):
+    returns None elsewhere or after the process is gone."""
+    pid = getattr(proc, "pid", None)
+    if pid is None:
+        return None
+    mapped = 0.0
+    file_rss = 0.0
+    anon_rss = 0.0
+    cur_file = False
+    try:
+        with open(f"/proc/{pid}/smaps", errors="replace") as f:
+            for line in f:
+                first = line.split()[0] if line.strip() else ""
+                if (
+                    len(first) >= 3
+                    and first[0] in "0123456789abcdef"
+                    and "-" in first
+                    and ":" not in first
+                ):
+                    # VMA header: "addr-addr perms offset dev inode [path]" -
+                    # exactly 5 fields before the optional path; a path
+                    # (6+ fields) means file-backed, "[vso]"-style or none
+                    # means anonymous
+                    cur_file = len(line.split()) >= 6
+                    continue
+                key, _, val = line.partition(":")
+                val = val.strip()
+                if key == "Size":
+                    mapped += int(val.split()[0])
+                elif key == "Rss":
+                    kb = int(val.split()[0])
+                    if cur_file:
+                        file_rss += kb
+                    else:
+                        anon_rss += kb
+    except Exception:
+        return None
+    gib = 1 / (1024 * 1024)
+    resident = file_rss + anon_rss
+    return {
+        "mapped_gib": mapped * gib,
+        "resident_gib": resident * gib,
+        "file_gib": file_rss * gib,
+        "anon_gib": anon_rss * gib,
+    }
 
 
 def system_memavailable_gib() -> float | None:

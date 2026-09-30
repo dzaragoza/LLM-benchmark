@@ -662,6 +662,8 @@ def bench_model(
         extra += ["--reasoning-format", "deepseek"]
     if no_thinking:
         extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
+    if not llama_server.drop_file_cache(model):
+        print("    note: cache drop unavailable - cost may read warm (137k)")
     mem_before = llama_server.system_memavailable_gib()
     proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
     try:
@@ -779,30 +781,45 @@ def bench_model(
 
     finally:
         peak = llama_server.peak_rss_gib(proc)
+        smaps = llama_server.mapped_memory_gib(proc)
         cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         llama_server.stop_server(proc, port)
-        file_gib = os.path.getsize(model) / (1024**3)
-        if peak is not None:
+        if peak is not None or smaps is not None:
             mem_reports.append(
                 {
                     "rep": 1,
                     "peak_rss_gib": peak,
                     "mem_cost_gib": cost,
+                    **(smaps or {}),
                     **(llama_server.parse_memory_log(log_path) or {}),
                 }
             )
-            note = (
-                ""
-                if (peak >= file_gib or cost is None)
-                else " - SUSPECT undercount (below the file size; see mem_cost_gib)"
-            )
-            print(
-                f"    memory: peak RSS {peak:.2f} GiB"
-                + (f", machine cost {cost:.2f} GiB" if cost is not None else "")
-                + " (weights + KV + buffers + runtime; VmHWM + "
-                "MemAvailable delta, addendum 36/40)" + note,
-                flush=True,
-            )
+            if smaps is not None and smaps.get("resident_gib") is not None:
+                print(
+                    f"    memory: mapped census {smaps['mapped_gib']:.2f} GiB mapped, "
+                    f"{smaps['resident_gib']:.2f} GiB resident "
+                    f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; "
+                    "smaps, addendum 23)"
+                    + (
+                        f", machine cost {cost:.2f} GiB (MemAvailable delta)"
+                        if cost is not None
+                        else ""
+                    ),
+                    flush=True,
+                )
+                resident = smaps.get("resident_gib")
+                if peak is not None and resident is not None and peak < resident - 0.05:
+                    print(
+                        f"    note: peak RSS {peak:.2f} GiB read below the smaps "
+                        f"census {resident:.2f} GiB - the VmHWM "
+                        "undercount (mmap eviction; addendum 23)"
+                    )
+            elif peak is not None:
+                print(
+                    f"    memory: peak RSS {peak:.2f} GiB (VmHWM; smaps unavailable)"
+                    + (f", machine cost {cost:.2f} GiB" if cost is not None else ""),
+                    flush=True,
+                )
     wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
     if wall_hits:
         print(

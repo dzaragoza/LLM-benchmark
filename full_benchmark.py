@@ -181,6 +181,7 @@ def fwe_pass(
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
     llama_server.drop_file_cache(model)
+    mem_before = llama_server.system_memavailable_gib()
     proc, healthy = llama_server.start_server(
         model,
         port=port,
@@ -194,6 +195,18 @@ def fwe_pass(
             port, label, depth, 1, csv_path, seed0=seed, no_thinking=True
         )
         row["window_cap"] = _banner_window(log_path)
+        smaps = llama_server.mapped_memory_gib(proc)
+        if smaps is not None:
+            row["mem_census"] = smaps
+            print(
+                f"    fwe census: {smaps['resident_gib']:.2f} GiB resident "
+                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)"
+            )
+        cost = llama_server.memory_cost_gib(
+            mem_before, llama_server.system_memavailable_gib()
+        )
+        if cost is not None:
+            row["mem_cost_gib"] = cost
     finally:
         llama_server.stop_server(proc, port)
     return row["acc"] == 1.0, row
@@ -301,6 +314,10 @@ def run_ladder(
             fwe_correct=fv.get("correct"),
             fwe_s=t_fwe,
         )
+        if cell.get("mem_cost_gib") is None and fv.get("mem_cost_gib") is not None:
+            cell["mem_cost_gib"] = fv["mem_cost_gib"]
+        if fv.get("mem_census") is not None:
+            cell["mem_census"] = fv["mem_census"]
         return cell, fv.get("window_cap")
 
     # ---- STAGE 1: the gallop (2x steps) - find the floor and the ceiling.
@@ -430,6 +447,7 @@ def scored_row(ladder: dict[str, Any]) -> dict[str, Any]:
                 "depth": score,
                 "worst_wps": cell.get("speed_worst_wps"),
                 "cold_cost_gib": cell.get("mem_cost_gib"),
+                "resident_gib": (cell.get("mem_census") or {}).get("resident_gib"),
             }
     return {"depth": score, "worst_wps": None, "cold_cost_gib": None}
 
