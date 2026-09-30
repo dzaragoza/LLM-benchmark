@@ -624,13 +624,17 @@ def test_code_edit_edit_many_rejects_duplicate_paths(tmp_path):
 
 
 def test_check_requirements_passes_when_all_importable(capsys, monkeypatch):
-    monkeypatch.setattr(fb, "REQ_PACKAGES", ["json"])  # stdlib: always importable
+    # pytest is a real distribution present in any interpreter running
+    # this suite (importlib.metadata resolves pip names, not module names)
+    monkeypatch.setattr(fb, "REQ_PACKAGES", ["pytest"])
     fb.check_requirements()
     out = capsys.readouterr().out
     assert "python :" in out
 
 
 def test_check_requirements_fails_loud_when_a_package_is_missing(capsys, monkeypatch):
+    # a distribution name that does not exist (importlib.metadata, not
+    # find_spec - protobuf installs as google.protobuf, addendum 25 fix)
     monkeypatch.setattr(fb, "REQ_PACKAGES", ["definitely-not-a-real-package-xyz"])
     try:
         fb.check_requirements()
