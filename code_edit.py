@@ -21,6 +21,8 @@ USAGE
       ("replace_all", old, new),         # every occurrence
       ("replace_n", old, new, 1),        # occurrence k of old (1-based), for dupes
       ("replace_regex", pattern, new),   # re.sub, count=1; pattern must match once
+      ("replace_regex_all", pattern, new),  # re.sub, all matches (>=1 required)
+      ("replace_region", start, end, new),  # replace text BETWEEN two unique anchors (exclusive)
       ("insert_before", anchor, new),
       ("insert_after", anchor, new),
       ("delete", old),
@@ -45,6 +47,12 @@ DESIGN RULES
   - no fuzzy matching: the caller states exactly what to change;
     ambiguity is a hard error. replace_regex is the one escape hatch
     (re.sub with count=1; the pattern must match exactly once)
+  - DELIMITER BALANCE: after applying all blocks, the tool checks that
+    the edit did not unbalance the file's quotes, brackets, braces or
+    parens (per line for most files; the whole buffer for minified or
+    long-line files like our single-line HTML pickers) - a leftover
+    duplicated fragment (seen in the wild, session 34 addendum 38)
+    is caught at edit time, not at syntax-check time
   - line-range blocks are 1-BASED and inclusive, like an editor's
     selection; new_lines may be a string (one line, no newline
     needed) or a list of strings
@@ -116,6 +124,111 @@ def _regex_once(buf: str, pattern: str, i: int, flags: int = 0) -> tuple[str, st
     return pattern, buf
 
 
+def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
+    """Locate the region strictly BETWEEN two unique anchors (anchors
+    themselves are kept). start must occur exactly once; end must
+    occur exactly once AFTER start."""
+    n = buf.count(start)
+    if n == 0:
+        raise CodeEditError(f"block {i}: replace_region start anchor not found:\n{start[:200]}")
+    if n > 1:
+        raise CodeEditError(f"block {i}: replace_region start anchor found {n} times - add context")
+    a = buf.index(start) + len(start)
+    tail = buf[a:]
+    m = tail.count(end)
+    if m == 0:
+        raise CodeEditError(
+            f"block {i}: replace_region end anchor not found after start:\n{end[:200]}"
+        )
+    if m > 1:
+        raise CodeEditError(
+            f"block {i}: replace_region end anchor found {m} times after start - add context"
+        )
+    return a, a + tail.index(end)
+
+
+def _check_delimiters(src: str, out: str, path: str) -> None:
+    """Sanity check that the edit did not unbalance quotes, brackets,
+    braces or parens. Per line when lines are short (most code); on
+    the whole buffer for minified/long-line files (HTML pickers) -
+    where a line legitimately spans many statements, only the whole
+    buffer must balance."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    closers = set(pairs.values())
+
+    def balance(text: str) -> str | None:
+        stack: list[tuple[str, int]] = []
+        quote: str | None = None
+        escape = False
+        in_comment = False
+        for ln_no, ln in enumerate(text.split("\n"), 1):
+            i = 0
+            n = len(ln)
+            while i < n:
+                ch = ln[i]
+                if escape:
+                    escape = False
+                    i += 1
+                    continue
+                if quote:
+                    if ch == "\\":
+                        escape = True
+                    elif ch == quote:
+                        quote = None
+                    i += 1
+                    continue
+                if in_comment:
+                    i += 1
+                    continue
+                if ch in ('"', "'"):
+                    quote = ch
+                elif ch == "#" or (ch == "/" and ln[i : i + 2] == "//"):
+                    in_comment = True
+                elif ch in pairs:
+                    stack.append((ch, ln_no))
+                elif ch in closers:
+                    if not stack or pairs[stack[-1][0]] != ch:
+                        return f"unbalanced {ch!r} (line {ln_no})"
+                    stack.pop()
+                i += 1
+            in_comment = False  # comments do not span lines here
+        if quote:
+            return f"unclosed quote {quote!r}"
+        if stack:
+            o, ln_no = stack[-1]
+            return f"unclosed {o!r} (opened line {ln_no})"
+        return None
+
+    def changed_lines(a: str, b: str) -> bool:
+        return a != b
+
+    max_len = max((len(ln) for ln in out.splitlines()), default=0)
+    if max_len > 500:
+        # minified/long-line file: balance over the whole buffer, and
+        # only warn-grade: compare only if the source already balanced
+        if balance(src) is None:
+            problem = balance(out)
+            if problem:
+                raise CodeEditError(
+                    f"{path}: delimiter balance check failed after edit ({problem}) - "
+                    "the buffer was balanced before; likely a duplicated or truncated fragment"
+                )
+    else:
+        src_lines = src.splitlines()
+        out_lines = out.splitlines()
+        n_src, n_out = len(src_lines), len(out_lines)
+        for idx in range(n_out):
+            old = src_lines[idx] if idx < n_src and (idx + 1 < n_src or n_src == n_out) else None
+            if idx >= n_src or (old is not None and old != out_lines[idx]):
+                problem = balance(out_lines[idx])
+                if problem:
+                    raise CodeEditError(
+                        f"{path}: delimiter balance check failed on line {idx + 1} "
+                        f"({problem}) - likely a duplicated or truncated fragment"
+                    )
+    _ = changed_lines  # kept for clarity; per-line comparison handled above
+
+
 def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
     """Check every block against src, in order, simulating the apply."""
     buf = src
@@ -180,6 +293,25 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
             except re.error as e:
                 raise CodeEditError(f"block {i}: bad regex {block[1]!r}: {e}") from e
             buf = re.sub(block[1], block[2], buf, count=1)
+        elif kind == "replace_regex_all":
+            if len(block) != 3:
+                raise CodeEditError(
+                    f"block {i}: replace_regex_all needs (replace_regex_all, pattern, new)"
+                )
+            try:
+                matches = len(re.findall(block[1], buf))
+            except re.error as e:
+                raise CodeEditError(f"block {i}: bad regex {block[1]!r}: {e}") from e
+            if matches == 0:
+                raise CodeEditError(f"block {i}: replace_regex_all pattern matched nothing")
+            buf = re.sub(block[1], block[2], buf)
+        elif kind == "replace_region":
+            if len(block) != 4:
+                raise CodeEditError(
+                    f"block {i}: replace_region needs (replace_region, start, end, new)"
+                )
+            a, b = _region_of(buf, block[1], block[2], i)
+            buf = buf[:a] + block[3] + buf[b:]
         elif kind == "set_lines":
             if len(block) != 4:
                 raise CodeEditError(f"block {i}: set_lines needs (set_lines, first, last, new)")
@@ -256,6 +388,11 @@ def _apply(src: str, blocks: Sequence[tuple]) -> str:
             buf = _replace_nth(buf, block[1], block[2], block[3])
         elif kind == "replace_regex":
             buf = re.sub(block[1], block[2], buf, count=1)
+        elif kind == "replace_regex_all":
+            buf = re.sub(block[1], block[2], buf)
+        elif kind == "replace_region":
+            a, b = _region_of(buf, block[1], block[2], 0)
+            buf = buf[:a] + block[3] + buf[b:]
         elif kind == "set_lines":
             lines, trailing = _lines_of(buf)
             buf = _join(lines[: block[1] - 1] + _as_lines(block[3]) + lines[block[2] :], trailing)
@@ -328,6 +465,7 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
         src = f.read()
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
+    _check_delimiters(src, out, path)
     _atomic_write_sync(path, out)
     # re-read from disk and re-verify the post-conditions
     with open(path, encoding="utf-8") as f:
@@ -392,6 +530,7 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
         src = f.read()
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
+    _check_delimiters(src, out, path)
     return "".join(
         difflib.unified_diff(
             src.splitlines(keepends=True),
@@ -441,6 +580,11 @@ if __name__ == "__main__":
         action="store_true",
         help="verify blocks only (JSON on stdin) - no write",
     )
+    ap.add_argument(
+        "--preview",
+        action="store_true",
+        help="print the unified diff edit() would produce - no write",
+    )
     args = ap.parse_args()
     import json
     import sys
@@ -450,6 +594,8 @@ if __name__ == "__main__":
         with open(args.path, encoding="utf-8") as f:
             _verify_blocks(f.read(), [tuple(b) for b in spec["blocks"]])
         print("OK - all blocks verify")
+    elif args.preview:
+        sys.stdout.write(preview(args.path, [tuple(b) for b in spec["blocks"]]))
     else:
         edit(args.path, [tuple(b) for b in spec["blocks"]])
         print(f"OK - {len(spec['blocks'])} block(s) applied and synced to {args.path}")

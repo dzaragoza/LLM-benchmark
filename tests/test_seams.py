@@ -580,6 +580,111 @@ def test_code_edit_preview_fails_like_edit(tmp_path):
     assert raised
 
 
+def test_code_edit_replace_region_between_anchors(tmp_path):
+    # addendum 39: replace everything BETWEEN two unique anchors,
+    # anchors kept - the minified-HTML pattern
+    p = tmp_path / "page.html"
+    p.write_text("<p>How the recommendation is computed.</strong> OLD TEXT </p> tail")
+    code_edit.edit(
+        str(p),
+        [("replace_region", "How the recommendation is computed.", "</p>", " NEW ")],
+    )
+    with open(str(p)) as f:
+        assert f.read() == "<p>How the recommendation is computed. NEW </p> tail"
+
+
+def test_code_edit_replace_region_requires_unique_anchors(tmp_path):
+    p = tmp_path / "page.html"
+    p.write_text("a x a x")
+    try:
+        code_edit.edit(str(p), [("replace_region", "a", "x", "y")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "found 2 times" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "a x a x"
+
+
+def test_code_edit_replace_region_end_not_after_start_fails(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("start middle end")
+    try:
+        code_edit.edit(str(p), [("replace_region", "end", "start", "y")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "not found after start" in str(e)
+    assert raised
+
+
+def test_code_edit_replace_regex_all_replaces_every_match(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("w1 = 1\nw2 = 2\nx = 3\n")
+    code_edit.edit(str(p), [("replace_regex_all", r"w\d = ", "w_ = ")])
+    with open(str(p)) as f:
+        assert f.read() == "w_ = 1\nw_ = 2\nx = 3\n"
+    try:
+        code_edit.edit(str(p), [("replace_regex_all", r"nope", "x")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "matched nothing" in str(e)
+    assert raised
+
+
+def test_code_edit_catches_duplicated_fragment_on_a_line(tmp_path):
+    # addendum 39: the delimiter balance check - a replace that leaves
+    # an unbalanced line (a truncated/duplicated fragment shape) is
+    # rejected at edit time and the file stays untouched
+    p = tmp_path / "page.html"
+    p.write_text('<div id="a">old</div>\n<div id="b">ok</div>\n')
+    try:
+        code_edit.edit(
+            str(p),
+            [("replace", '<div id="a">old</div>', '<div id="a>new</div>')],
+        )
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "balance" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == '<div id="a">old</div>\n<div id="b">ok</div>\n'
+
+
+def test_code_edit_balance_check_whole_buffer_for_minified_lines(tmp_path):
+    # long-line (minified) files: the whole buffer must balance - a
+    # balanced source that becomes unbalanced is rejected
+    long_line = '<t a="b">' + "x" * 600 + "</t>"
+    p = tmp_path / "page.html"
+    p.write_text(long_line)
+    try:
+        code_edit.edit(str(p), [("replace", "</t>", '</t>"')])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "balance" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == long_line  # untouched
+
+
+def test_code_edit_balance_check_passes_clean_minified_edit(tmp_path):
+    long_line = '<t a="b">' + "x" * 600 + "</t>"
+    p = tmp_path / "page.html"
+    p.write_text(long_line)
+    code_edit.edit(str(p), [("replace", 'a="b"', 'a="c"')])
+    with open(str(p)) as f:
+        assert 'a="c"' in f.read()
+
+
+def test_code_edit_balance_check_skips_unbalanced_source(tmp_path):
+    # if the SOURCE was already unbalanced (rare, template-y files),
+    # the check does not block the edit (it compares like with like)
+    p = tmp_path / "page.html"
+    p.write_text("<div>unclosed...\n<p>ok</p>\n")
+    code_edit.edit(str(p), [("replace", "ok", "fine")])
+    with open(str(p)) as f:
+        assert "fine" in f.read()
+
+
 def test_code_edit_edit_many_all_or_nothing_across_files(tmp_path):
     a, b = tmp_path / "a.py", tmp_path / "b.py"
     a.write_text("xa = 1\n")
