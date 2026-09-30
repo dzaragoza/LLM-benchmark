@@ -229,6 +229,12 @@ def run_ladder(
         print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
     score = 0
     rung = min_rung
+    if window and rung > window:
+        print(
+            f"  the start rung {rung} exceeds the trained window - capping to {window} "
+            "(addendum 6; the window is the ceiling, the start included)"
+        )
+        rung = window
     mid = rung & (rung - 1) == 0  # dyadic rungs step to the midpoint (1.5x) next
     rungs: list[dict[str, Any]] = []
     model_t0 = time.monotonic()
