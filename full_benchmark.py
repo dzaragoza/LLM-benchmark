@@ -173,29 +173,43 @@ def trained_window(model: str, port: int = 8210, log_dir: str = ".") -> int | No
     the probe fails (the ladder then doubles without a window cap -
     the speed gate alone decides, the pre-6 behavior)."""
     label = os.path.splitext(os.path.basename(model))[0]
-    log_path = os.path.join(log_dir, f"{label}-window-probe.log")
-    proc, healthy = llama_server.start_server(
-        model, port=port, extra_args=["-c", "1048576", "--parallel", "1"], log_path=log_path
-    )
-    window = None
-    try:
-        if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            return None
+    # descending probes: a huge -c can exceed the machine's RAM (the KV
+    # alloc scales with it) - any request ABOVE the window still triggers
+    # the server's cap line, so a smaller overshoot works too.
+    for probe_ctx in (1048576, 262144, 131072):
+        log_path = os.path.join(log_dir, f"{label}-window-probe.log")
+        proc, healthy = llama_server.start_server(
+            model,
+            port=port,
+            extra_args=["-c", str(probe_ctx), "--parallel", "1"],
+            log_path=log_path,
+        )
+        window = None
         try:
-            with open(log_path, encoding="utf-8", errors="replace") as f:
-                log = f.read()
-        except OSError:
-            return None
-        m = re.search(r"training context of the model \((\d+)\)", log)
-        if m is None:
-            m = re.search(r"n_ctx_train\s*=?\s*(\d+)", log)
-        if m is None:
-            m = re.search(r"n_ctx_slot\s*=\s*(\d+)", log)
-        if m:
+            if not healthy or not llama_server.wait_healthy(port, proc=proc):
+                print(f"    window probe @ -c {probe_ctx}: server did not come up")
+                continue
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as f:
+                    log = f.read()
+            except OSError:
+                print(f"    window probe @ -c {probe_ctx}: log unreadable")
+                continue
+            m = re.search(r"training context of the model \((\d+)\)", log)
+            if m is None:
+                m = re.search(r"n_ctx_train\s*=?\s*(\d+)", log)
+            if m is None:
+                m = re.search(r"n_ctx_slot\s*=\s*(\d+)", log)
+            if m is None:
+                print(f"    window probe @ -c {probe_ctx}: no cap line in the banner")
+                continue
             window = int(m.group(1))
-    finally:
-        llama_server.stop_server(proc, port)
-    return window
+        finally:
+            llama_server.stop_server(proc, port)
+        if window:
+            return window
+    print("    window probe FAILED at every -c - the ladder runs uncapped (the speed gate decides)")
+    return None
 
 
 def run_ladder(
