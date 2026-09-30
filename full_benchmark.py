@@ -60,7 +60,12 @@ import ruler_gate
 import speed_gate
 import tee_output
 
-RUNG_BASE = 8192
+# session 34 (addendum 32): the ladder floor is 4096 - the corpus's
+# structural floor (the worst conversation's side is ~2,670 tokens +
+# depth headroom + the noise reserve: 2048 cannot host it even
+# blob-less, so below 4096 the speed gate measures nothing, it just
+# fences - the 1k-grid HTTP 400s were exactly this)
+RUNG_BASE = 4096
 MIN_RUNG_FAIL = 16384  # session 34 (addendum 19): a floor below the start
 # rung means a base failure - the model is out, pending investigation
 
