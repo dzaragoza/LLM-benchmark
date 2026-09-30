@@ -841,6 +841,7 @@ def main() -> None:
     if args.thinking and args.no_thinking:
         ap.error("--thinking and --no-thinking are mutually exclusive")
 
+    check_requirements()
     if not args.dry_run:
         kill_stale_server()
         check_tooling(args)
@@ -875,6 +876,43 @@ def main() -> None:
         tee_output.uninstall()  # results.txt is complete - stop writing before it is committed
         git_tail(args)
     stamp("run complete")
+
+
+REQ_PACKAGES = [
+    "huggingface_hub",
+    "transformers",
+    "torch",
+    "safetensors",
+    "numpy",
+    "gguf",
+    "sentencepiece",
+    "protobuf",
+    "pandas",
+    "pyarrow",
+    "hf_transfer",
+]
+
+
+def check_requirements() -> None:
+    """Verify every requirements.txt package the run needs is importable
+    in THIS interpreter - the dry run included (the author: "I had to
+    restart our latest run because I forgot to enable the venv"). The
+    interpreter's own path is printed first so the wrong-venv (or
+    system-python) case is visible at a glance; a missing package is a
+    hard stop BEFORE any download or bench work begins."""
+    import importlib.util
+
+    print(f"  python : {sys.executable}")
+    missing = []
+    for name in REQ_PACKAGES:
+        if importlib.util.find_spec(name) is None:
+            missing.append(name)
+    if missing:
+        sys.exit(
+            "missing python packages in this interpreter: "
+            + ", ".join(missing)
+            + " - activate the study venv and/or: pip install -r requirements.txt"
+        )
 
 
 def check_tooling(args: argparse.Namespace) -> None:
