@@ -78,6 +78,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -88,10 +89,219 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import arc_eval
 import convert_quant
 import hf_download
-import ladder_bench
 import llama_server
 import mcnemar
+import ruler_gate
 import speed_gate
+
+RUNG_BASE = 8192
+# midpoint rungs: 8k, 12k, 16k, 24k, 32k, 48k, 64k (addendum 7 corrected)
+RUNG_MIDPOINT = True
+
+
+def speed_pass(
+    model: str, rung: int, corpus: str, port: int, results_dir: str
+) -> tuple[bool, dict[str, Any]]:
+    """One speed-gate cell at ctx=rung, n=1 conversation: real blob,
+    real turns, the v3.1 verdict from those turns only (reduced rules:
+    a screen, not a podium number). bench_model launches the server
+    itself (banner guard included); the verdict is the REAL analyze()
+    on a temp dump - the phase-4 code path, not a re-implementation."""
+    dropped = llama_server.drop_file_cache(model)
+    if not dropped:
+        print("    note: cache drop unavailable - cost may read warm (137k)")
+    turns, _, mem_reports = speed_gate.bench_model(
+        model,
+        corpus,
+        port,
+        rung,
+        1,
+        False,
+        True,
+        n_conversations=1,
+    )
+    if not turns:
+        return False, {"error": "no turns measured"}
+    label = os.path.splitext(os.path.basename(model))[0]
+    dump = os.path.join(results_dir, f"{label}-rung{rung}-speed.json")
+    with open(dump, "w") as f:
+        json.dump(turns, f)
+    verdict = speed_gate.analyze(model, no_thinking=True, dump_override=dump)
+    cost = next(
+        (m["mem_cost_gib"] for m in mem_reports if m.get("mem_cost_gib") is not None),
+        None,
+    )
+    verdict["mem_cost_gib"] = cost
+    return verdict.get("stall_rate", 1.0) <= speed_gate.STALL_RATE_MAX, verdict
+
+
+def fwe_pass(
+    model: str, rung: int, results_dir: str, seed: int, port: int
+) -> tuple[bool, dict[str, Any]]:
+    """One FWE cell at depth=rung-2x headroom, n=1, on its own server
+    launch at exactly the rung's ctx (ruler_gate's launch shape: one
+    slot, banner guard)."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
+    csv_path = os.path.join(results_dir, f"{label}-{depth}-fwe.csv")
+    if os.path.exists(csv_path):
+        os.remove(csv_path)
+    log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
+    llama_server.drop_file_cache(model)
+    proc, healthy = llama_server.start_server(
+        model,
+        port=port,
+        extra_args=["-c", str(rung), "--parallel", "1"],
+        log_path=log_path,
+    )
+    try:
+        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            return False, {"error": "fwe server did not come up", "depth": depth}
+        row = ruler_gate.run_fwe_depth(
+            port, label, depth, 1, csv_path, seed0=seed, no_thinking=True
+        )
+    finally:
+        llama_server.stop_server(proc, port)
+    return row["acc"] == 1.0, row
+
+
+def trained_window(model: str, port: int = 8210, log_dir: str = ".") -> int | None:
+    """The model's trained context window, measured the honest way: one
+    server launch at a huge -c lets the server cap to n_ctx_train and
+    the banner reports it (session 34, addendum 6). Returns None when
+    the probe fails (the ladder then doubles without a window cap -
+    the speed gate alone decides, the pre-6 behavior)."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    log_path = os.path.join(log_dir, f"{label}-window-probe.log")
+    proc, healthy = llama_server.start_server(
+        model, port=port, extra_args=["-c", "1048576", "--parallel", "1"], log_path=log_path
+    )
+    window = None
+    try:
+        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            return None
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as f:
+                log = f.read()
+        except OSError:
+            return None
+        m = re.search(r"training context of the model \((\d+)\)", log)
+        if m is None:
+            m = re.search(r"n_ctx_train\s*=?\s*(\d+)", log)
+        if m is None:
+            m = re.search(r"n_ctx_slot\s*=\s*(\d+)", log)
+        if m:
+            window = int(m.group(1))
+    finally:
+        llama_server.stop_server(proc, port)
+    return window
+
+
+def run_ladder(
+    model: str,
+    corpus: str,
+    port: int = 8210,
+    results_dir: str = "ladder-results",
+    seed: int = 1024,
+    max_rung: int | None = None,
+    min_rung: int = RUNG_BASE,
+) -> dict[str, Any]:
+    """One model's PROTOCOL v4 ladder (addendum 137p). Returns
+    {"model", "score", "wall_min", "rungs": [{rung, speed_pass,
+    speed_worst_wps, fwe_pass, fwe_correct, mem_cost_gib, speed_s,
+    fwe_s}]}. The scored rung's speed_worst_wps is the 137n w/s
+    anchor; its mem_cost_gib is the 137m cold cost anchor."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    print(f"\n=== ladder: {label} ===")
+    os.makedirs(results_dir, exist_ok=True)
+    if not os.path.exists(model):
+        print(f"  SKIP: file not found ({model}) - fix the path and re-run")
+        return {
+            "model": label,
+            "score": None,
+            "wall_min": 0.0,
+            "rungs": [],
+            "error": "file not found",
+        }
+    print(f"  rungs from {min_rung}, doubling until the speed gate fails")
+    window = trained_window(model, port, results_dir)
+    if window:
+        print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
+    score = 0
+    rung = min_rung
+    mid = rung & (rung - 1) == 0  # dyadic rungs step to the midpoint (1.5x) next
+    rungs: list[dict[str, Any]] = []
+    model_t0 = time.monotonic()
+    while True:
+        t0 = time.monotonic()
+        ok_s, sv = speed_pass(model, rung, corpus, port, results_dir)
+        t_speed = time.monotonic() - t0
+        print(
+            f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'} [{t_speed:.0f}s]",
+            flush=True,
+        )
+        cost = sv.get("mem_cost_gib")
+        if cost is not None:
+            print(f"    cold machine cost @ rung: {cost:.2f} GiB")
+        cell = {
+            "rung": rung,
+            "speed_pass": ok_s,
+            "speed_worst_wps": sv.get("worst"),
+            "mem_cost_gib": cost,
+            "speed_s": t_speed,
+        }
+        if not ok_s:
+            print(f"    speed verdict: {json.dumps(sv)[:200]}")
+            rungs.append(cell)
+            break
+        t0 = time.monotonic()
+        ok_f, fv = fwe_pass(model, rung, results_dir, seed, port)
+        t_fwe = time.monotonic() - t0
+        print(
+            f"    fwe @ depth {fv['depth']}: "
+            f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'} [{t_fwe:.0f}s]",
+            flush=True,
+        )
+        cell["fwe_pass"] = ok_f
+        cell["fwe_correct"] = fv.get("correct")
+        cell["fwe_s"] = t_fwe
+        rungs.append(cell)
+        if not ok_f:
+            break
+        score = rung
+        if max_rung and rung >= max_rung:
+            break
+        mult = 1.5 if mid else 2.0 / 1.5  # dyadic pair -> midpoint -> dyadic
+        nxt = int(round(rung * mult))
+        mid = not mid
+        if nxt <= rung:
+            break  # integer rounding collapsed the step - nothing above
+        if window and nxt >= window:
+            if rung >= window:
+                break  # the window rung already scored - nothing above it
+            nxt = window  # the window becomes the final rung (addendum 6)
+        rung = nxt
+    wall_min = (time.monotonic() - model_t0) / 60.0
+    print(
+        f"  {label}: SCORE = {score} tokens (last rung passing both) "
+        f"[{wall_min:.1f} min wall, measured]"
+    )
+    return {"model": label, "score": score, "wall_min": wall_min, "rungs": rungs}
+
+
+def scored_row(ladder: dict[str, Any]) -> dict[str, Any]:
+    """The 137n/137m picker row from a run_ladder result: the scored
+    rung's (depth, worst-span w/s, cold cost), or unranked."""
+    score = ladder.get("score") or 0
+    for cell in ladder.get("rungs", []):
+        if cell["rung"] == score and score:
+            return {
+                "depth": score,
+                "worst_wps": cell.get("speed_worst_wps"),
+                "cold_cost_gib": cell.get("mem_cost_gib"),
+            }
+    return {"depth": score, "worst_wps": None, "cold_cost_gib": None}
+
 
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
 CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
@@ -378,13 +588,13 @@ def process_family(
         # rung). The corpus-wall phases 3-4 are retired (the author:
         # "we don't do 50 conv turns. We do run fwe as in ladder-bench").
         if 3 not in run["phases_done"] or force:
-            ladder = ladder_bench.run_ladder(
+            ladder = run_ladder(
                 path,
                 corpus,
                 port=state.get("ladder_port", 8210),
                 results_dir=os.path.join(models_dir, "ladder-results"),
                 seed=state.get("ladder_seed", 1024),
-                min_rung=state.get("ladder_min_rung", ladder_bench.RUNG_BASE),
+                min_rung=state.get("ladder_min_rung", RUNG_BASE),
             )
             run["ladder"] = ladder
             run["phases_done"].append(3)
@@ -395,7 +605,7 @@ def process_family(
             # phase 4: the scored-rung row (the 137n/137m anchors)
             ladder = run.get("ladder")
             if ladder:
-                row = ladder_bench.scored_row(ladder)
+                row = scored_row(ladder)
                 run["verdict"] = f"PASS (ladder score {ladder['score']} tokens)"
                 run["rung"] = rung
                 run["score"] = ladder["score"]
@@ -729,7 +939,7 @@ def print_ladder_table(state: dict[str, Any]) -> None:
             lad = run.get("ladder")
             if lad is None:
                 continue
-            row = ladder_bench.scored_row(lad)
+            row = scored_row(lad)
             rows.append(
                 (
                     lad["score"] or 0,
