@@ -177,18 +177,40 @@ def test_local_rung_shortcut_skips_the_hub(tmp_path, capsys, monkeypatch):
     assert "no download needed" in out
 
 
-def test_run_ladder_caps_start_rung_to_the_window(tmp_path, monkeypatch):
-    """Session 34 (addendum 12): the trained window is the ceiling for
-    the WHOLE ladder, the start rung included - a model whose window is
-    below --min-rung runs at the window, never above it."""
+def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
+    """Stub the two gates for run_ladder tests: speed_results and
+    fwe_results map rung -> (ok, verdict); caps maps rung -> window."""
+    caps = caps or {}
+
+    def speed_pass(m, r, c, p, d):
+        ok, v = speed_results[r]
+        v = dict(v)
+        v["window_cap"] = caps.get(r)
+        worst = v.get("worst")
+        if ok:
+            v["ceiling_rung"] = worst is not None and 5.0 <= worst < 7.5
+        return ok, v
+
+    def fwe_pass(m, r, d, s, p):
+        ok, v = fwe_results[r]
+        v = dict(v)
+        v["window_cap"] = caps.get(r)
+        return ok, v
+
+    monkeypatch.setattr(fb, "speed_pass", speed_pass)
+    monkeypatch.setattr(fb, "fwe_pass", fwe_pass)
+
+
+def test_run_ladder_fails_when_the_ceiling_is_below_the_start(tmp_path, monkeypatch):
+    """Session 34 (addendum 19, refinement 4): any ceiling below the
+    16k start rung - here a speed <5 fail AT the start - marks the run
+    FAILED and the author investigates (a base failure, not a score)."""
     model = tmp_path / "X.gguf"
     model.write_bytes(b"fake")
-    monkeypatch.setattr(fb, "trained_window", lambda m, p=8210, d=".": 8192)
-    monkeypatch.setattr(
-        fb, "speed_pass", lambda m, r, c, p, d: (True, {"worst": 9.0, "mem_cost_gib": 2.0})
-    )
-    monkeypatch.setattr(
-        fb, "fwe_pass", lambda m, r, d, s, p: (True, {"depth": r - 256, "correct": 1, "n": 1})
+    _ladder_stub(
+        monkeypatch,
+        speed_results={16384: (False, {"worst": 3.0})},
+        fwe_results={},
     )
     ladder = fb.run_ladder(
         str(model),
@@ -196,5 +218,135 @@ def test_run_ladder_caps_start_rung_to_the_window(tmp_path, monkeypatch):
         results_dir=str(tmp_path / "res"),
         min_rung=16384,
     )
-    assert [c["rung"] for c in ladder["rungs"]] == [8192]
-    assert ladder["score"] == 8192
+    assert ladder["failed"] is True
+    assert ladder["score"] == 0
+    assert [c["rung"] for c in ladder["rungs"]] == [16384]
+
+
+def test_run_ladder_window_from_the_banner_is_the_ceiling(tmp_path, monkeypatch):
+    """Session 34 (addendum 19, refinement 2): THE PROBE IS GONE. The
+    gallop's own launch caps the -c down (the banner says so) - the
+    window becomes the ceiling and the fwe-only search resolves the
+    score below it. 16k passes; 32k's speed launch reads window 20480."""
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={
+            16384: (True, {"worst": 9.0, "mem_cost_gib": 2.0}),
+            32768: (False, {"error": "capped to the window"}),
+        },
+        fwe_results={
+            16384: (True, {"depth": 16128, "correct": 1, "n": 1}),
+            18432: (True, {"depth": 18176, "correct": 1, "n": 1}),
+            18944: (True, {"depth": 18688, "correct": 1, "n": 1}),
+            19456: (False, {"depth": 19200, "correct": 0, "n": 1}),
+        },
+        caps={32768: 20480},
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=16384,
+    )
+    assert ladder["failed"] is False
+    assert ladder["score"] == 18944
+    assert [c["rung"] for c in ladder["rungs"]] == [16384, 32768, 18432, 19456, 18944]
+
+
+def test_run_ladder_speed_fail_keeps_speed_in_the_search(tmp_path, monkeypatch):
+    """Session 34 (addendum 19, refinement 3.1): a <5 w/s fail sets the
+    ceiling and the binary search measures SPEED at every midpoint too
+    (a midpoint below 5 w/s must not be scored). 16k passes both; 32k
+    fails speed; every midpoint fails speed -> the score stays 16384."""
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={
+            16384: (True, {"worst": 9.0, "mem_cost_gib": 2.0}),
+            32768: (False, {"worst": 3.0}),
+            24576: (False, {"worst": 4.2}),
+            20480: (False, {"worst": 4.8}),
+            18432: (False, {"worst": 3.5}),
+            17408: (False, {"worst": 4.0}),
+            16896: (False, {"worst": 4.5}),
+        },
+        fwe_results={
+            r: (True, {"depth": r - 256, "correct": 1, "n": 1})
+            for r in (16384, 24576, 20480, 18432, 17408, 16896)
+        },
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=16384,
+    )
+    assert ladder["score"] == 16384
+    assert ladder["failed"] is False
+
+
+def test_run_ladder_fwe_fail_drops_speed_in_the_search(tmp_path, monkeypatch):
+    """Session 34 (addendum 19, refinement 3.3): speed >= 7.5 passed at
+    the ceiling rung, fwe failed - the midpoints' speed passes too, so
+    the search is fwe-only. 16k passes both; 32k speed-passes, fwe
+    fails; the search resolves 24576 (the rungs above it fail fwe)."""
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={
+            16384: (True, {"worst": 9.0, "mem_cost_gib": 2.0}),
+            32768: (True, {"worst": 8.0, "mem_cost_gib": 2.4}),
+        },
+        fwe_results={
+            16384: (True, {"depth": 16128, "correct": 1, "n": 1}),
+            32768: (False, {"depth": 32512, "correct": 0, "n": 1}),
+            24576: (True, {"depth": 24320, "correct": 1, "n": 1}),
+            28672: (False, {"depth": 28416, "correct": 0, "n": 1}),
+            26624: (False, {"depth": 26368, "correct": 0, "n": 1}),
+            25600: (False, {"depth": 25344, "correct": 0, "n": 1}),
+            25088: (False, {"depth": 24832, "correct": 0, "n": 1}),
+        },
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=16384,
+    )
+    assert ladder["score"] == 24576
+    benched = [c["rung"] for c in ladder["rungs"]]
+    assert benched == [16384, 32768, 24576, 28672, 26624, 25600, 25088]
+    assert ladder["failed"] is False
+
+
+def test_run_ladder_ceiling_rung_57_is_the_score_no_search(tmp_path, monkeypatch):
+    """Session 34 (addendum 19, refinement 3.2): a 5<=w<7.5 pass at the
+    gallop rung is the CEILING - speed is not measured anymore; the
+    rung still needs fwe to pass to become the floor; deeper is slower
+    still so NOTHING above is searched."""
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={
+            16384: (True, {"worst": 9.0, "mem_cost_gib": 2.0}),
+            32768: (True, {"worst": 6.0, "mem_cost_gib": 2.4}),
+        },
+        fwe_results={
+            16384: (True, {"depth": 16128, "correct": 1, "n": 1}),
+            32768: (True, {"depth": 32512, "correct": 1, "n": 1}),
+        },
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=16384,
+    )
+    assert ladder["score"] == 32768
+    assert [c["rung"] for c in ladder["rungs"]] == [16384, 32768]
+    assert ladder["failed"] is False
