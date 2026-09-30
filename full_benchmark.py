@@ -915,7 +915,9 @@ def check_requirements() -> None:
         sys.exit(
             "missing python packages in this interpreter: "
             + ", ".join(missing)
-            + " - activate the study venv and/or: pip install -r requirements.txt"
+            + " - interpreter: "
+            + sys.executable
+            + " - activate the study venv and/or: python3 -m pip install -r requirements.txt"
         )
 
 
