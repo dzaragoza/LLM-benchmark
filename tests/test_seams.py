@@ -2,7 +2,9 @@
 
 import argparse
 import copy
+import os
 
+import code_edit
 import full_benchmark as fb
 
 
@@ -350,3 +352,87 @@ def test_run_ladder_ceiling_rung_57_is_the_score_no_search(tmp_path, monkeypatch
     assert ladder["score"] == 32768
     assert [c["rung"] for c in ladder["rungs"]] == [16384, 32768]
     assert ladder["failed"] is False
+
+
+def test_code_edit_replaces_and_syncs_to_disk(tmp_path):
+    """Addendum 20: the editing tool writes the edit, fsyncs the file
+    AND its directory, then re-reads to verify what is on disk."""
+    p = tmp_path / "mod.py"
+    p.write_text("def f():\n    return 1\n")
+    code_edit.edit(str(p), [("replace", "return 1", "return 2")])
+    with open(str(p)) as f:
+        assert f.read() == "def f():\n    return 2\n"
+
+
+def test_code_edit_fails_loud_on_missing_target(tmp_path):
+    """Addendum 20: a bad block leaves the file UNTOUCHED."""
+    p = tmp_path / "mod.py"
+    p.write_text("def f():\n    return 1\n")
+    try:
+        code_edit.edit(str(p), [("replace", "return 99", "return 2")])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "def f():\n    return 1\n"
+
+
+def test_code_edit_rejects_ambiguous_targets(tmp_path):
+    """Addendum 20: two matches is an error, not a coin flip."""
+    p = tmp_path / "mod.py"
+    p.write_text("a = 1\nb = 1\n")
+    try:
+        code_edit.edit(str(p), [("replace", "= 1", "= 2")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "found 2 times" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "a = 1\nb = 1\n"
+
+
+def test_code_edit_blocks_apply_in_order(tmp_path):
+    """Addendum 20: a later block can rely on an earlier one; nothing
+    is written unless EVERY block verifies first."""
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    code_edit.edit(
+        str(p),
+        [
+            ("replace", "x = 1", "x = 2"),
+            ("insert_after", "x = 2", "\ny = x + 1"),
+        ],
+    )
+    with open(str(p)) as f:
+        assert f.read() == "x = 2\ny = x + 1\n"
+
+
+def test_code_edit_transaction_all_or_nothing(tmp_path):
+    """Addendum 20: when the SECOND block fails verification, the FIRST
+    block must not leak into the file either."""
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\nz = 3\n")
+    try:
+        code_edit.edit(
+            str(p),
+            [
+                ("replace", "x = 1", "x = 2"),
+                ("replace", "not there", "anything"),
+            ],
+        )
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\nz = 3\n"  # the first block did NOT apply
+
+
+def test_code_edit_atomic_write_leaves_no_tempfiles(tmp_path):
+    """Addendum 20: the atomic-write path cleans its temp file; the
+    directory holds only the edited module."""
+    p = tmp_path / "mod.py"
+    p.write_text("a\n")
+    code_edit.edit(str(p), [("replace", "a", "b")])
+    assert sorted(os.listdir(str(tmp_path))) == ["mod.py"]
