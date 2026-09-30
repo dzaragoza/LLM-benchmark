@@ -384,6 +384,7 @@ def process_family(
                 port=state.get("ladder_port", 8210),
                 results_dir=os.path.join(models_dir, "ladder-results"),
                 seed=state.get("ladder_seed", 1024),
+                min_rung=state.get("ladder_min_rung", ladder_bench.RUNG_BASE),
             )
             run["ladder"] = ladder
             run["phases_done"].append(3)
@@ -499,6 +500,15 @@ def build_parser() -> argparse.ArgumentParser:
         "discretion)",
     )
     ap.add_argument(
+        "--min-rung",
+        type=int,
+        default=None,
+        help="session 34 (addendum 9/10): the ladder's first rung "
+        "(default: the protocol v4 base 8192); stored in the state "
+        "as ladder_min_rung so every subsequent run of the family "
+        "climbs the same grid",
+    )
+    ap.add_argument(
         "--no-thinking",
         action="store_true",
         help="hybrid models, non-thinking category: "
@@ -522,6 +532,8 @@ def main() -> None:
         check_tooling(args)
 
     state = load_state(args.state_file)
+    if args.min_rung:
+        state["ladder_min_rung"] = args.min_rung
 
     if not args.families:
         ap.error("no family specs given")
