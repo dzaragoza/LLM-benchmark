@@ -479,6 +479,7 @@ def run_ladder(
         "failed": failed,
         "wall_min": wall_min,
         "rungs": rungs,
+        "file_gib": round(os.path.getsize(model) / (1024**3), 3),
     }
     if invalid_reason:
         ladder["invalid"] = True
