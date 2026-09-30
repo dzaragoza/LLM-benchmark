@@ -588,9 +588,13 @@ def process_family(
     print(f"  folder     : {famdir}")
     if fst["selected"] and not force:
         s = fst["runs"][fst["selected"]]
+        # worst is None for a floor-rule-failed family (score 0 has no
+        # scored rung) - the resume print must not format it (the
+        # lineage-2 run's TypeError, addendum 27)
+        worst_txt = "n/a" if s.get("worst") is None else f"{s['worst']:.1f}"
         print(
             f"  already selected: {fst['selected']} "
-            f"({s['verdict']}, worst {s['worst']:.1f} t/s) - skipping "
+            f"({s['verdict']}, worst {worst_txt} t/s) - skipping "
             "(--force to redo)"
         )
         return

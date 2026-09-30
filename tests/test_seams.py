@@ -640,3 +640,35 @@ def test_check_requirements_fails_loud_when_a_package_is_missing(capsys, monkeyp
             e
         ) and "definitely-not-a-real-package-xyz" in str(e)
     assert raised
+
+
+def test_resume_skip_prints_na_for_none_worst(capsys, tmp_path, monkeypatch):
+    # the lineage-2 TypeError (addendum 27): a floor-rule-failed family
+    # has selected set with worst=None; the resume print must not format it
+    state = {
+        "families": {
+            "Fam": {
+                "spec": "r/Fam",
+                "runs": {
+                    "Q8_0": {
+                        "phases_done": [1, 2, 3, 4],
+                        "verdict": "PASS (ladder score 0 tokens)",
+                        "worst": None,
+                    }
+                },
+                "selected": "Q8_0",
+            }
+        }
+    }
+    monkeypatch.setattr(fb, "save_state", lambda *a, **k: None)
+    fb.process_family(
+        "r/Fam",
+        "corpus.json",
+        str(tmp_path),
+        state,
+        "/tmp/unused-state.json",
+        dry_run=False,
+        force=False,
+    )
+    out = capsys.readouterr().out
+    assert "worst n/a t/s" in out
