@@ -387,3 +387,115 @@ all data     -> ./benchmark-results.json
 [2026-09-30T10:57:28 +10m] committed: [main 1e82b9d] benchmark artifacts 2026-09-30 10:57 (addendum 78 auto-commit): state, results, per-turn dumps, mem sidecars, ARC CSVs
 [2026-09-30T10:57:30 +10m] pushed
 [2026-09-30T10:57:30 +10m] run complete
+
+===== 2026-09-30T11:06:29 | full_benchmark.py --force --min-rung 16384 --state-file ladder-state.json Qwen3-1.7B-GGUF =====
+
+============================================================
+[2026-09-30T11:06:29 +0m] family: Qwen3-1.7B-GGUF
+  model repo : Qwen3-1.7B-GGUF
+  source repo: Qwen3-1.7B-GGUF
+  folder     : ./models/Qwen3-1.7B-GGUF
+  --force: re-benching Q8_0 (1 stored verdict(s) cleared; files reused)
+
+  rung Q8_0:
+
+=== ladder: Qwen3-1.7B-Q8_0 ===
+  rungs from 16384, doubling until the speed gate fails
+    window probe @ -c 1048576: server did not come up
+  trained window: 40960 (the top rung caps to it - addendum 6)
+
+=== Qwen3-1.7B-Q8_0.gguf ===
+  [rep 1/1] starting server...
+    [server] 0.01.386.435 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14855 tok): turns t/s: 18.6, 18.9, 18.6, 18.5   worst 18.5 (mean 18.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 14.3, 12.1, 12.4, 14.2   (reader line 5 w/s)
+      noise at depth: 18.6, 18.5
+    memory: peak RSS 0.17 GiB, machine cost 3.56 GiB (weights + KV + buffers + runtime; VmHWM + MemAvailable delta, addendum 36/40) - SUSPECT undercount (below the file size; see mem_cost_gib)
+  rep 1: conversation worsts -> 18.5   [rep worst 18.5, avg-of-worsts 18.5]
+
+  Qwen3-1.7B-Q8_0.gguf: WORST TURN = 18.5 t/s (min of 1 reps; avg-of-rep-worsts 18.5)
+  Qwen3-1.7B-Q8_0.gguf: NOISE AT DEPTH: worst 18.55  mean 18.58  worst/mean 0.998  (n=2)
+  Qwen3-1.7B-Q8_0.gguf: MEMORY: peak RSS 0.17 GiB across 1 rep(s) - file 1.71 GiB, i.e. -1.54 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [74s]
+    cold machine cost @ rung: 3.56 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('To solve the problem, we need to **decode the gi')
+    fwe @ depth 16128: 1/1 -> PASS [40s]
+
+=== Qwen3-1.7B-Q8_0.gguf ===
+  [rep 1/1] starting server...
+    [server] 0.01.474.749 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 24576, kv_unified = 'false'
+    [server] actual n_ctx = 24576 (requested 24576)
+    conv 1 (blob 23054 tok): turns t/s: 14.8, 14.6, 14.6, 14.4   worst 14.4 (mean 14.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 11.8, 8.9, 9.2, 10.3   (reader line 5 w/s)
+      noise at depth: 14.2, 14.5
+    memory: peak RSS 0.19 GiB, machine cost 4.44 GiB (weights + KV + buffers + runtime; VmHWM + MemAvailable delta, addendum 36/40) - SUSPECT undercount (below the file size; see mem_cost_gib)
+  rep 1: conversation worsts -> 14.4   [rep worst 14.4, avg-of-worsts 14.4]
+
+  Qwen3-1.7B-Q8_0.gguf: WORST TURN = 14.4 t/s (min of 1 reps; avg-of-rep-worsts 14.4)
+  Qwen3-1.7B-Q8_0.gguf: NOISE AT DEPTH: worst 14.24  mean 14.39  worst/mean 0.989  (n=2)
+  Qwen3-1.7B-Q8_0.gguf: MEMORY: peak RSS 0.19 GiB across 1 rep(s) - file 1.71 GiB, i.e. -1.51 GiB beyond the file (KV + buffers + runtime)
+  rung 24576: speed PASS [126s]
+    cold machine cost @ rung: 4.44 GiB
+  task 1/1 @ 24320 tok: 3/3 words -> HIT ('To solve the problem, we need to **track the fre')
+    fwe @ depth 24320: 1/1 -> PASS [81s]
+
+=== Qwen3-1.7B-Q8_0.gguf ===
+  [rep 1/1] starting server...
+    [server] 0.01.677.453 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] actual n_ctx = 32768 (requested 32768)
+    conv 1 (blob 31244 tok): turns t/s: 12.0, 12.0, 11.9, 11.8   worst 11.8 (mean 12.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 9.1, 7.6, 7.7, 9.1   (reader line 5 w/s)
+      noise at depth: 11.8, 11.9
+    memory: peak RSS 0.21 GiB, machine cost 5.05 GiB (weights + KV + buffers + runtime; VmHWM + MemAvailable delta, addendum 36/40) - SUSPECT undercount (below the file size; see mem_cost_gib)
+  rep 1: conversation worsts -> 11.8   [rep worst 11.8, avg-of-worsts 11.8]
+
+  Qwen3-1.7B-Q8_0.gguf: WORST TURN = 11.8 t/s (min of 1 reps; avg-of-rep-worsts 11.8)
+  Qwen3-1.7B-Q8_0.gguf: NOISE AT DEPTH: worst 11.81  mean 11.84  worst/mean 0.997  (n=2)
+  Qwen3-1.7B-Q8_0.gguf: MEMORY: peak RSS 0.21 GiB across 1 rep(s) - file 1.71 GiB, i.e. -1.50 GiB beyond the file (KV + buffers + runtime)
+  rung 32768: speed PASS [183s]
+    cold machine cost @ rung: 5.05 GiB
+  task 1/1 @ 32512 tok: 3/3 words -> HIT ('To solve the problem, we need to **track the fre')
+    fwe @ depth 32512: 1/1 -> PASS [127s]
+
+=== Qwen3-1.7B-Q8_0.gguf ===
+  [rep 1/1] starting server...
+    [server] 0.01.783.220 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 40960, kv_unified = 'false'
+    [server] actual n_ctx = 40960 (requested 40960)
+    conv 1 (blob 39437 tok): turns t/s: 10.2, 10.2, 10.1, 10.1   worst 10.1 (mean 10.1)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 7.8, 6.3, 6.0, 7.6   (reader line 5 w/s)
+      noise at depth: 10.1, 10.1
+    memory: peak RSS 0.24 GiB, machine cost 5.96 GiB (weights + KV + buffers + runtime; VmHWM + MemAvailable delta, addendum 36/40) - SUSPECT undercount (below the file size; see mem_cost_gib)
+  rep 1: conversation worsts -> 10.1   [rep worst 10.1, avg-of-worsts 10.1]
+
+  Qwen3-1.7B-Q8_0.gguf: WORST TURN = 10.1 t/s (min of 1 reps; avg-of-rep-worsts 10.1)
+  Qwen3-1.7B-Q8_0.gguf: NOISE AT DEPTH: worst 10.08  mean 10.08  worst/mean 1.000  (n=2)
+  Qwen3-1.7B-Q8_0.gguf: MEMORY: peak RSS 0.24 GiB across 1 rep(s) - file 1.71 GiB, i.e. -1.47 GiB beyond the file (KV + buffers + runtime)
+  rung 40960: speed PASS [264s]
+    cold machine cost @ rung: 5.96 GiB
+  task 1/1 @ 40704 tok: 0/3 words -> MISS ('</think>\n\nTo solve this problem, we need to trac')
+    fwe @ depth 40704: 0/1 -> FAIL [200s]
+  Qwen3-1.7B-Q8_0: SCORE = 32768 tokens (last rung passing both) [18.2 min wall, measured]
+  [3] ladder ok  (score: 32768 tokens)
+[2026-09-30T11:25:53 +19m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 32768 tokens, worst 7.6 w/s, cold cost 5.05 GiB
+[2026-09-30T11:25:53 +19m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Qwen3-1.7B-GGUF (ladder score 32768 tokens)
+
+============================================================
+[2026-09-30T11:25:53 +19m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-0.8B                         score  98,304 tokens | scored-rung worst  16.5 w/s | cold  2.15 GiB | 30.3 min
+  Qwen3.5-4B                           score  65,536 tokens | scored-rung worst   6.3 w/s | cold  7.70 GiB | 50.3 min
+  Qwen3-1.7B-GGUF                      score  32,768 tokens | scored-rung worst   7.6 w/s | cold  5.05 GiB | 18.2 min
+  Qwen2.5-1.5B-Instruct-GGUF           score  16,384 tokens | scored-rung worst  23.2 w/s | cold  2.22 GiB | 2.8 min
+  Qwen3-4B-GGUF                        score  16,384 tokens | scored-rung worst   6.0 w/s | cold  6.60 GiB | 11.8 min
+
+--arc not given - skipping the ARC phase and the ranking (session 34 addendum 4)
+
+resume state -> ladder-state.json
+all data     -> ./benchmark-results.json
+[2026-09-30T11:25:53 +19m] committing artifacts to git (state, results, dumps, mem sidecars, ARC CSVs)
