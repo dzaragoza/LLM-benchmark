@@ -926,6 +926,12 @@ def main() -> None:
     # table prints from the ladder results in state (ARC and the
     # McNemar ranking are retired - addendum 22).
     if args.dry_run:
+        # session 34 (addendum 36): a dry run WRITES results.txt (the tee
+        # is installed from the first line) - it must be committed and
+        # pushed like a real run's, so the git tail runs before the exit
+        if not args.no_git:
+            tee_output.uninstall()  # stop writing before committing
+            git_tail(args)
         sys.exit(preflight_report(args, state, failed_families))
     roster = prepare_roster(args)
     report_roster_notes(args, state, roster, failed_families)
