@@ -3,7 +3,7 @@
 
 Checks, in order of how they have hurt us before:
   1. GitHub API reachability (distinguishes CA vs auth vs proxy failure)
-  2. Tool availability + versions (git, python3, pytest, ruff, gh, node)
+  2. Tool availability + versions (git, python3, pytest, ruff, ty, gh, node)
   3. CA file presence (/tmp/proxy-ca.pem or SANDBOX_PROXY_CA_CERT)
   4. Remote HEAD of the repo (the only source of truth; local fetch is broken)
 Exit code 0 = all critical checks pass; 1 = something needs fixing first.
@@ -55,6 +55,13 @@ if os.path.exists(ruff):
     check("ruff (~/.local/bin)", out.returncode == 0, out.stdout.strip()[:40])
 else:
     check("ruff (~/.local/bin)", False, "missing (lint will be skipped)", critical=False)
+
+ty = shutil.which("ty")
+if ty:
+    out = subprocess.run([ty, "--version"], capture_output=True, text=True, timeout=15)
+    check("ty", out.returncode == 0, out.stdout.strip()[:40])
+else:
+    check("ty", False, "missing (typecheck will be skipped)", critical=False)
 
 print("== CA / credentials ==")
 ca = "/tmp/proxy-ca.pem"
