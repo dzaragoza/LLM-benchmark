@@ -87,6 +87,14 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
                 raise CodeEditError(f"block {i}: anchor not found:\n{block[1][:200]}")
             if n > 1:
                 raise CodeEditError(f"block {i}: anchor found {n} times - add context")
+            new_text = block[2] + block[1] if kind == "insert_before" else block[1] + block[2]
+            buf = buf.replace(block[1], new_text, 1)
+        elif kind == "replace_all":
+            if len(block) != 3:
+                raise CodeEditError(f"block {i}: replace_all needs (replace_all, old, new)")
+            if buf.count(block[1]) == 0:
+                raise CodeEditError(f"block {i}: replace_all target not found:\n{block[1][:400]}")
+            buf = buf.replace(block[1], block[2])
         else:
             raise CodeEditError(f"block {i}: unknown kind {kind!r}")
 
@@ -99,6 +107,8 @@ def _apply(src: str, blocks: Sequence[tuple]) -> str:
             buf = buf.replace(block[1], block[2], 1)
         elif kind == "delete":
             buf = buf.replace(block[1], "", 1)
+        elif kind == "replace_all":
+            buf = buf.replace(block[1], block[2])
         elif kind == "insert_before":
             buf = buf.replace(block[1], block[2] + block[1], 1)
         elif kind == "insert_after":
@@ -150,10 +160,15 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
             "the file may be corrupt; re-check"
         )
     for i, block in enumerate(blocks):
-        if block[0] == "replace" and block[2] and block[2] not in now:
+        if block[0] in ("replace", "replace_all") and block[2] and block[2] not in now:
             raise CodeEditError(
                 f"{path}: block {i} verify-after-write failed "
                 "(new text not on disk)"
+            )
+        if block[0] in ("insert_before", "insert_after") and block[2] and block[2] not in now:
+            raise CodeEditError(
+                f"{path}: block {i} verify-after-write failed "
+                "(inserted text not on disk)"
             )
         if block[0] == "delete" and block[1] in now:
             raise CodeEditError(
