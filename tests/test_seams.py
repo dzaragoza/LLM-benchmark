@@ -3,6 +3,8 @@
 import argparse
 import os
 
+import pytest
+
 import code_edit
 import full_benchmark as fb
 
@@ -517,3 +519,42 @@ def test_code_edit_new_blocks_compose_in_one_transaction(tmp_path):
     )
     with open(str(p)) as f:
         assert f.read() == "def bench():\n    do_work(1)\n    return 1\n"
+
+
+def test_mapped_memory_census_splits_file_and_anon(tmp_path):
+    """Addendum 23: the smaps census - mapped >= resident = file + anon;
+    the VmHWM undercount fix. Linux-only instrument (skipped elsewhere)."""
+    import subprocess
+    import sys
+    import time
+
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "b = bytearray(16*1024*1024); import time; time.sleep(30)"]
+        )
+    except Exception:
+        pytest.skip("cannot spawn a helper process")
+    time.sleep(0.5)
+    try:
+        import llama_server
+
+        if not os.path.exists(f"/proc/{proc.pid}/smaps"):
+            pytest.skip("no /proc smaps (Linux exclusive)")
+        c = llama_server.mapped_memory_gib(proc)
+        assert c is not None
+        assert c["mapped_gib"] >= c["resident_gib"] > 0
+        assert abs(c["file_gib"] + c["anon_gib"] - c["resident_gib"]) < 1e-6
+        assert c["anon_gib"] >= 0.015, "the 16 MiB anon bytearray"
+        assert c["file_gib"] > 0, "the python binary's file-backed pages"
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def test_mapped_memory_none_for_dead_pid():
+    import llama_server
+
+    class Dead:
+        pid = 999999998
+
+    assert llama_server.mapped_memory_gib(Dead()) is None
