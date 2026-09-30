@@ -22,6 +22,7 @@ import json
 import os
 import ssl
 import sys
+import urllib.error
 import urllib.request
 
 REPO = "dzaragoza/LLM-benchmark"
