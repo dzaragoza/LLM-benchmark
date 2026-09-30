@@ -133,7 +133,18 @@ def speed_pass(
         None,
     )
     verdict["mem_cost_gib"] = cost
-    return verdict.get("stall_rate", 1.0) <= speed_gate.STALL_RATE_MAX, verdict
+    # session 34 (addendum 18, refinement 3): the v4.2 speed verdict.
+    # >= 7.5 w/s: clean pass. 5 <= w < 7.5: pass, but this rung is the
+    # CEILING - the gallop stops here (every deeper rung is slower).
+    # < 5: fail (below the reader line).
+    stall_ok = verdict.get("stall_rate", 1.0) <= speed_gate.STALL_RATE_MAX
+    worst = verdict.get("worst")
+    if not stall_ok:
+        return False, verdict
+    if worst is not None and worst < 5.0:
+        return False, verdict
+    verdict["ceiling_rung"] = worst is not None and worst < 7.5
+    return True, verdict
 
 
 def fwe_pass(
@@ -176,7 +187,7 @@ def trained_window(model: str, port: int = 8210, log_dir: str = ".") -> int | No
     # descending probes: a huge -c can exceed the machine's RAM (the KV
     # alloc scales with it) - any request ABOVE the window still triggers
     # the server's cap line, so a smaller overshoot works too.
-    for probe_ctx in (1048576, 262144, 131072):
+    for probe_ctx in (262144, 131072):
         log_path = os.path.join(log_dir, f"{label}-window-probe.log")
         proc, healthy = llama_server.start_server(
             model,
@@ -221,11 +232,11 @@ def run_ladder(
     max_rung: int | None = None,
     min_rung: int = RUNG_BASE,
 ) -> dict[str, Any]:
-    """One model's PROTOCOL v4 ladder (addendum 137p). Returns
-    {"model", "score", "wall_min", "rungs": [{rung, speed_pass,
-    speed_worst_wps, fwe_pass, fwe_correct, mem_cost_gib, speed_s,
-    fwe_s}]}. The scored rung's speed_worst_wps is the 137n w/s
-    anchor; its mem_cost_gib is the 137m cold cost anchor."""
+    """One model's PROTOCOL v4.2 ladder (session 34 addendum 18): the
+    gallop (2x steps) finds the floor and the ceiling, then a binary
+    search finds the true value. Returns {"model", "score", "wall_min",
+    "rungs": [...]}. The scored rung's speed_worst_wps is the 137n
+    w/s anchor; its mem_cost_gib is the 137m cold cost anchor."""
     label = os.path.splitext(os.path.basename(model))[0]
     print(f"\n=== ladder: {label} ===")
     os.makedirs(results_dir, exist_ok=True)
@@ -238,11 +249,10 @@ def run_ladder(
             "rungs": [],
             "error": "file not found",
         }
-    print(f"  rungs from {min_rung}, doubling until the speed gate fails")
+    print(f"  gallop from {min_rung} in 2x steps, then binary search (protocol v4.2)")
     window = trained_window(model, port, results_dir)
     if window:
-        print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
-    score = 0
+        print(f"  trained window: {window} (the ceiling - the search runs below it)")
     rung = min_rung
     if window and rung > window:
         print(
@@ -250,33 +260,48 @@ def run_ladder(
             "(addendum 6; the window is the ceiling, the start included)"
         )
         rung = window
-    mid = rung & (rung - 1) == 0  # dyadic rungs step to the midpoint (1.5x) next
+    start = rung  # the benched first rung (possibly capped to the window)
     rungs: list[dict[str, Any]] = []
     model_t0 = time.monotonic()
-    while True:
+
+    def run_speed(r: int) -> dict[str, Any]:
         t0 = time.monotonic()
-        ok_s, sv = speed_pass(model, rung, corpus, port, results_dir)
+        ok_s, sv = speed_pass(model, r, corpus, port, results_dir)
         t_speed = time.monotonic() - t0
+        tag = " (ceiling)" if sv.get("ceiling_rung") else ""
         print(
-            f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'} [{t_speed:.0f}s]",
+            f"  rung {r}: speed {'PASS' if ok_s else 'FAIL'}{tag} [{t_speed:.0f}s]",
             flush=True,
         )
         cost = sv.get("mem_cost_gib")
         if cost is not None:
             print(f"    cold machine cost @ rung: {cost:.2f} GiB")
         cell = {
-            "rung": rung,
+            "rung": r,
             "speed_pass": ok_s,
             "speed_worst_wps": sv.get("worst"),
             "mem_cost_gib": cost,
             "speed_s": t_speed,
+            "ceiling_rung": bool(sv.get("ceiling_rung")),
         }
         if not ok_s:
             print(f"    speed verdict: {json.dumps(sv)[:200]}")
+        rungs.append(cell)
+        return cell
+
+    def run_fwe(r: int) -> dict[str, Any]:
+        cell = next((c for c in rungs if c["rung"] == r), None)
+        if cell is None:
+            cell = {
+                "rung": r,
+                "speed_pass": None,  # not measured (refinement 1.5)
+                "speed_worst_wps": None,
+                "mem_cost_gib": None,
+                "ceiling_rung": False,
+            }
             rungs.append(cell)
-            break
         t0 = time.monotonic()
-        ok_f, fv = fwe_pass(model, rung, results_dir, seed, port)
+        ok_f, fv = fwe_pass(model, r, results_dir, seed, port)
         t_fwe = time.monotonic() - t0
         print(
             f"    fwe @ depth {fv['depth']}: "
@@ -286,22 +311,77 @@ def run_ladder(
         cell["fwe_pass"] = ok_f
         cell["fwe_correct"] = fv.get("correct")
         cell["fwe_s"] = t_fwe
-        rungs.append(cell)
-        if not ok_f:
+        return cell
+
+    # ---- STAGE 1: the gallop (2x steps) - find the floor and the ceiling
+    floor = 0
+    ceiling = None  # first rung that fails a gate (or the window cap)
+    speed_ceiling = False  # True when the ceiling is a speed failure
+    window_capped = False
+    while True:
+        if window and rung >= window and rung != start and rung != floor:
+            # a gallop step reached the window: it IS the ceiling - skip
+            # benching it and search below (the author: "set the ceiling
+            # as the ceiling and start binary search immediately").
+            # The START rung is exempt: capped down to the window
+            # (addendum 12) it has never been benched - bench it first.
+            ceiling = window
+            window_capped = True
+            print(f"  rung {window}: the trained window - the ceiling")
             break
-        score = rung
+        cell = run_speed(rung)
+        if not cell["speed_pass"]:
+            ceiling = rung
+            speed_ceiling = True
+            break
+        fwe_cell = run_fwe(rung)
+        if not fwe_cell["fwe_pass"]:
+            ceiling = rung
+            break
+        floor = rung
+        if cell["ceiling_rung"]:
+            # refinement 3: 5<=w<7.5 - the last passing rung; deeper is
+            # slower still, so the floor IS the score - no search above
+            ceiling = None
+            break
         if max_rung and rung >= max_rung:
             break
-        mult = 1.5 if mid else 2.0 / 1.5  # dyadic pair -> midpoint -> dyadic
-        nxt = int(round(rung * mult))
-        mid = not mid
-        if nxt <= rung:
-            break  # integer rounding collapsed the step - nothing above
-        if window and nxt >= window:
-            if rung >= window:
-                break  # the window rung already scored - nothing above it
-            nxt = window  # the window becomes the final rung (addendum 6)
-        rung = nxt
+        rung = rung * 2
+
+    score = floor
+    # ---- STAGE 2: the binary search to the true value. Refinement 1.5
+    # (skip wps once the ceiling is known) is VALID for an FWE or window
+    # ceiling - speed passed at the ceiling, so every midpoint passes.
+    # For a SPEED ceiling the midpoints' wps is UNKNOWN, so speed is
+    # measured there too (a midpoint below 5 w/s would fail the
+    # guarantee - the search then narrows from above, not below).
+    if ceiling is not None and floor > 0:
+        lo, hi = floor, ceiling  # lo passes both, hi fails (or is capped)
+        mode = "speed+fwe" if speed_ceiling and not window_capped else "fwe only"
+        print(f"  binary search between {lo} (pass) and {hi} (fail) - {mode}")
+        while hi - lo > 512:
+            mid = (lo + hi) // 2
+            mid = (mid // 512) * 512  # keep rungs on 512-token boundaries
+            if mid <= lo or mid >= hi:
+                break
+            if speed_ceiling and not window_capped:
+                sc = run_speed(mid)
+                if not sc["speed_pass"]:
+                    hi = mid
+                    continue
+                fc = run_fwe(mid)
+                if not fc["fwe_pass"]:
+                    hi = mid
+                    continue
+                lo = mid
+            else:
+                fc = run_fwe(mid)
+                if fc["fwe_pass"]:
+                    lo = mid
+                else:
+                    hi = mid
+        score = lo
+
     wall_min = (time.monotonic() - model_t0) / 60.0
     print(
         f"  {label}: SCORE = {score} tokens (last rung passing both) "
