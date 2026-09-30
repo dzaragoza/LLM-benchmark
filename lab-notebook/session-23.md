@@ -20,4 +20,3 @@
 5. **Gate interaction note:** reasoning tokens generate at the same t/s as answer tokens, so the worst-turn metric is reasoning-agnostic in principle — prediction 1 implicitly assumes this holds on Windows/Vulkan.
 
 **Next:** author runs the Windows fresh-clone README test (the actual deliverable: can a stranger replicate the study?), then the non-thinking roster, then this category; grade all predictions when the numbers land.
-

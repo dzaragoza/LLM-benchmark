@@ -66,8 +66,7 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
                 )
             if n > 1:
                 raise CodeEditError(
-                    f"block {i}: replace target found {n} times - "
-                    "add context to make it unique"
+                    f"block {i}: replace target found {n} times - add context to make it unique"
                 )
             buf = buf.replace(block[1], block[2], 1)
         elif kind == "delete":
@@ -156,24 +155,20 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
         now = f.read()
     if now != out:
         raise CodeEditError(
-            f"{path}: disk content diverged after write - "
-            "the file may be corrupt; re-check"
+            f"{path}: disk content diverged after write - the file may be corrupt; re-check"
         )
     for i, block in enumerate(blocks):
         if block[0] in ("replace", "replace_all") and block[2] and block[2] not in now:
             raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed "
-                "(new text not on disk)"
+                f"{path}: block {i} verify-after-write failed (new text not on disk)"
             )
         if block[0] in ("insert_before", "insert_after") and block[2] and block[2] not in now:
             raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed "
-                "(inserted text not on disk)"
+                f"{path}: block {i} verify-after-write failed (inserted text not on disk)"
             )
         if block[0] == "delete" and block[1] in now:
             raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed "
-                "(deleted text still on disk)"
+                f"{path}: block {i} verify-after-write failed (deleted text still on disk)"
             )
 
 

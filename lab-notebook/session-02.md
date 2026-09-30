@@ -32,4 +32,3 @@
 ## Framing note (2026-09-21) — "witness machine" methodology
 
 Study #1's machine selection was ad hoc ("this is what I have"). Study #2 inverts it: the T14s Gen 4 / 7840U was *chosen* from the 102.4 GB/s class as a **witness machine** — a representative member of the tier, selected for tier-typical bandwidth (LPDDR5X-6400 dual channel), UMA shared-memory design (so the formula transfers), and matrix-capable iGPU (so prediction 4 is testable). The claim structure changes accordingly: study #1 claims "this machine"; study #2 claims "this *class*", with the witness machine as evidence. Limitation to state in the eventual report: one witness per tier is still n=1 for tier-level generalization.
-

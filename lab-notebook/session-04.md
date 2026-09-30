@@ -89,4 +89,3 @@ Model: 1.95 GiB, 3.40 B params (Q4_K_M). CPU binary loaded `libggml-cpu-zen4.so`
 - pp512 740.5: comparable to Qwen3B's 759.5 despite 2× params — Gemma3's prefill efficiency per param is high; recorded, no prediction was made (correctly).
 
 **Live estimate:** 23.96 bench × 0.80 ≈ **19 t/s live** — just under the 20 t/s comfort line. Gemma3-4B is effectively *at* the budget ceiling: the formula's budget said ~3.0 GiB max, and 2.93 GiB lands at ~19 t/s live. Consistent, and the threshold table's prediction (2.6 GiB) again proved conservative.
-

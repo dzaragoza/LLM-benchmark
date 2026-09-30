@@ -40,8 +40,7 @@ def _ca_path() -> str:
         pem = os.environ.get("SANDBOX_PROXY_CA_CERT", "")
         if not pem:
             raise PushError(
-                "no CA available: /tmp/proxy-ca.pem missing "
-                "and SANDBOX_PROXY_CA_CERT unset"
+                "no CA available: /tmp/proxy-ca.pem missing and SANDBOX_PROXY_CA_CERT unset"
             )
         with open(path, "w") as fh:
             fh.write(pem)

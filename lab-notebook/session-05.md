@@ -49,4 +49,3 @@ Rationale on record: Q6_K beat the live-threshold prediction with margin; pushin
 - **Comfort-line arithmetic, updated:** 23.38 bench ≈ 18.7 live — still just below 20. But the *budget* at 20 t/s live now computes as 75–78 × 0.80 ≈ **60–62 GiB/s effective live** → budget ≈ **3.0–3.1 GiB**, and at the Q8_0-implied 78.6: 20 live = 78.6 × 0.80 ÷ 20 ≈ 3.14 GiB. Call it: **size budget ≈ 3.0–3.2 GiB** (was 2.6 predicted, 3.0 assumed). The boundary is softer than study #1's — champion selection is firmly an accuracy question.
 - FP16 run still pending (split-file handling) — would pin the top of the correction curve.
 - Caveat on record: single model family; the correction term is provisional until a second family shows the same slope (candidate: Gemma3-4B QAT only ships Q4_0, so the cross-family check needs the self-quantized Llama3.2 or Phi-3.5 ladder later).
-

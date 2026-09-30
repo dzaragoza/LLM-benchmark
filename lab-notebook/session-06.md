@@ -47,4 +47,3 @@
 - ❌ **Correction 2 — it's not "dual channel," it's 4 × 32-bit channels.** Four memory devices on CHANNEL A/B/C/D, each 32-bit data width, total 32 GB → 128-bit aggregate bus, same as the notebook's number but via 4 narrow channels, not 2 wide ones. (AMD Phoenix memory topology: LPDDR5 is always 4×32-bit on this package.) No effect on the 102.4 GB/s figure.
 - **Net effect on all results: zero.** 6400 MT/s × 16 B/cycle = 102.4 GB/s either way; every efficiency percentage and the two-tier table stand unchanged. The open item ("verify memory speed on the running machine") closes as **confirmed**, with the LPDDR5/quad-channel description corrected for the report.
 - Also logged: fingerprint-reader sudo prompt — biometric auth on the T14s, nothing to do with anything, just notebook color. 🐱
-
