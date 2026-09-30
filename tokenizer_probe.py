@@ -49,6 +49,8 @@ import os
 import sys
 from typing import Any
 
+import tee_output
+
 CORPUS_DEFAULT = "./live-corpus-cal50.json"
 
 
@@ -128,6 +130,7 @@ def dump_wt_distribution(path: str) -> dict[str, Any] | None:
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="offline words/token probe: tokenizer efficiency on "
         "the registered text sets (the w/t predictor's first "

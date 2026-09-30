@@ -52,6 +52,7 @@ import time
 from typing import Any
 
 import llama_server
+import tee_output
 from speed_gate import (
     CTX_DEFAULT,
     READER_REACTION_S,
@@ -241,6 +242,7 @@ def resim_mode(session_path: str, reader_wps: float, reaction_s: float) -> None:
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(description="replay the gate's conversation live, streaming")
     ap.add_argument(
         "--resim",

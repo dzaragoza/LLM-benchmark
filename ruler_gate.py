@@ -46,6 +46,7 @@ import urllib.request
 from typing import Any
 
 import llama_server
+import tee_output
 
 WORD_BANK = (
     "the quick brown fox jumps over a lazy dog while rain falls on quiet "
@@ -446,6 +447,7 @@ def run_depth(
 
 
 def main() -> None:
+    tee_output.install()
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("model", help="GGUF path (the server runs this file)")
     p.add_argument(

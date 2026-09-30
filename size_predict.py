@@ -25,6 +25,8 @@ from __future__ import annotations
 import json
 import sys
 
+import tee_output
+
 GIB = 1024**3
 Q8_BYTES = 8.5 / 8
 F16_BYTES = 2.0
@@ -65,6 +67,7 @@ def predict(cfg_path: str) -> tuple[float, float]:
 
 
 def main(argv: list[str]) -> int:
+    tee_output.install()
     if len(argv) < 2:
         print(__doc__)
         return 2

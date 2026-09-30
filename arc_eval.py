@@ -34,6 +34,7 @@ from typing import Any, NoReturn
 import hf_download
 import llama_server
 import speed_gate
+import tee_output
 from llama_server import start_server, stop_server
 
 ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
@@ -248,6 +249,7 @@ def arc_run(
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="strict ARC-Challenge evaluation on a list of models "
         "(raw completions, logprob letter scoring)"

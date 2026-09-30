@@ -34,6 +34,7 @@ from typing import Any
 import llama_server
 import ruler_gate
 import speed_gate
+import tee_output
 
 RUNG_BASE = 8192
 
@@ -105,6 +106,7 @@ def fwe_pass(
 
 
 def main() -> None:
+    tee_output.install()
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("models", nargs="+", help="GGUF paths")
     p.add_argument("--corpus", default=speed_gate.CORPUS_DEFAULT)

@@ -60,6 +60,8 @@ import os
 import sys
 from typing import Any
 
+import tee_output
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from hf_download import RUNG_BITS  # single source (addendum 44): the bpw
@@ -184,6 +186,7 @@ def print_fit(name: str, a: float, b: float, r2: float, n: int) -> tuple[float, 
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="harvest the ladder data, fit the bandwidth->size law, "
         "print the right-sizing boundary size*(floor)"

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """speed_gate.py -- the worst-turn speed gate (middle layer).
 
 Measures live generation speed through the real serving stack, the way
@@ -103,6 +104,7 @@ import time
 from typing import Any, NoReturn
 
 import llama_server
+import tee_output
 from ruler_gate import report_server_ctx
 
 CORPUS_DEFAULT = "./live-corpus-cal50.json"
@@ -1130,6 +1132,7 @@ def analyze(
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="speed gate: live-bench a model and grade the worst "
         "turn against the reader line (absorbs the former "

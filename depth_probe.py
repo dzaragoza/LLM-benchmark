@@ -56,6 +56,7 @@ import sys
 from typing import Any, NoReturn
 
 import llama_server
+import tee_output
 from law_fit import kv_gib
 
 CORPUS_DEFAULT = "./live-corpus-cal50.json"
@@ -230,6 +231,7 @@ def parse_kv(spec: str) -> tuple[int, int, int, float]:
 
 
 def main() -> None:
+    tee_output.install()
     ap = argparse.ArgumentParser(
         description="decode speed at context depth via prefill blobs "
         "(the addendum-11 depth protocol)"
