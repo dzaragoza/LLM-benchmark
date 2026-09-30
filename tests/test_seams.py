@@ -504,10 +504,7 @@ def test_code_edit_new_blocks_compose_in_one_transaction(tmp_path):
     body, delete the loop header, fix the caller - all or nothing."""
     p = tmp_path / "mod.py"
     p.write_text(
-        "def bench():\n"
-        "    for rep in range(1, 2):\n"
-        "        do_work(rep)\n"
-        "        return rep\n"
+        "def bench():\n    for rep in range(1, 2):\n        do_work(rep)\n        return rep\n"
     )
     code_edit.edit(
         str(p),
