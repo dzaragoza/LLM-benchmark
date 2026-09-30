@@ -429,6 +429,16 @@ def test_code_edit_transaction_all_or_nothing(tmp_path):
         assert f.read() == "x = 1\nz = 3\n"  # the first block did NOT apply
 
 
+def test_code_edit_replace_all(tmp_path):
+    """Addendum 20: replace_all changes EVERY occurrence (a deliberate
+    multi-edit, not an ambiguous coin-flip)."""
+    p = tmp_path / "mod.py"
+    p.write_text("a = old\nb = old\nc = other\n")
+    code_edit.edit(str(p), [("replace_all", "old", "new")])
+    with open(str(p)) as f:
+        assert f.read() == "a = new\nb = new\nc = other\n"
+
+
 def test_code_edit_atomic_write_leaves_no_tempfiles(tmp_path):
     """Addendum 20: the atomic-write path cleans its temp file; the
     directory holds only the edited module."""
