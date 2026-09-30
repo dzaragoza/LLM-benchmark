@@ -93,6 +93,7 @@ import llama_server
 import mcnemar
 import ruler_gate
 import speed_gate
+import tee_output
 
 RUNG_BASE = 8192
 # midpoint rungs: 8k, 12k, 16k, 24k, 32k, 48k, 64k (addendum 7 corrected)
@@ -736,6 +737,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    tee_output.install()
     ap = build_parser()
     args = ap.parse_args()
     global DRY_RUN_ACTIVE
