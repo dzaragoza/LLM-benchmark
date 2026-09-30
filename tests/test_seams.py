@@ -558,3 +558,68 @@ def test_mapped_memory_none_for_dead_pid():
         pid = 999999998
 
     assert llama_server.mapped_memory_gib(Dead()) is None
+
+
+def test_code_edit_preview_shows_diff_without_writing(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    diff = code_edit.preview(str(p), [("replace", "x = 1", "x = 2")])
+    assert "-x = 1" in diff and "+x = 2" in diff
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\n"  # nothing written
+
+
+def test_code_edit_preview_fails_like_edit(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    try:
+        code_edit.preview(str(p), [("replace", "nope", "x")])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+
+
+def test_code_edit_edit_many_all_or_nothing_across_files(tmp_path):
+    a, b = tmp_path / "a.py", tmp_path / "b.py"
+    a.write_text("xa = 1\n")
+    b.write_text("xb = 1\n")
+    code_edit.edit_many(
+        [
+            (str(a), [("replace", "xa = 1", "xa = 2")]),
+            (str(b), [("replace", "xb = 1", "xb = 2")]),
+        ]
+    )
+    assert a.read_text() == "xa = 2\n"
+    assert b.read_text() == "xb = 2\n"
+    # now a failing set: b's block is bad - a must stay untouched
+    try:
+        code_edit.edit_many(
+            [
+                (str(a), [("replace", "xa = 2", "xa = 3")]),
+                (str(b), [("replace", "nope", "x")]),
+            ]
+        )
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+    assert a.read_text() == "xa = 2\n"  # rolled back - not half-edited
+    assert b.read_text() == "xb = 2\n"
+
+
+def test_code_edit_edit_many_rejects_duplicate_paths(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    try:
+        code_edit.edit_many(
+            [
+                (str(p), [("replace", "x = 1", "x = 2")]),
+                (str(p), [("replace", "x = 2", "x = 3")]),
+            ]
+        )
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "duplicate" in str(e)
+    assert raised
+    assert p.read_text() == "x = 1\n"

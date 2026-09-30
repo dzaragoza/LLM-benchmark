@@ -57,7 +57,7 @@ import re
 import tempfile
 from collections.abc import Sequence
 
-__all__ = ["CodeEditError", "edit", "write", "apply_patch_blocks"]
+__all__ = ["CodeEditError", "edit", "edit_many", "preview", "write", "apply_patch_blocks"]
 
 
 class CodeEditError(Exception):
@@ -381,6 +381,49 @@ def write(path: str, content: str) -> None:
     with open(path, encoding="utf-8") as f:
         if f.read() != content:
             raise CodeEditError(f"{path}: disk content diverged after write - re-check")
+
+
+def preview(path: str, blocks: Sequence[tuple]) -> str:
+    """The unified diff edit() would produce - verifies every block,
+    writes NOTHING. For eyeballing a change before committing to it."""
+    import difflib
+
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    _verify_blocks(src, blocks)
+    out = _apply(src, blocks)
+    return "".join(
+        difflib.unified_diff(
+            src.splitlines(keepends=True),
+            out.splitlines(keepends=True),
+            fromfile=path,
+            tofile=path + " (edited)",
+        )
+    )
+
+
+def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
+    """Apply one edit() per file as ONE cross-file transaction: every
+    file's blocks are verified FIRST; a failure anywhere touches
+    NOTHING (the whole set rolls back to git - no half-edited sets).
+    edits: [(path, blocks), ...] - paths must be unique."""
+    seen: set[str] = set()
+    specs = []
+    for path, blocks in edits:
+        if path in seen:
+            raise CodeEditError(f"edit_many: duplicate path {path}")
+        seen.add(path)
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        _verify_blocks(src, blocks)
+        specs.append((path, src, _apply(src, blocks)))
+    for path, _src, out in specs:
+        _atomic_write_sync(path, out)
+        with open(path, encoding="utf-8") as f:
+            if f.read() != out:
+                raise CodeEditError(
+                    f"{path}: disk content diverged after write - the file may be corrupt; re-check"
+                )
 
 
 def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:
