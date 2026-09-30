@@ -113,11 +113,11 @@ the seven members at or above 5 w/s.
 | Qwen2.5-7B-Instruct | 7.62B | 8.01 (C) | — | — | FAIL (3.4) | — | — |
 | Qwen3.5-4B | 4.0B | 4.29 (M) | **90.4** | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — | **32,768** |
 | Qwen3-4B | 4.0B | 3.99 (M) | **85.0** | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — | **16,384** |
-| Qwen2.5-3B-Instruct | 3.1B | 3.37 (M) | **76.1** | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — | 0 (counting floor) |
+| Qwen2.5-3B-Instruct | 3.1B | 3.37 (M) | **76.1** | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — | **OUT** (task refusal — session 34 add. 8) |
 | Qwen3-1.7B | 1.7B | 1.71 (M) | **68.0** | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — | **32,768** (trained window 40,960) |
 | Qwen2.5-1.5B-Instruct | 1.5B | 1.76 (M) | **73.5** | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — | **16,384** |
 | Qwen3.5-0.8B | 0.8B | 0.86 (M) | **61.3** | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) | **65,536** |
-| Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) | 0 (counting floor, 136f) |
+| Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) | **OUT** (counting floor — 136f) | 0 (counting floor, 136f) |
 
 † **The sentinel row, honestly stated (addenda 69/73):** the 4B is
 the predicted in-band member (5.92, dead in [5–10]) whose measured
