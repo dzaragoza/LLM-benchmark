@@ -127,3 +127,22 @@ THE RUN (the author, 2026-09-30: "run done"): the full re-climb under protocol v
 
 ### Session 34, addendum 22 - ARC is retired from the pages; 1024-token resolution; results.txt is sealed before the commit
 THE AUTHOR'S RULING (2026-09-30): "this is an amazing result! it demolishes arc as a measurement and gives a true smartness scale" - the FWE ladder score is now THE ranking; ARC is removed from both pickers (candidate records, verdict cards, table columns, prose; the old .arc CSS span is renamed .depth and now styles the depth score). THE REFINEMENTS: (1) the binary-search resolution window widens from 512 to 1024 tokens (midpoints on 1024 boundaries - one fewer measurement per model at n=1 cost); the two ladder tests re-anchored to the new boundaries (the window test resolves 18432 in one fewer midpoint; the fwe-flicker test resolves 24576 at 25600, since 25088 now falls inside the 1024 window). (2) tee_output gains uninstall() - full_benchmark calls it BEFORE the git tail, so results.txt is sealed (no more writes) before it is committed and pushed; the committed file is byte-complete. NEXT: the other lineages climb the same ladder.
+
+
+### Session 34, addendum 24 - Q4 rung choice: Q4_K_M over Q4_0; the rationale on record
+
+THE QUESTION (the author: "what is the best Quant suffix for q4? I was thinking of using _0, same as q8"): the Q4 test of context-over-parameters needs a 4-bit encoding, and the suffix choice determines what the ladder measures.
+
+THE RULING: **Q4_K_M**, recorded here for the report. The reasoning:
+
+1. **It is the honest instrument.** The hypothesis under test is "for this bandwidth class, context dominates - a smaller file should gain rungs (deeper KV, faster weight reads)." Q4_K_M is the community-standard best-quality 4-bit (~4.8 bpw): most tensors Q4_K, attention/output tensors Q6_K. It minimizes the confound - a rung gained is a context win, not a quant artifact. Q4_0 is the legacy bare block format (~4.5 bpw, no importance matrix, no mixed precision); its extra quality damage lands exactly on FWE counting, so a Q4_0 ladder cannot distinguish "context won" from "quant broke the counting" - the disambiguator (FWE flicker vs more passing rungs, addendum 21) loses its power.
+
+2. **The naming-symmetry case for Q4_0 was considered and deferred.** Symmetry with Q8_0 is real (both legacy formats, a cleaner size-law baseline), and Q4_0 is slightly faster per byte at equal size - but it answers the size-law question, not the practical one. If the size-law baseline is wanted later, Q4_0 is a defensible second run, not the lead.
+
+3. **Operational: the Qwen lineage has premade Q4_K_M files on the Hub for every size** - no local llama-quantize, no f16 staging, no extra disk (relevant after the disk cleanup). Where a premade file is missing, the pipeline quantizes from f16 locally (llama-quantize + temporary f16 on disk).
+
+THE MECHANISM (already in the tree, addendum 23 follow-on): `--rung` takes any suffix - `--rung Q4_K_M` or `--rung Q4_0` - so the choice is a flag, not a code change. The run keeps its own state/results pair: `--state-file benchmark-state-q4.json --results-file benchmark-results-q4.json`.
+
+THE QUEUE (the author's plan, on record): (1) the lineage-2 run finishes; (2) each model re-measured directly at its optimal rung with the smaps census live (resident_gib becomes the authoritative memory number for the pickers); (3) the Q4 run at Q4_K_M.
+
+THE BASELINE TO BEAT: Qwen3.5-0.8B Q8_0, scored 105,472 tok at 2.53 GiB cold (addendum 21). The Q4 question is whether a 0.8B-class model at ~0.45 GiB of weights reaches comparable or better depth+s cost - and whether the 4B-class models, freed from ~4.3 GiB of weight reads, climb past 65,536.
