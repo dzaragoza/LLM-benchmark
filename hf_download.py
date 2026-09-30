@@ -258,13 +258,23 @@ def has_pytorch_bin(names: list[str]) -> bool:
 
 
 def resolve_f16_local(famdir: str) -> str | None:
-    """Local f16/fp16/bf16 GGUF (fp16 does NOT match a *f16* glob)."""
+    """Local f16/fp16/bf16 GGUF (fp16 does NOT match a *f16* glob).
+    A quantized file must never resolve as the f16 source: 'bf16' in
+    the FAMILY name made the MiniCPM-*-sft-bf16 family's own -Q8_0.gguf
+    match the glob, and llama-quantize died with 'input and output
+    files are the same' (session 34, addendum 30)."""
     if not os.path.isdir(famdir):
         return None
     hits = []
     for pat in ("*f16*.gguf", "*fp16*.gguf", "*bf16*.gguf"):
         hits += glob.glob(os.path.join(famdir, pat))
-    hits = [h for h in hits if "mmproj" not in os.path.basename(h).lower()]
+    quant_sufs = ("q8_0", "q6_k", "q5_k", "q4_k", "q4_0", "q3_k", "q2_k", "q8_0")
+    hits = [
+        h
+        for h in hits
+        if "mmproj" not in os.path.basename(h).lower()
+        and not os.path.basename(h).lower().endswith(tuple(s + ".gguf" for s in quant_sufs))
+    ]
     return sorted(hits)[0] if hits else None
 
 
