@@ -636,7 +636,7 @@ def test_check_requirements_fails_loud_when_a_package_is_missing(capsys, monkeyp
         fb.check_requirements()
         raised = False
     except SystemExit as e:
-        raised = "pip install -r requirements.txt" in str(
+        raised = "python3 -m pip install -r requirements.txt" in str(
             e
         ) and "definitely-not-a-real-package-xyz" in str(e)
     assert raised
