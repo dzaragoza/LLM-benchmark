@@ -196,3 +196,88 @@ ok: corpus ./live-corpus-cal50.json
 dry run OK - rungs [8192, 12288, 16384, 24576, 32768, 49152, 65536, 98304, 131072, 196608, 262144, 393216, 524288, 786432, 1048576, 1572864, 2097152, 3145728, 4194304, 6291456, 8388608, 12582912, 16777216, 25165824, 33554432, 50331648, 67108864, 100663296, 134217728] from 8192, n=1 both (protocol v4)
 half rungs: x1.5 steps (addendum 7); the top rung caps to the trained window (addendum 6)
 per-rung wall time printed (the time command is retired, session 34)
+
+===== 2026-09-30T08:40:43 | full_benchmark.py --help =====
+usage: full_benchmark.py [-h] [--corpus CORPUS] [--reader-wps READER_WPS]
+                         [--models-dir MODELS_DIR] [--state-file STATE_FILE]
+                         [--results-file RESULTS_FILE] [--arc-num ARC_NUM]
+                         [--arc-results-dir ARC_RESULTS_DIR]
+                         [--arc-config {ARC-Challenge,ARC-Easy}]
+                         [--roster ROSTER] [--dry-run] [--force] [--thinking]
+                         [--no-git] [--arc] [--min-rung MIN_RUNG]
+                         [--no-thinking]
+                         families [families ...]
+
+end-to-end benchmark: quant selection, strict full ARC, exact-McNemar ranking
+- one final output
+
+positional arguments:
+  families              family specs: "model_repo" or "model_repo=source_repo"
+
+options:
+  -h, --help            show this help message and exit
+  --corpus CORPUS
+  --reader-wps READER_WPS
+                        the k=1 guarantee line in WORDS per second: worst turn
+                        at the reference depth must never fall below this
+                        (default 5.0 w/s = 300 wpm, Brysbaert 2019 - match the
+                        fast reader)
+  --models-dir MODELS_DIR
+  --state-file STATE_FILE
+  --results-file RESULTS_FILE
+  --arc-num ARC_NUM     ARC-Challenge questions (default: full 1172)
+  --arc-results-dir ARC_RESULTS_DIR
+  --arc-config {ARC-Challenge,ARC-Easy}
+  --roster ROSTER       restrict phases 5-6 and the ranking to these families
+                        (comma-separated, as named in the family specs); the
+                        state file accumulates across studies - without this
+                        flag the ranking defaults to the families named in
+                        this run's command line (addendum 41/56)
+  --dry-run             READ-ONLY pre-flight (addendum 79): lists every repo,
+                        verifies tooling, runs the RAM/disk feasibility checks
+                        and reports each family's acquisition plan WITHOUT
+                        downloading, converting, benching or touching the
+                        state file. THE WAY OF WORKING: always run the command
+                        with --dry-run first, read the pre-flight report, then
+                        issue it without.
+  --force               redo families that already have a selection
+  --thinking            thinking-model category: benchmark with thinking
+                        enabled (same worst-turn gate; reasoning measured
+                        descriptively). Use separate --state-file/--results-
+                        file for this category.
+  --no-git              skip the git tail (session 34 addendum 15: the commit-
+                        and-push of the run's artifacts is now DEFAULT - the
+                        git interface is layer 3, like the hub and llama.cpp;
+                        the old --git-commit opt-in is superseded)
+  --arc                 session 34 (addendum 4): run the ARC-Challenge phase
+                        and the McNemar ranking after the ladders - OPTIONAL
+                        (the ladder is the bench; ARC is a tiebreak at the
+                        author's discretion)
+  --min-rung MIN_RUNG   session 34 (addendum 9/10): the ladder's first rung
+                        (default: the protocol v4 base 8192); stored in the
+                        state as ladder_min_rung so every subsequent run of
+                        the family climbs the same grid
+  --no-thinking         hybrid models, non-thinking category: run with
+                        thinking disabled (chat-template kwargs
+                        enable_thinking=false; first-turn dump check confirms
+                        no reasoning appears)
+
+===== 2026-09-30T08:40:43 | full_benchmark.py --dry-run Qwen3.5-0.8B =====
+
+============================================================
+[2026-09-30T08:40:43 +0m] family: Qwen3.5-0.8B
+  model repo : Qwen3.5-0.8B
+  source repo: Qwen3.5-0.8B
+  folder     : ./models/Qwen3.5-0.8B
+[2026-09-30T08:40:43 +0m] FAMILY FAILED: Qwen3.5-0.8B (recorded; the sweep continues - addendum 78)
+
+============================================================
+[2026-09-30T08:40:43 +0m] DRY RUN COMPLETE - READ-ONLY PRE-FLIGHT REPORT
+  families checked : 1
+  rung             : Q8_0 (fixed; the rung walk is removed - addendum 86)
+  FAILED families  : 1 of 1 - fix these BEFORE the real run (the sweep would skip them):
+    Qwen3.5-0.8B: huggingface_hub is required: pip install -r requirements.txt (then activate the repo venv: .venv/bin/activate on Linux/macOS, .venv\Scripts\Activate.ps1 on Windows)
+
+  The state file was NOT modified and no files were downloaded (addendum 79).
+  If the report is clean, issue the SAME command without
+  --dry-run to start the real run.

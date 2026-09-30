@@ -701,12 +701,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--state-file/--results-file for this category.",
     )
     ap.add_argument(
-        "--git-commit",
+        "--no-git",
         action="store_true",
-        help="commit and push the run's artifacts (state, "
-        "results, per-turn dumps, mem sidecars, ARC "
-        "CSVs) when the run completes - force-added "
-        "past the ignores (addendum 78, item 5)",
+        help="skip the git tail (session 34 addendum 15: the "
+        "commit-and-push of the run's artifacts is now DEFAULT - "
+        "the git interface is layer 3, like the hub and llama.cpp; "
+        "the old --git-commit opt-in is superseded)",
     )
     ap.add_argument(
         "--arc",
@@ -775,10 +775,13 @@ def main() -> None:
         print("\n--arc not given - skipping the ARC phase and the ranking (session 34 addendum 4)")
     write_results(args, state)
 
-    # ---- addendum 78, item 5: the git tail - commit and push every
-    # artifact the study needs (state, results, per-turn dumps, mem
-    # sidecars, ARC CSVs), force-added past the .gitignore.
-    if args.git_commit and not args.dry_run:
+    # ---- addendum 78, item 5 / session 34 addendum 15: the git tail -
+    # commit and push every artifact the study needs, force-added past
+    # the .gitignore. Now DEFAULT (the author: "do the git work in full
+    # benchmark. layer 3 is the right place to have a git interface,
+    # same as the hugging face interface and the llama-cpp interface");
+    # --no-git opts out.
+    if not args.no_git and not args.dry_run:
         git_tail(args)
     stamp("run complete")
 
@@ -1097,7 +1100,7 @@ def print_wt_table(state: dict[str, Any]) -> None:
 
 def git_tail(args: argparse.Namespace) -> None:
     stamp("committing artifacts to git (state, results, dumps, mem sidecars, ARC CSVs)")
-    paths = [args.state_file, args.results_file]
+    paths = [args.state_file, args.results_file, "results.txt"]
     # per-turn dumps + mem sidecars: the grading instrument's raw data
     # (p05, Delta, stall attribution, gen_words, memory shape) - small
     # JSON, force-added past the models/ ignore (addendum 78).
@@ -1105,6 +1108,14 @@ def git_tail(args: argparse.Namespace) -> None:
         glob.glob("models/*/*.live-dump*.json")
         + glob.glob("models/*/*.sentinel*.json")
         + glob.glob("models/*/*.mem.json")
+    )
+    # session 34 addendum 15: the ladder's raw data rides too - the
+    # speed/fwe dumps and the window-probe logs (the addendum-6 cap's
+    # evidence), plus the ruler CSVs.
+    paths += (
+        glob.glob("models/*/ladder-results/*")
+        + glob.glob("ladder-results/*")
+        + glob.glob("ruler-results/*")
     )
     if os.path.isdir(args.arc_results_dir):
         paths.append(args.arc_results_dir)
