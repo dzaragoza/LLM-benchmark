@@ -904,12 +904,14 @@ def check_requirements() -> None:
     interpreter's own path is printed first so the wrong-venv (or
     system-python) case is visible at a glance; a missing package is a
     hard stop BEFORE any download or bench work begins."""
-    import importlib.util
+    from importlib.metadata import PackageNotFoundError, version
 
     print(f"  python : {sys.executable}")
     missing = []
     for name in REQ_PACKAGES:
-        if importlib.util.find_spec(name) is None:
+        try:
+            version(name)
+        except PackageNotFoundError:
             missing.append(name)
     if missing:
         sys.exit(
