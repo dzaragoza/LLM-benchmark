@@ -24,11 +24,11 @@ doubling ladder, but intermediate values are fine") - one probe launch
 at a huge -c reads the server's cap off the banner, and the grid
 gains one non-dyadic top rung (e.g. 8192, 16384, 32768, 40960).
 
-Session 34 (addendum 7): HALF RUNGS - the step is x1.5, not x2 (the
-author: "let's do the ladder in half rungs, I think it will help
-discriminate better"). Grid: 8192, 12288, 18432, 27648, 41472, ...
-The window still caps the top (a window below the next 1.5x step
-becomes the final rung).
+Session 34 (addendum 7, as corrected): MIDPOINT RUNGS - the dyadic
+rungs stay (x2), and the geometric MIDPOINT joins between each pair
+(the author: "rungs are still 2x, but adding the step in the middle
+between two rungs"). Grid: 8192, 12288, 16384, 24576, 32768, 49152,
+65536, ... The window still caps the top (addendum 6).
 
 Session 34 (addendum 4): the ladder machinery is MERGED into
 full_benchmark.py - the new way of working is one command that
@@ -56,7 +56,8 @@ import speed_gate
 import tee_output
 
 RUNG_BASE = 8192
-RUNG_STEP = 1.5  # half rungs in log space: 8k, 12k, 18k, 27k, 41k... (session 34, addendum 7)
+# midpoint rungs: 8k, 12k, 16k, 24k, 32k, 48k, 64k (addendum 7 corrected)
+RUNG_MIDPOINT = True
 
 
 def speed_pass(
@@ -188,6 +189,7 @@ def run_ladder(
         print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
     score = 0
     rung = RUNG_BASE
+    mid = True  # the next step after the base is the midpoint (1.5x)
     rungs: list[dict[str, Any]] = []
     model_t0 = time.monotonic()
     while True:
@@ -229,7 +231,9 @@ def run_ladder(
         score = rung
         if max_rung and rung >= max_rung:
             break
-        nxt = int(round(rung * RUNG_STEP))
+        mult = 1.5 if mid else 2.0 / 1.5  # dyadic pair -> midpoint -> dyadic
+        nxt = int(round(rung * mult))
+        mid = not mid
         if nxt <= rung:
             break  # integer rounding collapsed the step - nothing above
         if window and nxt >= window:
@@ -280,9 +284,11 @@ def dry_run(args: argparse.Namespace) -> int:
         return 1
     rungs = []
     r = RUNG_BASE
+    mid = True
     while not args.max_rung or r <= args.max_rung:
         rungs.append(r)
-        r = int(round(r * RUNG_STEP))
+        r = int(round(r * (1.5 if mid else 2.0 / 1.5)))
+        mid = not mid
     print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
     print(
         "half rungs: x1.5 steps (addendum 7); the top rung caps to the trained window (addendum 6)"
