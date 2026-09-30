@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from typing import Any
 
 import llama_server
@@ -37,6 +38,36 @@ import speed_gate
 import tee_output
 
 RUNG_BASE = 8192
+
+
+def dry_run(args: argparse.Namespace) -> int:
+    """The preflight the author asked for (session 34): verify every
+    model path and the corpus BEFORE any server work, print the plan
+    (rungs, corpus, ports), exit non-zero on any missing file. Never
+    burns a launch on a bad command line."""
+    missing = 0
+    for model in args.models:
+        if not os.path.exists(model):
+            print(f"DRY-RUN FAIL: model not found: {model}")
+            missing += 1
+        else:
+            print(f"ok: {model} ({os.path.getsize(model) / 1024**3:.2f} GiB)")
+    if not os.path.exists(args.corpus):
+        print(f"DRY-RUN FAIL: corpus not found: {args.corpus}")
+        missing += 1
+    else:
+        print(f"ok: corpus {args.corpus}")
+    if missing:
+        print(f"dry run: {missing} missing file(s) - nothing launched")
+        return 1
+    rungs = []
+    r = RUNG_BASE
+    while not args.max_rung or r <= args.max_rung:
+        rungs.append(r)
+        r *= 2
+    print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
+    print("per-rung wall time printed (the time command is retired, session 34)")
+    return 0
 
 
 def speed_pass(
@@ -114,7 +145,15 @@ def main() -> None:
     p.add_argument("--results-dir", default="ladder-results")
     p.add_argument("--seed", type=int, default=1024)
     p.add_argument("--max-rung", type=int, default=None, help="stop after this rung (debug)")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="preflight only: verify paths, print the plan, launch nothing",
+    )
     args = p.parse_args()
+
+    if args.dry_run:
+        raise SystemExit(dry_run(args))
 
     os.makedirs(args.results_dir, exist_ok=True)
     table = []
@@ -127,18 +166,27 @@ def main() -> None:
         print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
         score = 0
         rung = RUNG_BASE
+        model_t0 = time.monotonic()
         while True:
+            t0 = time.monotonic()
             ok_s, sv = speed_pass(model, rung, args.corpus, args.port, args.results_dir)
-            print(f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'}", flush=True)
+            t_speed = time.monotonic() - t0
+            print(
+                f"  rung {rung}: speed {'PASS' if ok_s else 'FAIL'} [{t_speed:.0f}s]",
+                flush=True,
+            )
             if sv.get("mem_cost_gib") is not None:
                 print(f"    cold machine cost @ rung: {sv['mem_cost_gib']:.2f} GiB")
             if not ok_s:
                 print(f"    speed verdict: {json.dumps(sv)[:200]}")
                 break
+            t0 = time.monotonic()
             ok_f, fv = fwe_pass(model, rung, args.results_dir, args.seed, args.port)
+            t_fwe = time.monotonic() - t0
             print(
                 f"    fwe @ depth {fv['depth']}: "
-                f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'}",
+                f"{fv['correct']}/{fv['n']} -> {'PASS' if ok_f else 'FAIL'} "
+                f"[{t_fwe:.0f}s]",
                 flush=True,
             )
             if not ok_f:
@@ -147,7 +195,11 @@ def main() -> None:
             if args.max_rung and rung >= args.max_rung:
                 break
             rung *= 2
-        print(f"  {label}: SCORE = {score} tokens (last rung passing both)")
+        model_t = time.monotonic() - model_t0
+        print(
+            f"  {label}: SCORE = {score} tokens (last rung passing both) "
+            f"[{model_t / 60:.1f} min wall, measured - the time command retired, session 34]"
+        )
         table.append({"model": label, "score": score})
     print("\n=== ladder table ===")
     for row in sorted(table, key=lambda r: -r["score"]):
