@@ -165,6 +165,7 @@ def run_ladder(
     results_dir: str = "ladder-results",
     seed: int = 1024,
     max_rung: int | None = None,
+    min_rung: int = RUNG_BASE,
 ) -> dict[str, Any]:
     """One model's PROTOCOL v4 ladder (addendum 137p). Returns
     {"model", "score", "wall_min", "rungs": [{rung, speed_pass,
@@ -183,13 +184,13 @@ def run_ladder(
             "rungs": [],
             "error": "file not found",
         }
-    print(f"  rungs from {RUNG_BASE}, doubling until the speed gate fails")
+    print(f"  rungs from {min_rung}, doubling until the speed gate fails")
     window = trained_window(model, port, results_dir)
     if window:
         print(f"  trained window: {window} (the top rung caps to it - addendum 6)")
     score = 0
-    rung = RUNG_BASE
-    mid = True  # the next step after the base is the midpoint (1.5x)
+    rung = min_rung
+    mid = rung & (rung - 1) == 0  # dyadic rungs step to the midpoint (1.5x) next
     rungs: list[dict[str, Any]] = []
     model_t0 = time.monotonic()
     while True:
@@ -283,13 +284,13 @@ def dry_run(args: argparse.Namespace) -> int:
         print(f"dry run: {missing} missing file(s) - nothing launched")
         return 1
     rungs = []
-    r = RUNG_BASE
-    mid = True
-    while not args.max_rung or r <= args.max_rung:
+    r = args.min_rung
+    mid = r & (r - 1) == 0
+    while (not args.max_rung or r <= args.max_rung) and r <= 1 << 27:
         rungs.append(r)
         r = int(round(r * (1.5 if mid else 2.0 / 1.5)))
         mid = not mid
-    print(f"dry run OK - rungs {rungs} from {RUNG_BASE}, n=1 both (protocol v4)")
+    print(f"dry run OK - rungs {rungs} from {args.min_rung}, n=1 both (protocol v4)")
     print(
         "half rungs: x1.5 steps (addendum 7); the top rung caps to the trained window (addendum 6)"
     )
@@ -306,6 +307,7 @@ def main() -> None:
     p.add_argument("--results-dir", default="ladder-results")
     p.add_argument("--seed", type=int, default=1024)
     p.add_argument("--max-rung", type=int, default=None, help="stop after this rung (debug)")
+    p.add_argument("--min-rung", type=int, default=RUNG_BASE, help="first rung (default 8192)")
     p.add_argument(
         "--dry-run",
         action="store_true",
@@ -319,7 +321,7 @@ def main() -> None:
     table = []
     for model in args.models:
         ladder = run_ladder(
-            model, args.corpus, args.port, args.results_dir, args.seed, args.max_rung
+            model, args.corpus, args.port, args.results_dir, args.seed, args.max_rung, args.min_rung
         )
         table.append({"model": ladder["model"], "score": ladder["score"]})
     print("\n=== ladder table ===")
