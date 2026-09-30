@@ -111,12 +111,12 @@ the seven members at or above 5 w/s.
 | Qwen3.6-27B | ~27B | 28.9 (P) | — | — | FAIL (1.1) | — | — |
 | Qwen3.5-9B | ~8.7B | 9.3 (P, from measured Q5 6.19) | 92.4 (at Q5_K_M, quant out of scope) | — | FAIL (3.1) | — | — |
 | Qwen2.5-7B-Instruct | 7.62B | 8.01 (C) | — | — | FAIL (3.4) | — | — |
-| Qwen3.5-4B | 4.0B | 4.29 (M) | **90.4** | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — | **65,536** (v4.1) |
-| Qwen3-4B | 4.0B | 3.99 (M) | **85.0** | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — | **16,384** (v4.1) |
+| Qwen3.5-4B | 4.0B | 4.29 (M) | **90.4** | — | **predicted 5.92 → measured 6.32 (2.6% stalls, v3.1 PASS)** † | — | **65,536** (v4.3: speed PASS at 65,536 (worst 6.2, the 5–7.5 band - the rung is the ceiling), FWE PASS; the v4.1 verdict stands, now at 512-token resolution) |
+| Qwen3-4B | 4.0B | 3.99 (M) | **85.0** | — | predicted 5.93 → **measured 7.10** (1.1% stalls, v3.1 PASS) | — | **16,384** (v4.3: the 5–7.5 band at the start rung - worst 5.9 w/s, speed ceiling immediately; FWE PASS) |
 | Qwen2.5-3B-Instruct | 3.1B | 3.37 (M) | **76.1** | — | predicted 6.77 → **measured 9.72** (0.4% stalls, v3.1 PASS) | — | **OUT** (task refusal — session 34 add. 8) |
-| Qwen3-1.7B | 1.7B | 1.71 (M) | **68.0** | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — | **32,768** (window 40,960 benched: speed PASS, FWE 0/1 at 40,704 - a quality edge, not the wall) |
-| Qwen2.5-1.5B-Instruct | 1.5B | 1.76 (M) | **73.5** | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — | **16,384** (v4.1) |
-| Qwen3.5-0.8B | 0.8B | 0.86 (M) | **61.3** | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) | **98,304** (v4.1: speed PASS at 131,072, FWE 0/1 at 130,816) |
+| Qwen3-1.7B | 1.7B | 1.71 (M) | **68.0** | predicted 11.05 → **measured 10.66** (0.0% stalls, v3.1 PASS; Δ gap 0.081 MISS) | — | — | **34,816** (v4.3 binary search to 512-token resolution: speed PASS at 32,768 (worst 7.7), speed FAIL at 65,536; FWE flickers above the score - 0/1 at 35,840 and 35,328, 1/1 at 34,816) |
+| Qwen2.5-1.5B-Instruct | 1.5B | 1.76 (M) | **73.5** | predicted 11.94 → **measured 14.86** (0.0% stalls, v3.1 PASS) | — | — | **20,992** (v4.3 binary search: FWE 0/1 at 32,768 and every midpoint above 20,992; 1/1 at 20,992 - a counting-quality edge, not the wall) |
+| Qwen3.5-0.8B | 0.8B | 0.86 (M) | **61.3** | predicted 16.68 (flipped) | — | **measured 25.86** (0.0% stalls, v3.1 PASS — the band flip, addendum 74) | **105,472** (v4.3 binary search to 512-token resolution: speed PASS through 131,072 (worst 15.2), FWE flickers - 0/1 at 130,816...102,400 passes, 114,688 and 106,496 fail, 1/1 at 105,472, 0/1 at 105,984) |
 | Qwen2.5-0.5B-Instruct | 0.5B | 0.63 (M) | **45.8** | — | — | predicted 20.09 → **measured 25.03** (0.0% stalls, v3.1 PASS; Δ gap 0.162 MISS — the study's first Δ miss, the generation-split question) | **OUT** (counting floor — 136f) | 0 (counting floor, 136f) |
 
 † **The sentinel row, honestly stated (addenda 69/73):** the 4B is
