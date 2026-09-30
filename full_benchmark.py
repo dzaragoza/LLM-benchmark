@@ -136,6 +136,13 @@ def speed_pass(
         os.path.dirname(model) or ".", os.path.basename(model) + ".server.log"
     )
     window_cap = _banner_window(server_log)
+    floor_hit = next((t for t in turns if t.get("error") == "rung below conversation floor"), None)
+    if floor_hit is not None:
+        print(
+            f"    rung {rung}: below the conversation floor - the speed "
+            "gate cannot run here (structural, addendum 31)"
+        )
+        return False, {"error": "rung below conversation floor", "window_cap": window_cap}
     if not turns:
         if window_cap is not None and window_cap < rung:
             print(f"    trained window {window_cap:,} caps the requested -c {rung:,}")
@@ -209,6 +216,25 @@ def fwe_pass(
     finally:
         llama_server.stop_server(proc, port)
     return row["acc"] == 1.0, row
+
+
+def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
+    """The flicker rule (session 34, addendum 31, ruling b): FWE
+    verdicts must be MONOTONE - depth only gets harder. Returns the
+    (deep_pass, shallow_fail) rung pair when a run passes FWE at a
+    deep rung but FAILS at a shallower one (an n=1 boundary
+    coin-flip, the addendum-29 flicker), else None. Works on any
+    ladder's rungs list - a live run_ladder result OR one re-read
+    from a state file (cross-grid flicker: the Qwen3-4B shape, a
+    2048 fail next to a 16384 pass)."""
+    fwe_cells = [c for c in rungs if c.get("fwe_pass") is not None]
+    for deep in fwe_cells:
+        if deep["fwe_pass"] is not True:
+            continue
+        for shallow in fwe_cells:
+            if shallow["rung"] < deep["rung"] and shallow["fwe_pass"] is False:
+                return deep["rung"], shallow["rung"]
+    return None
 
 
 def run_ladder(
@@ -422,18 +448,37 @@ def run_ladder(
             f"the {start:,} start rung; the model is out pending investigation"
         )
 
+    # ---- the flicker rule (session 34, addendum 31, ruling b): FWE
+    # verdicts must be MONOTONE - depth only gets harder. A run that
+    # passes FWE at a deep rung but FAILS at a shallower one is an
+    # n=1 boundary coin-flip (the addendum-29 flicker), and the whole
+    # ladder is INVALID: no score is recorded, the family re-benches.
+    flicker = fwe_flicker(rungs)
+    invalid_reason = None
+    if flicker:
+        invalid_reason = (
+            f"fwe flicker: pass at {flicker[0]:,} but fail at {flicker[1]:,} "
+            "- non-monotone n=1 boundary coin-flip; the run is invalid, re-bench"
+        )
+        failed = True
+        score = 0
+        print(f"  {label}: INVALID - {invalid_reason}")
     wall_min = (time.monotonic() - model_t0) / 60.0
     print(
         f"  {label}: SCORE = {score} tokens (last rung passing both) "
         f"[{wall_min:.1f} min wall, measured]"
     )
-    return {
+    ladder = {
         "model": label,
         "score": score,
         "failed": failed,
         "wall_min": wall_min,
         "rungs": rungs,
     }
+    if invalid_reason:
+        ladder["invalid"] = True
+        ladder["invalid_reason"] = invalid_reason
+    return ladder
 
 
 def scored_row(ladder: dict[str, Any]) -> dict[str, Any]:
@@ -722,6 +767,18 @@ def process_family(
     if 4 not in run["phases_done"]:
         # phase 4: the scored-rung row (the 137n/137m anchors)
         ladder = run.get("ladder")
+        if ladder and ladder.get("invalid"):
+            # the flicker rule (addendum 31): a non-monotone FWE run
+            # scores NOTHING - the verdict is invalid, not a depth
+            run["verdict"] = f"INVALID ({ladder.get('invalid_reason', 'fwe flicker')})"
+            run["rung"] = rung
+            run["score"] = 0
+            run["invalid"] = True
+            run["invalid_reason"] = ladder.get("invalid_reason")
+            run["phases_done"].append(4)
+            save_state(state_path, state)
+            stamp("      phase 4 done (invalid - flicker)")
+            return
         if ladder:
             row = scored_row(ladder)
             run["verdict"] = f"PASS (ladder score {ladder['score']} tokens)"

@@ -701,3 +701,64 @@ def test_resolve_f16_local_never_returns_a_quantized_file(tmp_path):
     (famdir / "MiniCPM-1B-sft-bf16-f16.gguf").write_text("x")
     got = hf_download.resolve_f16_local(str(famdir))
     assert got and got.endswith("MiniCPM-1B-sft-bf16-f16.gguf")
+
+
+def test_fwe_flicker_detects_non_monotone_verdicts():
+    # addendum 31 ruling b: pass deep + fail shallow = coin-flip pair
+    rungs = [
+        {"rung": 2048, "fwe_pass": False},
+        {"rung": 16384, "fwe_pass": True},
+    ]
+    assert fb.fwe_flicker(rungs) == (16384, 2048)  # the Qwen3-4B shape
+    # monotone: fail deep, pass shallow - stands
+    assert (
+        fb.fwe_flicker([{"rung": 1024, "fwe_pass": True}, {"rung": 4096, "fwe_pass": False}])
+        is None
+    )
+    # monotone: all pass / all fail - stands
+    assert (
+        fb.fwe_flicker([{"rung": 1024, "fwe_pass": True}, {"rung": 2048, "fwe_pass": True}]) is None
+    )
+    assert (
+        fb.fwe_flicker([{"rung": 1024, "fwe_pass": False}, {"rung": 2048, "fwe_pass": False}])
+        is None
+    )
+    # unmeasured rungs (speed-only cells) are ignored
+    assert (
+        fb.fwe_flicker([{"rung": 1024, "fwe_pass": None}, {"rung": 4096, "fwe_pass": True}]) is None
+    )
+
+
+def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
+    # the live hook: run_ladder consults fwe_flicker on its own rungs
+    # and marks a non-monotone run invalid (score 0, loud print).
+    # Within one ladder the gallop keeps verdicts monotone, so this
+    # simulates the read-time/cross-grid shape by injecting the pair.
+    monkeypatch.setattr(fb, "fwe_flicker", lambda rungs: (16384, 2048))
+    monkeypatch.setattr(
+        fb,
+        "speed_pass",
+        lambda model, rung, corpus, port, results_dir: (
+            True,
+            {"worst": 20.0, "stall_rate": 0.0, "ceiling_rung": False},
+        ),
+    )
+    monkeypatch.setattr(
+        fb,
+        "fwe_pass",
+        lambda model, rung, results_dir, seed, port: (
+            True,
+            {"depth": rung - 256, "correct": 1, "n": 1},
+        ),
+    )
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "m-Q8_0.gguf")
+        open(p, "w").write("x")
+        ladder = fb.run_ladder(p, corpus="c", min_rung=1024, max_rung=4096)
+    assert ladder.get("invalid") is True
+    assert "fwe flicker" in ladder["invalid_reason"]
+    assert ladder["score"] == 0 and ladder["failed"] is True
+    out = capsys.readouterr().out
+    assert "INVALID" in out
