@@ -98,6 +98,10 @@ def push_files(
     """
     if parent_sha is None:
         parent_sha = remote_head()
+    # the parent's tree is the base - without it, every file not listed
+    # in `files` would be wiped from the branch (learned the hard way)
+    parent = api_request("GET", f"git/commits/{parent_sha}")
+    base_tree = parent["tree"]["sha"]
     tree_items = []
     for repo_path, local_path in files:
         if local_path is None:
@@ -107,7 +111,7 @@ def push_files(
             blob_body = {"content": base64.b64encode(fh.read()).decode(), "encoding": "base64"}
         blob = api_request("POST", "git/blobs", blob_body)
         tree_items.append({"path": repo_path, "mode": "100644", "type": "blob", "sha": blob["sha"]})
-    tree = api_request("POST", "git/trees", {"base_tree": None, "tree": tree_items})
+    tree = api_request("POST", "git/trees", {"base_tree": base_tree, "tree": tree_items})
     commit = api_request(
         "POST",
         "git/commits",
