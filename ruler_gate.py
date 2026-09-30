@@ -148,11 +148,24 @@ def build_fwe_task(
     return prompt, vocab[1 : 1 + FWE_TOP_K]
 
 
+TEMPLATE_DEBRIS = re.compile(r"<\|[^|>]{1,32}\>|<\[/[^>]{1,32}\]>|\[INST\]|\[/INST\]")
+
+
+def strip_template_debris(answer: str) -> str:
+    """Remove chat-template special tokens the model emitted as literal
+    text (session 34, addendum 29/30: granite-4.0-h-350m answered
+    literally '<|im_end|>'; the author's ruling 1a - the reply is still
+    correct, the token is launch noise, not part of the answer)."""
+    return TEMPLATE_DEBRIS.sub("", answer)
+
+
 def score_fwe(answer: str, top_k: list[str]) -> tuple[bool, int]:
     """Upstream scores FWE as the hit-count of expected words in the
     reply; the study's verdict form (registered 136b) is all-or-nothing
-    per task, with the per-word count returned as the diagnostic."""
-    found = [w for w in top_k if w in re.sub(r"\s+", "", answer)]
+    per task, with the per-word count returned as the diagnostic.
+    Template debris is stripped first (ruling 1a, addendum 30)."""
+    clean = strip_template_debris(answer)
+    found = [w for w in top_k if w in re.sub(r"\s+", "", clean)]
     return len(found) == len(top_k), len(found)
 
 

@@ -7,6 +7,8 @@ import pytest
 
 import code_edit
 import full_benchmark as fb
+import hf_download
+import ruler_gate
 
 
 def make_args(**kw):
@@ -676,3 +678,26 @@ def test_resume_skip_prints_na_for_none_worst(capsys, tmp_path, monkeypatch):
     )
     out = capsys.readouterr().out
     assert "worst n/a t/s" in out
+
+
+def test_score_fwe_strips_template_debris():
+    # ruling 1a (addendum 29/30): '<|im_end|>' debris must not fail an
+    # otherwise-correct answer
+    top_k = ["nysskz", "swucem", "tvjzpa"]
+    ok, n = ruler_gate.score_fwe("nysskz, swucem, tvjzpa<|im_end|>", top_k)
+    assert ok and n == 3
+    # pure debris with no words still fails
+    ok2, n2 = ruler_gate.score_fwe("<|im_end|>", top_k)
+    assert not ok2 and n2 == 0
+
+
+def test_resolve_f16_local_never_returns_a_quantized_file(tmp_path):
+    # the MiniCPM-*-sft-bf16 bug (addendum 30): 'bf16' in the FAMILY
+    # name made the family's own -Q8_0.gguf match the f16 glob
+    famdir = tmp_path / "MiniCPM-1B-sft-bf16"
+    famdir.mkdir()
+    (famdir / "MiniCPM-1B-sft-bf16-Q8_0.gguf").write_text("x")
+    assert hf_download.resolve_f16_local(str(famdir)) is None
+    (famdir / "MiniCPM-1B-sft-bf16-f16.gguf").write_text("x")
+    got = hf_download.resolve_f16_local(str(famdir))
+    assert got and got.endswith("MiniCPM-1B-sft-bf16-f16.gguf")
