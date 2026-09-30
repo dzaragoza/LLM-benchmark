@@ -395,3 +395,125 @@ def test_code_edit_atomic_write_leaves_no_tempfiles(tmp_path):
     p.write_text("a\n")
     code_edit.edit(str(p), [("replace", "a", "b")])
     assert sorted(os.listdir(str(tmp_path))) == ["mod.py"]
+
+
+def test_code_edit_replace_n_targets_kth_occurrence(tmp_path):
+    """replace_n: the k-th occurrence, no ambiguity error on dupes."""
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\ny = 1\nz = 1\n")
+    code_edit.edit(str(p), [("replace_n", "= 1", "= 9", 2)])
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\ny = 9\nz = 1\n"
+
+
+def test_code_edit_replace_n_out_of_range_fails(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    try:
+        code_edit.edit(str(p), [("replace_n", "= 1", "= 9", 3)])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\n"
+
+
+def test_code_edit_replace_regex_requires_single_match(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("SCORE = 32768\nother = 16384\n")
+    code_edit.edit(str(p), [("replace_regex", r"SCORE = \d+", "SCORE = 65536")])
+    with open(str(p)) as f:
+        assert f.read() == "SCORE = 65536\nother = 16384\n"
+    try:
+        code_edit.edit(str(p), [("replace_regex", r"\d+", "0")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "matched 4 times" in str(e) or "matched" in str(e)
+    assert raised
+
+
+def test_code_edit_set_lines_replaces_range(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("a\nb\nc\nd\n")
+    code_edit.edit(str(p), [("set_lines", 2, 3, ["x", "y", "z"])])
+    with open(str(p)) as f:
+        assert f.read() == "a\nx\ny\nz\nd\n"
+
+
+def test_code_edit_insert_lines_before_line(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("a\nb\nc\n")
+    code_edit.edit(str(p), [("insert_lines", 2, ["inserted"])])
+    with open(str(p)) as f:
+        assert f.read() == "a\ninserted\nb\nc\n"
+
+
+def test_code_edit_delete_lines_range(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("a\nb\nc\nd\n")
+    code_edit.edit(str(p), [("delete_lines", 2, 3)])
+    with open(str(p)) as f:
+        assert f.read() == "a\nd\n"
+
+
+def test_code_edit_indent_dedent_ranges(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("def f():\n    a = 1\n    b = 2\n")
+    code_edit.edit(str(p), [("indent", 2, 3, "    ")])
+    with open(str(p)) as f:
+        assert f.read() == "def f():\n        a = 1\n        b = 2\n"
+    code_edit.edit(str(p), [("dedent", 2, 3, "    ")])
+    with open(str(p)) as f:
+        assert f.read() == "def f():\n    a = 1\n    b = 2\n"
+
+
+def test_code_edit_line_range_out_of_bounds_fails(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("a\n")
+    try:
+        code_edit.edit(str(p), [("set_lines", 1, 9, "x")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "out of bounds" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "a\n"
+
+
+def test_code_edit_append_and_prepend(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("middle\n")
+    code_edit.edit(str(p), [("prepend", "header\n"), ("append", "footer\n")])
+    with open(str(p)) as f:
+        assert f.read() == "header\nmiddle\nfooter\n"
+
+
+def test_code_edit_write_creates_verified_file(tmp_path):
+    p = tmp_path / "new.py"
+    code_edit.write(str(p), "x = 1\n")
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\n"
+
+
+def test_code_edit_new_blocks_compose_in_one_transaction(tmp_path):
+    """The session's ad-hoc recipe as one edit: dedent a collapsed loop
+    body, delete the loop header, fix the caller - all or nothing."""
+    p = tmp_path / "mod.py"
+    p.write_text(
+        "def bench():\n"
+        "    for rep in range(1, 2):\n"
+        "        do_work(rep)\n"
+        "        return rep\n"
+    )
+    code_edit.edit(
+        str(p),
+        [
+            ("dedent", 3, 4, "    "),
+            ("delete_lines", 2, 2),
+            ("replace", "do_work(rep)", "do_work(1)"),
+            ("replace", "return rep", "return 1"),
+        ],
+    )
+    with open(str(p)) as f:
+        assert f.read() == "def bench():\n    do_work(1)\n    return 1\n"
