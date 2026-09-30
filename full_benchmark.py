@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """full_benchmark.py -- the end-to-end benchmark orchestrator.
 
-One command: acquire each family's Q8_0 GGUF (fixed rung, addendum 86),
+One command: acquire each family's GGUF at the rung (default Q8_0, --rung
+overrides; addendum 86 removed the WALK, not the choice of rung),
 then run the PROTOCOL v4 ladder (speed gate + FWE per rung, addendum 4)
 and print the depth-scored ladder table - the study's ranking. This
 script owns the orchestration only - state/resume and the final results
@@ -202,9 +203,7 @@ def fwe_pass(
                 f"    fwe census: {smaps['resident_gib']:.2f} GiB resident "
                 f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)"
             )
-        cost = llama_server.memory_cost_gib(
-            mem_before, llama_server.system_memavailable_gib()
-        )
+        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         if cost is not None:
             row["mem_cost_gib"] = cost
     finally:
@@ -459,10 +458,11 @@ STATE_FILE_DEFAULT = "./benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # Q4_0 removed (author ruling, addendum 37): Q4_K_M is the single 4-bit
 # rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
-# RUNG_BITS keeps the Q4_0 ratio for ad-hoc size estimates.
-# Addendum 86: the rung walk is removed - the study is Q8_0 only
-# (quant out of scope, MODEL-SELECTION.md note). One fixed rung.
-RUNG = "Q8_0"
+# Addendum 86: the rung WALK is removed - one rung per run.
+# The study's default rung stays Q8_0; --rung overrides it (session
+# 34: the Q4 quants - context dominates this bw class, so the smaller
+# file with the deeper ladder is the hypothesis to test).
+RUNG_DEFAULT = "Q8_0"
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 SERVER_BIN = llama_server.find_server()
 
@@ -571,6 +571,7 @@ def process_family(
     thinking: bool = False,
     no_thinking: bool = False,
     reader_wps: float = READER_WPS_DEFAULT,
+    rung: str = RUNG_DEFAULT,
 ) -> None:
     model_repo, _, source_repo = spec.partition("=")
     if not source_repo:
@@ -607,7 +608,7 @@ def process_family(
                 cleared += 1
         fst["selected"] = None
         save_state(state_path, state)
-        print(f"  --force: re-benching {RUNG} ({cleared} stored verdict(s) cleared; files reused)")
+        print(f"  --force: re-benching {rung} ({cleared} stored verdict(s) cleared; files reused)")
 
     # Stale-state guard (addendum 43): a stored rung file can vanish
     # from disk (folder deleted/moved) while benchmark-state.json still
@@ -632,9 +633,9 @@ def process_family(
     # author's models/ tree is the common case; the v4 WoW runs local
     # files). The hub is only a real dependency when the file must be
     # downloaded or converted.
-    local_path = local_rung(famdir, RUNG)
-    if local_path and 1 not in (fst["runs"].get(RUNG, {}).get("phases_done", [])):
-        run = fst["runs"].setdefault(RUNG, {"phases_done": []})
+    local_path = local_rung(famdir, rung)
+    if local_path and 1 not in (fst["runs"].get(rung, {}).get("phases_done", [])):
+        run = fst["runs"].setdefault(rung, {"phases_done": []})
         run["plan"] = "local file"
         run["file"] = local_path
         if 1 not in run["phases_done"]:
@@ -657,7 +658,6 @@ def process_family(
         except Exception as e:
             fail(1, "-", f"cannot list repo files for {model_repo}: {e}", GUIDE[1])
 
-    rung = RUNG
     run = fst["runs"].get(rung, {"phases_done": []})
     fst["runs"][rung] = run
     if str(run.get("verdict", "")).startswith("PASS") or run.get("verdict") == "FAIL":
@@ -766,6 +766,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
+    ap.add_argument(
+        "--rung",
+        default=RUNG_DEFAULT,
+        help="the quant to benchmark (default Q8_0; e.g. Q4_K_M - session 34's "
+        "context-over-parameters test)",
+    )
     ap.add_argument(
         "--roster",
         default=None,
@@ -913,6 +919,7 @@ def sweep_families(args: argparse.Namespace, state: dict[str, Any]) -> list[tupl
                 args.thinking,
                 args.no_thinking,
                 args.reader_wps,
+                args.rung,
             )
         except SystemExit as e:
             failed_families.append((spec, str(e) or "exit"))
@@ -934,7 +941,9 @@ def preflight_report(
         print("=" * 60)
         stamp("DRY RUN COMPLETE - READ-ONLY PRE-FLIGHT REPORT")
         print(f"  families checked : {len(args.families)}")
-        print(f"  rung             : {RUNG} (fixed; the rung walk is removed - addendum 86)")
+        print(
+            f"  rung             : {args.rung} (one rung per run - addendum 86; --rung overrides)"
+        )
         # Addendum 83: the run-time estimate. Per-cell costs from the
         # run-1 measurement (the qwen overnight sweep, ~8.5 h for 7
         # cells, acquisition-dominated), split by acquisition-plan

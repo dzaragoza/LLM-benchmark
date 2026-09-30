@@ -13,6 +13,7 @@ def make_args(**kw):
     defaults = dict(
         families=["A/Qwen-A", "B/Qwen-B"],
         roster=None,
+        rung=fb.RUNG_DEFAULT,
         state_file="/tmp/unused-state.json",
         results_file="/tmp/unused-results.json",
     )
@@ -74,7 +75,7 @@ def test_dry_run_no_local_file_does_not_assert(tmp_path, monkeypatch, capsys):
     not fire before the dry-run guard."""
     import hf_download
 
-    monkeypatch.setattr(fb, "RUNG", "Q8_0")
+    monkeypatch.setattr(fb, "RUNG_DEFAULT", "Q8_0")
     monkeypatch.setattr(hf_download, "require_hub", lambda: None)
     monkeypatch.setattr("full_benchmark.list_repo_files", lambda repo: ["model.safetensors"])
     monkeypatch.setattr("full_benchmark.local_rung", lambda famdir, rung: None)
