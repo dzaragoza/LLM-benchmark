@@ -156,10 +156,8 @@ var MAX_COST = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.cost); }
 // keep only tiers that fit at least one measured model
 var TIERS = VRAM_TIERS.filter(function (t) { return t.v >= MIN_COST; });
 
-// default: the capacity needed to run the highest-scoring model (Qwen3.5-0.8B Q4_K_M,
-// depth 262,144 - its measured minimum RAM, session 35, addendum 2)
-var TOP_MODEL = CANDIDATES.reduce(function (a, c) { return (c.depth || 0) > (a.depth || 0) ? c : a; });
-var DEFAULT_TIER = TIERS.filter(function (t) { return t.v >= TOP_MODEL.cost; })[0] || TIERS[TIERS.length - 1];
+// default: the smallest capacity that runs every measured model (session 35, addendum 2)
+var DEFAULT_TIER = TIERS.filter(function (t) { return t.v >= MAX_COST; })[0] || TIERS[0];
 
 var selKey = DEFAULT_TIER ? String(DEFAULT_TIER.v) : "";
 
