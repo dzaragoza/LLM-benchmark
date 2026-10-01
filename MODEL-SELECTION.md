@@ -14,47 +14,33 @@ README's "Roster selection" section is a summary that points here.
 
 ## The rules
 
-1. **Lineage data density (the study's current criterion; popularity
-   RETIRED prospectively).** Rosters are built by counting usable data
-   points per lineage: models at or below the REGISTERED PARAMETER
-   CEILING (addendum 78 — NOT an ad-hoc number: the largest size
-   predicted to pass, size_max = BW_eff × (w/t/5.0 − 1/t_inf) = 76.5 ×
-   (0.412/5.0 − 1/74) = 5.27 GiB ≈ 4.92B params at Q8_0 (÷1.07 GiB/B)
-   under the qwen-class anchor (addendum 87 relabel: the old text read
-   "4.92 GiB ≈ 4.6B" — 4.92 is the PARAMS number; the size ceiling is
-   5.27 GiB, PROTOCOL row 103's own figure); the
-   addendum-76 "≤4B" window was this constant rounded down), non-thinking
-   or hybrid, instruct preferred (base acceptable), with a paper in the
-   lineage. **The lineage is selected by the count, then EVERY member
-   matching the rules enters the roster — no picking and choosing within
-   the line** (addendum 78, the author's correction). **Four lineages
-   per study; among qualifying lineages, pick only those that
-   contribute the most cells** (addendum 79, the author's ruling —
-   gemma's 3 cells lost to granite's 12 and phi/minicpm's 6 each; the
-   study's four: qwen + granite + phi + minicpm). Popularity is
-   explicitly irrelevant prospectively. (Addendum 77, the author's
-   ruling; supersedes the Ollama walk-down for all future rosters. The
-   historical criterion — start from the
-   [Ollama library](https://ollama.com/library?sort=popular)
-   ranked by pull count, walking down; popularity picks the *family*,
-   never the weight file — stands for the study-#1/#2/#3 rosters as
-   measured. Session 22; README walk-down table.)
+1. **Machine ceiling first (author ruling, session 35 addendum 12 —
+   supersedes the lineage-density criterion).** The machine's ceiling is
+   determined FIRST, by measurement — the gallop search of the protocol
+   ladder on the champion config (currently the champion Qwen3.5-0.8B @
+   Q8_0, f16 KV, 262,144 deep, cold cost 4.96 GiB; rule 17). THEN, and
+   only then, candidate models are screened: a candidate is any model
+   whose predicted RAM at 262,144, in its best configuration (smallest
+   weights/K/V combination that can run), is UNDER that measured
+   ceiling. Lineage data density, cell counts, and popularity are
+   RETIRED as selection criteria (the historical Ollama walk-down and
+   the addendum-77/78/79 lineage counting stand for the study-#1/#2/#3
+   rosters as measured).
 
-2. **Distinct families only — family = publisher/author.** No two
-   roster models from the same model family, where family is the
-   **publisher/author** (the organization that ships the weights).
-   *Lineage* is sharper and is logged, not gated: when a distinct
-   publisher ships a model that inherits another family's
-   architecture or tokenizer (e.g. Falcon3's `LlamaForCausalLM`,
-   deepseek-r1's Qwen-2.5 base, InternLM3's qwen-class tokenizer),
-   the inheritance is a **genetic caveat** on record, not a
-   conflict. The conflict test is publisher-identity only.
-   (Session 22 revision; Session 24 deepseek precedent; addendum 64.)
+2. **RETIRED (author ruling, session 35 addendum 12).** The
+   distinct-families (publisher-identity) rule is obsolete: the 256k
+   screen admits any model that passes both gates under the ceiling,
+   publisher notwithstanding (both current survivors are Qwen3.5). The
+   rule stands as history for the study-#1/#2/#3 rosters as measured.
 
-3. **Non-thinking category: models must run in non-thinking mode.**
-   Pure-reasoning models (no off switch) are excluded — the strict
-   letter-answer ARC protocol requires plain answers. Hybrid models
-   (toggleable reasoning) ARE allowed, run with thinking disabled.
+3. **Non-thinking category: models must run in non-thinking mode
+   (rationale updated, author ruling, session 35 addendum 12).**
+   Pure-reasoning models (no off switch) are excluded — NOT for the
+   strict letter-answer ARC protocol (ARC is no longer the study's
+   instrument), but for the gates that now define the study: the speed
+   gate (the 300-wpm reader line) and the FWE count at depth. Hybrid
+   models (toggleable reasoning) ARE allowed, run with thinking
+   disabled.
 
 4. **The family must have a size class predicted to pass the speed
    gate** on the target machine — via the general predictor
@@ -72,24 +58,19 @@ README's "Roster selection" section is a summary that points here.
    covering the *lineage* counts (LFM2 precedent, Session 28; the
    Granite 3.0 report covering the 3.3 line, addendum 64).
 
-7. **Prefer the latest generation** within a family: the newest
-   model generation supersedes older ones of the same family
-   (e.g. qwen3.5 > qwen3; phi4-mini > phi3).
+7. **RETIRED (author ruling, session 35 addendum 12).** The
+   prefer-latest-generation rule is obsolete under the 256k screen: a
+   candidate is screened by window, RAM, and gates, not by generation.
 
-8. **Hybrid models (toggleable reasoning) are allowed in BOTH
-   categories**, always run in the mode that matches the category.
-   Mode control is part of the protocol and is logged per run.
+8. **RETIRED (author ruling, session 35 addendum 12).** The
+   two-category hybrid allowance is obsolete with the category
+   structure it served; hybrids still run with thinking disabled per
+   rule 3.
 
-9. **Class-exclusive selection (bandwidth-class rule).** For a
-   machine of bandwidth class C, benchmark only the model sizes
-   that are *exclusive to C*: sizes that would NOT run (fail the
-   reader-wall gate) on any lower class and DO run on C. Sizes
-   that also pass on a lower class are out of scope for class C —
-   a practitioner on that hardware would be served by the class-C
-   roster; running a below-class model wastes the machine (they
-   would simply switch to another machine). The real benefit for
-   practitioners is the class-exclusive set: the models the
-   machine unlocks. (Author ruling, addendum 65.)
+9. **RETIRED (author ruling, session 35 addendum 12).** The
+   class-exclusive (bandwidth-class) rule is obsolete: the roster
+   question is the 256k goal under the measured ceiling (rule 17), not
+   the class-exclusive set.
 
 11. **Data hygiene: v3.1-instrument measurements only (addendum 79).**
     Avoid using any data collected before protocol v3.1 in study
@@ -116,17 +97,17 @@ README's "Roster selection" section is a summary that points here.
     same command with X changed": hand-editing arguments is a recipe
     for non-reproducibility. The notebook's registered sequences carry
     the full literal text of every command.
-14. **Fixed rung: Q8_0 only (addendum 86).** The rung walk is REMOVED
-    from the tooling (`--ladder` deleted; full_benchmark benches the
-    single fixed Q8_0 rung). Quant comparison is out of scope for this
-    study — every cell is Q8_0, and every prediction and the size
-    ceiling (rule 1) are Q8_0-only; no other rung is acquired or
-    benched.
-15. **ARC runs ALWAYS (addendum 86).** Every benched family gets the
-    full ARC pass — PASS or FAIL verdict alike, selected or not; the
-    ONLY skip is an already-complete CSV (arc_csv_valid). The
-    `--arc-only`/`--arc-models` ad-hoc paths are removed; the McNemar
-    ranking still uses the selected (PASS) models only.
+14. **RETIRED (author ruling, session 35 addendum 12).** The fixed
+   Q8_0-rung rule is obsolete: the 256k screen benches the candidate's
+   best configuration (weights quant under the Q8_0 cap, K/V quant as
+   fit), and the FWE rules are the protocol's latest (the 3/3
+   word-count HIT at depth, protocol v4.3 — see PROTOCOL.md and rule
+   17), not the addendum-86 fixed-rung regime.
+
+15. **RETIRED (author ruling, session 35 addendum 12).** The
+   ARC-runs-always rule is obsolete: ARC is retired as the study's
+   instrument; the speed gate and FWE (rule 3, rule 17) are the
+   measures.
 
 16. **The way of working: tests before any sweep (addendum 87).**
     `python3 -m pytest tests/ -q` runs before any benchmark command
@@ -151,7 +132,8 @@ README's "Roster selection" section is a summary that points here.
       model's best configuration (smallest weights/K/V combination
       that can run): currently **4.96 GiB** (0.8B @ Q8_0, f16 KV,
       measured). The champion sets the ceiling; a new survivor
-      raises it.
+      raises it only if its own measured cost is higher (the 2B
+      survivor at 3.48 GiB does not).
     - **Weights quant cap: Q8_0** (author ruling, session 35 — F16
       runs too long to wait for).
     The **single-rung probe** (`--min-rung 262144 --max-rung 262144`)
@@ -190,7 +172,7 @@ for a follow-up study.
   on the 102.4 GB/s tier: w/t 0.33 → 6.1B params, 0.37 → 7.0B,
   0.445 → 8.7B, 0.49 → 9.7B (addendum 58).
 
-10. **The sentinel certificate (Q8_0-only study; addendum 67).** For a
+10. **The sentinel certificate (addendum 67; protocol references updated to v4.3, author ruling, session 35 addendum 12).** For a
 tokenizer class and machine class, S = {models of the class at or
 below the sentinel's size, well-behaved} at the fixed rung. The
 sentinel self-selects: the largest class member under the predicted

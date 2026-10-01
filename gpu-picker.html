@@ -189,7 +189,10 @@
         max="128"
         step="0.5"
         value="16"
-        oninput="clearSel(); pick()"
+        oninput="
+          clearSel();
+          pick();
+        "
       />
       <div class="footnote" style="margin-top: 0.3rem">
         VRAM fit uses the <strong>measured minimum RAM</strong> (weights + KV +
@@ -244,11 +247,21 @@
 
     <script>
       "use strict";
-      // Measured records (v4.3-scored, session 35 addendum 10) - the 256k survivors only;
+      // Measured records (v4.3-scored, session 35 addenda 10-12) - the 256k survivors only;
       // identical to cpu-picker.html. wps = the WORST TURN at the scored rung. cost =
       // minimum RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the
       // scored rung), measured - used here as a conservative VRAM requirement.
       var CANDIDATES = [
+        {
+          name: "Qwen3.5-2B",
+          size: 1.22,
+          cost: 3.48,
+          costEst: false,
+          wps: 9.5,
+          depth: 262144,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
         {
           name: "Qwen3.5-0.8B",
           size: 0.78,
@@ -260,9 +273,10 @@
         },
       ];
       // depth = the v4.3 ladder score (tokens): the deepest rung at which the model BOTH
-      // serves the reader (speed gate) AND counts (FWE) - n=1 everywhere. The single row is
-      // the 0.8B champion config: Q8_0 weights (the quant CAP is Q8), f16 KV, 262,144 deep,
-      // 4.96 GiB cold, 9.3 w/s worst. THE RETIRED FAMILIES (session 35, addendum 10): every
+      // serves the reader (speed gate) AND counts (FWE) - n=1 everywhere. The rows are
+      // the survivors: the 2B at Q4_K_M + K/V q5_0 (3.48 GiB, 9.5 w/s - pending its
+      // quant-raise re-probe, addendum 12) and the 0.8B champion at Q8_0 weights (the
+      // quant CAP is Q8), f16 KV, 262,144 deep, 4.96 GiB cold, 9.3 w/s worst. THE RETIRED FAMILIES (session 35, addendum 10): every
       // other pool family failed the 256k screen - training window below 262,144, KV
       // geometry too fat under the RAM ceiling, or FWE quality broken far shallower; the
       // full rejection log lives in the lab notebook (session 35, addendum 10).
@@ -276,7 +290,7 @@
       // Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
       // each paired with the lowest memory bandwidth among cards found at that capacity
       // (the conservative w/s estimate for the tier). Only tiers that fit at least one
-      // measured model are listed; the smallest minimum RAM is ~2.53 GiB (Qwen3.5-0.8B, cold at its scored rung).
+      // measured model are listed; the smallest minimum RAM is 3.48 GiB (Qwen3.5-2B, cold at its scored rung).
       var VRAM_TIERS = [
         { v: 1.5, bw: 177.4 }, // GTX 480 (2010)
         { v: 2, bw: 176.0 }, // Radeon HD 6970 (2010)
