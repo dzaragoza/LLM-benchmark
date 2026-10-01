@@ -395,7 +395,8 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
                 raise CodeEditError(f"block {i}: anchor not found:\n{block[1][:200]}")
             if n > 1:
                 raise CodeEditError(f"block {i}: anchor found {n} times - add context")
-            new_text = block[2] + block[1] if kind == "insert_before" else block[1] + block[2]
+            new = _sep(block[1], block[2], kind == "insert_after")
+            new_text = new + block[1] if kind == "insert_before" else block[1] + new
             buf = buf.replace(block[1], new_text, 1)
         elif kind == "replace_all":
             if len(block) != 3:
@@ -498,6 +499,20 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
             raise CodeEditError(f"block {i}: unknown kind {kind!r}")
 
 
+def _sep(anchor: str, new: str, after: bool) -> str:
+    """The separator an insert needs (session 35, addendum 9 - register
+    entry 6): when the join point sits between two non-newline
+    characters the texts would fuse into one broken line, so a newline
+    is forced. An explicit blank line in `new` is preserved as-is."""
+    edge_a = anchor[-1] if anchor else "\n"
+    edge_b = new[0] if new else "\n"
+    if after and edge_a != "\n" and edge_b != "\n":
+        return "\n" + new
+    if not after and edge_b != "\n" and edge_a != "\n":
+        return new + "\n"
+    return new
+
+
 def _apply(src: str, blocks: Sequence[tuple]) -> str:
     buf = src
     for block in blocks:
@@ -509,9 +524,9 @@ def _apply(src: str, blocks: Sequence[tuple]) -> str:
         elif kind == "replace_all":
             buf = buf.replace(block[1], block[2])
         elif kind == "insert_before":
-            buf = buf.replace(block[1], block[2] + block[1], 1)
+            buf = buf.replace(block[1], _sep(block[1], block[2], False) + block[1], 1)
         elif kind == "insert_after":
-            buf = buf.replace(block[1], block[1] + block[2], 1)
+            buf = buf.replace(block[1], block[1] + _sep(block[1], block[2], True), 1)
         elif kind == "replace_n":
             buf = _replace_nth(buf, block[1], block[2], block[3])
         elif kind == "replace_regex":
