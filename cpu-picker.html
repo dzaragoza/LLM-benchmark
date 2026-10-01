@@ -297,12 +297,23 @@
 
     <script>
       "use strict";
-      // Measured records (v4.3-scored, session 35 addendum 10: the roster is the 256k
+      // Measured records (v4.3-scored, session 35 addenda 10-12: the roster is the 256k
       // survivors - every family that cannot reach 262,144 under the RAM ceiling is
-      // retired. wps = the WORST TURN at the scored rung. cost = minimum RAM
+      // retired. The 2B row is the addendum-11 probe PASS (Q4_K_M + K/V q5_0, cold
+      // 3.48 GiB); a higher-quant re-probe toward the 4.96 GiB ceiling is pending
+      // (addendum 12). wps = the WORST TURN at the scored rung. cost = minimum RAM
       // (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
       // measured.
       var CANDIDATES = [
+        {
+          name: "Qwen3.5-2B",
+          size: 1.22,
+          cost: 3.48,
+          wps: 9.5,
+          depth: 262144,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
         {
           name: "Qwen3.5-0.8B",
           size: 0.78,
@@ -316,8 +327,10 @@
       ];
       // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
       // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1
-      // everywhere. The single row is the 0.8B champion config: Q8_0 weights (the
-      // quant CAP is Q8 - session 35, addendum 10), f16 KV, 262,144 deep, 4.96 GiB
+      // everywhere. The rows are the survivors: the 2B at Q4_K_M + K/V q5_0
+      // (3.48 GiB - pending its quant-raise re-probe, addendum 12) and the 0.8B
+      // champion at Q8_0 weights (the quant CAP is Q8 - session 35, addendum 10),
+      // f16 KV, 262,144 deep, 4.96 GiB
       // cold, 9.3 w/s worst at the scored rung. THE RETIRED FAMILIES (session 35,
       // addendum 10): every other pool family failed the 256k screen - training
       // window below 262,144, KV geometry too fat under the RAM ceiling, or FWE
@@ -382,7 +395,7 @@
       var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) {
         return Math.max(a, c.wps);
       }, 0);
-      MIN_RUN_BW = (READER * REF_BW) / MIN_RUN_BW; // ~19.8 GB/s with the current pool
+      MIN_RUN_BW = (READER * REF_BW) / MIN_RUN_BW; // ~54 GB/s with the current pool (worst w/s 9.5)
 
       function buildMachineMenu() {
         [1, 2, 4, 8].forEach(function (ch) {
@@ -603,7 +616,7 @@
             html +=
               '<div class="verdict none"><h3>No measured model fits ' +
               ram +
-              " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of minimum RAM (cold, scored rung).</div></div>";
+              " GiB of RAM</h3><div>The smallest measured member (Qwen3.5-2B) needs 3.48 GiB of minimum RAM (cold, scored rung).</div></div>";
           }
         }
         $("result").innerHTML = html;
