@@ -47,3 +47,29 @@ One type per model in the whole document: the instruct tune; base
 | Ministral 3B | gated repo (HTTP 401) and 128k-class window |
 | Qwen3.5-2B-Base | BASE type, not instruct (addendum 18): the benchmark is conversation- and instruction-shaped (the speed gate is a live conversation, FWE is an instruction-following task); the instruct 2B is already PASS - only one type per model |
 | Qwen3.5-4B-Base | BASE type, not instruct (addendum 18): same reason; the instruct 4B is the candidate the study probes |
+| Qwen2.5-1.5B-Instruct | retro-analysis (addendum 19): trained window 32,768 < 262,144, no rope scaling; v4.3 score 20,992 @ Q8_0 - the RAM would fit (1.97 GiB q4_0 KV at 262k), the window is the wall |
+| Qwen3-1.7B | retro-analysis (addendum 19): KV geometry 112 KiB/token f16 -> q4_0 KV alone ~7.9 GiB > 4.96 ceiling (plus window 40,960 and FWE broken at 40,704) |
+| Qwen3-4B | retro-analysis (addendum 19): KV 144 KiB/token -> q4_0 KV ~10.1 GiB, triple the ceiling; window 40,960 besides |
+| phi-4-mini-instruct | retro-analysis (addendum 19): KV 128 KiB/token -> q4_0 KV ~9.0 GiB > ceiling; window 131,072 (the deepest non-Qwen3.5 score, 44,032 @ Q4_K_M, is 6x short of the goal) |
+| Phi-3.5-mini-instruct | retro-analysis (addendum 19): KV 384 KiB/token -> q4_0 KV ~27 GiB, 5x the ceiling; window 131,072; also FWE zero at Q4_K_M |
+| Phi-3-mini-4k-instruct | retro-analysis (addendum 19): window 4,096; KV 384 KiB/token -> ~27 GiB q4_0 KV at 262k |
+| phi-1 | retro-analysis (addendum 19): window 2,048; base/code model (type rule); far under the 16k screen |
+| phi-2 | retro-analysis (addendum 19): window 2,048; KV 320 KiB/token -> ~22.5 GiB q4_0 KV at 262k |
+| granite-3.0-2b-instruct | retro-analysis (addendum 19): window 4,096; KV 80 KiB/token -> ~5.6 GiB q4_0 KV; 4,096-class score |
+| granite-3.1-2b-instruct | retro-analysis (addendum 19): window 131,072 < 262,144; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; Q4 counting fell off the cliff (12,288 -> 6,144) |
+| granite-3.2-2b-instruct | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 15,360 |
+| granite-3.3-2b-instruct | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 26,624 |
+| granite-4.0-350m | retro-analysis (addendum 19): window 32,768; never passed the 16k screen on the f4k grid (quality) |
+| granite-4.0-h-350m | retro-analysis (addendum 19): window 32,768; never passed the 16k screen on the f4k grid (quality) |
+| granite-4.0-1b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling |
+| granite-4.0-micro | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
+| granite-4.0-h-micro | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
+| granite-4.0-h-1b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
+| granite-4.1-3b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 18,432 |
+| granite-4.2-3b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; also corrupted f16 file in the Q4 resume, out of that sweep |
+| MiniCPM-1B-sft | retro-analysis (addendum 19): window 4,096; sft = instruct-tuned (type OK) but KV 104 KiB/token -> ~7.3 GiB q4_0 KV > ceiling; 4,096-class score |
+| MiniCPM-2B-sft | retro-analysis (addendum 19): window 4,096; KV 360 KiB/token -> ~25.3 GiB q4_0 KV; 4,096-class score |
+| MiniCPM3-4B | retro-analysis (addendum 19): window 32,768 (no usable rope scaling); KV 620 KiB/token -> ~43.6 GiB q4_0 KV |
+| MiniCPM4-0.5B | retro-analysis (addendum 19): window 32,768; KV 12 KiB/token (RAM would fit) but never passed the 16k screen on the f4k grid (quality) |
+| MiniCPM5-1B | retro-analysis (addendum 19): window 131,072 < 262,144; RAM would fit (1.69 GiB q4_0 KV) but the window is the wall (no rope scaling by rule) |
+| MiniCPM5-2B | retro-analysis (addendum 19): window 131,072; KV 42 KiB/token -> 2.95 GiB q4_0 KV, weights+KV+overhead ~4.2 GiB - would fit, but the window is the wall; also FWE zero at Q4_K_M |
