@@ -44,3 +44,18 @@ Implementation (pushed with this addendum):
 - full_benchmark.py gains --kv-quant {q8_0,q4_0}; it is persisted in the state file (kv_quant) so every rung of the ladder launches the same way, and it plumbs through run_ladder -> speed_pass/fwe_pass -> speed_gate.bench_model; both launch sites add -fa --cache-type-k <q> --cache-type-v <q> to the server args.
 - code_edit.py: the delimiter balance check goes REGION-based (session 35, addendum 3: a per-line check blamed legitimate multi-line code). Each replaced region must balance as a unit; insert/delete-only edits fall back to the whole buffer only when the source was balanced; a region may OPEN a delimiter that closes after it (an inserted call whose closing paren lands on a later line) - the real failure modes, a mismatched closer or an unclosed quote, still fail. The test stubs for speed_pass/fwe_pass gained the kv_quant parameter.
 - The witness commands (dry-run first, then real, Q4_K_M then Q8_0) are with the author; the results land in fresh results.txt sections read back here.
+
+
+## Session 35, addendum 4 - the Q4 resume lands; code_edit goes file-type aware; prettier owns the pages
+
+THE Q4 RESUME LANDED (13:03): phi-4-mini-instruct flips to Q4_K_M - 44,032 tokens (from 32,768 at Q8), scored-rung worst 6.4 w/s, cold cost 8.14 GiB, 123.4 min. granite-3.3-2b-instruct flips to Q4_K_M - 26,624 tokens (from 6,144 at Q8!), cold cost 3.78 GiB. granite-3.0-2b-instruct Q4 ties its Q8 (4,096) so it stays Q8. granite-4.2-3b failed BOTH resume attempts (corrupted f16: blk.27.ffn_down.weight out of file bounds - the safetensors -> f16 conversion produced a truncated file); it stays on its Q8 row and is out of the Q4 sweep. The pages now carry the flips; the GPU default tier self-adjusts (MAX_COST is computed from the rows: 8.14 GiB now).
+
+CODE_EDIT (three fixes, each hit during this addendum):
+1. File-type aware delimiter check: prose (md/txt) has NO balance check (apostrophes are legal); python keeps the region check; markup (html/js) gets a whole-buffer bracket check with apostrophes stripped (prose inside the page) but DOUBLE quotes still counted (a truncated attribute is a real error); json balances fully.
+2. The balance parser now understands triple-quoted strings (a docstring used to parse as open/close/open and false-positive an unclosed quote).
+3. The block post-conditions (new-text-on-disk etc) moved BEFORE the atomic write - they used to run after it, so a failed verify left a MODIFIED file and broke the file-untouched contract (this corrupted code_edit.py once today). edit_many got the same pre-write checks it was missing.
+4. The balance check for markup revealed two REAL page bugs prettier refused to reformat over: a stray closing div in cpu-picker.html and three doubled closing p tags in gpu-picker.html - fixed.
+
+PRETTIER now owns the page formatting (prettier 3.3.3, print-width 100): both pickers reformatted; the check runs on every page edit from here on.
+
+THE WITNESS (author ruling): the witness is Qwen3.5-4B at Q4_K_M - the cache encoding varies (KV q8_0 vs KV q4_0, weight quant fixed at Q4_K_M). The commands are with the author (fresh state/results pairs: benchmark-state-kvq8-q4.json etc).
