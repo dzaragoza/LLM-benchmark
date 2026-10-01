@@ -7046,3 +7046,61 @@ all data     -> benchmark-results-o8probe.json
 [2026-10-01T17:38:48 +0m]       phase 2 done (create)
   [3] would run the PROTOCOL v4 ladder on the rung file
   [4] would record the ladder score (the deepest rung passing both; scored-rung w/s + cold cost per addendum 137n/137m)
+
+===== 2026-10-01T17:38:56 | full_benchmark.py Qwen/Qwen3.5-2B --rung Q4_K_M --kv-quant-k q5_0 --kv-quant-v q5_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-p2.json --results-file benchmark-results-p2.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T17:38:56 +0m] family: Qwen3.5-2B
+  model repo : Qwen/Qwen3.5-2B
+  source repo: Qwen/Qwen3.5-2B
+  folder     : ./models/Qwen3.5-2B
+
+  rung Q4_K_M:
+  [1] downloading safetensors from Qwen/Qwen3.5-2B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from Qwen/Qwen3.5-2B, convert + quantize)
+[2026-10-01T17:39:38 +1m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Qwen3.5-2B-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3.5-2B/Qwen3.5-2B-Q4_K_M.gguf)
+[2026-10-01T17:40:03 +1m]       phase 2 done (create)
+
+=== ladder: Qwen3.5-2B-Q4_K_M ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-2B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.527.494 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260616 tok): turns t/s: 15.4, 15.4, 15.2, 15.4   worst 15.2 (mean 15.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.9, 10.0, 9.5, 10.2   (reader line 5 w/s)
+      noise at depth: 15.4, 15.4
+    memory: mapped census 5.34 GiB mapped, 0.59 GiB resident (file 0.39 + anon 0.20; smaps, addendum 23), machine cost 3.48 GiB (MemAvailable delta)
+
+  Qwen3.5-2B-Q4_K_M.gguf: WORST TURN = 15.2 t/s (worst turn; avg-of-worsts 15.2)
+  Qwen3.5-2B-Q4_K_M.gguf: NOISE AT DEPTH: worst 15.40  mean 15.42  worst/mean 0.999  (n=2)
+  Qwen3.5-2B-Q4_K_M.gguf: MEMORY: peak RSS 0.65 GiB - file 1.22 GiB, i.e. -0.57 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS [1662s]
+    cold machine cost @ rung: 3.48 GiB
+  task 1/1 @ 261888 tok: 3/3 words -> HIT ('Based on a comprehensive scan of the provided te')
+    fwe census: 0.33 GiB resident (file 0.21 + anon 0.12; smaps)
+    fwe @ depth 261888: 1/1 -> PASS [1584s]
+  Qwen3.5-2B-Q4_K_M: SCORE = 262144 tokens (last rung passing both) [54.1 min wall, measured]
+  [3] ladder ok  (score: 262144 tokens)
+[2026-10-01T18:34:08 +55m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 262144 tokens, worst 9.5 w/s, cold cost 3.48 GiB
+[2026-10-01T18:34:08 +55m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3.5-2B (ladder score 262144 tokens)
+
+============================================================
+[2026-10-01T18:34:08 +55m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-2B                           score 262,144 tokens | scored-rung worst   9.5 w/s | cold  3.48 GiB | 54.1 min
+
+resume state -> benchmark-state-p2.json
+all data     -> benchmark-results-p2.json
+
+resume state -> benchmark-state-p2.json
+all data     -> benchmark-results-p2.json
