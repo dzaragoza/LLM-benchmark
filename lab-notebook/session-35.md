@@ -92,3 +92,14 @@ THE RESUME RERUNS NEVER RAN: the fresh state files carried the crashed launches 
 SEPARATE K/V CACHE QUANTS (author ruling): --kv-quant-k and --kv-quant-v (choices q8_0, q4_0, q4_1, q5_0, q5_1, iq4_nl) ride the state file like --kv-quant. The witness design: K stays DEFAULT (f16), only V quantizes - community wisdom says V-quantization is nearly free quality-wise, K is where the damage shows. If V-only works, K-only is the follow-up.
 
 64K FLOOR for the witness runs: --min-rung 65536 (persisted as ladder_min_rung in the state file) - the witness is speed-wall-bound near 123k, so the 4k-32k rungs are wasted machine time; the ladder starts at 64k and gallops up.
+
+
+## Session 35, addendum 8 - the log tail names the killer: -fa takes a value; the combined flag is gone
+
+THE WITNESS RERUNS both died at launch again - and this time the log tail (addendum 5's fix) named the exact cause: this llama.cpp build changed -fa to TAKE A VALUE ("-fa [on|off|auto]", default auto). Our bare "-fa" made the server eat the NEXT flag as its value: "error: unknown value for --flash-attn: '--cache-type-k'". The false-zero fix (addendum 7) worked exactly as designed: both runs recorded FAIL (server launch failed), the family stayed UNSELECTED, and the table flagged it for investigation instead of recording a score.
+
+FIX (pushed): both launch sites pass "-fa on" when either cache quantizes. The default "auto" would also work; "on" is explicit because a quantized cache REQUIRES the FA kernels.
+
+THE COMBINED OPTION IS GONE (author ruling): --kv-quant is removed from the CLI and the plumbing - K and V quantize ONLY via --kv-quant-k and --kv-quant-v. speed_gate.bench_model and the fwe launch build their args from the two separate params alone. Old state files carrying a stale "kv_quant" key are simply ignored (state.get on the removed key no longer happens).
+
+code_edit register entry 5: a big multi-block removal transaction rolled back silently next to a formatting drift (ruff had reflowed a call site my target copied from memory) - check() caught it before any write; re-applied in smaller verified chunks. Reminder recorded: targets are copied FROM THE FILE, never from memory.
