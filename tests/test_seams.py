@@ -138,7 +138,7 @@ def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
     fwe_results map rung -> (ok, verdict); caps maps rung -> window."""
     caps = caps or {}
 
-    def speed_pass(m, r, c, p, d):
+    def speed_pass(m, r, c, p, d, kv_quant=None):
         ok, v = speed_results[r]
         v = dict(v)
         v["window_cap"] = caps.get(r)
@@ -147,7 +147,7 @@ def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
             v["ceiling_rung"] = worst is not None and 5.0 <= worst < 7.5
         return ok, v
 
-    def fwe_pass(m, r, d, s, p):
+    def fwe_pass(m, r, d, s, p, kv_quant=None):
         ok, v = fwe_results[r]
         v = dict(v)
         v["window_cap"] = caps.get(r)
@@ -843,7 +843,7 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     monkeypatch.setattr(
         fb,
         "speed_pass",
-        lambda model, rung, corpus, port, results_dir: (
+        lambda model, rung, corpus, port, results_dir, kv_quant=None: (
             True,
             {"worst": 20.0, "stall_rate": 0.0, "ceiling_rung": False},
         ),
@@ -851,7 +851,7 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     monkeypatch.setattr(
         fb,
         "fwe_pass",
-        lambda model, rung, results_dir, seed, port: (
+        lambda model, rung, results_dir, seed, port, kv_quant=None: (
             True,
             {"depth": rung - 256, "correct": 1, "n": 1},
         ),

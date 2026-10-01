@@ -634,6 +634,7 @@ def bench_model(
     label: str | None = None,
     reader_wps: float | None = None,
     n_conversations: int | None = None,
+    kv_quant: str | None = None,
 ) -> tuple[list[dict[str, Any]], tuple[str, float, float] | None, list[dict[str, Any]]]:
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
@@ -659,6 +660,12 @@ def bench_model(
     log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
     print("  starting server...", flush=True)
     extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
+    if kv_quant:
+        # session 35: the KV-cache variant. -fa is REQUIRED for quantized
+        # caches (the non-FA kernels do not implement them) and shrinks
+        # the attention compute buffers at deep ctx (the O(n^2) score
+        # matrix is tiled with a running softmax, never materialized).
+        extra += ["-fa", "--cache-type-k", kv_quant, "--cache-type-v", kv_quant]
     if thinking:
         extra += ["--reasoning-format", "deepseek"]
     if no_thinking:

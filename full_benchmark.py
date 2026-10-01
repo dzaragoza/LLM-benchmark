@@ -110,7 +110,12 @@ RUNG_MIDPOINT = True
 
 
 def speed_pass(
-    model: str, rung: int, corpus: str, port: int, results_dir: str
+    model: str,
+    rung: int,
+    corpus: str,
+    port: int,
+    results_dir: str,
+    kv_quant: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """One speed-gate cell at ctx=rung, n=1 conversation: real blob,
     real turns, the v3.1 verdict from those turns only (reduced rules:
@@ -133,6 +138,7 @@ def speed_pass(
         False,
         True,
         n_conversations=1,
+        kv_quant=kv_quant,
     )
     # the launch's banner: when the server capped the -c DOWN to the
     # trained window, bench_model's banner guard refused to bench (no
@@ -179,7 +185,12 @@ def speed_pass(
 
 
 def fwe_pass(
-    model: str, rung: int, results_dir: str, seed: int, port: int
+    model: str,
+    rung: int,
+    results_dir: str,
+    seed: int,
+    port: int,
+    kv_quant: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """One FWE cell at depth=rung-2x headroom, n=1, on its own server
     launch at exactly the rung's ctx (ruler_gate's launch shape: one
@@ -195,10 +206,13 @@ def fwe_pass(
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
+    extra_args = ["-c", str(rung), "--parallel", "1"]
+    if kv_quant:
+        extra_args += ["-fa", "--cache-type-k", kv_quant, "--cache-type-v", kv_quant]
     proc, healthy = llama_server.start_server(
         model,
         port=port,
-        extra_args=["-c", str(rung), "--parallel", "1"],
+        extra_args=extra_args,
         log_path=log_path,
     )
     try:
@@ -250,6 +264,7 @@ def run_ladder(
     seed: int = 1024,
     max_rung: int | None = None,
     min_rung: int = RUNG_BASE,
+    kv_quant: str | None = None,
 ) -> dict[str, Any]:
     """One model's PROTOCOL v4.3 ladder (session 34 addendum 19): the
     gallop (2x steps) finds the floor and the ceiling, then a binary
@@ -300,7 +315,7 @@ def run_ladder(
         this rung is not scored)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_s, sv = speed_pass(model, r, corpus, port, results_dir)
+        ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant)
         t_speed = time.monotonic() - t0
         tag = " (ceiling)" if sv.get("ceiling_rung") else ""
         print(
@@ -331,7 +346,7 @@ def run_ladder(
         """Bench FWE at rung r. Returns (cell, window_cap)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_f, fv = fwe_pass(model, r, results_dir, seed, port)
+        ok_f, fv = fwe_pass(model, r, results_dir, seed, port, kv_quant)
         t_fwe = time.monotonic() - t0
         print(
             f"    fwe @ depth {fv.get('depth')}: "
@@ -764,6 +779,7 @@ def process_family(
             results_dir=os.path.join(models_dir, "ladder-results"),
             seed=state.get("ladder_seed", 1024),
             min_rung=state.get("ladder_min_rung", RUNG_BASE),
+            kv_quant=state.get("kv_quant"),
         )
         run["ladder"] = ladder
         run["phases_done"].append(3)
@@ -863,6 +879,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="redo families that already have a selection"
     )
     ap.add_argument(
+        "--kv-quant",
+        default=None,
+        choices=["q8_0", "q4_0"],
+        help="session 35: quantize the KV cache (K and V both) to this type - "
+        "launches with -fa (required for quantized caches). Rides the state "
+        "file (kv_quant) so every rung of the ladder launches the same way; "
+        "use a FRESH --state-file/--results-file pair so the variant never "
+        "contaminates the baseline grids.",
+    )
+    ap.add_argument(
         "--thinking",
         action="store_true",
         help="thinking-model category: benchmark with "
@@ -916,6 +942,8 @@ def main() -> None:
     state = load_state(args.state_file)
     if args.min_rung:
         state["ladder_min_rung"] = args.min_rung
+    if args.kv_quant:
+        state["kv_quant"] = args.kv_quant
 
     if not args.families:
         ap.error("no family specs given")
