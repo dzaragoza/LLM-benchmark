@@ -1081,29 +1081,24 @@ def test_run_ladder_single_rung_probe_fail_is_failed(tmp_path, monkeypatch):
     assert ladder["score"] == 0
 
 
-def test_code_edit_md_gate_blocks_new_table_violation(tmp_path):
-    """Session 35, addendum 16: a markdown edit that introduces a
-    GitHub-rendering violation (no blank line before a table) fails
-    BEFORE the write - the file stays untouched."""
+def test_code_edit_md_autofix_inserts_blank_line_before_table(tmp_path):
+    """Session 35, addendum 17: the mechanical rules are FIXED by the
+    editor, not linted - a table inserted with no blank line before it
+    gets the blank line inserted automatically (MD058)."""
     p = tmp_path / "doc.md"
     p.write_text("# Title\n\nSome prose.\n")
-    try:
-        code_edit.edit(
-            str(p),
-            [
-                (
-                    "replace",
-                    "Some prose.",
-                    "Some prose.\n| a | b |\n|---|---|\n| 1 | 2 |",
-                )
-            ],
-        )
-        raised = False
-    except code_edit.CodeEditError as e:
-        raised = "markdown-lint" in str(e) and "MD058" in str(e)
-    assert raised
+    code_edit.edit(
+        str(p),
+        [
+            (
+                "replace",
+                "Some prose.",
+                "Some prose.\n| a | b |\n|---|---|\n| 1 | 2 |",
+            )
+        ],
+    )
     with open(str(p)) as f:
-        assert f.read() == "# Title\n\nSome prose.\n"
+        assert f.read() == ("# Title\n\nSome prose.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
 
 
 def test_code_edit_md_gate_allows_clean_table(tmp_path):
@@ -1171,19 +1166,27 @@ def test_code_edit_md_gate_unclosed_fence_blocked(tmp_path):
         assert f.read() == "# T\n\nprose\n"
 
 
-def test_code_edit_md_gate_double_trailing_newline_blocked(tmp_path):
-    """MD047: an edit leaving two trailing newlines fails (single
-    trailing newline only)."""
+def test_code_edit_md_autofix_single_trailing_newline(tmp_path):
+    """Session 35, addendum 17: MD047 is auto-fixed - an edit leaving
+    extra trailing newlines (or none) lands with exactly one."""
     p = tmp_path / "doc.md"
     p.write_text("# T\n\nprose\n")
-    try:
-        code_edit.edit(str(p), [("replace", "prose\n", "prose\n\n")])
-        raised = False
-    except code_edit.CodeEditError as e:
-        raised = "MD047" in str(e)
-    assert raised
+    code_edit.edit(str(p), [("replace", "prose\n", "prose\n\n\n")])
     with open(str(p)) as f:
         assert f.read() == "# T\n\nprose\n"
+
+
+def test_code_edit_md_autofix_blank_line_after_table(tmp_path):
+    """Session 35, addendum 17: a non-table line directly after a
+    table body gets the blank line inserted automatically."""
+    p = tmp_path / "doc.md"
+    p.write_text("# T\n\ntable below\n")
+    code_edit.edit(
+        str(p),
+        [("replace", "table below", "table below\n\n| a | b |\n|---|---|\nfooter")],
+    )
+    with open(str(p)) as f:
+        assert f.read() == ("# T\n\ntable below\n\n| a | b |\n|---|---|\n\nfooter\n")
 
 
 def test_code_edit_md_gate_not_applied_to_python(tmp_path):

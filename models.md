@@ -30,12 +30,13 @@ registered ceiling predictor (MODEL-SELECTION.md rule 2):
 |---|---|---|---|---|---|---|---|
 | Qwen3.5-2B-Base | Q8_0 | q8_0 | q8_0 | 2.09 | 4.78 GiB | ~8 | 96% of ceiling; base model — FWE at depth unproven, that risk is the experiment |
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | THE EDGE: 100% of ceiling, RAM PASS by 0.01 GiB; speed straddler (the 4B wall was 6.07 w/s at 131k with f16 KV); Q2_K quality the wild card |
-| Qwen3.5-4B-Base | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | same floor config on the base weights; the addendum-10 hypothesis test (match the 0.8 footprint, does the 4B pass?) |
+| Qwen3.5-4B-Base | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | the PRETRAINED base of the 4B (the instruct 4B is its finetune - same architecture/RAM geometry, different weights); FWE at depth on an untuned model is the untested question |
 
-CLOSED, NOT CANDIDATES (one model appears in at most one table;
-these never enter a table again): Qwen3.5-0.8B-Base (identical
-config to the champion 0.8B already measured — retired,
-addendum 14); Qwen3.5-9B (no config fits under the 4.96 GiB
-ceiling — the family is closed at 9B); gemma-4-e2b-it
-(window 131,072 < 262,144, no rope scaling by standing rule);
-Ministral 3B (gated repo, 128k class).
+## REJECTED
+
+| model name | reason for rejection |
+|---|---|
+| Qwen3.5-0.8B-Base | identical RAM geometry to the champion 0.8B already measured (Q8_0 + f16, 4.96 GiB); only the tuning differs - not worth an hour (addendum 14) |
+| Qwen3.5-9B | no configuration fits under the 4.96 GiB ceiling (best: Q2_K + q4_0/q4_0 = 7.05 GiB predicted) - the family closes at 9B |
+| gemma-4-e2b-it | trained window 131,072 < 262,144 (verified from config.json); no rope scaling by standing rule |
+| Ministral 3B | gated repo (HTTP 401) and 128k-class window |
