@@ -9,6 +9,13 @@ RAM = cold whole-stack machine cost (MemAvailable delta) at depth
 registered ceiling predictor (MODEL-SELECTION.md rule 2):
 `cost = file(rung) + KV_eff(262144) x kvquant + 1.10 GiB`.
 
+TYPE RULE (author ruling, session 35 addendum 18): only INSTRUCT
+models are suited to this benchmark - both gates are
+instruction-shaped (the speed gate is a live conversation with a
+following reader; FWE is an instruction-following extraction task).
+One type per model in the whole document: the instruct tune; base
+(pretrained) variants are rejected on type, not re-evaluated.
+
 ---
 
 ## PASS (both gates at 262,144)
@@ -28,9 +35,7 @@ registered ceiling predictor (MODEL-SELECTION.md rule 2):
 
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
-| Qwen3.5-2B-Base | Q8_0 | q8_0 | q8_0 | 2.09 | 4.78 GiB | ~8 | 96% of ceiling; base model — FWE at depth unproven, that risk is the experiment |
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | THE EDGE: 100% of ceiling, RAM PASS by 0.01 GiB; speed straddler (the 4B wall was 6.07 w/s at 131k with f16 KV); Q2_K quality the wild card |
-| Qwen3.5-4B-Base | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | the PRETRAINED base of the 4B (the instruct 4B is its finetune - same architecture/RAM geometry, different weights); FWE at depth on an untuned model is the untested question |
 
 ## REJECTED
 
@@ -40,3 +45,5 @@ registered ceiling predictor (MODEL-SELECTION.md rule 2):
 | Qwen3.5-9B | no configuration fits under the 4.96 GiB ceiling (best: Q2_K + q4_0/q4_0 = 7.05 GiB predicted) - the family closes at 9B |
 | gemma-4-e2b-it | trained window 131,072 < 262,144 (verified from config.json); no rope scaling by standing rule |
 | Ministral 3B | gated repo (HTTP 401) and 128k-class window |
+| Qwen3.5-2B-Base | BASE type, not instruct (addendum 18): the benchmark is conversation- and instruction-shaped (the speed gate is a live conversation, FWE is an instruction-following task); the instruct 2B is already PASS - only one type per model |
+| Qwen3.5-4B-Base | BASE type, not instruct (addendum 18): same reason; the instruct 4B is the candidate the study probes |
