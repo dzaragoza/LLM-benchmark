@@ -118,79 +118,16 @@ Standalone instruments (outside the pipeline, one-shot experiments):
 ## Roster selection (pre-registered, transparent)
 
 The roster selection rules are fixed in advance and recorded in
-full in **[MODEL-SELECTION.md](MODEL-SELECTION.md)** (nine rules:
-popularity-sourced; distinct families with family =
-publisher/author and lineage logged as a genetic caveat;
-non-thinking mode; predictor + trust band; first-party weights;
-paper rule; latest generation; hybrid mode control; and the
-class-exclusive bandwidth rule). The study's practitioner goals
-are recorded in **[PRACTITIONER-GOALS.md](PRACTITIONER-GOALS.md)**.
-This section keeps the study-#1 walk-down for auditability — the
-popularity snapshot with each candidate's verdict:
-1. Start from the [Ollama library](https://ollama.com/library?sort=popular)
-   ranked by pull count (snapshot: 2026-09-23).
-2. **Distinct families only** — no two models from the same model
-   family/owner. A family is defined by its **publisher/author**
-   (the organization that ships the weights); a model from a distinct
-   publisher that inherits another family's architecture or tokenizer
-   (e.g. a llama-derived or qwen-derived model) is a *genetic caveat*
-   to be logged, not a conflict (addendum 64).
-3. **Non-thinking category: models must run in non-thinking mode.**
-   Pure-reasoning models (no off switch) are excluded here - the
-   strict letter-answer ARC protocol requires plain answers. Hybrid
-   models (reasoning can be toggled) ARE allowed, run with thinking
-   disabled (rule 8).
-4. The family must have a size class **predicted to pass the speed
-   floor** on the target machine class (51.2 GB/s system RAM; live
-   t/s ≈ 26 ÷ model size in GiB, so floor 20 t/s requires ≲ 1.3 GiB
-   files, i.e. roughly 1–2B parameters at 4–6 bit).
-5. Weights are always **first-party** (the model owner's official
-   Hugging Face repos) — popularity picks the family, never the
-   weight file.
-6. At least one model in the family has a **published research
-   paper** (technical report or peer-reviewed).
-7. **Prefer the latest generation** within a family: the newest
-   model generation supersedes older ones of the same family
-   (e.g. qwen3.5 supersedes qwen3).
-8. **Hybrid models (toggleable reasoning) are allowed in BOTH
-   categories** and are always run in the mode that matches the
-   category: thinking enabled in the thinking category, disabled in
-   the non-thinking category. Mode control is part of the protocol
-   and is logged per run.
-
-**Popularity snapshot and the walk down the list** (Ollama pull counts):
-
-| # | Ollama family | Pulls | Small variant | Verdict |
-|---|---|---|---|---|
-| 1 | llama3.1 | 119.8M | 8b | excluded — no variant under ~4 GB |
-| 2 | deepseek-r1 | 93.1M | 1.5b | excluded — thinking model; 1.5b is a Qwen distill |
-| 3 | nomic-embed-text | 86.9M | — | excluded — embedding model |
-| 4 | **llama3.2** | **84.2M** | **1b** | **SELECTED** |
-| 5 | **qwen2.5** | **40.8M** | **1.5b** | **SELECTED** |
-| 6 | **gemma3** | **40.7M** | **1b** | **SELECTED** |
-| 7 | qwen3 | 37.8M | 1.7b | excluded — thinking model; same family as qwen2.5 |
-| 8 | mistral | 33.7M | 7b | excluded — no small variant |
-| 9 | gemma2 | 33.2M | 2b | excluded — same family as gemma3 (superseded) |
-| 10 | gemma4 | 25.6M | e2b | excluded — thinking model; same family as gemma3 |
-| 11 | llama3 | 25.3M | 8b | excluded — same family as llama3.2 |
-| 12 | qwen2.5-coder | 21.7M | 1.5b | excluded — same family as qwen2.5 |
-| 13 | qwen3.5 | 20.8M | 0.8b | excluded — same family as qwen2.5 (Qwen series) |
-| 14 | phi3 | 18.2M | 3.8b | excluded — smallest variant ~2.2 GiB at Q4, predicted ~10.6 t/s: fails floor 20 at every rung |
-| 15 | llava | 15.0M | 7b | excluded — vision model, too big |
-| 16 | mxbai-embed-large | 15.0M | — | excluded — embedding model |
-| 17 | gpt-oss | 13.1M | 20b | excluded — thinking model; too big |
-| 18 | qwen3-coder | 9.5M | 30b | excluded — same family; too big |
-| 19 | gemma | 8.3M | 2b | excluded — same family as gemma3 |
-| 20 | **smollm2** | **4M** | **1.7b** | **SELECTED** |
-
-Selected, in popularity order: **llama3.2:1b, qwen2.5:1.5b, gemma3:1b,
-smollm2:1.7b** — the first four families in the popularity ranking that
-satisfy all rules. SmolLM2 was also a study #1 family, giving a direct
-cross-study replication check. Its official repo ships safetensors
-only, so every rung on its ladder is self-quantized via the pinned
-toolchain — the same provenance path as study #1's SmolLM2 variants.
-
----
+full in **[MODEL-SELECTION.md](MODEL-SELECTION.md)** (ten rules).
+The machine's RAM ceiling is measured FIRST (the gallop search on
+the champion config), then candidates screen by the registered
+ceiling predictor (rule 2): predicted machine cost at 262,144
+tokens under the champion's ceiling (4.96 GiB), non-thinking mode
+required, speed-gate predictor, first-party weights, paper rule,
+v4.3 data hygiene, dry-run pre-flight, and verbatim commands. The
+study's practitioner goals are recorded in
+**[PRACTITIONER-GOALS.md](PRACTITIONER-GOALS.md)**. The study-#1
+popularity walk-down history lives in the lab notebook.
 
 ## Reproduction guide (Windows 10/11 and Linux)
 
