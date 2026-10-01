@@ -6430,3 +6430,43 @@ all data     -> benchmark-results-q4.json
   rung Q4_K_M:
   [3] would run the PROTOCOL v4 ladder on ./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf
   [4] would record the ladder score (the deepest rung passing both; scored-rung w/s + cold cost per addendum 137n/137m)
+
+===== 2026-10-01T13:19:54 | full_benchmark.py Qwen/Qwen3.5-4B --rung Q4_K_M --kv-quant q8_0 --state-file benchmark-state-kvq8-q4.json --results-file benchmark-results-kvq8-q4.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T13:19:54 +0m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+  [1] local rung file found - no download needed  (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf)
+  [2] rung file ready  (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf)
+
+  rung Q4_K_M:
+
+=== ladder: Qwen3.5-4B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+  ERROR: server did not become healthy; skipping
+  rung 4096: speed FAIL [1s]
+    speed verdict: {"error": "no turns measured", "window_cap": null}
+  Qwen3.5-4B-Q4_K_M: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  Qwen3.5-4B-Q4_K_M: SCORE = 0 tokens (last rung passing both) [0.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T13:19:54 +0m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T13:19:54 +0m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3.5-4B (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T13:19:54 +0m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-4B                           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.0 min  FAILED (below the start rung - investigate)
+
+resume state -> benchmark-state-kvq8-q4.json
+all data     -> benchmark-results-kvq8-q4.json
+
+resume state -> benchmark-state-kvq8-q4.json
+all data     -> benchmark-results-kvq8-q4.json
