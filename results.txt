@@ -7312,3 +7312,56 @@ all data     -> benchmark-results-ceil1.json
 
 resume state -> benchmark-state-ceil1.json
 all data     -> benchmark-results-ceil1.json
+
+===== 2026-10-01T22:32:47 | full_benchmark.py Qwen/Qwen3.5-4B --rung Q2_K --kv-quant-k q4_0 --kv-quant-v q4_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil4.json --results-file benchmark-results-ceil4.json --force =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T22:32:47 +0m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+  --force: re-benching Q2_K (0 stored verdict(s) cleared; files reused)
+
+  rung Q2_K:
+  [1] downloading safetensors from Qwen/Qwen3.5-4B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from Qwen/Qwen3.5-4B, convert + quantize)
+[2026-10-01T22:34:12 +1m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Qwen3.5-4B-f16.gguf -> Q2_K (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3.5-4B/Qwen3.5-4B-Q2_K.gguf)
+[2026-10-01T22:35:04 +2m]       phase 2 done (create)
+
+=== ladder: Qwen3.5-4B-Q2_K ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q2_K.gguf ===
+  starting server...
+    [server] 0.02.050.324 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260616 tok): turns t/s: 7.4, 7.4, 7.3, 7.3   worst 7.3 (mean 7.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 5.5, 5.5, 5.4, 5.4   (reader line 5 w/s)
+      noise at depth: 7.3, 7.4
+    memory: mapped census 7.63 GiB mapped, 1.00 GiB resident (file 0.22 + anon 0.78; smaps, addendum 23), machine cost 5.81 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q2_K.gguf: WORST TURN = 7.3 t/s (worst turn; avg-of-worsts 7.3)
+  Qwen3.5-4B-Q2_K.gguf: NOISE AT DEPTH: worst 7.33  mean 7.35  worst/mean 0.997  (n=2)
+  Qwen3.5-4B-Q2_K.gguf: MEMORY: peak RSS 1.03 GiB - file 1.82 GiB, i.e. -0.80 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS (ceiling) [3713s]
+    cold machine cost @ rung: 5.81 GiB
+[2026-10-02T00:07:16 +94m] FAMILY FAILED: Qwen/Qwen3.5-4B - TimeoutError('timed out') (recorded; the sweep continues - addendum 78)
+  note: roster families without a selection (excluded from the ranking): Qwen3.5-4B
+
+[2026-10-02T00:07:16 +94m] families failed this run (isolated; state preserved):
+  Qwen/Qwen3.5-4B: TimeoutError('timed out')
+
+no ladder results in state - nothing benched yet
+
+resume state -> benchmark-state-ceil4.json
+all data     -> benchmark-results-ceil4.json
+
+resume state -> benchmark-state-ceil4.json
+all data     -> benchmark-results-ceil4.json
