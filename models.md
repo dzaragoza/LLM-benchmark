@@ -67,7 +67,7 @@ family's one entry.
 |---|---|---|
 | Qwen3.5-9B | no model small enough (q2, q4, q4) > ceiling | best config Q2_K + q4_0/q4_0 = 7.05 GiB predicted; the family closes at 9B |
 | gemma-4-e2b-it | training window < 256k | trained window 131,072 (verified from config.json); no rope scaling by standing rule |
-| Ministral 3B | other | the repo does not exist on the hub (author-authenticated pull: RepositoryNotFoundError; the agent's unauthenticated 401 masked it); no first-party Ministral-3B weights to screen |
+| mistralai/Ministral-3-3B-Instruct-2512 | no model small enough (q2, q4, q4) > ceiling | KV 104 KiB/token f16 (26 layers x 8 kv heads x 128 head_dim) -> ~7.3 GiB q4_0 KV at 262k, over the ceiling before weights; the declared 262,144 window is also YaRN rope-scaled from an original 16,384 (params.json llama_4_scaling, factor 16) - closed by the no-rope-scaling rule; first-party GGUF exists (Q4_K_M 2.00 GiB), the earlier 'repo does not exist' was a stale-name probe, corrected addendum 24 |
 | Qwen2.5-1.5B-Instruct | training window < 256k | window 32,768; the RAM would fit (1.97 GiB q4_0 KV at 262k) - the window is the wall; v4.3 score 20,992 @ Q8_0 |
 | Qwen3-1.7B | no model small enough (q2, q4, q4) > ceiling | KV 112 KiB/token -> q4_0 KV alone ~7.9 GiB > 4.96; window 40,960 and FWE broken at 40,704 besides |
 | Qwen3-4B | no model small enough (q2, q4, q4) > ceiling | KV 144 KiB/token -> ~10.1 GiB q4_0 KV; window 40,960 besides |
@@ -103,7 +103,7 @@ family's one entry.
 | inclusionAI/Ling-lite-1.5B | training window < 256k | window 32,768 (addendum-20 sweep) |
 | zai-org/GLM-4.5-Air | training window < 256k | window 131,072 |
 | meta-llama/Llama-3.2-1B-Instruct | training window < 256k | window 131,072 (author-verified from the gated repo); RAM would fit - KV 32 KiB/token f16 (16 layers x 8 kv heads x 64 head_dim) -> ~2.25 GiB q4_0 KV, whole config ~3.75 GiB - the window is the wall |
-| meta-llama/Llama-3.1-8B-Instruct | other | gated (HTTP 401); 128k-class window |
+| meta-llama/Llama-3.1-8B-Instruct | no model small enough (q2, q4, q4) > ceiling | KV 128 KiB/token f16 (32 layers x 8 kv heads x 128 head_dim) -> ~9 GiB q4_0 KV at 262k, over the ceiling before weights; window 131,072 < 262,144 besides (both disqualifiers bind; size first per the fair-chance order); gated repo, numbers from the public model card |
 | google/gemma-3-1b-it | training window < 256k | window 32,768 (author-verified); 1 kv head - thin KV, but the window binds hard |
 | google/gemma-3-4b-it | training window < 256k | window 131,072 class (the author's pull shows the config nests it in text_config - the gemma-3 wrapper; text models are 128k per the model card) |
 | Qwen3-30B-A3B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but MoE: Q2_K weights alone far over the ceiling; KV 96 KiB/token -> 6.75 GiB q4_0 KV besides |
