@@ -7365,3 +7365,62 @@ all data     -> benchmark-results-ceil4.json
 
 resume state -> benchmark-state-ceil4.json
 all data     -> benchmark-results-ceil4.json
+
+===== 2026-10-02T00:07:19 | full_benchmark.py ai21labs/AI21-Jamba2-3B --rung Q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceilj.json --results-file benchmark-results-ceilj.json --force =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-02T00:07:19 +0m] family: AI21-Jamba2-3B
+  model repo : ai21labs/AI21-Jamba2-3B
+  source repo: ai21labs/AI21-Jamba2-3B
+  folder     : ./models/AI21-Jamba2-3B
+  --force: re-benching Q8_0 (0 stored verdict(s) cleared; files reused)
+
+  rung Q8_0:
+  [1] downloading safetensors from ai21labs/AI21-Jamba2-3B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from ai21labs/AI21-Jamba2-3B, convert + quantize)
+[2026-10-02T00:08:19 +1m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing AI21-Jamba2-3B-f16.gguf -> Q8_0 (output hidden; shown on error)
+  [2] rung file ready  (./models/AI21-Jamba2-3B/AI21-Jamba2-3B-Q8_0.gguf)
+[2026-10-02T00:08:39 +1m]       phase 2 done (create)
+
+=== ladder: AI21-Jamba2-3B-Q8_0 ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== AI21-Jamba2-3B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.249.133 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260619 tok): turns t/s: 9.5, 9.3, 9.3, 9.3   worst 9.3 (mean 9.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.1, 6.1, 6.9, 6.6   (reader line 5 w/s)
+      noise at depth: 9.2, 9.3
+    memory: mapped census 5.77 GiB mapped, 0.66 GiB resident (file 0.27 + anon 0.39; smaps, addendum 23), machine cost 4.42 GiB (MemAvailable delta)
+
+  AI21-Jamba2-3B-Q8_0.gguf: WORST TURN = 9.3 t/s (worst turn; avg-of-worsts 9.3)
+  AI21-Jamba2-3B-Q8_0.gguf: NOISE AT DEPTH: worst 9.22  mean 9.26  worst/mean 0.996  (n=2)
+  AI21-Jamba2-3B-Q8_0.gguf: MEMORY: peak RSS 0.71 GiB - file 3.17 GiB, i.e. -2.47 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS (ceiling) [1649s]
+    cold machine cost @ rung: 4.42 GiB
+  task 1/1 @ 261888 tok: 3/3 words -> HIT ('To find the **three most frequently appeared cod')
+    fwe census: 0.51 GiB resident (file 0.15 + anon 0.36; smaps)
+    fwe @ depth 261888: 1/1 -> PASS [1616s]
+  AI21-Jamba2-3B-Q8_0: SCORE = 262144 tokens (last rung passing both) [54.4 min wall, measured]
+  [3] ladder ok  (score: 262144 tokens)
+[2026-10-02T01:03:04 +56m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 262144 tokens, worst 6.1 w/s, cold cost 4.42 GiB
+[2026-10-02T01:03:04 +56m]       phase 4 done (scored row)
+  SELECTED Q8_0 for AI21-Jamba2-3B (ladder score 262144 tokens)
+
+============================================================
+[2026-10-02T01:03:04 +56m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  AI21-Jamba2-3B                       score 262,144 tokens | scored-rung worst   6.1 w/s | cold  4.42 GiB | 54.4 min
+
+resume state -> benchmark-state-ceilj.json
+all data     -> benchmark-results-ceilj.json
+
+resume state -> benchmark-state-ceilj.json
+all data     -> benchmark-results-ceilj.json
