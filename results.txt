@@ -7255,3 +7255,60 @@ full_benchmark.py: error: argument --kv-quant-k: invalid choice: 'f16' (choose f
 [2026-10-01T21:45:28 +0m]       phase 2 done (create)
   [3] would run the PROTOCOL v4 ladder on the rung file
   [4] would record the ladder score (the deepest rung passing both; scored-rung w/s + cold cost per addendum 137n/137m)
+
+===== 2026-10-01T21:46:23 | full_benchmark.py Qwen/Qwen3.5-2B --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil1.json --results-file benchmark-results-ceil1.json --force =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T21:46:23 +0m] family: Qwen3.5-2B
+  model repo : Qwen/Qwen3.5-2B
+  source repo: Qwen/Qwen3.5-2B
+  folder     : ./models/Qwen3.5-2B
+  --force: re-benching Q8_0 (0 stored verdict(s) cleared; files reused)
+
+  rung Q8_0:
+  [1] downloads ok  (plan: quantize from local f16)
+[2026-10-01T21:46:23 +0m]       phase 1 done (acquire)
+  [2] quantizing Qwen3.5-2B-f16.gguf -> Q8_0 (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf)
+[2026-10-01T21:46:26 +0m]       phase 2 done (create)
+
+=== ladder: Qwen3.5-2B-Q8_0 ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-2B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.849.823 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260616 tok): turns t/s: 13.7, 13.8, 13.8, 13.8   worst 13.7 (mean 13.8)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 8.2, 9.0, 9.7, 10.4   (reader line 5 w/s)
+      noise at depth: 13.8, 13.8
+    memory: mapped census 7.21 GiB mapped, 0.65 GiB resident (file 0.39 + anon 0.25; smaps, addendum 23), machine cost 5.22 GiB (MemAvailable delta)
+
+  Qwen3.5-2B-Q8_0.gguf: WORST TURN = 13.7 t/s (worst turn; avg-of-worsts 13.7)
+  Qwen3.5-2B-Q8_0.gguf: NOISE AT DEPTH: worst 13.78  mean 13.79  worst/mean 0.999  (n=2)
+  Qwen3.5-2B-Q8_0.gguf: MEMORY: peak RSS 0.69 GiB - file 1.93 GiB, i.e. -1.25 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS [1399s]
+    cold machine cost @ rung: 5.22 GiB
+  task 1/1 @ 261888 tok: 2/3 words -> MISS ('Based on the provided text, which appears to be ')
+    fwe census: 0.33 GiB resident (file 0.21 + anon 0.12; smaps)
+    fwe @ depth 261888: 0/1 -> FAIL [1381s]
+  Qwen3.5-2B-Q8_0: FAILED - the ceiling (262,144) is at or below the 262,144 start rung; the model is out pending investigation
+  Qwen3.5-2B-Q8_0: SCORE = 0 tokens (last rung passing both) [46.3 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T22:32:45 +46m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T22:32:45 +46m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Qwen3.5-2B (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T22:32:45 +46m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-2B                           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 46.3 min  FAILED (below the start rung - investigate)
+
+resume state -> benchmark-state-ceil1.json
+all data     -> benchmark-results-ceil1.json
+
+resume state -> benchmark-state-ceil1.json
+all data     -> benchmark-results-ceil1.json
