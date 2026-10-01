@@ -150,12 +150,44 @@ def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
 _last_edit_regions: list[tuple[str, str]] = []
 
 
+def _file_type(path: str) -> str:
+    """The check rules differ per file type (session 35, addendum 4):
+    prose files legally contain unbalanced quotes and brackets."""
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in ("md", "markdown", "rst", "txt", "log"):
+        return "prose"
+    if ext == "py":
+        return "python"
+    if ext in ("html", "htm", "js", "mjs", "css"):
+        return "markup"
+    if ext == "json":
+        return "json"
+    return "code"
+
+
+def _strip_apostrophes(text: str) -> str:
+    """Drop single quotes so the balance check ignores prose
+    apostrophes inside markup files, while DOUBLE quotes (HTML/JS
+    attribute and string delimiters) stay counted - a truncated
+    attribute quote is a real error (session 35, addendum 4)."""
+    return text.replace("'", "")
+
+
 def _check_delimiters(src: str, out: str, path: str) -> None:
     """Sanity check that the edit did not unbalance quotes, brackets,
-    braces or parens. Per line when lines are short (most code); on
-    the whole buffer for minified/long-line files (HTML pickers) -
-    where a line legitimately spans many statements, only the whole
-    buffer must balance."""
+    braces or parens. File-type aware (session 35, addendum 4):
+    - prose (md/txt/...): NO check - apostrophes and brackets in
+      sentences are legal; truncation/duplication is still caught by
+      the pre-write verify.
+    - python: region-based check (each replaced region balances as a
+      unit; a region may open a delimiter that closes after it).
+    - markup (html/js/css): whole-buffer bracket check, quotes
+      stripped (prose inside the page carries apostrophes) - only
+      applies when the source already balanced.
+    - json/other code: whole-buffer balance, quotes included."""
+    ftype = _file_type(path)
+    if ftype == "prose":
+        return
     pairs = {"(": ")", "[": "]", "{": "}"}
     closers = set(pairs.values())
 
@@ -175,6 +207,7 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
     def balance(text: str) -> str | None:
         stack: list[tuple[str, int]] = []
         quote: str | None = None
+        tq_open: str | None = None
         escape = False
         in_comment = False
         for ln_no, ln in enumerate(text.split("\n"), 1):
@@ -196,7 +229,22 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
                 if in_comment:
                     i += 1
                     continue
+                if tq_open:
+                    end = ln.find(tq_open)
+                    if end < 0:
+                        break
+                    i = end + 3
+                    tq_open = None
+                    continue
                 if ch in ('"', "'"):
+                    tq = ln[i : i + 3]
+                    if tq == '"""' or tq == "'''":
+                        end = ln.find(tq, i + 3)
+                        if end < 0:
+                            tq_open = tq
+                            break
+                        i = end + 3
+                        continue
                     quote = ch
                 elif ch == "#" or (ch == "/" and ln[i : i + 2] == "//"):
                     in_comment = True
@@ -219,11 +267,15 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
         return a != b
 
     max_len = max((len(ln) for ln in out.splitlines()), default=0)
-    if max_len > 500:
+    if ftype in ("markup", "json") or max_len > 500:
         # minified/long-line file: balance over the whole buffer, and
         # only warn-grade: compare only if the source already balanced
-        if balance(src) is None:
-            problem = balance(out)
+        if ftype == "markup":
+            check_src, check_out = _strip_apostrophes(src), _strip_apostrophes(out)
+        else:
+            check_src, check_out = src, out
+        if balance(check_src) is None:
+            problem = balance(check_out)
             if problem:
                 raise CodeEditError(
                     f"{path}: delimiter balance check failed after edit ({problem}) - "
@@ -500,21 +552,30 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     _last_edit_regions.clear()
     _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
     _check_delimiters(src, out, path)
+    # verify every post-condition against the IN-MEMORY result BEFORE
+    # touching disk (session 35, addendum 4: these checks used to run
+    # after the write, so a failed verify left the file MODIFIED and
+    # broke the file-untouched contract). They are all deterministic
+    # against out, so they belong here.
+    _verify_result(out, blocks, path)
     _atomic_write_sync(path, out)
-    # re-read from disk and re-verify the post-conditions
     with open(path, encoding="utf-8") as f:
         now = f.read()
     if now != out:
         raise CodeEditError(
             f"{path}: disk content diverged after write - the file may be corrupt; re-check"
         )
+
+
+def _verify_result(out: str, blocks: Sequence[tuple], path: str) -> None:
+    """Check every block post-condition against the in-memory result.
+    Runs BEFORE the write so a failure leaves the file untouched."""
     for i, block in enumerate(blocks):
-        if block[0] in ("replace", "replace_all", "replace_n") and block[2] and block[2] not in now:
-            raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed (new text not on disk)"
-            )
+        kind = block[0]
+        if kind in ("replace", "replace_all", "replace_n") and block[2] and block[2] not in out:
+            raise CodeEditError(f"{path}: block {i} verify failed (new text not in the result)")
         if (
-            block[0]
+            kind
             in (
                 "insert_before",
                 "insert_after",
@@ -525,21 +586,21 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
             )
             and block[-1]
             and _as_lines(block[-1])
-            and all(ln in now for ln in _as_lines(block[-1])) is False
-            and block[-1] not in now
+            and not all(ln in out for ln in _as_lines(block[-1]))
+            and block[-1] not in out
         ):
             raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed (inserted text not on disk)"
+                f"{path}: block {i} verify failed (inserted text not in the result)"
             )
-        if block[0] == "delete" and block[1] in now:
+        if kind == "delete" and block[1] in out:
             raise CodeEditError(
-                f"{path}: block {i} verify-after-write failed (deleted text still on disk)"
+                f"{path}: block {i} verify failed (deleted text still in the result)"
             )
-        if block[0] == "replace_regex":
+        if kind == "replace_regex":
             try:
-                if not re.search(block[1], now):
+                if not re.search(block[1], out):
                     raise CodeEditError(
-                        f"{path}: block {i} verify-after-write failed (pattern result not on disk)"
+                        f"{path}: block {i} verify failed (pattern result not in the result)"
                     )
             except re.error as e:
                 raise CodeEditError(f"{path}: block {i}: bad regex: {e}") from e
@@ -589,7 +650,10 @@ def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
         with open(path, encoding="utf-8") as f:
             src = f.read()
         _verify_blocks(src, blocks)
-        specs.append((path, src, _apply(src, blocks)))
+        out = _apply(src, blocks)
+        _check_delimiters(src, out, path)
+        _verify_result(out, blocks, path)
+        specs.append((path, src, out))
     for path, _src, out in specs:
         _atomic_write_sync(path, out)
         with open(path, encoding="utf-8") as f:

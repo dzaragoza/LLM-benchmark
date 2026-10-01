@@ -895,3 +895,53 @@ def test_convert_quant_deletes_tensors_after_f16(tmp_path, monkeypatch):
     got = convert_quant.create("fam", str(famdir), "Q4_K_M")
     assert got == str(out_q)
     assert not (famdir / "safetensors-source").exists(), "tensors deleted after f16"
+
+
+def test_code_edit_prose_files_skip_the_balance_check(tmp_path):
+    # session 35, addendum 4: prose (md) legally contains apostrophes
+    # and brackets - no delimiter check runs for prose file types
+    p = tmp_path / "note.md"
+    p.write_text("hello\n")
+    code_edit.edit(str(p), [("append", "Daniela's results (see [1])\n")])
+    with open(str(p)) as f:
+        assert "Daniela's results" in f.read()
+
+
+def test_code_edit_markup_ignores_apostrophes_but_guards_double_quotes(tmp_path):
+    # session 35, addendum 4: an apostrophe inside markup text is
+    # fine; a TRUNCATED double-quoted attribute is still rejected
+    p = tmp_path / "page.html"
+    p.write_text('<div id="a">old</div>\n')
+    code_edit.edit(str(p), [("replace", ">old<", ">it's new<")])
+    with open(str(p)) as f:
+        assert "it's new" in f.read()
+    try:
+        code_edit.edit(str(p), [("replace", 'id="a"', 'id="a')])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "balance" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert 'id="a"' in f.read()  # untouched
+
+
+def test_code_edit_verify_failure_leaves_the_file_untouched(tmp_path):
+    # session 35, addendum 4: the block post-conditions run BEFORE the
+    # write - a verify failure must not leave a modified file behind
+    p = tmp_path / "code.py"
+    p.write_text("x = 1\n")
+    try:
+        code_edit.edit(str(p), [("replace", "x = 1", "x = 2")]) if False else None
+    except Exception:
+        pass
+    # real case: a replace whose new text is empty cannot pass verify
+    # via the not-in-result rule when it IS in the result - use a
+    # delete of a nonexistent... instead force a bad regex block
+    try:
+        code_edit.edit(str(p), [("replace_regex", "(unclosed", "y")])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\n"

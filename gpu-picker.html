@@ -1,263 +1,627 @@
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Local LLM picker &mdash; GPU: which model serves your card?</title>
-<style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { font-family: Georgia, 'Times New Roman', serif; margin: 0 auto; max-width: 900px;
-         padding: 1.5rem 1rem 4rem; line-height: 1.55; }
-  h1 { font-size: 1.45rem; margin-bottom: 0.2rem; }
-  .sub { color: #666; font-size: 0.95rem; margin-bottom: 1.4rem; font-style: italic; }
-  h2 { font-size: 1.05rem; margin-top: 1.6rem; }
-  .panel { border: 1px solid #bbb; border-radius: 8px; padding: 1rem 1.2rem; margin: 0.6rem 0 1.2rem; background: rgba(127,127,127,0.06); }
-  label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.8rem; }
-  input[type=number] { font: inherit; padding: 0.35rem 0.5rem; width: 12rem; max-width: 100%; }
-  .readout { font-family: 'Courier New', monospace; margin-top: 0.9rem; font-size: 0.95rem; }
-  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
-            background: rgba(127,127,127,0.12); }
-  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
-  .mitem:hover { background: rgba(127,127,127,0.15); }
-  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
-  #gpuList { background: rgba(127,127,127,0.04); }
-  .verdict { border: 2px solid #2a7; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
-  .verdict.none { border-color: #b33; }
-  .verdict h3 { margin: 0 0 0.3rem; font-size: 1.15rem; }
-  .verdict .depth { font-size: 2rem; font-weight: bold; }
-  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0 1rem; font-size: 0.85rem; font-family: Verdana, Arial, sans-serif; }
-  th, td { border: 1px solid #bbb; padding: 0.3rem 0.5rem; text-align: left; }
-  th { background: rgba(127,127,127,0.12); }
-  td.num, th.num { text-align: right; }
-  .ok { color: #1a7; font-weight: bold; }
-  .bad { color: #b33; font-weight: bold; }
-  .est { color: #888; }
-  .foot { font-size: 0.8rem; color: #555; margin-top: 2rem; border-top: 1px solid #bbb; padding-top: 0.8rem; }
-  .footnote { font-size: 0.75rem; color: #777; }
-</style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local LLM picker &mdash; GPU: which model serves your card?</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0 auto;
+        max-width: 900px;
+        padding: 1.5rem 1rem 4rem;
+        line-height: 1.55;
+      }
+      h1 {
+        font-size: 1.45rem;
+        margin-bottom: 0.2rem;
+      }
+      .sub {
+        color: #666;
+        font-size: 0.95rem;
+        margin-bottom: 1.4rem;
+        font-style: italic;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin-top: 1.6rem;
+      }
+      .panel {
+        border: 1px solid #bbb;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin: 0.6rem 0 1.2rem;
+        background: rgba(127, 127, 127, 0.06);
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.2rem;
+        font-weight: bold;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 0.8rem;
+      }
+      input[type="number"] {
+        font: inherit;
+        padding: 0.35rem 0.5rem;
+        width: 12rem;
+        max-width: 100%;
+      }
+      .readout {
+        font-family: "Courier New", monospace;
+        margin-top: 0.9rem;
+        font-size: 0.95rem;
+      }
+      .mgroup {
+        font-weight: bold;
+        font-size: 0.72rem;
+        padding: 0.35rem 0.5rem 0.15rem;
+        background: rgba(127, 127, 127, 0.12);
+      }
+      .mitem {
+        padding: 0.22rem 0.6rem;
+        cursor: pointer;
+      }
+      .mitem:hover {
+        background: rgba(127, 127, 127, 0.15);
+      }
+      .mitem.msel {
+        background: rgba(42, 119, 119, 0.2);
+        font-weight: bold;
+      }
+      #gpuList {
+        background: rgba(127, 127, 127, 0.04);
+      }
+      .verdict {
+        border: 2px solid #2a7;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin: 1rem 0;
+      }
+      .verdict.none {
+        border-color: #b33;
+      }
+      .verdict h3 {
+        margin: 0 0 0.3rem;
+        font-size: 1.15rem;
+      }
+      .verdict .depth {
+        font-size: 2rem;
+        font-weight: bold;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0.6rem 0 1rem;
+        font-size: 0.85rem;
+        font-family: Verdana, Arial, sans-serif;
+      }
+      th,
+      td {
+        border: 1px solid #bbb;
+        padding: 0.3rem 0.5rem;
+        text-align: left;
+      }
+      th {
+        background: rgba(127, 127, 127, 0.12);
+      }
+      td.num,
+      th.num {
+        text-align: right;
+      }
+      .ok {
+        color: #1a7;
+        font-weight: bold;
+      }
+      .bad {
+        color: #b33;
+        font-weight: bold;
+      }
+      .est {
+        color: #888;
+      }
+      .foot {
+        font-size: 0.8rem;
+        color: #555;
+        margin-top: 2rem;
+        border-top: 1px solid #bbb;
+        padding-top: 0.8rem;
+      }
+      .footnote {
+        font-size: 0.75rem;
+        color: #777;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Local LLM picker &mdash; GPU</h1>
+    <div class="sub">
+      The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise)
+      for your GPU, among the models the study scored under protocol v4.3 (a depth-scored ladder:
+      per rung, a speed gate at &ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction
+      count; the score is the deepest context passing both; n=1 everywhere, floor 4,096 &mdash; the
+      corpus structural floor, addendum 32). Lab notebook study &mdash; measured on a T14s (102.4
+      GB/s class), live-corpus cal-50. Serving from system RAM instead?
+      <a href="cpu-picker.html">System RAM picker</a>.
+    </div>
 
-<h1>Local LLM picker &mdash; GPU</h1>
-<div class="sub">The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise) for your GPU, among the models the
-study scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at
-&ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the score is the
-deepest context passing both; n=1 everywhere, floor 4,096 &mdash; the corpus structural
-floor, addendum 32). Lab notebook study &mdash; measured on a T14s (102.4 GB/s class),
-live-corpus cal-50.
-Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>.</div>
+    <div class="panel">
+      <label for="gfilter">GPU VRAM (GiB) &mdash; the common card capacities</label>
+      <input
+        type="search"
+        id="gfilter"
+        placeholder="type to filter, e.g. 16"
+        oninput="renderList()"
+        style="width: 20rem; max-width: 100%"
+      />
+      <div class="footnote" style="margin-top: 0.3rem">
+        Distinct GPU VRAM capacities of the last ~30 years of cards; only tiers that fit at least
+        one measured model are listed (the smallest needs <span id="mincost"></span>&nbsp;GiB of
+        minimum RAM). The estimated w/s column uses the lowest-bandwidth card found at each capacity
+        &mdash; conservative for anything faster.
+      </div>
+      <div
+        id="gpuList"
+        style="
+          border: 1px solid #bbb;
+          border-radius: 6px;
+          max-height: 14rem;
+          overflow-y: auto;
+          margin-top: 0.4rem;
+          font-family: Verdana, Arial, sans-serif;
+          font-size: 0.82rem;
+        "
+      ></div>
+      <label for="vram">Your GPU's VRAM (GiB)</label>
+      <input
+        type="number"
+        id="vram"
+        min="1"
+        max="128"
+        step="0.5"
+        value="16"
+        oninput="clearSel(); pick()"
+      />
+      <div class="footnote" style="margin-top: 0.3rem">
+        VRAM fit uses the <strong>measured minimum RAM</strong> (weights + KV + buffers + runtime),
+        conservatively taken from the CPU-side instrument &mdash; the GPU stack is expected to need
+        less, so a fit here is a lower bound on what the card can hold.
+      </div>
+      <div class="readout" id="bwout"></div>
+    </div>
 
-<div class="panel">
-  <label for="gfilter">GPU VRAM (GiB) &mdash; the common card capacities</label>
-  <input type="search" id="gfilter" placeholder="type to filter, e.g. 16" oninput="renderList()" style="width:20rem;max-width:100%">
-  <div class="footnote" style="margin-top:0.3rem">Distinct GPU VRAM capacities of the last ~30 years of cards;
-    only tiers that fit at least one measured model are listed (the smallest needs
-    <span id="mincost"></span>&nbsp;GiB of minimum RAM). The estimated w/s column uses the
-    lowest-bandwidth card found at each capacity &mdash; conservative for anything faster.</div>
-  <div id="gpuList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
-  <label for="vram">Your GPU's VRAM (GiB)</label>
-  <input type="number" id="vram" min="1" max="128" step="0.5" value="16" oninput="clearSel(); pick()">
-  <div class="footnote" style="margin-top:0.3rem">VRAM fit uses the
-    <strong>measured minimum RAM</strong> (weights + KV + buffers + runtime), conservatively taken
-    from the CPU-side instrument &mdash; the GPU stack is expected to need less, so a fit here is a lower
-    bound on what the card can hold.</div>
-  <div class="readout" id="bwout"></div>
-</div>
+    <div id="result"></div>
+    <div id="tables"></div>
 
-<div id="result"></div>
-<div id="tables"></div>
+    <div class="foot">
+      <p>
+        <strong>How the recommendation is computed.</strong> Candidates are the measured members of
+        the studied lineages (qwen, granite, MiniCPM, Phi), each scored under protocol v4.3 (session
+        34, addendum 33): a depth-scored ladder from the 4,096-token floor, doubling rungs, score =
+        the deepest rung passing BOTH the speed gate (n=1, worst-turn &ge; 5 w/s, &le; 5% stall) AND
+        FWE (n=1, 3/3 coded words), refined to 1,024-token resolution &mdash; the same pool as the
+        <a href="cpu-picker.html">system-RAM picker</a>. A candidate is eligible iff (a) its
+        <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers + runtime,
+        MemAvailable-delta instrument, cold-cache at the scored rung) fits the card's VRAM &mdash;
+        conservative, since the CPU-side cost is an upper bound on the GPU-side one &mdash; and (b)
+        its predicted w/s at the card's bandwidth clears the 5.0 reader line, evaluated at each
+        capacity's lowest-bandwidth card (conservative for anything faster). Eligibility is the VRAM
+        fit; the w/s column shows the reader-line margin.
+      </p>
+      <p>
+        <strong>Two extrapolations, both flagged.</strong> The minimum-RAM criterion carries the CPU
+        measurement onto the GPU unchanged (conservative by design; the first GPU-side calibration
+        run should replace it), and the linear bandwidth law is validated only on system RAM &mdash;
+        on GPU, compute and kernel overheads can make the true w/s <em>higher</em> than predicted
+        for small models (the law stays conservative) or the decode path can behave differently.
+        Treat GPU recommendations as provisional until the study re-benches at least one candidate
+        on a GPU.
+      </p>
+      <p class="footnote">
+        VRAM figures are nominal card capacity; a small fraction is consumed by the display/OS.
+        Bandwidth figures are the card's theoretical peak (memory type &times; bus). Quant: each
+        family appears once, at its best-scoring quant (Q4_K_M where the Q4 run scored deeper, Q8_0
+        otherwise; session 35, addendum 2).
+      </p>
+    </div>
 
-<div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the measured members of the
-  studied lineages (qwen, granite, MiniCPM, Phi), each scored under protocol v4.3 (session
-  34, addendum 33): a depth-scored ladder from the 4,096-token floor, doubling rungs, score
-  = the deepest rung passing BOTH the speed gate (n=1, worst-turn &ge; 5 w/s, &le; 5% stall)
-  AND FWE (n=1, 3/3 coded words), refined to 1,024-token resolution &mdash; the same pool as
-  the <a href="cpu-picker.html">system-RAM picker</a>. A candidate is eligible iff
-  (a) its <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers + runtime,
-  MemAvailable-delta instrument, cold-cache at the scored rung) fits the card's VRAM &mdash;
-  conservative, since the CPU-side cost is an upper bound on the GPU-side one &mdash; and
-  (b) its predicted w/s at the card's bandwidth clears the 5.0 reader line, evaluated at
-  each capacity's lowest-bandwidth card (conservative for anything faster). Eligibility is
-  the VRAM fit; the w/s column shows the reader-line margin.</p></p>
-  <p><strong>Two extrapolations, both flagged.</strong> The minimum-RAM criterion carries the CPU
-  measurement onto the GPU unchanged (conservative by design; the first GPU-side
-  calibration run should replace it), and the linear bandwidth law is validated only on
-  system RAM &mdash; on GPU, compute and kernel overheads can make the true w/s
-  <em>higher</em> than predicted for small models (the law stays conservative) or the
-  decode path can behave differently. Treat GPU recommendations as provisional until the
-  study re-benches at least one candidate on a GPU.</p></p>
-  <p class="footnote">VRAM figures are nominal card capacity; a small fraction is consumed by the
-  display/OS. Bandwidth figures are the card's theoretical peak (memory type &times; bus).
-  Quant: each family appears once, at its best-scoring quant (Q4_K_M where the Q4 run
-  scored deeper, Q8_0 otherwise; session 35, addendum 2).</p></p>
-</div>
+    <script>
+      "use strict";
+      // Measured records (v4.3-scored, best quant per family - session 35, addendum 2) - identical to cpu-picker.html. wps = the WORST
+      // TURN at the model's deepest speed-measured rung (session 34, addendum 33). cost = minimum
+      // RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
+      // measured - used here as a conservative VRAM requirement.
+      var CANDIDATES = [
+        {
+          name: "Qwen3.5-4B",
+          size: 2.59,
+          cost: 7.71,
+          wps: 6.3,
+          depth: 123904,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen2.5-1.5B-Instruct",
+          size: 1.76,
+          cost: 2.39,
+          wps: 18.3,
+          depth: 20992,
+          family: "Qwen2.5",
+          quant: "Q8_0",
+        },
+        {
+          name: "Qwen3-1.7B",
+          size: 1.71,
+          cost: 5.24,
+          wps: 7.7,
+          depth: 34816,
+          family: "Qwen3",
+          quant: "Q8_0",
+        },
+        {
+          name: "phi-4-mini",
+          size: 2.4,
+          cost: 8.14,
+          costEst: false,
+          wps: 6.4,
+          depth: 44032,
+          family: "Phi",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen3.5-0.8B",
+          size: 0.5,
+          cost: 4.44,
+          wps: 8.1,
+          depth: 262144,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-4.1-3b",
+          size: 1.96,
+          cost: 3.72,
+          wps: 8.5,
+          depth: 18432,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-3.2-2b",
+          size: 1.44,
+          cost: 2.62,
+          wps: 14.7,
+          depth: 15360,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-3.1-2b",
+          size: 2.51,
+          cost: 3.63,
+          wps: 13.1,
+          depth: 12288,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM5-2B",
+          size: 2.5,
+          cost: 2.86,
+          wps: 19.9,
+          depth: 12288,
+          family: "MiniCPM",
+          quant: "Q8_0",
+        },
+        {
+          name: "granite-3.3-2b",
+          size: 1.65,
+          cost: 3.78,
+          costEst: false,
+          wps: 8.5,
+          depth: 26624,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen3-4B",
+          size: 2.33,
+          cost: 4.8,
+          wps: 6.9,
+          depth: 16384,
+          family: "Qwen3",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Phi-3.5-mini",
+          size: 3.78,
+          cost: 6.52,
+          wps: 5.7,
+          depth: 7168,
+          family: "Phi",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM-1B-sft",
+          size: 1.35,
+          cost: 1.39,
+          wps: 21.1,
+          depth: 4096,
+          family: "MiniCPM",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM-2B-sft",
+          size: 1.68,
+          cost: 3.42,
+          wps: 18.4,
+          depth: 4096,
+          family: "MiniCPM",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-4.2-3b",
+          size: 3.63,
+          cost: 3.68,
+          wps: 10.7,
+          depth: 4096,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+        {
+          name: "granite-3.0-2b",
+          size: 2.61,
+          cost: 2.63,
+          wps: 12.4,
+          depth: 4096,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+      ];
+      // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
+      // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
+      // floor 4096 (addendum 32, the corpus structural floor). 0 = a measured zero on the f4k
+      // grid (the 4096 base rung fails). OUT OF THE POOL: Qwen2.5-0.5B (counting floor) and
+      // Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - a refusing model is out; the
+      // benchmark is not changed to fit a model).
+      var REF_BW = 102.4;
+      var READER = 5.0;
 
-<script>
-"use strict";
-// Measured records (v4.3-scored, best quant per family - session 35, addendum 2) - identical to cpu-picker.html. wps = the WORST
-// TURN at the model's deepest speed-measured rung (session 34, addendum 33). cost = minimum
-// RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
-// measured - used here as a conservative VRAM requirement.
-var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 2.59, cost: 7.71,  wps: 6.3,  depth: 123904, family: "Qwen3.5", quant: "Q4_K_M" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  wps: 18.3, depth: 20992,  family: "Qwen2.5", quant: "Q8_0" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  wps: 7.7,  depth: 34816,  family: "Qwen3", quant: "Q8_0" },
-  { name: "phi-4-mini",            size: 3.80, cost: 8.73,  wps: 6.5,  depth: 32768,  family: "Phi", quant: "Q8_0" },
-  { name: "Qwen3.5-0.8B",         size: 0.50, cost: 4.44,  wps: 8.1,  depth: 262144, family: "Qwen3.5", quant: "Q4_K_M" },
-  { name: "granite-4.1-3b",       size: 1.96, cost: 3.72,  wps: 8.5,  depth: 18432,  family: "Granite", quant: "Q4_K_M" },
-  { name: "granite-3.2-2b",       size: 1.44, cost: 2.62,  wps: 14.7, depth: 15360,  family: "Granite", quant: "Q4_K_M" },
-  { name: "granite-3.1-2b",       size: 2.51, cost: 3.63,  wps: 13.1, depth: 12288,  family: "Granite", quant: "Q8_0" },
-  { name: "MiniCPM5-2B",          size: 2.50, cost: 2.86,  wps: 19.9, depth: 12288,  family: "MiniCPM", quant: "Q8_0" },
-  { name: "granite-3.3-2b",         size: 2.51, cost: 3.17,  wps: 12.4, depth: 6144,   family: "Granite", quant: "Q8_0" },
-  { name: "Qwen3-4B",             size: 2.33, cost: 4.80,  wps: 6.9,  depth: 16384,  family: "Qwen3", quant: "Q4_K_M" },
-  { name: "Phi-3.5-mini",         size: 3.78, cost: 6.52,  wps: 5.7,  depth: 7168,   family: "Phi", quant: "Q8_0" },
-  { name: "MiniCPM-1B-sft",       size: 1.35, cost: 1.39,  wps: 21.1, depth: 4096,    family: "MiniCPM", quant: "Q8_0" },
-  { name: "MiniCPM-2B-sft",       size: 1.68, cost: 3.42,  wps: 18.4, depth: 4096,    family: "MiniCPM", quant: "Q4_K_M" },
-  { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  wps: 10.7, depth: 4096,    family: "Granite", quant: "Q8_0" },
-  { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  wps: 12.4, depth: 4096,    family: "Granite", quant: "Q8_0" }
-];
-// depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
-// which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
-// floor 4096 (addendum 32, the corpus structural floor). 0 = a measured zero on the f4k
-// grid (the 4096 base rung fails). OUT OF THE POOL: Qwen2.5-0.5B (counting floor) and
-// Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - a refusing model is out; the
-// benchmark is not changed to fit a model).
-var REF_BW = 102.4;
-var READER = 5.0;
+      function $(id) {
+        return document.getElementById(id);
+      }
 
-function $(id) { return document.getElementById(id); }
+      // Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
+      // each paired with the lowest memory bandwidth among cards found at that capacity
+      // (the conservative w/s estimate for the tier). Only tiers that fit at least one
+      // measured model are listed; the smallest minimum RAM is ~2.53 GiB (Qwen3.5-0.8B, cold at its scored rung).
+      var VRAM_TIERS = [
+        { v: 1.5, bw: 177.4 }, // GTX 480 (2010)
+        { v: 2, bw: 176.0 }, // Radeon HD 6970 (2010)
+        { v: 3, bw: 240.0 }, // Radeon HD 7950 (2012, 3 GB)
+        { v: 4, bw: 224.1 }, // GTX 970 (2014)
+        { v: 6, bw: 192.0 }, // GTX 1060 6GB (2016)
+        { v: 8, bw: 211.0 }, // Radeon RX 470 8GB (2016)
+        { v: 10, bw: 760.3 }, // RTX 3080 10GB (2020)
+        { v: 11, bw: 484.3 }, // GTX 1080 Ti (2017)
+        { v: 12, bw: 360.0 }, // RTX 3060 12GB (2021)
+        { v: 16, bw: 288.1 }, // RTX 4060 Ti 16GB (2024)
+        { v: 20, bw: 800.0 }, // RX 7900 XT (2022)
+        { v: 22, bw: 616.0 }, // RTX 2080 Ti 22GB mod (2018)
+        { v: 24, bw: 936.2 }, // RTX 3090 (2020)
+        { v: 32, bw: 900.0 }, // V100 32GB (2017)
+        { v: 48, bw: 768.0 }, // RTX A6000 (2020)
+        { v: 80, bw: 2039.0 }, // A100 80GB (2020)
+      ];
+      var MIN_COST = CANDIDATES.reduce(function (a, c) {
+        return Math.min(a, c.cost);
+      }, Infinity);
+      var MAX_COST = CANDIDATES.reduce(function (a, c) {
+        return Math.max(a, c.cost);
+      }, 0);
 
-// Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
-// each paired with the lowest memory bandwidth among cards found at that capacity
-// (the conservative w/s estimate for the tier). Only tiers that fit at least one
-// measured model are listed; the smallest minimum RAM is ~2.53 GiB (Qwen3.5-0.8B, cold at its scored rung).
-var VRAM_TIERS = [
-  { v: 1.5,  bw: 177.4 },   // GTX 480 (2010)
-  { v: 2,    bw: 176.0 },   // Radeon HD 6970 (2010)
-  { v: 3,    bw: 240.0 },   // Radeon HD 7950 (2012, 3 GB)
-  { v: 4,    bw: 224.1 },   // GTX 970 (2014)
-  { v: 6,    bw: 192.0 },   // GTX 1060 6GB (2016)
-  { v: 8,    bw: 211.0 },   // Radeon RX 470 8GB (2016)
-  { v: 10,   bw: 760.3 },   // RTX 3080 10GB (2020)
-  { v: 11,   bw: 484.3 },   // GTX 1080 Ti (2017)
-  { v: 12,   bw: 360.0 },   // RTX 3060 12GB (2021)
-  { v: 16,   bw: 288.1 },   // RTX 4060 Ti 16GB (2024)
-  { v: 20,   bw: 800.0 },   // RX 7900 XT (2022)
-  { v: 22,   bw: 616.0 },   // RTX 2080 Ti 22GB mod (2018)
-  { v: 24,   bw: 936.2 },   // RTX 3090 (2020)
-  { v: 32,   bw: 900.0 },   // V100 32GB (2017)
-  { v: 48,   bw: 768.0 },   // RTX A6000 (2020)
-  { v: 80,   bw: 2039.0 }   // A100 80GB (2020)
-];
-var MIN_COST = CANDIDATES.reduce(function (a, c) { return Math.min(a, c.cost); }, Infinity);
-var MAX_COST = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.cost); }, 0);
+      // keep only tiers that fit at least one measured model
+      var TIERS = VRAM_TIERS.filter(function (t) {
+        return t.v >= MIN_COST;
+      });
 
-// keep only tiers that fit at least one measured model
-var TIERS = VRAM_TIERS.filter(function (t) { return t.v >= MIN_COST; });
+      // default: the smallest capacity that runs every measured model (session 35, addendum 2)
+      var DEFAULT_TIER =
+        TIERS.filter(function (t) {
+          return t.v >= MAX_COST;
+        })[0] || TIERS[0];
 
-// default: the smallest capacity that runs every measured model (session 35, addendum 2)
-var DEFAULT_TIER = TIERS.filter(function (t) { return t.v >= MAX_COST; })[0] || TIERS[0];
+      var selKey = DEFAULT_TIER ? String(DEFAULT_TIER.v) : "";
 
-var selKey = DEFAULT_TIER ? String(DEFAULT_TIER.v) : "";
+      function renderList() {
+        var q = ($("gfilter").value || "").toLowerCase().trim();
+        var host = $("gpuList");
+        var html = "";
+        TIERS.forEach(function (t) {
+          var label = t.v + " GiB VRAM";
+          if (q && label.toLowerCase().indexOf(q) < 0) return;
+          var cls = "mitem" + (String(t.v) === selKey ? " msel" : "");
+          html +=
+            '<div class="' +
+            cls +
+            '" data-key="' +
+            t.v +
+            '" onclick="chooseVram(this.dataset.key)">' +
+            label +
+            "</div>";
+        });
+        if (!html) html = '<div class="mitem">no capacity matches the filter</div>';
+        host.innerHTML = html;
+      }
 
-function renderList() {
-  var q = ($("gfilter").value || "").toLowerCase().trim();
-  var host = $("gpuList");
-  var html = "";
-  TIERS.forEach(function (t) {
-    var label = t.v + " GiB VRAM";
-    if (q && label.toLowerCase().indexOf(q) < 0) return;
-    var cls = "mitem" + (String(t.v) === selKey ? " msel" : "");
-    html += '<div class="' + cls + '" data-key="' + t.v +
-      '" onclick="chooseVram(this.dataset.key)">' + label + "</div>";
-  });
-  if (!html) html = '<div class="mitem">no capacity matches the filter</div>';
-  host.innerHTML = html;
-}
+      function tierBw(vram) {
+        var t = TIERS.filter(function (x) {
+          return String(x.v) === String(vram);
+        })[0];
+        return t ? t.bw : null;
+      }
 
-function tierBw(vram) {
-  var t = TIERS.filter(function (x) { return String(x.v) === String(vram); })[0];
-  return t ? t.bw : null;
-}
+      function chooseVram(v) {
+        selKey = v;
+        $("vram").value = v;
+        renderList();
+        pick();
+      }
 
-function chooseVram(v) {
-  selKey = v;
-  $("vram").value = v;
-  renderList();
-  pick();
-}
+      function clearSel() {
+        selKey = "";
+        renderList();
+      }
 
-function clearSel() { selKey = ""; renderList(); }
+      function pick() {
+        var vram = parseFloat($("vram").value);
+        if (!(vram > 0)) {
+          $("result").innerHTML = "";
+          $("tables").innerHTML = "";
+          return;
+        }
+        var bw = tierBw(vram) || null;
+        $("bwout").textContent =
+          "VRAM: " +
+          vram +
+          " GiB" +
+          (bw
+            ? " \u00b7 w/s estimated at " +
+              bw.toFixed(0) +
+              " GB/s (the lowest-bandwidth card found at this capacity)"
+            : "");
 
-function pick() {
-  var vram = parseFloat($("vram").value);
-  if (!(vram > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
-  var bw = tierBw(vram) || null;
-  $("bwout").textContent = "VRAM: " + vram + " GiB" +
-    (bw ? " \u00b7 w/s estimated at " + bw.toFixed(0) + " GB/s (the lowest-bandwidth card found at this capacity)" : "");
+        var rows = CANDIDATES.map(function (m) {
+          var wpred = bw ? (m.wps * bw) / REF_BW : null;
+          return {
+            m: m,
+            w: m.wps === null ? null : wpred,
+            fits: m.cost <= vram,
+            passes: m.wps !== null && wpred >= READER,
+          };
+        }).sort(cmpRows);
 
-  var rows = CANDIDATES.map(function (m) {
-    var wpred = bw ? m.wps * bw / REF_BW : null;
-    return { m: m, w: m.wps === null ? null : wpred, fits: m.cost <= vram, passes: m.wps !== null && wpred >= READER };
-  }).sort(cmpRows);
+        var host = $("result");
+        var eligible = rows.filter(function (r) {
+          return r.fits;
+        });
+        if (eligible.length) {
+          var best = eligible.reduce(function (a, r) {
+            return (r.m.depth || 0) > (a.m.depth || 0) ? r : a;
+          });
+          host.innerHTML =
+            '<div class="verdict"><h3>Recommended: ' +
+            best.m.name +
+            " " +
+            best.m.quant +
+            "</h3>" +
+            '<div><span class="depth">' +
+            (best.m.depth === null
+              ? "\u2014"
+              : best.m.depth === 0
+                ? "counting floor"
+                : best.m.depth.toLocaleString()) +
+            " depth score (v4.3 ladder, n=1 screen)</div>" +
+            "<div>file " +
+            best.m.size.toFixed(2) +
+            " GiB \u00b7 minimum RAM " +
+            best.m.cost.toFixed(2) +
+            " GiB of your " +
+            vram +
+            " GiB VRAM (conservative: CPU-side measured minimum RAM)</div></div>";
+        } else {
+          var cheapest = CANDIDATES.reduce(function (a, c) {
+            return c.cost < a.cost ? c : a;
+          });
+          host.innerHTML =
+            '<div class="verdict none"><h3>No measured model qualifies</h3><div>' +
+            "no measured model's minimum RAM fits " +
+            vram +
+            " GiB (smallest needs " +
+            cheapest.cost.toFixed(2) +
+            " GiB).</div></div>";
+        }
 
-  var host = $("result");
-  var eligible = rows.filter(function (r) { return r.fits; });
-  if (eligible.length) {
-    var best = eligible.reduce(function (a, r) { return (r.m.depth || 0) > (a.m.depth || 0) ? r : a; });
-    host.innerHTML =
-      '<div class="verdict"><h3>Recommended: ' + best.m.name + ' ' + best.m.quant + '</h3>' +
-      '<div><span class="depth">' + (best.m.depth === null ? "\u2014" : (best.m.depth === 0 ? "counting floor" : best.m.depth.toLocaleString())) + " depth score (v4.3 ladder, n=1 screen)</div>" +
-      "<div>file " + best.m.size.toFixed(2) + " GiB \u00b7 minimum RAM " + best.m.cost.toFixed(2) +
-      " GiB of your " + vram + " GiB VRAM (conservative: CPU-side measured minimum RAM)</div></div>";
-  } else {
-    var cheapest = CANDIDATES.reduce(function (a, c) { return c.cost < a.cost ? c : a; });
-    host.innerHTML = '<div class="verdict none"><h3>No measured model qualifies</h3><div>' +
-      "no measured model's minimum RAM fits " + vram + " GiB (smallest needs " +
-      cheapest.cost.toFixed(2) + " GiB).</div></div>";
-  }
+        var t =
+          "<table><thead><tr>" +
+          '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
+          '<th class="num" data-k="cost">minimum RAM GiB</th><th class="num" data-k="fits">fits ' +
+          vram +
+          " GiB</th>" +
+          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">depth (tok)</th></tr></thead><tbody id="tbody">';
+        rows.forEach(function (r) {
+          t +=
+            "<tr><td>" +
+            r.m.name +
+            "</td><td>" +
+            r.m.quant +
+            "</td>" +
+            '<td class="num">' +
+            r.m.size.toFixed(2) +
+            '</td><td class="num">' +
+            r.m.cost.toFixed(2) +
+            '</td><td class="num">' +
+            (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
+            '</td><td class="num">' +
+            (r.w !== null && r.w !== undefined ? r.w.toFixed(1) : "\u2014") +
+            '</td><td class="num">' +
+            (r.m.depth === null
+              ? "\u2014"
+              : r.m.depth === 0
+                ? "0 (counting floor)"
+                : r.m.depth.toLocaleString()) +
+            "</td></tr>";
+        });
+        t += "</tbody></table>";
+        $("tables").innerHTML =
+          t +
+          '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
+          '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
+      }
 
-  var t = "<table><thead><tr>" +
-    '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
-    '<th class="num" data-k="cost">minimum RAM GiB</th><th class="num" data-k="fits">fits ' + vram + ' GiB</th>' +
-    '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">depth (tok)</th></tr></thead><tbody id="tbody">';
-  rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + "</td><td>" + r.m.quant + "</td>" + '<td class="num">' + r.m.size.toFixed(2) +
-      '</td><td class="num">' + r.m.cost.toFixed(2) + '</td><td class="num">' +
-      (r.fits ? '<span class="ok">yes</span>' : '<span class="bad">no</span>') +
-      '</td><td class="num">' + (r.w !== null && r.w !== undefined ? r.w.toFixed(1) : "\u2014") +
-      '</td><td class="num">' +
-      (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) + "</td></tr>";
-  });
-  t += "</tbody></table>";
-  $("tables").innerHTML = t +
-    '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
-    '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
-}
-
-var SORT = { k: "depth", dir: -1 };
-function cmpRows(a, b) {
-  var k = SORT.k, va, vb;
-  if (k === "name" || k === "quant" || k === "fits") {
-    va = a[k] !== undefined ? a[k] : a.m[k]; vb = b[k] !== undefined ? b[k] : b.m[k];
-    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
-    return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
-  }
-  if (k === "w") { va = a.w; vb = b.w; }
-  else { va = a.m[k]; vb = b.m[k]; }
-  if (va === null || va === undefined) return 1;
-  if (vb === null || vb === undefined) return -1;
-  return (va - vb) * SORT.dir;
-}
-$("tables").addEventListener("click", function (ev) {
-  var th = ev.target.closest("th");
-  if (!th || !th.dataset.k) return;
-  if (SORT.k === th.dataset.k) { SORT.dir *= -1; } else { SORT.k = th.dataset.k; SORT.dir = 1; }
-  pick();
-});
-$("mincost").textContent = MIN_COST.toFixed(2);
-chooseVram(selKey);
-</script>
-</body>
+      var SORT = { k: "depth", dir: -1 };
+      function cmpRows(a, b) {
+        var k = SORT.k,
+          va,
+          vb;
+        if (k === "name" || k === "quant" || k === "fits") {
+          va = a[k] !== undefined ? a[k] : a.m[k];
+          vb = b[k] !== undefined ? b[k] : b.m[k];
+          if (typeof va === "boolean") {
+            va = va ? 1 : 0;
+            vb = vb ? 1 : 0;
+          }
+          return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
+        }
+        if (k === "w") {
+          va = a.w;
+          vb = b.w;
+        } else {
+          va = a.m[k];
+          vb = b.m[k];
+        }
+        if (va === null || va === undefined) return 1;
+        if (vb === null || vb === undefined) return -1;
+        return (va - vb) * SORT.dir;
+      }
+      $("tables").addEventListener("click", function (ev) {
+        var th = ev.target.closest("th");
+        if (!th || !th.dataset.k) return;
+        if (SORT.k === th.dataset.k) {
+          SORT.dir *= -1;
+        } else {
+          SORT.k = th.dataset.k;
+          SORT.dir = 1;
+        }
+        pick();
+      });
+      $("mincost").textContent = MIN_COST.toFixed(2);
+      chooseVram(selKey);
+    </script>
+  </body>
 </html>

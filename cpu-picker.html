@@ -1,334 +1,781 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Local LLM picker &mdash; CPU/iGPU: which model serves your machine?</title>
-<style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { font-family: Georgia, 'Times New Roman', serif; margin: 0 auto; max-width: 900px;
-         padding: 1.5rem 1rem 4rem; line-height: 1.55; }
-  h1 { font-size: 1.45rem; margin-bottom: 0.2rem; }
-  .sub { color: #666; font-size: 0.95rem; margin-bottom: 1.4rem; font-style: italic; }
-  h2 { font-size: 1.05rem; margin-top: 1.6rem; }
-  .panel { border: 1px solid #bbb; border-radius: 8px; padding: 1rem 1.2rem; margin: 0.6rem 0 1.2rem; background: rgba(127,127,127,0.06); }
-  label { display: block; margin: 0.5rem 0 0.2rem; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.8rem; }
-  input[type=number], select { font: inherit; padding: 0.35rem 0.5rem; width: 12rem; max-width: 100%; }
-  .radios { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-top: 0.3rem; font-family: Verdana, Arial, sans-serif; font-size: 0.85rem; }
-  .radios label { display: inline; font-weight: normal; }
-  .readout { font-family: 'Courier New', monospace; margin-top: 0.9rem; font-size: 0.95rem; }
-  .verdict { border: 2px solid #2a7; border-radius: 8px; padding: 1rem 1.2rem; margin: 1rem 0; }
-  .verdict.none { border-color: #b33; }
-  .verdict h3 { margin: 0 0 0.3rem; font-size: 1.15rem; }
-  .verdict .depth { font-size: 2rem; font-weight: bold; }
-  table { border-collapse: collapse; width: 100%; margin: 0.6rem 0 1rem; font-size: 0.85rem; font-family: Verdana, Arial, sans-serif; }
-  th, td { border: 1px solid #bbb; padding: 0.3rem 0.5rem; text-align: left; }
-  th { background: rgba(127,127,127,0.12); }
-  td.num, th.num { text-align: right; }
-  .ok { color: #1a7; font-weight: bold; }
-  .bad { color: #b33; font-weight: bold; }
-  .est { color: #888; }
-  details { margin: 0.8rem 0; }
-  summary { cursor: pointer; font-weight: bold; font-family: Verdana, Arial, sans-serif; font-size: 0.85rem; }
-  .foot { font-size: 0.8rem; color: #555; margin-top: 2rem; border-top: 1px solid #bbb; padding-top: 0.8rem; }
-  .footnote { font-size: 0.75rem; color: #777; }
-  .mgroup { font-weight: bold; font-size: 0.72rem; padding: 0.35rem 0.5rem 0.15rem;
-            background: rgba(127,127,127,0.12); }
-  .mitem { padding: 0.22rem 0.6rem; cursor: pointer; }
-  .mitem:hover { background: rgba(127,127,127,0.15); }
-  .mitem.msel { background: rgba(42,119,119,0.2); font-weight: bold; }
-  #machineList { background: rgba(127,127,127,0.04); }
-</style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local LLM picker &mdash; CPU/iGPU: which model serves your machine?</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0 auto;
+        max-width: 900px;
+        padding: 1.5rem 1rem 4rem;
+        line-height: 1.55;
+      }
+      h1 {
+        font-size: 1.45rem;
+        margin-bottom: 0.2rem;
+      }
+      .sub {
+        color: #666;
+        font-size: 0.95rem;
+        margin-bottom: 1.4rem;
+        font-style: italic;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin-top: 1.6rem;
+      }
+      .panel {
+        border: 1px solid #bbb;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin: 0.6rem 0 1.2rem;
+        background: rgba(127, 127, 127, 0.06);
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.2rem;
+        font-weight: bold;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 0.8rem;
+      }
+      input[type="number"],
+      select {
+        font: inherit;
+        padding: 0.35rem 0.5rem;
+        width: 12rem;
+        max-width: 100%;
+      }
+      .radios {
+        display: flex;
+        gap: 1.2rem;
+        flex-wrap: wrap;
+        margin-top: 0.3rem;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 0.85rem;
+      }
+      .radios label {
+        display: inline;
+        font-weight: normal;
+      }
+      .readout {
+        font-family: "Courier New", monospace;
+        margin-top: 0.9rem;
+        font-size: 0.95rem;
+      }
+      .verdict {
+        border: 2px solid #2a7;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        margin: 1rem 0;
+      }
+      .verdict.none {
+        border-color: #b33;
+      }
+      .verdict h3 {
+        margin: 0 0 0.3rem;
+        font-size: 1.15rem;
+      }
+      .verdict .depth {
+        font-size: 2rem;
+        font-weight: bold;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0.6rem 0 1rem;
+        font-size: 0.85rem;
+        font-family: Verdana, Arial, sans-serif;
+      }
+      th,
+      td {
+        border: 1px solid #bbb;
+        padding: 0.3rem 0.5rem;
+        text-align: left;
+      }
+      th {
+        background: rgba(127, 127, 127, 0.12);
+      }
+      td.num,
+      th.num {
+        text-align: right;
+      }
+      .ok {
+        color: #1a7;
+        font-weight: bold;
+      }
+      .bad {
+        color: #b33;
+        font-weight: bold;
+      }
+      .est {
+        color: #888;
+      }
+      details {
+        margin: 0.8rem 0;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: bold;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 0.85rem;
+      }
+      .foot {
+        font-size: 0.8rem;
+        color: #555;
+        margin-top: 2rem;
+        border-top: 1px solid #bbb;
+        padding-top: 0.8rem;
+      }
+      .footnote {
+        font-size: 0.75rem;
+        color: #777;
+      }
+      .mgroup {
+        font-weight: bold;
+        font-size: 0.72rem;
+        padding: 0.35rem 0.5rem 0.15rem;
+        background: rgba(127, 127, 127, 0.12);
+      }
+      .mitem {
+        padding: 0.22rem 0.6rem;
+        cursor: pointer;
+      }
+      .mitem:hover {
+        background: rgba(127, 127, 127, 0.15);
+      }
+      .mitem.msel {
+        background: rgba(42, 119, 119, 0.2);
+        font-weight: bold;
+      }
+      #machineList {
+        background: rgba(127, 127, 127, 0.04);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Local LLM picker &mdash; CPU/iGPU</h1>
+    <div class="sub">
+      The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise)
+      for your machine, among the models the study scored under protocol v4.3 (a depth-scored
+      ladder: per rung, a speed gate at &ge; 5 w/s for a 300-wpm reader, then a
+      frequent-word-extraction count; the score is the deepest context passing both). Lab notebook
+      study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50. The recommendation
+      ranks by measured DEPTH (the v4.3 ladder score, session 34 addendum 33: the deepest context at
+      which the model both serves the reader and counts; n=1 everywhere, floor 4,096 &mdash; the
+      corpus structural floor, addendum 32). Serving from a GPU instead?
+      <a href="gpu-picker.html">GPU picker</a>.
+    </div>
 
-<h1>Local LLM picker &mdash; CPU/iGPU</h1>
-<div class="sub">The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise) for your machine, among the models the
-study scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at
-&ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the score is the
-deepest context passing both). Lab notebook study &mdash; measured on a T14s
-(102.4 GB/s class), live-corpus cal-50. The recommendation ranks by measured DEPTH
-(the v4.3 ladder score, session 34 addendum 33: the deepest context at which the model
-both serves the reader and counts; n=1 everywhere, floor 4,096 &mdash; the corpus
-structural floor, addendum 32).
-Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
+    <div class="panel">
+      <label for="filter"
+        >Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label
+      >
+      <div style="font-weight: bold; margin: 0.2rem 0">
+        Any machine with higher specs than the options below (over 102.4&nbsp;GB/s) will run the
+        same models as the default.
+      </div>
+      <input
+        type="search"
+        id="filter"
+        placeholder="type to filter, e.g. ddr5 or 3200"
+        oninput="renderList()"
+        style="width: 20rem; max-width: 100%"
+      />
+      <div class="footnote" style="margin-top: 0.3rem">
+        Configurations whose bandwidth cannot run any measured model (below
+        <span id="minbw"></span>&nbsp;GB/s) are not listed.
+      </div>
+      <div
+        id="machineList"
+        style="
+          border: 1px solid #bbb;
+          border-radius: 6px;
+          max-height: 14rem;
+          overflow-y: auto;
+          margin-top: 0.4rem;
+          font-family: Verdana, Arial, sans-serif;
+          font-size: 0.82rem;
+        "
+      ></div>
+      <label for="perch" id="perchLabel" style="display: none"
+        >Custom per-channel memory bandwidth (GB/s)</label
+      >
+      <input
+        type="number"
+        id="perch"
+        min="1"
+        max="200"
+        step="0.1"
+        value="25.6"
+        style="display: none"
+        oninput="pick()"
+      />
+      <label for="chcustom" id="chLabel" style="display: none">Custom channel count</label>
+      <input
+        type="number"
+        id="chcustom"
+        min="1"
+        max="8"
+        step="1"
+        value="1"
+        style="display: none"
+        oninput="pick()"
+      />
+      <label for="ram">System memory (GiB)</label>
+      <input type="number" id="ram" min="1" max="512" step="0.5" value="32" oninput="pick()" />
+      <div class="readout" id="bwout"></div>
+      <div class="readout" id="classout"></div>
+    </div>
 
-<div class="panel">
-  <label for="filter">Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label>
-  <div style="font-weight:bold;margin:0.2rem 0">Any machine with higher specs than the options below (over 102.4&nbsp;GB/s) will run the same models as the default.</div>
-  <input type="search" id="filter" placeholder="type to filter, e.g. ddr5 or 3200" oninput="renderList()" style="width:20rem;max-width:100%">
-  <div class="footnote" style="margin-top:0.3rem">Configurations whose bandwidth cannot run any measured model (below
-    <span id="minbw"></span>&nbsp;GB/s) are not listed.</div>
-  <div id="machineList" style="border:1px solid #bbb; border-radius:6px; max-height:14rem; overflow-y:auto; margin-top:0.4rem; font-family:Verdana,Arial,sans-serif; font-size:0.82rem;"></div>
-  <label for="perch" id="perchLabel" style="display:none">Custom per-channel memory bandwidth (GB/s)</label>
-  <input type="number" id="perch" min="1" max="200" step="0.1" value="25.6" style="display:none" oninput="pick()">
-  <label for="chcustom" id="chLabel" style="display:none">Custom channel count</label>
-  <input type="number" id="chcustom" min="1" max="8" step="1" value="1" style="display:none" oninput="pick()">
-  <label for="ram">System memory (GiB)</label>
-  <input type="number" id="ram" min="1" max="512" step="0.5" value="32" oninput="pick()">
-  <div class="readout" id="bwout"></div>
-  <div class="readout" id="classout"></div>
-</div>
-</div>
+    <div id="result"></div>
+    <div id="tables"></div>
 
-<div id="result"></div>
-<div id="tables"></div>
+    <div class="foot">
+      <p>
+        <strong>How the recommendation is computed.</strong> Candidates are the measured members of
+        the studied lineages (qwen, granite, MiniCPM, Phi), each scored under protocol v4.3 (session
+        34, addendum 33): a depth-scored ladder that starts at the 4,096-token floor (addendum 32)
+        and doubles the context rung until the model fails &mdash; the deepest rung at which it BOTH
+        serves the reader (speed gate: n=1 conversation, worst-turn &ge; 5 w/s, &le; 5% stall rate)
+        AND counts (FWE: n=1, 3/3 coded words) is the score, refined to 1,024-token resolution by
+        binary search. A candidate is eligible iff (a) its <em>minimum RAM</em> (whole-stack machine
+        cost: weights + KV + buffers + runtime, MemAvailable-delta instrument, cold-cache at the
+        scored rung) fits your RAM, and (b) its predicted w/s at your bandwidth clears the 5.0
+        reader line. The w/s anchor is the worst turn at the model's deepest speed-measured rung.
+        Bandwidth scaling is the pre-registered halving form: w/s(BW) = w/s<sub>measured@102.4</sub>
+        &times; BW/102.4 &mdash; linear because at these sizes decode is bandwidth-dominated; for
+        the smallest members it is conservative. The recommendation is the highest-depth eligible
+        candidate.
+      </p>
 
-<div class="foot">
-  <p><strong>How the recommendation is computed.</strong> Candidates are the
-  measured members of the studied lineages (qwen, granite, MiniCPM, Phi), each scored under
-  protocol v4.3 (session 34, addendum 33): a depth-scored ladder that starts at the
-  4,096-token floor (addendum 32) and doubles the context rung until the model fails &mdash;
-  the deepest rung at which it BOTH serves the reader (speed gate: n=1 conversation,
-  worst-turn &ge; 5 w/s, &le; 5% stall rate) AND counts (FWE: n=1, 3/3 coded words) is the
-  score, refined to 1,024-token resolution by binary search. A candidate is eligible iff
-  (a) its <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers + runtime,
-  MemAvailable-delta instrument, cold-cache at the scored rung) fits your RAM, and (b) its
-  predicted w/s at your bandwidth clears the 5.0 reader line. The w/s anchor is the worst
-  turn at the model's deepest speed-measured rung. Bandwidth scaling is the pre-registered
-  halving form: w/s(BW) = w/s<sub>measured@102.4</sub> &times; BW/102.4 &mdash; linear
-  because at these sizes decode is bandwidth-dominated; for the smallest members it is
-  conservative. The recommendation is the highest-depth eligible candidate.
-  <p><strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting floor
-  &mdash; it cannot do FWE at any measured depth); Qwen2.5-3B-Instruct is out (task
-  refusal; the benchmark is not changed to fit a model). Models scoring zero under v4.3
-  rank last and cannot be recommended. Quant: each family appears once, at its best-scoring
-  quant (Q4_K_M where the Q4 run scored deeper, Q8_0 otherwise; session 35, addendum 2).
-  <p class="footnote">Caveats: w/s figures are the worst turn at each model's deepest
-  speed-measured rung (the v4.3 ladder's n=1 screen &mdash; one conversation at the ranked
-  depth). Depth scores are n=1 screening ranks (session 34, addendum 33). The bandwidth law
-  is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the
-  fit boundary as soft within ~1 GiB.
-</div>
+      <p>
+        <strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting floor &mdash; it
+        cannot do FWE at any measured depth); Qwen2.5-3B-Instruct is out (task refusal; the
+        benchmark is not changed to fit a model). Models scoring zero under v4.3 rank last and
+        cannot be recommended. Quant: each family appears once, at its best-scoring quant (Q4_K_M
+        where the Q4 run scored deeper, Q8_0 otherwise; session 35, addendum 2).
+      </p>
 
-<script>
-"use strict";
-// Measured records (v4.3-scored, best quant per family - session 35, addendum 2). wps = the WORST TURN at the model's deepest
-// speed-measured rung (session 34, addendum 33). cost = minimum RAM (whole-stack machine
-// cost, MemAvailable delta, cold-cache at the scored rung), measured.
-var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 2.59, cost: 7.71,  costEst: false, wps: 6.3,  depth: 123904, family: "Qwen3.5", quant: "Q4_K_M" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992,  family: "Qwen2.5", quant: "Q8_0" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7,  depth: 34816,  family: "Qwen3", quant: "Q8_0" },
-  { name: "phi-4-mini",            size: 3.80, cost: 8.73,  costEst: false, wps: 6.5,  depth: 32768,  family: "Phi", quant: "Q8_0" },
-  { name: "Qwen3.5-0.8B",         size: 0.50, cost: 4.44,  costEst: false, wps: 8.1,  depth: 262144, family: "Qwen3.5", quant: "Q4_K_M" },
-  { name: "granite-4.1-3b",       size: 1.96, cost: 3.72,  costEst: false, wps: 8.5,  depth: 18432,  family: "Granite", quant: "Q4_K_M" },
-  { name: "granite-3.2-2b",       size: 1.44, cost: 2.62,  costEst: false, wps: 14.7, depth: 15360,  family: "Granite", quant: "Q4_K_M" },
-  { name: "granite-3.1-2b",       size: 2.51, cost: 3.63,  costEst: false, wps: 13.1, depth: 12288,  family: "Granite", quant: "Q8_0" },
-  { name: "MiniCPM5-2B",          size: 2.50, cost: 2.86,  costEst: false, wps: 19.9, depth: 12288,  family: "MiniCPM", quant: "Q8_0" },
-  { name: "granite-3.3-2b",         size: 2.51, cost: 3.17,  costEst: false, wps: 12.4, depth: 6144,   family: "Granite", quant: "Q8_0" },
-  { name: "Qwen3-4B",             size: 2.33, cost: 4.80,  costEst: false, wps: 6.9,  depth: 16384,  family: "Qwen3", quant: "Q4_K_M" },
-  { name: "Phi-3.5-mini",         size: 3.78, cost: 6.52,  costEst: false, wps: 5.7,  depth: 7168,   family: "Phi", quant: "Q8_0" },
-  { name: "MiniCPM-1B-sft",       size: 1.35, cost: 1.39,  costEst: false, wps: 21.1, depth: 4096,    family: "MiniCPM", quant: "Q8_0" },
-  { name: "MiniCPM-2B-sft",       size: 1.68, cost: 3.42,  costEst: false, wps: 18.4, depth: 4096,    family: "MiniCPM", quant: "Q4_K_M" },
-  { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  costEst: false, wps: 10.7, depth: 4096,    family: "Granite", quant: "Q8_0" },
-  { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  costEst: false, wps: 12.4, depth: 4096,    family: "Granite", quant: "Q8_0" }
-];
-// depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
-// which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
-// floor 4096 (addendum 32, the corpus structural floor). The
-// granite/MiniCPM/Phi rows are the lineage-2 families measured on the f4k grid
-// (session 34, addendum 33); their w/s anchor is the deepest SPEED-MEASURED rung
-// (fwe-only binary-search midpoints launch no speed server, refinement 1.5).
-// Qwen3-4B's 8,192 supersedes its old 16,384 (the 5-7.5 w/s band fires at 8192 on
-// the f4k grid, addendum 33). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
-// 136f) and Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - the
-// benchmark is not changed to fit a model; a refusing model is out).
-var CLASSES = [25.6, 51.2, 102.4];
-var REF_BW = 102.4, READER = 5.0;
+      <p class="footnote">
+        Caveats: w/s figures are the worst turn at each model's deepest speed-measured rung (the
+        v4.3 ladder's n=1 screen &mdash; one conversation at the ranked depth). Depth scores are n=1
+        screening ranks (session 34, addendum 33). The bandwidth law is validated only at the 102.4
+        GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
+      </p>
+    </div>
 
-function $(id) { return document.getElementById(id); }
+    <script>
+      "use strict";
+      // Measured records (v4.3-scored, best quant per family - session 35, addendum 2). wps = the WORST TURN at the model's deepest
+      // speed-measured rung (session 34, addendum 33). cost = minimum RAM (whole-stack machine
+      // cost, MemAvailable delta, cold-cache at the scored rung), measured.
+      var CANDIDATES = [
+        {
+          name: "Qwen3.5-4B",
+          size: 2.59,
+          cost: 7.71,
+          costEst: false,
+          wps: 6.3,
+          depth: 123904,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen2.5-1.5B-Instruct",
+          size: 1.76,
+          cost: 2.39,
+          costEst: false,
+          wps: 18.3,
+          depth: 20992,
+          family: "Qwen2.5",
+          quant: "Q8_0",
+        },
+        {
+          name: "Qwen3-1.7B",
+          size: 1.71,
+          cost: 5.24,
+          costEst: false,
+          wps: 7.7,
+          depth: 34816,
+          family: "Qwen3",
+          quant: "Q8_0",
+        },
+        {
+          name: "phi-4-mini",
+          size: 2.4,
+          cost: 8.14,
+          costEst: false,
+          wps: 6.4,
+          depth: 44032,
+          family: "Phi",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen3.5-0.8B",
+          size: 0.5,
+          cost: 4.44,
+          costEst: false,
+          wps: 8.1,
+          depth: 262144,
+          family: "Qwen3.5",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-4.1-3b",
+          size: 1.96,
+          cost: 3.72,
+          costEst: false,
+          wps: 8.5,
+          depth: 18432,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-3.2-2b",
+          size: 1.44,
+          cost: 2.62,
+          costEst: false,
+          wps: 14.7,
+          depth: 15360,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-3.1-2b",
+          size: 2.51,
+          cost: 3.63,
+          costEst: false,
+          wps: 13.1,
+          depth: 12288,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM5-2B",
+          size: 2.5,
+          cost: 2.86,
+          costEst: false,
+          wps: 19.9,
+          depth: 12288,
+          family: "MiniCPM",
+          quant: "Q8_0",
+        },
+        {
+          name: "granite-3.3-2b",
+          size: 1.65,
+          cost: 3.78,
+          costEst: false,
+          wps: 8.5,
+          depth: 26624,
+          family: "Granite",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Qwen3-4B",
+          size: 2.33,
+          cost: 4.8,
+          costEst: false,
+          wps: 6.9,
+          depth: 16384,
+          family: "Qwen3",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "Phi-3.5-mini",
+          size: 3.78,
+          cost: 6.52,
+          costEst: false,
+          wps: 5.7,
+          depth: 7168,
+          family: "Phi",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM-1B-sft",
+          size: 1.35,
+          cost: 1.39,
+          costEst: false,
+          wps: 21.1,
+          depth: 4096,
+          family: "MiniCPM",
+          quant: "Q8_0",
+        },
+        {
+          name: "MiniCPM-2B-sft",
+          size: 1.68,
+          cost: 3.42,
+          costEst: false,
+          wps: 18.4,
+          depth: 4096,
+          family: "MiniCPM",
+          quant: "Q4_K_M",
+        },
+        {
+          name: "granite-4.2-3b",
+          size: 3.63,
+          cost: 3.68,
+          costEst: false,
+          wps: 10.7,
+          depth: 4096,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+        {
+          name: "granite-3.0-2b",
+          size: 2.61,
+          cost: 2.63,
+          costEst: false,
+          wps: 12.4,
+          depth: 4096,
+          family: "Granite",
+          quant: "Q8_0",
+        },
+      ];
+      // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
+      // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
+      // floor 4096 (addendum 32, the corpus structural floor). The
+      // granite/MiniCPM/Phi rows are the lineage-2 families measured on the f4k grid
+      // (session 34, addendum 33); their w/s anchor is the deepest SPEED-MEASURED rung
+      // (fwe-only binary-search midpoints launch no speed server, refinement 1.5).
+      // Qwen3-4B's 8,192 supersedes its old 16,384 (the 5-7.5 w/s band fires at 8192 on
+      // the f4k grid, addendum 33). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
+      // 136f) and Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - the
+      // benchmark is not changed to fit a model; a refusing model is out).
+      var CLASSES = [25.6, 51.2, 102.4];
+      var REF_BW = 102.4,
+        READER = 5.0;
 
-var MACHINES = [];   // {gen, mt, ch, perch, bw, label, key}
-var selKey = "51.2|2";   // default: DDR5-6400 dual (128-bit) - the measured class
+      function $(id) {
+        return document.getElementById(id);
+      }
 
-// Addendum 84: the machine list. One entry per (generation, JEDEC speed,
-// channel count). per-channel GB/s = MT/s x 8 bytes / 1000. Bus width:
-// 64 bits per channel (single 64, dual 128, quad 256). Channel variants
-// offered where they make sense: single/dual for every generation, quad
-// from DDR3 on (the server/HEDT tier; DDR and DDR2 quad boards were
-// exotic and are omitted), octa for DDR4/DDR5 (the modern workstation/
-// server tier, 512-bit bus).
-var GENERATIONS = [
-  { gen: "DDR",  mts: [200, 266, 333, 400],                       quad: false, octa: false },
-  { gen: "DDR2", mts: [400, 533, 667, 800, 1066],                 quad: false, octa: false },
-  { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133],        quad: true,  octa: false },
-  { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200],  quad: true,  octa: true  },
-  { gen: "DDR5", mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400], quad: true, octa: true }
-];
+      var MACHINES = []; // {gen, mt, ch, perch, bw, label, key}
+      var selKey = "51.2|2"; // default: DDR5-6400 dual (128-bit) - the measured class
 
-// The list is trimmed at the study's top class, 102.4 GB/s: a faster
-// machine runs the same models (nothing in the measured pool needs more
-// bandwidth to clear the reader line), so listing higher configs would be
-// options without consequences.
-var MAX_BW = 102.4;
+      // Addendum 84: the machine list. One entry per (generation, JEDEC speed,
+      // channel count). per-channel GB/s = MT/s x 8 bytes / 1000. Bus width:
+      // 64 bits per channel (single 64, dual 128, quad 256). Channel variants
+      // offered where they make sense: single/dual for every generation, quad
+      // from DDR3 on (the server/HEDT tier; DDR and DDR2 quad boards were
+      // exotic and are omitted), octa for DDR4/DDR5 (the modern workstation/
+      // server tier, 512-bit bus).
+      var GENERATIONS = [
+        { gen: "DDR", mts: [200, 266, 333, 400], quad: false, octa: false },
+        { gen: "DDR2", mts: [400, 533, 667, 800, 1066], quad: false, octa: false },
+        { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133], quad: true, octa: false },
+        { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200], quad: true, octa: true },
+        {
+          gen: "DDR5",
+          mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400],
+          quad: true,
+          octa: true,
+        },
+      ];
 
-// A machine config is listed only if it can honestly run SOME measured
-// model: the candidate with the highest measured w/s (the most
-// bandwidth-forgiving one) must still clear the reader line when scaled
-// to the config's bandwidth. min BW = READER x REF_BW / max(wps).
-var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.wps); }, 0);
-MIN_RUN_BW = READER * REF_BW / MIN_RUN_BW;   // ~19.8 GB/s with the current pool
+      // The list is trimmed at the study's top class, 102.4 GB/s: a faster
+      // machine runs the same models (nothing in the measured pool needs more
+      // bandwidth to clear the reader line), so listing higher configs would be
+      // options without consequences.
+      var MAX_BW = 102.4;
 
-function buildMachineMenu() {
-  [1, 2, 4, 8].forEach(function (ch) {
-    GENERATIONS.forEach(function (g) {
-      if (ch === 4 && !g.quad) return;
-      if (ch === 8 && !g.octa) return;
-      g.mts.forEach(function (mt) {
-        var perch = mt * 8 / 1000;
-        var bw = perch * ch;
-        if (bw < MIN_RUN_BW) return;   // cannot run any measured model - not listed
-        if (bw > MAX_BW) return;       // above the study's top class - same models as the default
-        var chName = ch === 1 ? "single" : ch === 2 ? "dual" : ch === 4 ? "quad" : "octa";
-        MACHINES.push({
-          gen: g.gen, mt: mt, ch: ch, perch: perch, bw: bw,
-          key: perch + "|" + ch,
-          label: g.gen + "-" + mt + " \u2014 " + chName + " channel (" +
-            (64 * ch) + "-bit) \u2014 " + bw.toFixed(1) + " GB/s",
-          group: g.gen + " " + chName + " channel (" + (64 * ch) + "-bit bus)"
+      // A machine config is listed only if it can honestly run SOME measured
+      // model: the candidate with the highest measured w/s (the most
+      // bandwidth-forgiving one) must still clear the reader line when scaled
+      // to the config's bandwidth. min BW = READER x REF_BW / max(wps).
+      var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) {
+        return Math.max(a, c.wps);
+      }, 0);
+      MIN_RUN_BW = (READER * REF_BW) / MIN_RUN_BW; // ~19.8 GB/s with the current pool
+
+      function buildMachineMenu() {
+        [1, 2, 4, 8].forEach(function (ch) {
+          GENERATIONS.forEach(function (g) {
+            if (ch === 4 && !g.quad) return;
+            if (ch === 8 && !g.octa) return;
+            g.mts.forEach(function (mt) {
+              var perch = (mt * 8) / 1000;
+              var bw = perch * ch;
+              if (bw < MIN_RUN_BW) return; // cannot run any measured model - not listed
+              if (bw > MAX_BW) return; // above the study's top class - same models as the default
+              var chName = ch === 1 ? "single" : ch === 2 ? "dual" : ch === 4 ? "quad" : "octa";
+              MACHINES.push({
+                gen: g.gen,
+                mt: mt,
+                ch: ch,
+                perch: perch,
+                bw: bw,
+                key: perch + "|" + ch,
+                label:
+                  g.gen +
+                  "-" +
+                  mt +
+                  " \u2014 " +
+                  chName +
+                  " channel (" +
+                  64 * ch +
+                  "-bit) \u2014 " +
+                  bw.toFixed(1) +
+                  " GB/s",
+                group: g.gen + " " + chName + " channel (" + 64 * ch + "-bit bus)",
+              });
+            });
+          });
         });
+        MACHINES.push({ gen: "custom", key: "custom", label: "custom\u2026", group: "custom" });
+      }
+
+      function renderList() {
+        var q = ($("filter").value || "").toLowerCase().trim();
+        var host = $("machineList");
+        var html = "";
+        var lastGroup = null;
+        MACHINES.forEach(function (m) {
+          if (q && m.label.toLowerCase().indexOf(q) < 0) return;
+          if (m.group !== lastGroup) {
+            html += '<div class="mgroup">' + m.group + "</div>";
+            lastGroup = m.group;
+          }
+          var cls = "mitem" + (m.key === selKey ? " msel" : "");
+          html +=
+            '<div class="' +
+            cls +
+            '" data-key="' +
+            m.key +
+            '" onclick="chooseMachine(this.dataset.key)">' +
+            m.label +
+            "</div>";
+        });
+        if (!html) html = '<div class="mitem">no machine matches the filter</div>';
+        host.innerHTML = html;
+      }
+
+      function chooseMachine(key) {
+        selKey = key;
+        renderList();
+        applyMachine();
+      }
+
+      function applyMachine() {
+        var isCustom = selKey === "custom";
+        $("perch").style.display = isCustom ? "" : "none";
+        $("chcustom").style.display = isCustom ? "" : "none";
+        $("perchLabel").style.display = isCustom ? "" : "none";
+        $("chLabel").style.display = isCustom ? "" : "none";
+        pick();
+      }
+
+      function pick() {
+        var perch, ch, chLabel;
+        var m = MACHINES.filter(function (x) {
+          return x.key === selKey;
+        })[0];
+        if (!m) {
+          $("result").innerHTML = "";
+          $("tables").innerHTML = "";
+          return;
+        }
+        if (m.key === "custom") {
+          perch = parseFloat($("perch").value);
+          ch = parseFloat($("chcustom").value);
+          chLabel =
+            ch + " channel" + (ch > 1 ? "s" : "") + ", custom \u2014 " + 64 * ch + "-bit bus";
+        } else {
+          perch = m.perch;
+          ch = m.ch;
+          chLabel = m.label;
+        }
+        var ram = parseFloat($("ram").value);
+        if (!(perch > 0) || !(ram > 0) || !(ch > 0)) {
+          $("result").innerHTML = "";
+          $("tables").innerHTML = "";
+          return;
+        }
+        var bw = perch * ch;
+        var nearest = CLASSES.reduce(function (a, b) {
+          return Math.abs(b - bw) < Math.abs(a - bw) ? b : a;
+        });
+        var extrap;
+        if (Math.abs(bw - nearest) / nearest < 0.05)
+          extrap =
+            "the registered " +
+            nearest.toFixed(1) +
+            " class" +
+            (nearest < 102.4
+              ? " (halving pre-registered, not yet validated by replication)"
+              : " (the measured tier)");
+        else if (bw > 102.4)
+          extrap =
+            "above the measured class \u2014 extrapolated up linearly (conservative: compute headroom only helps)";
+        else
+          extrap =
+            "between/below the registered classes \u2014 extrapolated by the pre-registered halving form (unvalidated)";
+
+        $("bwout").innerHTML =
+          "<strong>" +
+          chLabel +
+          "</strong> &rarr; total memory bandwidth: <strong>" +
+          bw.toFixed(1) +
+          " GB/s</strong>";
+        $("classout").innerHTML =
+          "Nearest registered class: <strong>" +
+          nearest.toFixed(1) +
+          " GB/s</strong> &mdash; " +
+          extrap +
+          ".";
+
+        var rows = CANDIDATES.map(function (m) {
+          var wpred = (m.wps * bw) / REF_BW;
+          return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
+        }).sort(cmpRows);
+
+        var eligible = rows.filter(function (r) {
+          return r.fits && r.passes;
+        });
+        var html = "";
+        if (eligible.length) {
+          var r = eligible[0];
+          html +=
+            '<div class="verdict"><h3>Recommended: ' +
+            r.m.name +
+            " (" +
+            r.m.quant +
+            ")</h3>" +
+            '<div><span class="depth">' +
+            (r.m.depth === null
+              ? "\u2014"
+              : r.m.depth === 0
+                ? "counting floor"
+                : r.m.depth.toLocaleString()) +
+            " depth score (FWE ladder, n=1 screen)</div>" +
+            "<div>predicted " +
+            r.w.toFixed(1) +
+            " w/s at " +
+            bw.toFixed(1) +
+            " GB/s (scored-rung worst turn, scaled)</div>" +
+            "<div>file " +
+            r.m.size.toFixed(2) +
+            " GiB \u00b7 minimum RAM " +
+            r.m.cost.toFixed(2) +
+            " GiB" +
+            (r.m.costEst ? " (est)" : "") +
+            " of your " +
+            ram +
+            " GiB</div></div>";
+        } else {
+          var fitting = rows.filter(function (r) {
+            return r.fits;
+          });
+          if (fitting.length) {
+            var best = fitting.reduce(function (a, b) {
+              return b.w > a.w ? b : a;
+            });
+            html +=
+              '<div class="verdict none"><h3>No measured model is predicted to pass at ' +
+              bw.toFixed(1) +
+              " GB/s</h3>" +
+              "<div>Closest fit: <strong>" +
+              best.m.name +
+              "</strong> at a predicted " +
+              best.w.toFixed(1) +
+              " w/s \u2014 below the 5.0 reader line. These machines are served by classes below the study's floor tier; no recommendation is honest here.</div></div>";
+          } else {
+            html +=
+              '<div class="verdict none"><h3>No measured model fits ' +
+              ram +
+              " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of minimum RAM (cold, scored rung).</div></div>";
+          }
+        }
+        $("result").innerHTML = html;
+
+        var t =
+          "<table><thead><tr>" +
+          '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
+          '<th class="num" data-k="cost">minimum RAM GiB</th>' +
+          '<th class="num" data-k="depth">depth score (tok)</th><th class="num" data-k="w">w/s @ you</th><th data-k="fits">fits RAM</th><th data-k="passes">clears reader</th></tr></thead><tbody id="tbody">';
+        rows.forEach(function (r) {
+          t +=
+            "<tr><td>" +
+            r.m.name +
+            "</td><td>" +
+            r.m.quant +
+            '</td><td class="num">' +
+            r.m.size.toFixed(2) +
+            '</td><td class="num">' +
+            r.m.cost.toFixed(2) +
+            (r.m.costEst ? ' <span class="est">(est)</span>' : "") +
+            '</td><td class="num">' +
+            (r.m.depth === null
+              ? "\u2014 (ladder climbing)"
+              : r.m.depth === 0
+                ? "0 (counting floor)"
+                : r.m.depth.toLocaleString()) +
+            '</td><td class="num">' +
+            (r.w === null ? "\u2014 (ladder climbing)" : r.w.toFixed(2)) +
+            '</td><td class="' +
+            (r.fits ? "ok" : "bad") +
+            '">' +
+            (r.fits ? "yes" : "no") +
+            '</td><td class="' +
+            (r.passes ? "ok" : "bad") +
+            '">' +
+            (r.passes ? "yes" : "no") +
+            "</td></tr>";
+        });
+        t += "</tbody></table>";
+        $("tables").innerHTML =
+          t +
+          '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
+          '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
+      }
+      var SORT = { k: "depth", dir: -1 };
+      function cmpRows(a, b) {
+        var k = SORT.k,
+          va,
+          vb;
+        if (k === "name" || k === "quant" || k === "fits" || k === "passes") {
+          va = a[k] !== undefined ? a[k] : a.m[k];
+          vb = b[k] !== undefined ? b[k] : b.m[k];
+          if (typeof va === "boolean") {
+            va = va ? 1 : 0;
+            vb = vb ? 1 : 0;
+          }
+          return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
+        }
+        if (k === "w") {
+          va = a.w;
+          vb = b.w;
+        } else {
+          va = a.m[k];
+          vb = b.m[k];
+        }
+        if (va === null || va === undefined) return 1;
+        if (vb === null || vb === undefined) return -1;
+        return (va - vb) * SORT.dir;
+      }
+      $("tables").addEventListener("click", function (ev) {
+        var th = ev.target.closest("th");
+        if (!th || !th.dataset.k) return;
+        if (SORT.k === th.dataset.k) {
+          SORT.dir *= -1;
+        } else {
+          SORT.k = th.dataset.k;
+          SORT.dir = 1;
+        }
+        pick();
       });
-    });
-  });
-  MACHINES.push({ gen: "custom", key: "custom", label: "custom\u2026", group: "custom" });
-}
-
-function renderList() {
-  var q = ($("filter").value || "").toLowerCase().trim();
-  var host = $("machineList");
-  var html = "";
-  var lastGroup = null;
-  MACHINES.forEach(function (m) {
-    if (q && m.label.toLowerCase().indexOf(q) < 0) return;
-    if (m.group !== lastGroup) {
-      html += '<div class="mgroup">' + m.group + "</div>";
-      lastGroup = m.group;
-    }
-    var cls = "mitem" + (m.key === selKey ? " msel" : "");
-    html += '<div class="' + cls + '" data-key="' + m.key +
-      '" onclick="chooseMachine(this.dataset.key)">' + m.label + "</div>";
-  });
-  if (!html) html = '<div class="mitem">no machine matches the filter</div>';
-  host.innerHTML = html;
-}
-
-function chooseMachine(key) {
-  selKey = key;
-  renderList();
-  applyMachine();
-}
-
-function applyMachine() {
-  var isCustom = selKey === "custom";
-  $("perch").style.display = isCustom ? "" : "none";
-  $("chcustom").style.display = isCustom ? "" : "none";
-  $("perchLabel").style.display = isCustom ? "" : "none";
-  $("chLabel").style.display = isCustom ? "" : "none";
-  pick();
-}
-
-function pick() {
-  var perch, ch, chLabel;
-  var m = MACHINES.filter(function (x) { return x.key === selKey; })[0];
-  if (!m) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
-  if (m.key === "custom") {
-    perch = parseFloat($("perch").value);
-    ch = parseFloat($("chcustom").value);
-    chLabel = ch + " channel" + (ch > 1 ? "s" : "") + ", custom \u2014 " +
-      (64 * ch) + "-bit bus";
-  } else {
-    perch = m.perch; ch = m.ch;
-    chLabel = m.label;
-  }
-  var ram = parseFloat($("ram").value);
-  if (!(perch > 0) || !(ram > 0) || !(ch > 0)) { $("result").innerHTML = ""; $("tables").innerHTML = ""; return; }
-  var bw = perch * ch;
-  var nearest = CLASSES.reduce(function (a, b) { return Math.abs(b - bw) < Math.abs(a - bw) ? b : a; });
-  var extrap;
-  if (Math.abs(bw - nearest) / nearest < 0.05) extrap = "the registered " + nearest.toFixed(1) + " class" +
-    (nearest < 102.4 ? " (halving pre-registered, not yet validated by replication)" : " (the measured tier)");
-  else if (bw > 102.4) extrap = "above the measured class \u2014 extrapolated up linearly (conservative: compute headroom only helps)";
-  else extrap = "between/below the registered classes \u2014 extrapolated by the pre-registered halving form (unvalidated)";
-
-  $("bwout").innerHTML = "<strong>" + chLabel + "</strong> &rarr; total memory bandwidth: <strong>" + bw.toFixed(1) + " GB/s</strong>";
-  $("classout").innerHTML = "Nearest registered class: <strong>" + nearest.toFixed(1) +
-    " GB/s</strong> &mdash; " + extrap + ".";
-
-  var rows = CANDIDATES.map(function (m) {
-    var wpred = m.wps * bw / REF_BW;
-    return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
-  }).sort(cmpRows);
-
-  var eligible = rows.filter(function (r) { return r.fits && r.passes; });
-  var html = "";
-  if (eligible.length) {
-    var r = eligible[0];
-    html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (" + r.m.quant + ")</h3>" +
-      "<div><span class=\"depth\">" + (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "counting floor" : r.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
-      "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (scored-rung worst turn, scaled)</div>" +
-      "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 minimum RAM " + r.m.cost.toFixed(2) +
-      " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + ram + " GiB</div></div>";
-  } else {
-    var fitting = rows.filter(function (r) { return r.fits; });
-    if (fitting.length) {
-      var best = fitting.reduce(function (a, b) { return b.w > a.w ? b : a; });
-      html += "<div class=\"verdict none\"><h3>No measured model is predicted to pass at " +
-        bw.toFixed(1) + " GB/s</h3>" +
-        "<div>Closest fit: <strong>" + best.m.name + "</strong> at a predicted " + best.w.toFixed(1) +
-        " w/s \u2014 below the 5.0 reader line. These machines are served by classes below the study's floor tier; no recommendation is honest here.</div></div>";
-    } else {
-      html += "<div class=\"verdict none\"><h3>No measured model fits " + ram +
-        " GiB of RAM</h3><div>The smallest measured member (MiniCPM-1B-sft) needs 1.39 GiB of minimum RAM (cold, scored rung).</div></div>";
-    }
-  }
-  $("result").innerHTML = html;
-
-  var t = "<table><thead><tr>" +
-    '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
-    '<th class="num" data-k="cost">minimum RAM GiB</th>' +
-    '<th class="num" data-k="depth">depth score (tok)</th><th class="num" data-k="w">w/s @ you</th><th data-k="fits">fits RAM</th><th data-k="passes">clears reader</th></tr></thead><tbody id="tbody">';
-  rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + "</td><td>" + r.m.quant + "</td><td class=\"num\">" +
-      r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
-      "</td><td class=\"num\">" +
-      (r.m.depth === null ? "\u2014 (ladder climbing)" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) +
-      "</td><td class=\"num\">" + (r.w === null ? "\u2014 (ladder climbing)" : r.w.toFixed(2)) +
-      "</td><td class=\"" + (r.fits ? "ok" : "bad") + "\">" +
-      (r.fits ? "yes" : "no") + "</td><td class=\"" + (r.passes ? "ok" : "bad") + "\">" +
-      (r.passes ? "yes" : "no") + "</td></tr>";
-  });
-  t += "</tbody></table>";
-  $("tables").innerHTML = t +
-    '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
-    '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
-}
-var SORT = { k: "depth", dir: -1 };
-function cmpRows(a, b) {
-  var k = SORT.k, va, vb;
-  if (k === "name" || k === "quant" || k === "fits" || k === "passes") {
-    va = a[k] !== undefined ? a[k] : a.m[k]; vb = b[k] !== undefined ? b[k] : b.m[k];
-    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
-    return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
-  }
-  if (k === "w") { va = a.w; vb = b.w; }
-  else { va = a.m[k]; vb = b.m[k]; }
-  if (va === null || va === undefined) return 1;
-  if (vb === null || vb === undefined) return -1;
-  return (va - vb) * SORT.dir;
-}
-$("tables").addEventListener("click", function (ev) {
-  var th = ev.target.closest("th");
-  if (!th || !th.dataset.k) return;
-  if (SORT.k === th.dataset.k) { SORT.dir *= -1; } else { SORT.k = th.dataset.k; SORT.dir = 1; }
-  pick();
-});
-buildMachineMenu();
-$("minbw").textContent = MIN_RUN_BW.toFixed(1);
-renderList();
-applyMachine();
-pick();
-</script>
-</body>
+      buildMachineMenu();
+      $("minbw").textContent = MIN_RUN_BW.toFixed(1);
+      renderList();
+      applyMachine();
+      pick();
+    </script>
+  </body>
 </html>
