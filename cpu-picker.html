@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Local LLM picker &mdash; CPU/iGPU: which Q8_0 model serves your machine?</title>
+<title>Local LLM picker &mdash; CPU/iGPU: which model serves your machine?</title>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -44,7 +44,7 @@
 <body>
 
 <h1>Local LLM picker &mdash; CPU/iGPU</h1>
-<div class="sub">The recommended Q8_0 model for your machine, among the models the
+<div class="sub">The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise) for your machine, among the models the
 study scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at
 &ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the score is the
 deepest context passing both). Lab notebook study &mdash; measured on a T14s
@@ -93,8 +93,8 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
   <p><strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting floor
   &mdash; it cannot do FWE at any measured depth); Qwen2.5-3B-Instruct is out (task
   refusal; the benchmark is not changed to fit a model). Models scoring zero under v4.3
-  rank last and cannot be recommended. Quant: this tool answers the Q8_0 question only
-  &mdash; the Q4_K_M run (addendum 24) is being prepared.
+  rank last and cannot be recommended. Quant: each family appears once, at its best-scoring
+  quant (Q4_K_M where the Q4 run scored deeper, Q8_0 otherwise; session 34, addendum 43).
   <p class="footnote">Caveats: w/s figures are the worst turn at each model's deepest
   speed-measured rung (the v4.3 ladder's n=1 screen &mdash; one conversation at the ranked
   depth). Depth scores are n=1 screening ranks (session 34, addendum 33). The bandwidth law
@@ -104,26 +104,26 @@ Serving from a GPU instead? <a href="gpu-picker.html">GPU picker</a>.</div>
 
 <script>
 "use strict";
-// Measured records (Q8_0, v4.3-scored). wps = the WORST TURN at the model's deepest
+// Measured records (v4.3-scored, best quant per family - addendum 43). wps = the WORST TURN at the model's deepest
 // speed-measured rung (session 34, addendum 33). cost = minimum RAM (whole-stack machine
 // cost, MemAvailable delta, cold-cache at the scored rung), measured.
 var CANDIDATES = [
-  { name: "Qwen3.5-4B",           size: 4.29, cost: 7.53,  costEst: false, wps: 6.2,  depth: 65536,  family: "Qwen3.5" },
-  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992,  family: "Qwen2.5" },
-  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7,  depth: 34816,  family: "Qwen3" },
-  { name: "phi-4-mini",            size: 3.80, cost: 8.73,  costEst: false, wps: 6.5,  depth: 32768,  family: "Phi" },
-  { name: "Qwen3.5-0.8B",         size: 0.86, cost: 2.53,  costEst: false, wps: 21.3, depth: 105472, family: "Qwen3.5" },
-  { name: "granite-4.1-3b",       size: 3.37, cost: 4.64,  costEst: false, wps: 7.1,  depth: 16384,  family: "Granite" },
-  { name: "granite-3.2-2b",       size: 2.51, cost: 3.73,  costEst: false, wps: 13.1, depth: 15360,  family: "Granite" },
-  { name: "granite-3.1-2b",       size: 2.51, cost: 3.63,  costEst: false, wps: 13.1, depth: 12288,  family: "Granite" },
-  { name: "MiniCPM5-2B",          size: 2.50, cost: 2.86,  costEst: false, wps: 19.9, depth: 12288,  family: "MiniCPM" },
-  { name: "granite-3.3-2b",         size: 2.51, cost: 3.17,  costEst: false, wps: 12.4, depth: 6144,   family: "Granite" },
-  { name: "Qwen3-4B",             size: 3.98, cost: 5.52,  costEst: false, wps: 6.6,  depth: 8192,   family: "Qwen3" },
-  { name: "Phi-3.5-mini",         size: 3.78, cost: 6.52,  costEst: false, wps: 5.7,  depth: 7168,   family: "Phi" },
-  { name: "MiniCPM-1B-sft",       size: 1.35, cost: 1.39,  costEst: false, wps: 21.1, depth: 4096,    family: "MiniCPM" },
-  { name: "MiniCPM-2B-sft",       size: 2.70, cost: 4.52,  costEst: false, wps: 13.4, depth: 4096,    family: "MiniCPM" },
-  { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  costEst: false, wps: 10.7, depth: 4096,    family: "Granite" },
-  { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  costEst: false, wps: 12.4, depth: 4096,    family: "Granite" }
+  { name: "Qwen3.5-4B",           size: 2.59, cost: 7.71,  costEst: false, wps: 6.3,  depth: 123904, family: "Qwen3.5", quant: "Q4_K_M" },
+  { name: "Qwen2.5-1.5B-Instruct",size: 1.76, cost: 2.39,  costEst: false, wps: 18.3, depth: 20992,  family: "Qwen2.5", quant: "Q8_0" },
+  { name: "Qwen3-1.7B",           size: 1.71, cost: 5.24,  costEst: false, wps: 7.7,  depth: 34816,  family: "Qwen3", quant: "Q8_0" },
+  { name: "phi-4-mini",            size: 3.80, cost: 8.73,  costEst: false, wps: 6.5,  depth: 32768,  family: "Phi", quant: "Q8_0" },
+  { name: "Qwen3.5-0.8B",         size: 0.50, cost: 4.44,  costEst: false, wps: 8.1,  depth: 262144, family: "Qwen3.5", quant: "Q4_K_M" },
+  { name: "granite-4.1-3b",       size: 1.96, cost: 3.72,  costEst: false, wps: 8.5,  depth: 18432,  family: "Granite", quant: "Q4_K_M" },
+  { name: "granite-3.2-2b",       size: 1.44, cost: 2.62,  costEst: false, wps: 14.7, depth: 15360,  family: "Granite", quant: "Q4_K_M" },
+  { name: "granite-3.1-2b",       size: 2.51, cost: 3.63,  costEst: false, wps: 13.1, depth: 12288,  family: "Granite", quant: "Q8_0" },
+  { name: "MiniCPM5-2B",          size: 2.50, cost: 2.86,  costEst: false, wps: 19.9, depth: 12288,  family: "MiniCPM", quant: "Q8_0" },
+  { name: "granite-3.3-2b",         size: 2.51, cost: 3.17,  costEst: false, wps: 12.4, depth: 6144,   family: "Granite", quant: "Q8_0" },
+  { name: "Qwen3-4B",             size: 2.33, cost: 4.80,  costEst: false, wps: 6.9,  depth: 16384,  family: "Qwen3", quant: "Q4_K_M" },
+  { name: "Phi-3.5-mini",         size: 3.78, cost: 6.52,  costEst: false, wps: 5.7,  depth: 7168,   family: "Phi", quant: "Q8_0" },
+  { name: "MiniCPM-1B-sft",       size: 1.35, cost: 1.39,  costEst: false, wps: 21.1, depth: 4096,    family: "MiniCPM", quant: "Q8_0" },
+  { name: "MiniCPM-2B-sft",       size: 1.68, cost: 3.42,  costEst: false, wps: 18.4, depth: 4096,    family: "MiniCPM", quant: "Q4_K_M" },
+  { name: "granite-4.2-3b",       size: 3.63, cost: 3.68,  costEst: false, wps: 10.7, depth: 4096,    family: "Granite", quant: "Q8_0" },
+  { name: "granite-3.0-2b",       size: 2.61, cost: 2.63,  costEst: false, wps: 12.4, depth: 4096,    family: "Granite", quant: "Q8_0" }
 ];
 // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
 // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
@@ -259,13 +259,13 @@ function pick() {
   var rows = CANDIDATES.map(function (m) {
     var wpred = m.wps * bw / REF_BW;
     return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
-  }).sort(function (a, b) { return (b.m.depth || 0) - (a.m.depth || 0); });
+  }).sort(cmpRows);
 
   var eligible = rows.filter(function (r) { return r.fits && r.passes; });
   var html = "";
   if (eligible.length) {
     var r = eligible[0];
-    html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (Q8_0)</h3>" +
+    html += "<div class=\"verdict\"><h3>Recommended: " + r.m.name + " (" + r.m.quant + ")</h3>" +
       "<div><span class=\"depth\">" + (r.m.depth === null ? "\u2014" : (r.m.depth === 0 ? "counting floor" : r.m.depth.toLocaleString())) + " depth score (FWE ladder, n=1 screen)</div>" +
       "<div>predicted " + r.w.toFixed(1) + " w/s at " + bw.toFixed(1) + " GB/s (scored-rung worst turn, scaled)</div>" +
       "<div>file " + r.m.size.toFixed(2) + " GiB \u00b7 minimum RAM " + r.m.cost.toFixed(2) +
@@ -285,11 +285,12 @@ function pick() {
   }
   $("result").innerHTML = html;
 
-  var t = "<table><tr><th>model</th><th>quant</th><th class=\"num\">file GiB</th>" +
-    "<th class=\"num\">minimum RAM GiB</th>" +
-    "<th class=\"num\">depth score (tok)</th><th class=\"num\">w/s @ you</th><th>fits RAM</th><th>clears reader</th></tr>";
+  var t = "<table><thead><tr>" +
+    '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
+    '<th class="num" data-k="cost">minimum RAM GiB</th>' +
+    '<th class="num" data-k="depth">depth score (tok)</th><th class="num" data-k="w">w/s @ you</th><th data-k="fits">fits RAM</th><th data-k="passes">clears reader</th></tr></thead><tbody id="tbody">';
   rows.forEach(function (r) {
-    t += "<tr><td>" + r.m.name + "</td><td>Q8_0</td><td class=\"num\">" +
+    t += "<tr><td>" + r.m.name + "</td><td>" + r.m.quant + "</td><td class=\"num\">" +
       r.m.size.toFixed(2) + "</td><td class=\"num\">" + r.m.cost.toFixed(2) + (r.m.costEst ? " <span class=\"est\">(est)</span>" : "") +
       "</td><td class=\"num\">" +
       (r.m.depth === null ? "\u2014 (ladder climbing)" : (r.m.depth === 0 ? "0 (counting floor)" : r.m.depth.toLocaleString())) +
@@ -298,10 +299,31 @@ function pick() {
       (r.fits ? "yes" : "no") + "</td><td class=\"" + (r.passes ? "ok" : "bad") + "\">" +
       (r.passes ? "yes" : "no") + "</td></tr>";
   });
-  t += "</table>";
+  t += "</tbody></table>";
   $("tables").innerHTML = t +
+    '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
     '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>w/s</strong> = words/second at your bandwidth, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
 }
+var SORT = { k: "depth", dir: -1 };
+function cmpRows(a, b) {
+  var k = SORT.k, va, vb;
+  if (k === "name" || k === "quant" || k === "fits" || k === "passes") {
+    va = a[k] !== undefined ? a[k] : a.m[k]; vb = b[k] !== undefined ? b[k] : b.m[k];
+    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+    return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
+  }
+  if (k === "w") { va = a.w; vb = b.w; }
+  else { va = a.m[k]; vb = b.m[k]; }
+  if (va === null || va === undefined) return 1;
+  if (vb === null || vb === undefined) return -1;
+  return (va - vb) * SORT.dir;
+}
+$("tables").addEventListener("click", function (ev) {
+  var th = ev.target.closest("th");
+  if (!th || !th.dataset.k) return;
+  if (SORT.k === th.dataset.k) { SORT.dir *= -1; } else { SORT.k = th.dataset.k; SORT.dir = 1; }
+  pick();
+});
 buildMachineMenu();
 $("minbw").textContent = MIN_RUN_BW.toFixed(1);
 renderList();
