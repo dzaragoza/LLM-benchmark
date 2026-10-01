@@ -115,7 +115,6 @@ def speed_pass(
     corpus: str,
     port: int,
     results_dir: str,
-    kv_quant: str | None = None,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
@@ -140,7 +139,6 @@ def speed_pass(
         False,
         True,
         n_conversations=1,
-        kv_quant=kv_quant,
         kv_quant_k=kv_quant_k,
         kv_quant_v=kv_quant_v,
     )
@@ -198,7 +196,6 @@ def fwe_pass(
     results_dir: str,
     seed: int,
     port: int,
-    kv_quant: str | None = None,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
@@ -217,10 +214,10 @@ def fwe_pass(
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
-    if kv_quant:
-        extra_args += ["-fa", "--cache-type-k", kv_quant, "--cache-type-v", kv_quant]
+    # session 35, addendum 8: separate K/V (the combined flag is gone);
+    # -fa takes a value on this build: "-fa on"
     if kv_quant_k or kv_quant_v:
-        extra_args += ["-fa"]
+        extra_args += ["-fa", "on"]
         if kv_quant_k:
             extra_args += ["--cache-type-k", kv_quant_k]
         if kv_quant_v:
@@ -287,7 +284,6 @@ def run_ladder(
     seed: int = 1024,
     max_rung: int | None = None,
     min_rung: int = RUNG_BASE,
-    kv_quant: str | None = None,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
 ) -> dict[str, Any]:
@@ -340,7 +336,7 @@ def run_ladder(
         this rung is not scored)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant, kv_quant_k, kv_quant_v)
+        ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant_k, kv_quant_v)
         t_speed = time.monotonic() - t0
         tag = " (ceiling)" if sv.get("ceiling_rung") else ""
         print(
@@ -373,7 +369,7 @@ def run_ladder(
         """Bench FWE at rung r. Returns (cell, window_cap)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_f, fv = fwe_pass(model, r, results_dir, seed, port, kv_quant, kv_quant_k, kv_quant_v)
+        ok_f, fv = fwe_pass(model, r, results_dir, seed, port, kv_quant_k, kv_quant_v)
         t_fwe = time.monotonic() - t0
         print(
             f"    fwe @ depth {fv.get('depth')}: "
@@ -820,7 +816,6 @@ def process_family(
             results_dir=os.path.join(models_dir, "ladder-results"),
             seed=state.get("ladder_seed", 1024),
             min_rung=state.get("ladder_min_rung", RUNG_BASE),
-            kv_quant=state.get("kv_quant"),
             kv_quant_k=state.get("kv_quant_k"),
             kv_quant_v=state.get("kv_quant_v"),
         )
@@ -939,16 +934,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
-        "--kv-quant",
-        default=None,
-        choices=_KV_CHOICES,
-        help="session 35: quantize the KV cache (K and V both) to this type - "
-        "launches with -fa (required for quantized caches). Rides the state "
-        "file (kv_quant) so every rung of the ladder launches the same way; "
-        "use a FRESH --state-file/--results-file pair so the variant never "
-        "contaminates the baseline grids.",
-    )
-    ap.add_argument(
         "--kv-quant-k",
         default=None,
         choices=_KV_CHOICES,
@@ -1016,8 +1001,6 @@ def main() -> None:
     state = load_state(args.state_file)
     if args.min_rung:
         state["ladder_min_rung"] = args.min_rung
-    if args.kv_quant:
-        state["kv_quant"] = args.kv_quant
     if args.kv_quant_k:
         state["kv_quant_k"] = args.kv_quant_k
     if args.kv_quant_v:
