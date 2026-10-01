@@ -240,3 +240,10 @@ REAL-RUN BLOCK:
   python3 full_benchmark.py Qwen/Qwen3.5-2B-Base --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil3.json --results-file benchmark-results-ceil3.json
   python3 full_benchmark.py Qwen/Qwen3.5-4B --rung Q2_K --kv-quant-k q4_0 --kv-quant-v q4_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil4.json --results-file benchmark-results-ceil4.json --force
 The three probes are ~3 h wall. The 4B stays last (the 0.01-GiB edge).
+
+## Session 35, addendum 15 - the registry's one-model-one-table rule; the pages' RAM/VRAM defaults
+MODELS.MD CORRECTED (the author caught it: "the candidates table is very wrong, you have duplicates"): the 2B appeared in BOTH the PASS and the CANDIDATES table (and a "quant raise" pseudo-row re-listed it a third time). THE RULE (author): a model appears at most ONCE, in exactly ONE table. Applied: the PASS 2B row carries its quant-raise status in its NOTES (not as a candidate row); the 0.8B-Base/9B/e2b/Ministral closures move to a prose CLOSED section (they never enter a table); the CANDIDATES table now holds only the never-benched models (2B-Base, 4B, 4B-Base). Verified programmatically: no model name in two tables.
+THE PAGES (author rulings):
+- CPU (cpu-picker.html): the RAM input defaults to the MINIMUM RAM NEEDED - 5 GiB (the champion's 4.96 GiB cold cost, the smallest RAM any measured model needs) instead of 32; a footnote states the prefill and that more memory changes nothing. The machine list already filtered to configurations that can run the models (MIN_RUN_BW); the "higher specs" note is sharpened to "higher bandwidth runs the same models without issue".
+- GPU (gpu-picker.html): the tier list already carries only the VRAM capacities that fit a measured model; the note now states that a card with higher VRAM than the largest tier is expected to MATCH the recommendation of the highest-VRAM model in the list (the pool is measured at its ceiling; more VRAM cannot change the recommendation).
+Prettier clean; both pages' JS parses; md_check passes.
