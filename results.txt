@@ -6849,3 +6849,113 @@ Traceback (most recent call last):
     return self._sock.recv_into(b)
            ~~~~~~~~~~~~~~~~~~~~^^^
 KeyboardInterrupt
+
+===== 2026-10-01T15:57:06 | full_benchmark.py Qwen/Qwen3.5-4B --rung Q4_K_M --kv-quant-k q4_0 --kv-quant-v q4_0 --min-rung 262144 --max-rung 262144 --force --state-file benchmark-state-kvprobe.json --results-file benchmark-results-kvprobe.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T15:57:06 +0m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+  --force: re-benching Q4_K_M (0 stored verdict(s) cleared; files reused)
+  [1] local rung file found - no download needed  (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf)
+  [2] rung file ready  (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf)
+
+  rung Q4_K_M:
+
+=== ladder: Qwen3.5-4B-Q4_K_M ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.327.797 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/speed_gate.py", line 734, in bench_model
+    res, conv_history = run_conversation(
+                        ~~~~~~~~~~~~~~~~^
+        port,
+        ^^^^^
+    ...<7 lines>...
+        reader_wps=reader_wps,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/speed_gate.py", line 413, in run_conversation
+    for text, t_arr in llama_server.stream_completion(port, payload, meta=meta):
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama_server.py", line 377, in stream_completion
+    for chunk in resp:
+                 ^^^^
+  File "/usr/lib64/python3.13/http/client.py", line 727, in readline
+    return super().readline(limit)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib64/python3.13/http/client.py", line 719, in peek
+    return self._peek_chunked(n)
+           ~~~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib64/python3.13/http/client.py", line 757, in _peek_chunked
+    chunk_left = self._get_chunk_left()
+  File "/usr/lib64/python3.13/http/client.py", line 603, in _get_chunk_left
+    chunk_left = self._read_next_chunk_size()
+  File "/usr/lib64/python3.13/http/client.py", line 554, in _read_next_chunk_size
+    line = self.fp.readline(_MAXLINE + 1)
+  File "/usr/lib64/python3.13/socket.py", line 723, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1376, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1024, in main
+    failed_families = sweep_families(args, state)
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1127, in sweep_families
+    process_family(
+    ~~~~~~~~~~~~~~^
+        spec,
+        ^^^^^
+    ...<9 lines>...
+        args.rung,
+        ^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 812, in process_family
+    ladder = run_ladder(
+        path,
+    ...<7 lines>...
+        kv_quant_v=state.get("kv_quant_v"),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 403, in run_ladder
+    cell, cap = run_speed(rung)
+                ~~~~~~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 339, in run_speed
+    ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant_k, kv_quant_v)
+               ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 134, in speed_pass
+    turns, _, mem_reports = speed_gate.bench_model(
+                            ~~~~~~~~~~~~~~~~~~~~~~^
+        model,
+        ^^^^^^
+    ...<7 lines>...
+        kv_quant_v=kv_quant_v,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/speed_gate.py", line 846, in bench_model
+    llama_server.stop_server(proc, port)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama_server.py", line 279, in stop_server
+    proc.wait(timeout=15)
+    ~~~~~~~~~^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/subprocess.py", line 1280, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/subprocess.py", line 2079, in _wait
+    time.sleep(delay)
+    ~~~~~~~~~~^^^^^^^
+KeyboardInterrupt
