@@ -4300,3 +4300,1664 @@ idempotent and will resume from this phase.
 [2026-09-30T23:42:39 +0m]       phase 2 done (create)
   [3] would run the PROTOCOL v4 ladder on the rung file
   [4] would record the ladder score (the deepest rung passing both; scored-rung w/s + cold cost per addendum 137n/137m)
+
+===== 2026-09-30T23:44:37 | full_benchmark.py Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-4B Qwen/Qwen3-1.7B Qwen/Qwen2.5-1.5B-Instruct-GGUF Qwen/Qwen3-4B-GGUF ibm-granite/granite-4.1-3b ibm-granite/granite-3.2-2b-instruct ibm-granite/granite-3.1-2b-instruct openbmb/MiniCPM5-2B microsoft/Phi-3.5-mini-instruct openbmb/MiniCPM-1B-sft-bf16 openbmb/MiniCPM-2B-sft-bf16 ibm-granite/granite-4.2-3b ibm-granite/granite-3.0-2b-instruct microsoft/phi-4-mini-instruct ibm-granite/granite-3.3-2b-instruct --rung Q4_K_M --state-file benchmark-state-q4.json --results-file benchmark-results-q4.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-09-30T23:44:37 +0m] family: Qwen3.5-0.8B
+  model repo : Qwen/Qwen3.5-0.8B
+  source repo: Qwen/Qwen3.5-0.8B
+  folder     : ./models/Qwen3.5-0.8B
+
+  rung Q4_K_M:
+  [1] downloading safetensors from Qwen/Qwen3.5-0.8B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from Qwen/Qwen3.5-0.8B, convert + quantize)
+[2026-09-30T23:44:55 +0m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing Qwen3.5-0.8B-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q4_K_M.gguf)
+[2026-09-30T23:45:09 +1m]       phase 2 done (create)
+
+=== ladder: Qwen3.5-0.8B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.054.571 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2575 tok): turns t/s: 90.9, 87.6, 87.3, 87.4   worst 87.3 (mean 88.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 53.1, 50.4, 48.7, 56.3   (reader line 5 w/s)
+      noise at depth: 87.5, 87.0
+    memory: mapped census 2.90 GiB mapped, 0.40 GiB resident (file 0.35 + anon 0.05; smaps, addendum 23), machine cost 1.06 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 87.3 t/s (worst turn; avg-of-worsts 87.3)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 87.05  mean 87.26  worst/mean 0.998  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.40 GiB - file 0.50 GiB, i.e. -0.10 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [18s]
+    cold machine cost @ rung: 1.06 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('Based on the text provided, here is the frequenc')
+    fwe census: 0.22 GiB resident (file 0.17 + anon 0.04; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [5s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.047.556 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6663 tok): turns t/s: 82.1, 82.5, 81.7, 82.1   worst 81.7 (mean 82.1)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 48.7, 46.7, 45.0, 41.1   (reader line 5 w/s)
+      noise at depth: 81.7, 81.8
+    memory: mapped census 2.95 GiB mapped, 0.40 GiB resident (file 0.35 + anon 0.06; smaps, addendum 23), machine cost 1.03 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 81.7 t/s (worst turn; avg-of-worsts 81.7)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 81.72  mean 81.75  worst/mean 1.000  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.40 GiB - file 0.50 GiB, i.e. -0.10 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [22s]
+    cold machine cost @ rung: 1.03 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('Based on the text provided, here is the frequenc')
+    fwe census: 0.22 GiB resident (file 0.17 + anon 0.05; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [7s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.087.088 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14862 tok): turns t/s: 73.6, 73.7, 72.9, 72.9   worst 72.9 (mean 73.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 49.1, 44.9, 44.6, 43.5   (reader line 5 w/s)
+      noise at depth: 73.4, 73.3
+    memory: mapped census 3.06 GiB mapped, 0.42 GiB resident (file 0.34 + anon 0.08; smaps, addendum 23), machine cost 0.99 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 72.9 t/s (worst turn; avg-of-worsts 72.9)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 73.31  mean 73.33  worst/mean 1.000  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.42 GiB - file 0.50 GiB, i.e. -0.08 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [30s]
+    cold machine cost @ rung: 0.99 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('Based on the text provided, here is the analysis')
+    fwe census: 0.23 GiB resident (file 0.18 + anon 0.05; smaps)
+    fwe @ depth 16128: 1/1 -> PASS [13s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.091.536 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] actual n_ctx = 32768 (requested 32768)
+    conv 1 (blob 31241 tok): turns t/s: 55.2, 55.4, 55.2, 55.0   worst 55.0 (mean 55.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 33.3, 33.7, 32.7, 31.6   (reader line 5 w/s)
+      noise at depth: 55.6, 55.6
+    memory: mapped census 3.28 GiB mapped, 0.47 GiB resident (file 0.35 + anon 0.11; smaps, addendum 23), machine cost 1.30 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 55.0 t/s (worst turn; avg-of-worsts 55.0)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 55.55  mean 55.58  worst/mean 0.999  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.47 GiB - file 0.50 GiB, i.e. -0.04 GiB beyond the file (KV + buffers + runtime)
+  rung 32768: speed PASS [58s]
+    cold machine cost @ rung: 1.30 GiB
+  task 1/1 @ 32512 tok: 3/3 words -> HIT ('Based on the text provided, here is the analysis')
+    fwe census: 0.26 GiB resident (file 0.18 + anon 0.08; smaps)
+    fwe @ depth 32512: 1/1 -> PASS [35s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.190.908 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'false'
+    [server] actual n_ctx = 65536 (requested 65536)
+    conv 1 (blob 64010 tok): turns t/s: 39.0, 38.8, 38.6, 38.5   worst 38.5 (mean 38.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 26.2, 25.8, 26.0, 26.4   (reader line 5 w/s)
+      noise at depth: 38.8, 38.5
+    memory: mapped census 3.72 GiB mapped, 0.54 GiB resident (file 0.35 + anon 0.18; smaps, addendum 23), machine cost 2.02 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 38.5 t/s (worst turn; avg-of-worsts 38.5)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 38.48  mean 38.63  worst/mean 0.996  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.54 GiB - file 0.50 GiB, i.e. 0.03 GiB beyond the file (KV + buffers + runtime)
+  rung 65536: speed PASS [135s]
+    cold machine cost @ rung: 2.02 GiB
+  task 1/1 @ 65280 tok: 3/3 words -> HIT ('Based on the text provided, here is the frequenc')
+    fwe census: 0.30 GiB resident (file 0.18 + anon 0.12; smaps)
+    fwe @ depth 65280: 1/1 -> PASS [104s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.339.811 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 131072, kv_unified = 'false'
+    [server] actual n_ctx = 131072 (requested 131072)
+    conv 1 (blob 129545 tok): turns t/s: 24.7, 24.5, 24.5, 24.5   worst 24.5 (mean 24.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.8, 13.4, 12.0, 12.9   (reader line 5 w/s)
+      noise at depth: 24.6, 24.4
+    memory: mapped census 4.61 GiB mapped, 0.56 GiB resident (file 0.36 + anon 0.20; smaps, addendum 23), machine cost 2.78 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 24.5 t/s (worst turn; avg-of-worsts 24.5)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 24.38  mean 24.51  worst/mean 0.995  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.56 GiB - file 0.50 GiB, i.e. 0.05 GiB beyond the file (KV + buffers + runtime)
+  rung 131072: speed PASS [426s]
+    cold machine cost @ rung: 2.78 GiB
+  task 1/1 @ 130816 tok: 3/3 words -> HIT ('Based on the text provided, here is the frequenc')
+    fwe census: 0.40 GiB resident (file 0.19 + anon 0.21; smaps)
+    fwe @ depth 130816: 1/1 -> PASS [372s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.568.216 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260616 tok): turns t/s: 15.5, 15.5, 15.5, 15.5   worst 15.5 (mean 15.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 9.2, 8.1, 9.8, 9.8   (reader line 5 w/s)
+      noise at depth: 15.5, 15.5
+    memory: mapped census 6.38 GiB mapped, 0.63 GiB resident (file 0.38 + anon 0.26; smaps, addendum 23), machine cost 4.44 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q4_K_M.gguf: WORST TURN = 15.5 t/s (worst turn; avg-of-worsts 15.5)
+  Qwen3.5-0.8B-Q4_K_M.gguf: NOISE AT DEPTH: worst 15.47  mean 15.48  worst/mean 0.999  (n=2)
+  Qwen3.5-0.8B-Q4_K_M.gguf: MEMORY: peak RSS 0.67 GiB - file 0.50 GiB, i.e. 0.16 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS [1481s]
+    cold machine cost @ rung: 4.44 GiB
+  task 1/1 @ 261888 tok: 3/3 words -> HIT ('Based on the frequency of the coded words in the')
+    fwe census: 0.32 GiB resident (file 0.21 + anon 0.12; smaps)
+    fwe @ depth 261888: 1/1 -> PASS [1402s]
+
+=== Qwen3.5-0.8B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.902.172 W llama_context: n_ctx_seq (524288) > n_ctx_train (262144) -- possible training context overflow
+    [server] 0.02.066.346 W srv    load_model: the slot context (524288) exceeds the training context of the model (262144) - capping
+    [server] 0.02.295.474 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 524288)
+  ERROR: server accepted -c 524288 but runs n_ctx 262144 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q4_K_M.gguf.server.log
+    memory: mapped census 9.18 GiB mapped, 0.19 GiB resident (file 0.19 + anon 0.00; smaps, addendum 23), machine cost 7.87 GiB (MemAvailable delta)
+    trained window 262,144 caps the requested -c 524,288
+  rung 524288: speed FAIL [3s]
+    speed verdict: {"error": "capped to the window", "window_cap": 262144}
+    trained window 262,144 caps the requested -c 524,288 - the window is the ceiling
+  binary search between 262144 (pass) and 262144 (fail) - fwe only
+  Qwen3.5-0.8B-Q4_K_M: SCORE = 262144 tokens (last rung passing both) [68.5 min wall, measured]
+  [3] ladder ok  (score: 262144 tokens)
+[2026-10-01T00:53:40 +69m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 262144 tokens, worst 8.1 w/s, cold cost 4.44 GiB
+[2026-10-01T00:53:40 +69m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3.5-0.8B (ladder score 262144 tokens)
+
+============================================================
+[2026-10-01T00:53:40 +69m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+
+  rung Q4_K_M:
+  [1] downloading safetensors from Qwen/Qwen3.5-4B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from Qwen/Qwen3.5-4B, convert + quantize)
+[2026-10-01T00:54:58 +70m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing Qwen3.5-4B-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf)
+[2026-10-01T00:55:55 +71m]       phase 2 done (create)
+
+=== ladder: Qwen3.5-4B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.846.199 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2575 tok): turns t/s: 23.1, 23.1, 23.1, 23.0   worst 23.0 (mean 23.1)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 14.3, 14.7, 14.3, 15.9   (reader line 5 w/s)
+      noise at depth: 22.9, 22.9
+    memory: mapped census 5.71 GiB mapped, 0.71 GiB resident (file 0.16 + anon 0.55; smaps, addendum 23), machine cost 3.73 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 23.0 t/s (worst turn; avg-of-worsts 23.0)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 22.89  mean 22.91  worst/mean 0.999  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.71 GiB - file 2.59 GiB, i.e. -1.88 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [76s]
+    cold machine cost @ rung: 3.73 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('Based on the analysis of the provided coded text')
+    fwe census: 0.28 GiB resident (file 0.18 + anon 0.10; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [17s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.639.792 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6663 tok): turns t/s: 22.5, 22.4, 22.3, 22.3   worst 22.3 (mean 22.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 15.2, 14.0, 14.0, 15.9   (reader line 5 w/s)
+      noise at depth: 22.4, 22.3
+    memory: mapped census 5.84 GiB mapped, 0.74 GiB resident (file 0.18 + anon 0.56; smaps, addendum 23), machine cost 3.72 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 22.3 t/s (worst turn; avg-of-worsts 22.3)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 22.27  mean 22.32  worst/mean 0.998  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.74 GiB - file 2.59 GiB, i.e. -1.85 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [77s]
+    cold machine cost @ rung: 3.72 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.28 GiB resident (file 0.18 + anon 0.11; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [27s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.715.196 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14862 tok): turns t/s: 20.3, 20.3, 20.1, 20.1   worst 20.1 (mean 20.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 12.9, 12.3, 11.3, 11.9   (reader line 5 w/s)
+      noise at depth: 20.2, 20.3
+    memory: mapped census 6.11 GiB mapped, 0.76 GiB resident (file 0.18 + anon 0.58; smaps, addendum 23), machine cost 4.27 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 20.1 t/s (worst turn; avg-of-worsts 20.1)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 20.16  mean 20.25  worst/mean 0.996  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.76 GiB - file 2.59 GiB, i.e. -1.83 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [112s]
+    cold machine cost @ rung: 4.27 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.29 GiB resident (file 0.18 + anon 0.11; smaps)
+    fwe @ depth 16128: 1/1 -> PASS [50s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.787.709 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] actual n_ctx = 32768 (requested 32768)
+    conv 1 (blob 31241 tok): turns t/s: 17.5, 17.4, 17.4, 17.4   worst 17.4 (mean 17.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 11.5, 11.2, 11.3, 12.1   (reader line 5 w/s)
+      noise at depth: 17.3, 17.4
+    memory: mapped census 6.64 GiB mapped, 0.80 GiB resident (file 0.18 + anon 0.62; smaps, addendum 23), machine cost 4.81 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 17.4 t/s (worst turn; avg-of-worsts 17.4)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 17.32  mean 17.38  worst/mean 0.996  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.80 GiB - file 2.59 GiB, i.e. -1.79 GiB beyond the file (KV + buffers + runtime)
+  rung 32768: speed PASS [195s]
+    cold machine cost @ rung: 4.81 GiB
+  task 1/1 @ 32512 tok: 3/3 words -> HIT ('Based on a frequency analysis of the coded text ')
+    fwe census: 0.32 GiB resident (file 0.18 + anon 0.14; smaps)
+    fwe @ depth 32512: 1/1 -> PASS [127s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.092.417 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'false'
+    [server] actual n_ctx = 65536 (requested 65536)
+    conv 1 (blob 64010 tok): turns t/s: 13.7, 13.6, 13.6, 13.6   worst 13.6 (mean 13.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 9.3, 9.3, 8.5, 8.9   (reader line 5 w/s)
+      noise at depth: 13.6, 13.6
+    memory: mapped census 7.71 GiB mapped, 0.87 GiB resident (file 0.19 + anon 0.69; smaps, addendum 23), machine cost 6.04 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 13.6 t/s (worst turn; avg-of-worsts 13.6)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 13.59  mean 13.59  worst/mean 1.000  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.87 GiB - file 2.59 GiB, i.e. -1.72 GiB beyond the file (KV + buffers + runtime)
+  rung 65536: speed PASS [468s]
+    cold machine cost @ rung: 6.04 GiB
+  task 1/1 @ 65280 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.37 GiB resident (file 0.19 + anon 0.18; smaps)
+    fwe @ depth 65280: 1/1 -> PASS [384s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.492.860 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 131072, kv_unified = 'false'
+    [server] actual n_ctx = 131072 (requested 131072)
+    conv 1 (blob 129545 tok): turns t/s: 9.5, 9.5, 9.5, 9.5   worst 9.5 (mean 9.5)
+      reader wall (catch-up events): 0, 0, 2, 0   [reader waited 0.09s on the worst turn]
+      words/s (diagnostic): 6.2, 5.8, 5.9, 5.7   (reader line 5 w/s)
+      noise at depth: 9.4, 9.5
+    memory: mapped census 9.84 GiB mapped, 0.83 GiB resident (file 0.20 + anon 0.64; smaps, addendum 23), machine cost 7.91 GiB (MemAvailable delta)
+  note: 1 wall-failing turn(s) recorded - the verdict is the stall rate (protocol v3.1, addendum 73; recomputed from deltas at analyze time)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 9.5 t/s (worst turn; avg-of-worsts 9.5)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 9.45  mean 9.46  worst/mean 0.999  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.85 GiB - file 2.59 GiB, i.e. -1.74 GiB beyond the file (KV + buffers + runtime)
+  rung 131072: speed FAIL [1486s]
+    cold machine cost @ rung: 7.91 GiB
+    speed verdict: {"worst": 5.744026820893876, "mean": 5.899973748632441, "sigma": 0.0, "threshold": 5.0, "verdict": "FAIL", "stall_rate": 0.25, "stall_rate_max": 0.05, "wall_fail_turns": 1, "catchup_events": 2, "worst
+  binary search between 65536 (pass) and 131072 (fail) - speed+fwe
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.249.777 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 98304, kv_unified = 'false'
+    [server] actual n_ctx = 98304 (requested 98304)
+    conv 1 (blob 96783 tok): turns t/s: 11.3, 11.3, 11.3, 11.3   worst 11.3 (mean 11.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 7.0, 6.7, 6.7, 6.9   (reader line 5 w/s)
+      noise at depth: 11.3, 11.3
+    memory: mapped census 8.78 GiB mapped, 0.84 GiB resident (file 0.19 + anon 0.64; smaps, addendum 23), machine cost 6.87 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 11.3 t/s (worst turn; avg-of-worsts 11.3)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 11.27  mean 11.28  worst/mean 0.999  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.84 GiB - file 2.59 GiB, i.e. -1.76 GiB beyond the file (KV + buffers + runtime)
+  rung 98304: speed PASS (ceiling) [907s]
+    cold machine cost @ rung: 6.87 GiB
+  task 1/1 @ 98048 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.42 GiB resident (file 0.19 + anon 0.23; smaps)
+    fwe @ depth 98048: 1/1 -> PASS [789s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.395.570 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 114688, kv_unified = 'false'
+    [server] actual n_ctx = 114688 (requested 114688)
+    conv 1 (blob 113163 tok): turns t/s: 10.3, 10.3, 10.3, 10.2   worst 10.2 (mean 10.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.1, 6.4, 5.7, 6.1   (reader line 5 w/s)
+      noise at depth: 10.2, 10.2
+    memory: mapped census 9.31 GiB mapped, 0.79 GiB resident (file 0.19 + anon 0.60; smaps, addendum 23), machine cost 7.36 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 10.2 t/s (worst turn; avg-of-worsts 10.2)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 10.22  mean 10.22  worst/mean 1.000  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.81 GiB - file 2.59 GiB, i.e. -1.78 GiB beyond the file (KV + buffers + runtime)
+  rung 114688: speed PASS (ceiling) [1157s]
+    cold machine cost @ rung: 7.36 GiB
+  task 1/1 @ 114432 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.41 GiB resident (file 0.19 + anon 0.22; smaps)
+    fwe @ depth 114432: 1/1 -> PASS [1042s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.464.047 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 122880, kv_unified = 'false'
+    [server] actual n_ctx = 122880 (requested 122880)
+    conv 1 (blob 121359 tok): turns t/s: 9.9, 9.9, 9.9, 9.9   worst 9.9 (mean 9.9)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 5.6, 6.3, 5.9, 6.4   (reader line 5 w/s)
+      noise at depth: 9.9, 9.9
+    memory: mapped census 9.58 GiB mapped, 0.81 GiB resident (file 0.20 + anon 0.62; smaps, addendum 23), machine cost 7.64 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 9.9 t/s (worst turn; avg-of-worsts 9.9)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 9.87  mean 9.87  worst/mean 1.000  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.84 GiB - file 2.59 GiB, i.e. -1.75 GiB beyond the file (KV + buffers + runtime)
+  rung 122880: speed PASS (ceiling) [1283s]
+    cold machine cost @ rung: 7.64 GiB
+  task 1/1 @ 122624 tok: 3/3 words -> HIT ('Based on a frequency analysis of the coded text ')
+    fwe census: 0.43 GiB resident (file 0.19 + anon 0.24; smaps)
+    fwe @ depth 122624: 1/1 -> PASS [1170s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.444.561 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 126976, kv_unified = 'false'
+    [server] actual n_ctx = 126976 (requested 126976)
+    conv 1 (blob 125453 tok): turns t/s: 9.7, 9.7, 9.7, 9.7   worst 9.7 (mean 9.7)
+      reader wall (catch-up events): 0, 0, 1, 1   [reader waited 1.11s on the worst turn]
+      words/s (diagnostic): 5.7, 5.3, 5.0, 5.4   (reader line 5 w/s)
+      noise at depth: 9.7, 9.7
+    memory: mapped census 9.71 GiB mapped, 0.83 GiB resident (file 0.19 + anon 0.64; smaps, addendum 23), machine cost 7.84 GiB (MemAvailable delta)
+  note: 2 wall-failing turn(s) recorded - the verdict is the stall rate (protocol v3.1, addendum 73; recomputed from deltas at analyze time)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 9.7 t/s (worst turn; avg-of-worsts 9.7)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 9.70  mean 9.72  worst/mean 0.998  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.85 GiB - file 2.59 GiB, i.e. -1.74 GiB beyond the file (KV + buffers + runtime)
+  rung 126976: speed FAIL [1369s]
+    cold machine cost @ rung: 7.84 GiB
+    speed verdict: {"worst": 5.01070634844969, "mean": 5.334900857383486, "sigma": 0.0, "threshold": 5.0, "verdict": "FAIL", "stall_rate": 0.5, "stall_rate_max": 0.05, "wall_fail_turns": 2, "catchup_events": 2, "worst_c
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.394.993 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 124928, kv_unified = 'false'
+    [server] actual n_ctx = 124928 (requested 124928)
+    conv 1 (blob 123406 tok): turns t/s: 9.8, 9.8, 9.8, 9.8   worst 9.8 (mean 9.8)
+      reader wall (catch-up events): 0, 0, 1, 0   [reader waited 0.57s on the worst turn]
+      words/s (diagnostic): 5.9, 5.8, 5.5, 6.9   (reader line 5 w/s)
+      noise at depth: 9.8, 9.8
+    memory: mapped census 9.64 GiB mapped, 0.79 GiB resident (file 0.19 + anon 0.60; smaps, addendum 23), machine cost 7.71 GiB (MemAvailable delta)
+  note: 1 wall-failing turn(s) recorded - the verdict is the stall rate (protocol v3.1, addendum 73; recomputed from deltas at analyze time)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 9.8 t/s (worst turn; avg-of-worsts 9.8)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 9.78  mean 9.79  worst/mean 0.998  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.81 GiB - file 2.59 GiB, i.e. -1.78 GiB beyond the file (KV + buffers + runtime)
+  rung 124928: speed FAIL [1321s]
+    cold machine cost @ rung: 7.71 GiB
+    speed verdict: {"worst": 5.499384320273151, "mean": 6.03641201464995, "sigma": 0.0, "threshold": 5.0, "verdict": "FAIL", "stall_rate": 0.25, "stall_rate_max": 0.05, "wall_fail_turns": 1, "catchup_events": 1, "worst_
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.417.797 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 123904, kv_unified = 'false'
+    [server] actual n_ctx = 123904 (requested 123904)
+    conv 1 (blob 122380 tok): turns t/s: 9.9, 9.9, 9.8, 9.8   worst 9.8 (mean 9.9)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 7.1, 6.8, 6.3, 6.7   (reader line 5 w/s)
+      noise at depth: 9.8, 9.8
+    memory: mapped census 9.61 GiB mapped, 0.82 GiB resident (file 0.20 + anon 0.63; smaps, addendum 23), machine cost 7.71 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 9.8 t/s (worst turn; avg-of-worsts 9.8)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 9.84  mean 9.85  worst/mean 1.000  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.84 GiB - file 2.59 GiB, i.e. -1.75 GiB beyond the file (KV + buffers + runtime)
+  rung 123904: speed PASS (ceiling) [1256s]
+    cold machine cost @ rung: 7.71 GiB
+  task 1/1 @ 123648 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.45 GiB resident (file 0.19 + anon 0.26; smaps)
+    fwe @ depth 123648: 1/1 -> PASS [1180s]
+  Qwen3.5-4B-Q4_K_M: SCORE = 123904 tokens (last rung passing both) [241.5 min wall, measured]
+  [3] ladder ok  (score: 123904 tokens)
+[2026-10-01T04:57:27 +313m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 123904 tokens, worst 6.3 w/s, cold cost 7.71 GiB
+[2026-10-01T04:57:27 +313m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3.5-4B (ladder score 123904 tokens)
+
+============================================================
+[2026-10-01T04:57:27 +313m] family: Qwen3-1.7B
+  model repo : Qwen/Qwen3-1.7B
+  source repo: Qwen/Qwen3-1.7B
+  folder     : ./models/Qwen3-1.7B
+
+  rung Q4_K_M:
+  [1] downloading safetensors from Qwen/Qwen3-1.7B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from Qwen/Qwen3-1.7B, convert + quantize)
+[2026-10-01T04:58:05 +313m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing Qwen3-1.7B-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/Qwen3-1.7B/Qwen3-1.7B-Q4_K_M.gguf)
+[2026-10-01T04:58:36 +314m]       phase 2 done (create)
+
+=== ladder: Qwen3-1.7B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3-1.7B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.872.380 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 45.5, 45.9, 45.2, 44.7   worst 44.7 (mean 45.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 35.1, 34.8, 33.6, 32.8   (reader line 5 w/s)
+      noise at depth: 44.6, 45.1
+    memory: mapped census 3.19 GiB mapped, 0.14 GiB resident (file 0.13 + anon 0.01; smaps, addendum 23), machine cost 1.74 GiB (MemAvailable delta)
+
+  Qwen3-1.7B-Q4_K_M.gguf: WORST TURN = 44.7 t/s (worst turn; avg-of-worsts 44.7)
+  Qwen3-1.7B-Q4_K_M.gguf: NOISE AT DEPTH: worst 44.64  mean 44.89  worst/mean 0.994  (n=2)
+  Qwen3-1.7B-Q4_K_M.gguf: MEMORY: peak RSS 0.14 GiB - file 1.19 GiB, i.e. -1.06 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [14s]
+    cold machine cost @ rung: 1.74 GiB
+  task 1/1 @ 3840 tok: 2/3 words -> MISS ('The three most frequently appearing coded words ')
+    fwe census: 0.13 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [6s]
+  Qwen3-1.7B-Q4_K_M: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  Qwen3-1.7B-Q4_K_M: SCORE = 0 tokens (last rung passing both) [0.3 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T04:58:55 +314m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T04:58:55 +314m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3-1.7B (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T04:58:55 +314m] family: Qwen2.5-1.5B-Instruct-GGUF
+  model repo : Qwen/Qwen2.5-1.5B-Instruct-GGUF
+  source repo: Qwen/Qwen2.5-1.5B-Instruct-GGUF
+  folder     : ./models/Qwen2.5-1.5B-Instruct-GGUF
+
+  rung Q4_K_M:
+  [1] downloading Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf (output hidden; shown on error)
+  [1] downloads ok  (plan: downloaded Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf)
+[2026-10-01T04:59:08 +315m]       phase 1 done (acquire)
+  [2] rung file ready  (./models/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf)
+[2026-10-01T04:59:08 +315m]       phase 2 done (create)
+
+=== ladder: qwen2.5-1.5b-instruct-q4_k_m ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== qwen2.5-1.5b-instruct-q4_k_m.gguf ===
+  starting server...
+    [server] 0.00.739.220 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 57.5, 59.0, 59.1, 58.7   worst 57.5 (mean 58.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 44.4, 45.8, 45.7, 40.9   (reader line 5 w/s)
+      noise at depth: 58.6, 58.2
+    memory: mapped census 2.72 GiB mapped, 0.14 GiB resident (file 0.13 + anon 0.01; smaps, addendum 23), machine cost 1.09 GiB (MemAvailable delta)
+
+  qwen2.5-1.5b-instruct-q4_k_m.gguf: WORST TURN = 57.5 t/s (worst turn; avg-of-worsts 57.5)
+  qwen2.5-1.5b-instruct-q4_k_m.gguf: NOISE AT DEPTH: worst 58.18  mean 58.37  worst/mean 0.997  (n=2)
+  qwen2.5-1.5b-instruct-q4_k_m.gguf: MEMORY: peak RSS 0.14 GiB - file 1.04 GiB, i.e. -0.90 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [12s]
+    cold machine cost @ rung: 1.09 GiB
+  task 1/1 @ 3840 tok: 2/3 words -> MISS ('Based on the provided text, the three most frequ')
+    fwe census: 0.13 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [5s]
+  qwen2.5-1.5b-instruct-q4_k_m: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  qwen2.5-1.5b-instruct-q4_k_m: SCORE = 0 tokens (last rung passing both) [0.3 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T04:59:25 +315m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T04:59:25 +315m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen2.5-1.5B-Instruct-GGUF (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T04:59:25 +315m] family: Qwen3-4B-GGUF
+  model repo : Qwen/Qwen3-4B-GGUF
+  source repo: Qwen/Qwen3-4B-GGUF
+  folder     : ./models/Qwen3-4B-GGUF
+
+  rung Q4_K_M:
+  [1] downloading Qwen/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf (output hidden; shown on error)
+  [1] downloads ok  (plan: downloaded Qwen/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf)
+[2026-10-01T04:59:52 +315m]       phase 1 done (acquire)
+  [2] rung file ready  (./models/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf)
+[2026-10-01T04:59:52 +315m]       phase 2 done (create)
+
+=== ladder: Qwen3-4B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.208.864 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 24.1, 23.7, 23.3, 23.0   worst 23.0 (mean 23.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 14.3, 12.1, 12.9, 16.3   (reader line 5 w/s)
+      noise at depth: 22.9, 23.0
+    memory: mapped census 4.80 GiB mapped, 0.14 GiB resident (file 0.13 + anon 0.01; smaps, addendum 23), machine cost 2.94 GiB (MemAvailable delta)
+
+  Qwen3-4B-Q4_K_M.gguf: WORST TURN = 23.0 t/s (worst turn; avg-of-worsts 23.0)
+  Qwen3-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 22.90  mean 22.95  worst/mean 0.998  (n=2)
+  Qwen3-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.14 GiB - file 2.33 GiB, i.e. -2.18 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [55s]
+    cold machine cost @ rung: 2.94 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('nysskz, swucem, tvjzpa')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [12s]
+
+=== Qwen3-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.343.556 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6669 tok): turns t/s: 19.7, 19.3, 19.1, 18.8   worst 18.8 (mean 19.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 11.3, 8.5, 9.7, 8.1   (reader line 5 w/s)
+      noise at depth: 18.7, 18.7
+    memory: mapped census 5.37 GiB mapped, 0.15 GiB resident (file 0.13 + anon 0.02; smaps, addendum 23), machine cost 3.62 GiB (MemAvailable delta)
+
+  Qwen3-4B-Q4_K_M.gguf: WORST TURN = 18.8 t/s (worst turn; avg-of-worsts 18.8)
+  Qwen3-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 18.68  mean 18.69  worst/mean 0.999  (n=2)
+  Qwen3-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.15 GiB - file 2.33 GiB, i.e. -2.17 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [102s]
+    cold machine cost @ rung: 3.62 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('To determine the three most frequently appeared ')
+    fwe census: 0.14 GiB resident (file 0.13 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [42s]
+
+=== Qwen3-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.633.971 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14855 tok): turns t/s: 14.3, 14.2, 14.0, 13.9   worst 13.9 (mean 14.1)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 8.5, 6.9, 7.5, 7.2   (reader line 5 w/s)
+      noise at depth: 13.9, 13.8
+    memory: mapped census 6.51 GiB mapped, 0.17 GiB resident (file 0.13 + anon 0.04; smaps, addendum 23), machine cost 4.80 GiB (MemAvailable delta)
+
+  Qwen3-4B-Q4_K_M.gguf: WORST TURN = 13.9 t/s (worst turn; avg-of-worsts 13.9)
+  Qwen3-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 13.78  mean 13.83  worst/mean 0.997  (n=2)
+  Qwen3-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.17 GiB - file 2.33 GiB, i.e. -2.15 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS (ceiling) [229s]
+    cold machine cost @ rung: 4.80 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('To determine the **three most frequently appeare')
+    fwe census: 0.16 GiB resident (file 0.13 + anon 0.02; smaps)
+    fwe @ depth 16128: 1/1 -> PASS [141s]
+  Qwen3-4B-Q4_K_M: SCORE = 16384 tokens (last rung passing both) [9.7 min wall, measured]
+  [3] ladder ok  (score: 16384 tokens)
+[2026-10-01T05:09:32 +325m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 16384 tokens, worst 6.9 w/s, cold cost 4.80 GiB
+[2026-10-01T05:09:32 +325m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Qwen3-4B-GGUF (ladder score 16384 tokens)
+
+============================================================
+[2026-10-01T05:09:32 +325m] family: granite-4.1-3b
+  model repo : ibm-granite/granite-4.1-3b
+  source repo: ibm-granite/granite-4.1-3b
+  folder     : ./models/granite-4.1-3b
+
+  rung Q4_K_M:
+  [1] downloading safetensors from ibm-granite/granite-4.1-3b (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from ibm-granite/granite-4.1-3b, convert + quantize)
+[2026-10-01T05:10:34 +326m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing granite-4.1-3b-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/granite-4.1-3b/granite-4.1-3b-Q4_K_M.gguf)
+[2026-10-01T05:11:23 +327m]       phase 2 done (create)
+
+=== ladder: granite-4.1-3b-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-4.1-3b-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.899.566 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2569 tok): turns t/s: 30.0, 29.6, 29.2, 29.0   worst 29.0 (mean 29.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 22.7, 23.3, 22.9, 21.5   (reader line 5 w/s)
+      noise at depth: 28.7, 28.8
+    memory: mapped census 4.05 GiB mapped, 0.13 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 2.20 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q4_K_M.gguf: WORST TURN = 29.0 t/s (worst turn; avg-of-worsts 29.0)
+  granite-4.1-3b-Q4_K_M.gguf: NOISE AT DEPTH: worst 28.75  mean 28.76  worst/mean 1.000  (n=2)
+  granite-4.1-3b-Q4_K_M.gguf: MEMORY: peak RSS 0.13 GiB - file 1.96 GiB, i.e. -1.83 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [52s]
+    cold machine cost @ rung: 2.20 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('nysskz\nswucem\ntvjzpa\n<|im_end|>')
+    fwe census: 0.12 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [10s]
+
+=== granite-4.1-3b-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.105.887 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6669 tok): turns t/s: 24.6, 24.3, 24.1, 23.9   worst 23.9 (mean 24.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 15.9, 15.5, 16.9, 19.5   (reader line 5 w/s)
+      noise at depth: 23.7, 23.7
+    memory: mapped census 4.37 GiB mapped, 0.14 GiB resident (file 0.12 + anon 0.02; smaps, addendum 23), machine cost 2.90 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q4_K_M.gguf: WORST TURN = 23.9 t/s (worst turn; avg-of-worsts 23.9)
+  granite-4.1-3b-Q4_K_M.gguf: NOISE AT DEPTH: worst 23.68  mean 23.69  worst/mean 1.000  (n=2)
+  granite-4.1-3b-Q4_K_M.gguf: MEMORY: peak RSS 0.14 GiB - file 1.96 GiB, i.e. -1.82 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [63s]
+    cold machine cost @ rung: 2.90 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('The three most frequently appeared coded words i')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [24s]
+
+=== granite-4.1-3b-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.212.359 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14855 tok): turns t/s: 19.1, 19.2, 19.0, 18.9   worst 18.9 (mean 19.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 14.7, 9.6, 11.5, 10.9   (reader line 5 w/s)
+      noise at depth: 19.0, 19.1
+    memory: mapped census 5.01 GiB mapped, 0.16 GiB resident (file 0.12 + anon 0.04; smaps, addendum 23), machine cost 3.32 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q4_K_M.gguf: WORST TURN = 18.9 t/s (worst turn; avg-of-worsts 18.9)
+  granite-4.1-3b-Q4_K_M.gguf: NOISE AT DEPTH: worst 19.01  mean 19.04  worst/mean 0.998  (n=2)
+  granite-4.1-3b-Q4_K_M.gguf: MEMORY: peak RSS 0.16 GiB - file 1.96 GiB, i.e. -1.80 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [81s]
+    cold machine cost @ rung: 3.32 GiB
+  task 1/1 @ 16128 tok: 3/3 words -> HIT ('The three most frequently appeared coded words i')
+    fwe census: 0.14 GiB resident (file 0.12 + anon 0.02; smaps)
+    fwe @ depth 16128: 1/1 -> PASS [64s]
+
+=== granite-4.1-3b-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.485.237 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] actual n_ctx = 32768 (requested 32768)
+    conv 1 (blob 31244 tok): turns t/s: 12.6, 12.6, 12.6, 12.5   worst 12.5 (mean 12.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.5, 6.9, 7.7, 7.7   (reader line 5 w/s)
+      noise at depth: 12.5, 12.5
+    memory: mapped census 6.29 GiB mapped, 0.19 GiB resident (file 0.12 + anon 0.07; smaps, addendum 23), machine cost 4.87 GiB (MemAvailable delta)
+
+  granite-4.1-3b-Q4_K_M.gguf: WORST TURN = 12.5 t/s (worst turn; avg-of-worsts 12.5)
+  granite-4.1-3b-Q4_K_M.gguf: NOISE AT DEPTH: worst 12.51  mean 12.52  worst/mean 0.999  (n=2)
+  granite-4.1-3b-Q4_K_M.gguf: MEMORY: peak RSS 0.20 GiB - file 1.96 GiB, i.e. -1.76 GiB beyond the file (KV + buffers + runtime)
+  rung 32768: speed PASS (ceiling) [304s]
+    cold machine cost @ rung: 4.87 GiB
+  task 1/1 @ 32512 tok: 2/3 words -> MISS ('The three most frequently appeared coded words i')
+    fwe census: 0.15 GiB resident (file 0.12 + anon 0.03; smaps)
+    fwe @ depth 32512: 0/1 -> FAIL [271s]
+  binary search between 16384 (pass) and 32768 (fail) - fwe only
+  task 1/1 @ 24320 tok: 2/3 words -> MISS ('The three most frequently appeared coded words i')
+    fwe census: 0.16 GiB resident (file 0.12 + anon 0.03; smaps)
+    fwe @ depth 24320: 0/1 -> FAIL [146s]
+  task 1/1 @ 20224 tok: 2/3 words -> MISS ('The three most frequently appeared coded words i')
+    fwe census: 0.14 GiB resident (file 0.12 + anon 0.02; smaps)
+    fwe @ depth 20224: 0/1 -> FAIL [98s]
+  task 1/1 @ 18176 tok: 3/3 words -> HIT ('The three most frequently appeared coded words i')
+    fwe census: 0.14 GiB resident (file 0.12 + anon 0.02; smaps)
+    fwe @ depth 18176: 1/1 -> PASS [81s]
+  task 1/1 @ 19200 tok: 2/3 words -> MISS ('The three most frequently appeared coded words i')
+    fwe census: 0.15 GiB resident (file 0.12 + anon 0.03; smaps)
+    fwe @ depth 19200: 0/1 -> FAIL [89s]
+  granite-4.1-3b-Q4_K_M: SCORE = 18432 tokens (last rung passing both) [21.4 min wall, measured]
+  [3] ladder ok  (score: 18432 tokens)
+[2026-10-01T05:32:47 +348m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 18432 tokens, worst n/a w/s, cold cost 3.72 GiB
+[2026-10-01T05:32:47 +348m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for granite-4.1-3b (ladder score 18432 tokens)
+
+============================================================
+[2026-10-01T05:32:47 +348m] family: granite-3.2-2b-instruct
+  model repo : ibm-granite/granite-3.2-2b-instruct
+  source repo: ibm-granite/granite-3.2-2b-instruct
+  folder     : ./models/granite-3.2-2b-instruct
+
+  rung Q4_K_M:
+  [1] downloading safetensors from ibm-granite/granite-3.2-2b-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from ibm-granite/granite-3.2-2b-instruct, convert + quantize)
+[2026-10-01T05:33:36 +349m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing granite-3.2-2b-instruct-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/granite-3.2-2b-instruct/granite-3.2-2b-instruct-Q4_K_M.gguf)
+[2026-10-01T05:34:13 +350m]       phase 2 done (create)
+
+=== ladder: granite-3.2-2b-instruct-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-3.2-2b-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.289.106 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 38.2, 37.7, 37.2, 36.9   worst 36.9 (mean 37.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 24.1, 24.9, 22.5, 29.6   (reader line 5 w/s)
+      noise at depth: 36.8, 36.9
+    memory: mapped census 3.40 GiB mapped, 0.11 GiB resident (file 0.10 + anon 0.01; smaps, addendum 23), machine cost 1.55 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q4_K_M.gguf: WORST TURN = 36.9 t/s (worst turn; avg-of-worsts 36.9)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 36.79  mean 36.82  worst/mean 0.999  (n=2)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.11 GiB - file 1.44 GiB, i.e. -1.33 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [33s]
+    cold machine cost @ rung: 1.55 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('The three most frequently appearing coded words ')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [9s]
+
+=== granite-3.2-2b-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.846.481 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6664 tok): turns t/s: 29.8, 29.4, 29.0, 28.4   worst 28.4 (mean 29.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 18.0, 17.1, 16.5, 22.8   (reader line 5 w/s)
+      noise at depth: 28.5, 28.6
+    memory: mapped census 3.72 GiB mapped, 0.12 GiB resident (file 0.10 + anon 0.02; smaps, addendum 23), machine cost 2.24 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q4_K_M.gguf: WORST TURN = 28.4 t/s (worst turn; avg-of-worsts 28.4)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 28.53  mean 28.59  worst/mean 0.998  (n=2)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.12 GiB - file 1.44 GiB, i.e. -1.32 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [57s]
+    cold machine cost @ rung: 2.24 GiB
+  task 1/1 @ 7936 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 7936: 1/1 -> PASS [20s]
+
+=== granite-3.2-2b-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.925.683 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 16384, kv_unified = 'false'
+    [server] actual n_ctx = 16384 (requested 16384)
+    conv 1 (blob 14859 tok): turns t/s: 22.4, 22.2, 21.9, 21.7   worst 21.7 (mean 22.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.9, 13.7, 14.2, 13.6   (reader line 5 w/s)
+      noise at depth: 21.6, 21.6
+    memory: mapped census 4.36 GiB mapped, 0.13 GiB resident (file 0.10 + anon 0.03; smaps, addendum 23), machine cost 2.67 GiB (MemAvailable delta)
+
+  granite-3.2-2b-instruct-Q4_K_M.gguf: WORST TURN = 21.7 t/s (worst turn; avg-of-worsts 21.7)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 21.55  mean 21.57  worst/mean 0.999  (n=2)
+  granite-3.2-2b-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.13 GiB - file 1.44 GiB, i.e. -1.31 GiB beyond the file (KV + buffers + runtime)
+  rung 16384: speed PASS [112s]
+    cold machine cost @ rung: 2.67 GiB
+  task 1/1 @ 16128 tok: 2/3 words -> MISS ('After analyzing the coded text, here are the thr')
+    fwe census: 0.13 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 16128: 0/1 -> FAIL [52s]
+  binary search between 8192 (pass) and 16384 (fail) - fwe only
+  task 1/1 @ 12032 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 12032: 1/1 -> PASS [33s]
+  task 1/1 @ 14080 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 14080: 1/1 -> PASS [43s]
+  task 1/1 @ 15104 tok: 3/3 words -> HIT ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.02; smaps)
+    fwe @ depth 15104: 1/1 -> PASS [47s]
+  granite-3.2-2b-instruct-Q4_K_M: SCORE = 15360 tokens (last rung passing both) [6.8 min wall, measured]
+  [3] ladder ok  (score: 15360 tokens)
+[2026-10-01T05:40:58 +356m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 15360 tokens, worst n/a w/s, cold cost 2.62 GiB
+[2026-10-01T05:40:58 +356m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for granite-3.2-2b-instruct (ladder score 15360 tokens)
+
+============================================================
+[2026-10-01T05:40:58 +356m] family: granite-3.1-2b-instruct
+  model repo : ibm-granite/granite-3.1-2b-instruct
+  source repo: ibm-granite/granite-3.1-2b-instruct
+  folder     : ./models/granite-3.1-2b-instruct
+
+  rung Q4_K_M:
+  [1] downloading safetensors from ibm-granite/granite-3.1-2b-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from ibm-granite/granite-3.1-2b-instruct, convert + quantize)
+[2026-10-01T05:41:45 +357m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing granite-3.1-2b-instruct-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/granite-3.1-2b-instruct/granite-3.1-2b-instruct-Q4_K_M.gguf)
+[2026-10-01T05:42:22 +358m]       phase 2 done (create)
+
+=== ladder: granite-3.1-2b-instruct-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== granite-3.1-2b-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.913.724 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 38.4, 37.8, 37.2, 37.0   worst 37.0 (mean 37.6)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 24.5, 23.8, 23.5, 26.1   (reader line 5 w/s)
+      noise at depth: 37.1, 36.9
+    memory: mapped census 3.39 GiB mapped, 0.11 GiB resident (file 0.10 + anon 0.01; smaps, addendum 23), machine cost 1.61 GiB (MemAvailable delta)
+
+  granite-3.1-2b-instruct-Q4_K_M.gguf: WORST TURN = 37.0 t/s (worst turn; avg-of-worsts 37.0)
+  granite-3.1-2b-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 36.87  mean 36.97  worst/mean 0.997  (n=2)
+  granite-3.1-2b-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.11 GiB - file 1.44 GiB, i.e. -1.33 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [36s]
+    cold machine cost @ rung: 1.61 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('The three most frequently appearing coded words ')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [9s]
+
+=== granite-3.1-2b-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.779.278 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 8192, kv_unified = 'false'
+    [server] actual n_ctx = 8192 (requested 8192)
+    conv 1 (blob 6664 tok): turns t/s: 29.9, 29.5, 29.2, 28.8   worst 28.8 (mean 29.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 19.0, 18.3, 20.1, 18.0   (reader line 5 w/s)
+      noise at depth: 28.7, 28.7
+    memory: mapped census 3.72 GiB mapped, 0.12 GiB resident (file 0.10 + anon 0.02; smaps, addendum 23), machine cost 2.25 GiB (MemAvailable delta)
+
+  granite-3.1-2b-instruct-Q4_K_M.gguf: WORST TURN = 28.8 t/s (worst turn; avg-of-worsts 28.8)
+  granite-3.1-2b-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 28.66  mean 28.66  worst/mean 1.000  (n=2)
+  granite-3.1-2b-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.12 GiB - file 1.44 GiB, i.e. -1.32 GiB beyond the file (KV + buffers + runtime)
+  rung 8192: speed PASS [59s]
+    cold machine cost @ rung: 2.25 GiB
+  task 1/1 @ 7936 tok: 2/3 words -> MISS ('After analyzing the coded text, here are the thr')
+    fwe census: 0.12 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 7936: 0/1 -> FAIL [19s]
+  binary search between 4096 (pass) and 8192 (fail) - fwe only
+  task 1/1 @ 5888 tok: 3/3 words -> HIT ('After analyzing the coded text, I have identifie')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 5888: 1/1 -> PASS [14s]
+  task 1/1 @ 6912 tok: 2/3 words -> MISS ('After analyzing the coded text, I have identifie')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 6912: 0/1 -> FAIL [17s]
+  granite-3.1-2b-instruct-Q4_K_M: SCORE = 6144 tokens (last rung passing both) [2.6 min wall, measured]
+  [3] ladder ok  (score: 6144 tokens)
+[2026-10-01T05:44:57 +360m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 6144 tokens, worst n/a w/s, cold cost 2.05 GiB
+[2026-10-01T05:44:57 +360m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for granite-3.1-2b-instruct (ladder score 6144 tokens)
+
+============================================================
+[2026-10-01T05:44:57 +360m] family: MiniCPM5-2B
+  model repo : openbmb/MiniCPM5-2B
+  source repo: openbmb/MiniCPM5-2B
+  folder     : ./models/MiniCPM5-2B
+
+  rung Q4_K_M:
+  [1] downloading safetensors from openbmb/MiniCPM5-2B (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from openbmb/MiniCPM5-2B, convert + quantize)
+[2026-10-01T05:45:45 +361m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing MiniCPM5-2B-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/MiniCPM5-2B/MiniCPM5-2B-Q4_K_M.gguf)
+[2026-10-01T05:46:25 +362m]       phase 2 done (create)
+
+=== ladder: MiniCPM5-2B-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM5-2B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.929.567 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2572 tok): turns t/s: 43.6, 43.4, 42.5, 42.4   worst 42.4 (mean 43.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 34.4, 35.6, 34.6, 34.1   (reader line 5 w/s)
+      noise at depth: 42.6, 42.4
+    memory: mapped census 3.19 GiB mapped, 0.14 GiB resident (file 0.12 + anon 0.01; smaps, addendum 23), machine cost 1.45 GiB (MemAvailable delta)
+
+  MiniCPM5-2B-Q4_K_M.gguf: WORST TURN = 42.4 t/s (worst turn; avg-of-worsts 42.4)
+  MiniCPM5-2B-Q4_K_M.gguf: NOISE AT DEPTH: worst 42.38  mean 42.47  worst/mean 0.998  (n=2)
+  MiniCPM5-2B-Q4_K_M.gguf: MEMORY: peak RSS 0.14 GiB - file 1.45 GiB, i.e. -1.32 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [33s]
+    cold machine cost @ rung: 1.45 GiB
+  task 1/1 @ 3840 tok: 2/3 words -> MISS ('<think>\nWe need to read the coded text and track')
+    fwe census: 0.13 GiB resident (file 0.12 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [9s]
+  MiniCPM5-2B-Q4_K_M: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  MiniCPM5-2B-Q4_K_M: SCORE = 0 tokens (last rung passing both) [0.7 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T05:47:08 +363m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T05:47:08 +363m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for MiniCPM5-2B (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T05:47:08 +363m] family: Phi-3.5-mini-instruct
+  model repo : microsoft/Phi-3.5-mini-instruct
+  source repo: microsoft/Phi-3.5-mini-instruct
+  folder     : ./models/Phi-3.5-mini-instruct
+
+  rung Q4_K_M:
+  [1] downloading safetensors from microsoft/Phi-3.5-mini-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from microsoft/Phi-3.5-mini-instruct, convert + quantize)
+[2026-10-01T05:48:20 +364m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing Phi-3.5-mini-instruct-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/Phi-3.5-mini-instruct/Phi-3.5-mini-instruct-Q4_K_M.gguf)
+[2026-10-01T05:49:14 +365m]       phase 2 done (create)
+
+=== ladder: Phi-3.5-mini-instruct-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== Phi-3.5-mini-instruct-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.545.817 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2574 tok): turns t/s: 21.7, 20.8, 20.1, 19.4   worst 19.4 (mean 20.5)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 12.9, 12.8, 12.8, 11.7   (reader line 5 w/s)
+      noise at depth: 18.9, 18.9
+    memory: mapped census 5.25 GiB mapped, 0.10 GiB resident (file 0.09 + anon 0.01; smaps, addendum 23), machine cost 3.40 GiB (MemAvailable delta)
+
+  Phi-3.5-mini-instruct-Q4_K_M.gguf: WORST TURN = 19.4 t/s (worst turn; avg-of-worsts 19.4)
+  Phi-3.5-mini-instruct-Q4_K_M.gguf: NOISE AT DEPTH: worst 18.88  mean 18.89  worst/mean 0.999  (n=2)
+  Phi-3.5-mini-instruct-Q4_K_M.gguf: MEMORY: peak RSS 0.10 GiB - file 2.23 GiB, i.e. -2.13 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [79s]
+    cold machine cost @ rung: 3.40 GiB
+  task 1/1 @ 3840 tok: 2/3 words -> MISS ('1. nysskz\n2. swucem\n3. devoqp\n4. cvdros\n5. jhdxh')
+    fwe census: 0.10 GiB resident (file 0.09 + anon 0.01; smaps)
+    fwe @ depth 3840: 0/1 -> FAIL [17s]
+  Phi-3.5-mini-instruct-Q4_K_M: FAILED - the ceiling (4,096) is at or below the 4,096 start rung; the model is out pending investigation
+  Phi-3.5-mini-instruct-Q4_K_M: SCORE = 0 tokens (last rung passing both) [1.6 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T05:50:51 +366m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-01T05:50:51 +366m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for Phi-3.5-mini-instruct (ladder score 0 tokens)
+
+============================================================
+[2026-10-01T05:50:51 +366m] family: MiniCPM-1B-sft-bf16
+  model repo : openbmb/MiniCPM-1B-sft-bf16
+  source repo: openbmb/MiniCPM-1B-sft-bf16
+  folder     : ./models/MiniCPM-1B-sft-bf16
+
+  rung Q4_K_M:
+  [1] downloading pytorch_model.bin from openbmb/MiniCPM-1B-sft-bf16 (weights + configs; output hidden; shown on error)
+  [1] downloads ok  (plan: pytorch_model.bin from openbmb/MiniCPM-1B-sft-bf16, convert + quantize)
+[2026-10-01T05:51:17 +367m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing MiniCPM-1B-sft-bf16-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/MiniCPM-1B-sft-bf16/MiniCPM-1B-sft-bf16-Q4_K_M.gguf)
+[2026-10-01T05:51:37 +367m]       phase 2 done (create)
+
+=== ladder: MiniCPM-1B-sft-bf16-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM-1B-sft-bf16-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.648.736 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2570 tok): turns t/s: 40.9, 47.0, 46.2, 46.5   worst 40.9 (mean 45.2)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 25.3, 33.6, 34.1, 31.9   (reader line 5 w/s)
+      noise at depth: 46.2, 46.2
+    memory: mapped census 2.87 GiB mapped, 0.16 GiB resident (file 0.14 + anon 0.02; smaps, addendum 23), machine cost 1.44 GiB (MemAvailable delta)
+
+  MiniCPM-1B-sft-bf16-Q4_K_M.gguf: WORST TURN = 40.9 t/s (worst turn; avg-of-worsts 40.9)
+  MiniCPM-1B-sft-bf16-Q4_K_M.gguf: NOISE AT DEPTH: worst 46.18  mean 46.21  worst/mean 0.999  (n=2)
+  MiniCPM-1B-sft-bf16-Q4_K_M.gguf: MEMORY: peak RSS 0.16 GiB - file 0.78 GiB, i.e. -0.62 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [15s]
+    cold machine cost @ rung: 1.44 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('The coded text contains 15 words that appear 10 ')
+    fwe census: 0.11 GiB resident (file 0.10 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [6s]
+
+=== MiniCPM-1B-sft-bf16-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.480.476 W llama_context: n_ctx_seq (8192) > n_ctx_train (4096) -- possible training context overflow
+    [server] 0.00.680.779 W srv    load_model: the slot context (8192) exceeds the training context of the model (4096) - capping
+    [server] 0.00.735.134 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 8192)
+  ERROR: server accepted -c 8192 but runs n_ctx 4096 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/MiniCPM-1B-sft-bf16/MiniCPM-1B-sft-bf16-Q4_K_M.gguf.server.log
+    memory: mapped census 2.56 GiB mapped, 0.09 GiB resident (file 0.09 + anon 0.00; smaps, addendum 23), machine cost 1.70 GiB (MemAvailable delta)
+    trained window 4,096 caps the requested -c 8,192
+  rung 8192: speed FAIL [1s]
+    speed verdict: {"error": "capped to the window", "window_cap": 4096}
+    trained window 4,096 caps the requested -c 8,192 - the window is the ceiling
+  binary search between 4096 (pass) and 4096 (fail) - fwe only
+  MiniCPM-1B-sft-bf16-Q4_K_M: SCORE = 4096 tokens (last rung passing both) [0.4 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-10-01T05:52:00 +367m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 25.3 w/s, cold cost 1.44 GiB
+[2026-10-01T05:52:00 +367m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for MiniCPM-1B-sft-bf16 (ladder score 4096 tokens)
+
+============================================================
+[2026-10-01T05:52:00 +367m] family: MiniCPM-2B-sft-bf16
+  model repo : openbmb/MiniCPM-2B-sft-bf16
+  source repo: openbmb/MiniCPM-2B-sft-bf16
+  folder     : ./models/MiniCPM-2B-sft-bf16
+
+  rung Q4_K_M:
+  [1] downloading pytorch_model.bin from openbmb/MiniCPM-2B-sft-bf16 (weights + configs; output hidden; shown on error)
+  [1] downloads ok  (plan: pytorch_model.bin from openbmb/MiniCPM-2B-sft-bf16, convert + quantize)
+[2026-10-01T05:52:54 +368m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] quantizing MiniCPM-2B-sft-bf16-f16.gguf -> Q4_K_M (output hidden; shown on error)
+  [2] rung file ready  (./models/MiniCPM-2B-sft-bf16/MiniCPM-2B-sft-bf16-Q4_K_M.gguf)
+[2026-10-01T05:53:29 +369m]       phase 2 done (create)
+
+=== ladder: MiniCPM-2B-sft-bf16-Q4_K_M ===
+  gallop from 4096 in 2x steps, then binary search (protocol v4.3)
+
+=== MiniCPM-2B-sft-bf16-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.01.837.170 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 4096)
+    conv 1 (blob 2575 tok): turns t/s: 24.2, 24.3, 23.8, 23.6   worst 23.6 (mean 24.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 20.5, 19.3, 18.4, 18.6   (reader line 5 w/s)
+      noise at depth: 23.2, 23.3
+    memory: mapped census 4.89 GiB mapped, 0.16 GiB resident (file 0.14 + anon 0.02; smaps, addendum 23), machine cost 3.42 GiB (MemAvailable delta)
+
+  MiniCPM-2B-sft-bf16-Q4_K_M.gguf: WORST TURN = 23.6 t/s (worst turn; avg-of-worsts 23.6)
+  MiniCPM-2B-sft-bf16-Q4_K_M.gguf: NOISE AT DEPTH: worst 23.20  mean 23.25  worst/mean 0.998  (n=2)
+  MiniCPM-2B-sft-bf16-Q4_K_M.gguf: MEMORY: peak RSS 0.16 GiB - file 1.68 GiB, i.e. -1.52 GiB beyond the file (KV + buffers + runtime)
+  rung 4096: speed PASS [31s]
+    cold machine cost @ rung: 3.42 GiB
+  task 1/1 @ 3840 tok: 3/3 words -> HIT ('Based on the frequency of each coded word, the m')
+    fwe census: 0.12 GiB resident (file 0.11 + anon 0.01; smaps)
+    fwe @ depth 3840: 1/1 -> PASS [14s]
+
+=== MiniCPM-2B-sft-bf16-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.00.755.368 W llama_context: n_ctx_seq (8192) > n_ctx_train (4096) -- possible training context overflow
+    [server] 0.01.329.536 W srv    load_model: the slot context (8192) exceeds the training context of the model (4096) - capping
+    [server] 0.01.469.449 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'
+    [server] actual n_ctx = 4096 (requested 8192)
+  ERROR: server accepted -c 8192 but runs n_ctx 4096 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/MiniCPM-2B-sft-bf16/MiniCPM-2B-sft-bf16-Q4_K_M.gguf.server.log
+    memory: mapped census 5.65 GiB mapped, 0.10 GiB resident (file 0.10 + anon 0.00; smaps, addendum 23), machine cost 4.75 GiB (MemAvailable delta)
+    trained window 4,096 caps the requested -c 8,192
+  rung 8192: speed FAIL [2s]
+    speed verdict: {"error": "capped to the window", "window_cap": 4096}
+    trained window 4,096 caps the requested -c 8,192 - the window is the ceiling
+  binary search between 4096 (pass) and 4096 (fail) - fwe only
+  MiniCPM-2B-sft-bf16-Q4_K_M: SCORE = 4096 tokens (last rung passing both) [0.8 min wall, measured]
+  [3] ladder ok  (score: 4096 tokens)
+[2026-10-01T05:54:15 +370m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 4096 tokens, worst 18.4 w/s, cold cost 3.42 GiB
+[2026-10-01T05:54:15 +370m]       phase 4 done (scored row)
+  SELECTED Q4_K_M for MiniCPM-2B-sft-bf16 (ladder score 4096 tokens)
+
+============================================================
+[2026-10-01T05:54:15 +370m] family: granite-4.2-3b
+  model repo : ibm-granite/granite-4.2-3b
+  source repo: ibm-granite/granite-4.2-3b
+  folder     : ./models/granite-4.2-3b
+
+  rung Q4_K_M:
+  [1] downloading safetensors from ibm-granite/granite-4.2-3b (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from ibm-granite/granite-4.2-3b, convert + quantize)
+[2026-10-01T05:55:22 +371m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: ./models/granite-4.2-3b/convert-f16.log) ---
+INFO:hf-to-gguf:Loading model: safetensors-source
+INFO:hf-to-gguf:Model architecture: GraniteForCausalLM
+INFO:hf-to-gguf:gguf: loading model weight map from 'model.safetensors.index.json'
+INFO:hf-to-gguf:gguf: indexing model part 'model-00001-of-00002.safetensors'
+INFO:hf-to-gguf:gguf: indexing model part 'model-00002-of-00002.safetensors'
+INFO:gguf.gguf_writer:gguf: This GGUF file is for Little Endian only
+INFO:hf-to-gguf:Exporting model...
+INFO:hf-to-gguf:output.weight,             torch.bfloat16 --> F16, shape = {2560, 100352}
+INFO:hf-to-gguf:token_embd.weight,         torch.bfloat16 --> F16, shape = {2560, 100352}
+INFO:hf-to-gguf:blk.0.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.0.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.0.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.0.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.0.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.0.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.0.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.0.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.0.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.1.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.1.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.1.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.1.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.1.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.1.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.1.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.1.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.1.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.10.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.10.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.10.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.10.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.10.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.10.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.10.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.10.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.10.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.11.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.11.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.11.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.11.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.11.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.11.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.11.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.11.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.11.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.12.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.12.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.12.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.12.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.12.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.12.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.12.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.12.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.12.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.13.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.13.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.13.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.13.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.13.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.13.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.13.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.13.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.13.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.14.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.14.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.14.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.14.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.14.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.14.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.14.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.14.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.14.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.15.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.15.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.15.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.15.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.15.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.15.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.15.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.15.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.15.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.16.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.16.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.16.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.16.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.16.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.16.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.16.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.16.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.16.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.17.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.17.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.17.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.17.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.17.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.17.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.17.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.17.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.17.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.18.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.18.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.18.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.18.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.18.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.18.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.18.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.18.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.18.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.19.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.19.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.19.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.19.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.19.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.19.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.19.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.19.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.19.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.2.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.2.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.2.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.2.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.2.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.2.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.2.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.2.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.2.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.20.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.20.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.20.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.20.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.20.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.20.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.20.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.20.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.20.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.21.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.21.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.21.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.21.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.21.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.21.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.21.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.21.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.21.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.22.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.22.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.22.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.22.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.22.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.22.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.22.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.22.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.22.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.23.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.23.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.23.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.23.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.23.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.23.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.23.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.23.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.23.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.24.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.24.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.24.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.24.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.24.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.24.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.24.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.24.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.24.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.25.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.25.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.25.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.25.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.25.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.25.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.25.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.25.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.25.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.26.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.26.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.26.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.26.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.26.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.26.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.26.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.26.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.26.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.27.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.27.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.27.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.27.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.27.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.27.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.27.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.27.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.27.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.28.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.28.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.28.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.28.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.28.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.28.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.28.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.28.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.28.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.29.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.29.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.29.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.29.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.29.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.29.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.29.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.29.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.29.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.3.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.3.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.3.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.3.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.3.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.3.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.3.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.3.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.3.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.30.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.30.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.30.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.30.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.30.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.30.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.30.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.30.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.30.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.31.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.31.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.31.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.31.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.31.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.31.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.31.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.31.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.31.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.32.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.32.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.32.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.32.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.32.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.32.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.32.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.32.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.32.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.33.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.33.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.33.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.33.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.33.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.33.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.33.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.33.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.33.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.34.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.34.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.34.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.34.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.34.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.34.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.34.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.34.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.34.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.35.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.35.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.35.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.35.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.35.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.35.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.35.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.35.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.35.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.36.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.36.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.36.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.36.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.36.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.36.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.36.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.36.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.36.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.37.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.37.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.37.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.37.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.37.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.37.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.37.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.37.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.37.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.38.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.38.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.38.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.38.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.38.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.38.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.38.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.38.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.38.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.39.attn_norm.weight,   torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.39.ffn_down.weight,    torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.39.ffn_gate.weight,    torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.39.ffn_up.weight,      torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.39.ffn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.39.attn_k.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.39.attn_output.weight, torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.39.attn_q.weight,      torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.39.attn_v.weight,      torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.4.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.4.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.4.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.4.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.4.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.4.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.4.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.4.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.4.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.5.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.5.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.5.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.5.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.5.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.5.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.5.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.5.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.5.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.6.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.6.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.6.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.6.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.6.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.6.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.6.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.6.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.6.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.7.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.7.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.7.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.7.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.7.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.7.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.7.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.7.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.7.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.8.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.8.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.8.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.8.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.8.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.8.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.8.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.8.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.8.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.9.attn_norm.weight,    torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.9.ffn_down.weight,     torch.bfloat16 --> F16, shape = {8192, 2560}
+INFO:hf-to-gguf:blk.9.ffn_gate.weight,     torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.9.ffn_up.weight,       torch.bfloat16 --> F16, shape = {2560, 8192}
+INFO:hf-to-gguf:blk.9.ffn_norm.weight,     torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:blk.9.attn_k.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:blk.9.attn_output.weight,  torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.9.attn_q.weight,       torch.bfloat16 --> F16, shape = {2560, 2560}
+INFO:hf-to-gguf:blk.9.attn_v.weight,       torch.bfloat16 --> F16, shape = {2560, 512}
+INFO:hf-to-gguf:output_norm.weight,        torch.bfloat16 --> F32, shape = {2560}
+INFO:hf-to-gguf:Set meta model
+INFO:hf-to-gguf:Set model parameters
+INFO:hf-to-gguf:gguf: context length = 131072
+INFO:hf-to-gguf:gguf: embedding length = 2560
+INFO:hf-to-gguf:gguf: feed forward length = 8192
+INFO:hf-to-gguf:gguf: head count = 40
+INFO:hf-to-gguf:gguf: key-value head count = 8
+WARNING:hf-to-gguf:Unknown RoPE type: default
+INFO:hf-to-gguf:gguf: rope scaling type = NONE
+INFO:hf-to-gguf:gguf: rope theta = 10000000
+INFO:hf-to-gguf:gguf: rms norm epsilon = 1e-05
+INFO:hf-to-gguf:gguf: file type = 1
+INFO:hf-to-gguf:gguf: (granite) attention_scale = 0.015625
+INFO:hf-to-gguf:gguf: (granite) embedding_scale = 1.0
+INFO:hf-to-gguf:gguf: (granite) residual_scale = 1.0
+INFO:hf-to-gguf:gguf: (granite) logits_scale = 1.0
+INFO:hf-to-gguf:Set model quantization version
+INFO:hf-to-gguf:Set model tokenizer
+INFO:gguf.vocab:Adding 100000 merge(s).
+INFO:gguf.vocab:Setting special token type bos to 100283
+INFO:gguf.vocab:Setting special token type eos to 100257
+INFO:gguf.vocab:Setting special token type unk to 100269
+INFO:gguf.vocab:Setting special token type pad to 100257
+INFO:gguf.gguf_writer:Writing the following files:
+INFO:gguf.gguf_writer:models/granite-4.2-3b/granite-4.2-3b-f16.gguf: n_tensors = 363, total_size = 7.3G
+
+Writing:   0%|          | 0.00/7.32G [00:00<?, ?byte/s]
+Writing:   7%|▋         | 514M/7.32G [00:01<00:13, 505Mbyte/s]
+Writing:  14%|█▍        | 1.03G/7.32G [00:01<00:10, 575Mbyte/s]
+Writing:  15%|█▌        | 1.11G/7.32G [00:01<00:10, 570Mbyte/s]
+Writing:  16%|█▌        | 1.18G/7.32G [00:02<00:10, 575Mbyte/s]
+Writing:  17%|█▋        | 1.27G/7.32G [00:02<00:10, 596Mbyte/s]
+Writing:  18%|█▊        | 1.34G/7.32G [00:02<00:09, 607Mbyte/s]
+Writing:  19%|█▉        | 1.43G/7.32G [00:02<00:09, 632Mbyte/s]
+Writing:  20%|██        | 1.50G/7.32G [00:02<00:09, 642Mbyte/s]
+Writing:  22%|██▏       | 1.58G/7.32G [00:02<00:08, 660Mbyte/s]
+Writing:  23%|██▎       | 1.65G/7.32G [00:02<00:08, 665Mbyte/s]
+Writing:  24%|██▍       | 1.74G/7.32G [00:02<00:08, 677Mbyte/s]
+Writing:  25%|██▍       | 1.81G/7.32G [00:02<00:08, 678Mbyte/s]
+Writing:  26%|██▌       | 1.90G/7.32G [00:03<00:07, 689Mbyte/s]
+Writing:  27%|██▋       | 1.97G/7.32G [00:03<00:07, 690Mbyte/s]
+Writing:  28%|██▊       | 2.06G/7.32G [00:03<00:07, 698Mbyte/s]
+Writing:  29%|██▉       | 2.13G/7.32G [00:03<00:07, 693Mbyte/s]
+Writing:  30%|███       | 2.21G/7.32G [00:03<00:07, 697Mbyte/s]
+Writing:  31%|███       | 2.28G/7.32G [00:03<00:07, 693Mbyte/s]
+Writing:  32%|███▏      | 2.37G/7.32G [00:03<00:07, 697Mbyte/s]
+Writing:  33%|███▎      | 2.44G/7.32G [00:03<00:07, 693Mbyte/s]
+Writing:  35%|███▍      | 2.53G/7.32G [00:04<00:06, 691Mbyte/s]
+Writing:  36%|███▌      | 2.60G/7.32G [00:04<00:06, 696Mbyte/s]
+Writing:  37%|███▋      | 2.68G/7.32G [00:04<00:06, 708Mbyte/s]
+Writing:  38%|███▊      | 2.76G/7.32G [00:04<00:06, 707Mbyte/s]
+Writing:  39%|███▉      | 2.84G/7.32G [00:04<00:06, 719Mbyte/s]
+Writing:  40%|███▉      | 2.92G/7.32G [00:04<00:06, 718Mbyte/s]
+Writing:  41%|████      | 3.00G/7.32G [00:04<00:06, 716Mbyte/s]
+Writing:  42%|████▏     | 3.07G/7.32G [00:04<00:05, 712Mbyte/s]
+Writing:  43%|████▎     | 3.16G/7.32G [00:04<00:05, 710Mbyte/s]
+Writing:  44%|████▍     | 3.23G/7.32G [00:05<00:05, 708Mbyte/s]
+Writing:  45%|████▌     | 3.31G/7.32G [00:05<00:05, 711Mbyte/s]
+Writing:  46%|████▋     | 3.39G/7.32G [00:05<00:05, 708Mbyte/s]
+Writing:  47%|████▋     | 3.47G/7.32G [00:05<00:05, 671Mbyte/s]
+Writing:  48%|████▊     | 3.54G/7.32G [00:05<00:05, 680Mbyte/s]
+Writing:  50%|████▉     | 3.63G/7.32G [00:05<00:05, 692Mbyte/s]
+Writing:  51%|█████     | 3.70G/7.32G [00:05<00:05, 697Mbyte/s]
+Writing:  52%|█████▏    | 3.79G/7.32G [00:05<00:05, 705Mbyte/s]
+Writing:  53%|█████▎    | 3.86G/7.32G [00:05<00:04, 706Mbyte/s]
+Writing:  54%|█████▍    | 3.94G/7.32G [00:06<00:04, 710Mbyte/s]
+Writing:  55%|█████▍    | 4.02G/7.32G [00:06<00:04, 707Mbyte/s]
+Writing:  56%|█████▌    | 4.10G/7.32G [00:06<00:04, 655Mbyte/s]
+Writing:  57%|█████▋    | 4.17G/7.32G [00:06<00:04, 645Mbyte/s]Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py", line 312, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py", line 306, in main
+    model_instance.write()
+    ~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama.cpp/conversion/base.py", line 1166, in write
+    self.gguf_writer.write_tensors_to_file(progress=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama.cpp/gguf-py/gguf/gguf_writer.py", line 474, in write_tensors_to_file
+    ti.tensor.tofile(fout)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama.cpp/gguf-py/gguf/lazy.py", line 226, in tofile
+    return eager.tofile(*args, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+OSError: Not enough free space to write 41943040 bytes after offset 4177314432
+
+Writing:  57%|█████▋    | 4.17G/7.32G [00:07<00:05, 574Mbyte/s]
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q4_K_M: f16 conversion failed (full log: ./models/granite-4.2-3b/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the b10964 checkout
+  - quantizer missing: place the b10964 build at ./llama-b10964-gpu/
+  - RAM/disk: f16 conversion needs several GB of each
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[2026-10-01T05:55:35 +371m] FAMILY FAILED: ibm-granite/granite-4.2-3b (recorded; the sweep continues - addendum 78)
+
+============================================================
+[2026-10-01T05:55:35 +371m] family: granite-3.0-2b-instruct
+  model repo : ibm-granite/granite-3.0-2b-instruct
+  source repo: ibm-granite/granite-3.0-2b-instruct
+  folder     : ./models/granite-3.0-2b-instruct
+
+  rung Q4_K_M:
+  [1] Q4_K_M: estimated 1.5 GiB rung (worst case 2.9 GiB with source) but only 0.0 GiB free on disk - fix disk space; attempting anyway (local files may already exist)
+  [1] downloading safetensors from ibm-granite/granite-3.0-2b-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 4999.98 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source/.cache/huggingface/download only has 4.09 MB free disk space.
+  warnings.warn(
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 4999.98 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source only has 4.09 MB free disk space.
+  warnings.warn(
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 268.46 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source/.cache/huggingface/download only has 4.09 MB free disk space.
+  warnings.warn(
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 268.46 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source only has 4.09 MB free disk space.
+  warnings.warn(
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 0.78 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source/.cache/huggingface/download only has 0.26 MB free disk space.
+  warnings.warn(
+/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/file_download.py:769: UserWarning: Not enough free disk space to download the file. The expected file size is: 0.78 MB. The target location /home/daniela/technical_reports/LLM-benchmark/models/granite-3.0-2b-instruct/safetensors-source only has 0.26 MB free disk space.
+  warnings.warn(
+
+============================================================
+PHASE 1 FAILED at Q4_K_M: safetensors download from ibm-granite/granite-3.0-2b-instruct failed: [Errno 28] No space left on device
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[2026-10-01T05:55:51 +371m] FAMILY FAILED: ibm-granite/granite-3.0-2b-instruct (recorded; the sweep continues - addendum 78)
+
+============================================================
+[2026-10-01T05:55:51 +371m] family: phi-4-mini-instruct
+  model repo : microsoft/phi-4-mini-instruct
+  source repo: microsoft/phi-4-mini-instruct
+  folder     : ./models/phi-4-mini-instruct
+
+  rung Q4_K_M:
+  [1] Q4_K_M: estimated 2.1 GiB rung (worst case 4.3 GiB with source) but only 0.0 GiB free on disk - fix disk space; attempting anyway (local files may already exist)
+  [1] downloading safetensors from microsoft/phi-4-mini-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at Q4_K_M: safetensors download from microsoft/phi-4-mini-instruct failed: [Errno 28] No space left on device: '/home/daniela/technical_reports/LLM-benchmark/models/phi-4-mini-instruct/safetensors-source'
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[2026-10-01T05:55:52 +371m] FAMILY FAILED: microsoft/phi-4-mini-instruct (recorded; the sweep continues - addendum 78)
+
+============================================================
+[2026-10-01T05:55:52 +371m] family: granite-3.3-2b-instruct
+  model repo : ibm-granite/granite-3.3-2b-instruct
+  source repo: ibm-granite/granite-3.3-2b-instruct
+  folder     : ./models/granite-3.3-2b-instruct
+
+  rung Q4_K_M:
+  [1] Q4_K_M: estimated 1.4 GiB rung (worst case 2.8 GiB with source) but only 0.0 GiB free on disk - fix disk space; attempting anyway (local files may already exist)
+  [1] downloading safetensors from ibm-granite/granite-3.3-2b-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at Q4_K_M: safetensors download from ibm-granite/granite-3.3-2b-instruct failed: [Errno 28] No space left on device: '/home/daniela/technical_reports/LLM-benchmark/models/granite-3.3-2b-instruct/safetensors-source'
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[2026-10-01T05:55:53 +371m] FAMILY FAILED: ibm-granite/granite-3.3-2b-instruct (recorded; the sweep continues - addendum 78)
+  note: roster families without a selection (excluded from the ranking): granite-4.2-3b, granite-3.0-2b-instruct, phi-4-mini-instruct, granite-3.3-2b-instruct
+
+[2026-10-01T05:55:53 +371m] families failed this run (isolated; state preserved):
+  ibm-granite/granite-4.2-3b: 1
+  ibm-granite/granite-3.0-2b-instruct: 1
+  microsoft/phi-4-mini-instruct: 1
+  ibm-granite/granite-3.3-2b-instruct: 1
+
+============================================================
+[2026-10-01T05:55:53 +371m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-0.8B                         score 262,144 tokens | scored-rung worst   8.1 w/s | cold  4.44 GiB | 68.5 min
+  Qwen3.5-4B                           score 123,904 tokens | scored-rung worst   6.3 w/s | cold  7.71 GiB | 241.5 min
+  granite-4.1-3b                       score  18,432 tokens | scored-rung worst   n/a w/s | cold  3.72 GiB | 21.4 min
+  Qwen3-4B-GGUF                        score  16,384 tokens | scored-rung worst   6.9 w/s | cold  4.80 GiB | 9.7 min
+  granite-3.2-2b-instruct              score  15,360 tokens | scored-rung worst   n/a w/s | cold  2.62 GiB | 6.8 min
+  granite-3.1-2b-instruct              score   6,144 tokens | scored-rung worst   n/a w/s | cold  2.05 GiB | 2.6 min
+  MiniCPM-1B-sft-bf16                  score   4,096 tokens | scored-rung worst  25.3 w/s | cold  1.44 GiB | 0.4 min
+  MiniCPM-2B-sft-bf16                  score   4,096 tokens | scored-rung worst  18.4 w/s | cold  3.42 GiB | 0.8 min
+  MiniCPM5-2B                          score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.7 min  FAILED (below the start rung - investigate)
+  Phi-3.5-mini-instruct                score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 1.6 min  FAILED (below the start rung - investigate)
+  Qwen2.5-1.5B-Instruct-GGUF           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.3 min  FAILED (below the start rung - investigate)
+  Qwen3-1.7B                           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.3 min  FAILED (below the start rung - investigate)
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1275, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 939, in main
+    write_results(args, state)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1195, in write_results
+    with open(args.results_file, "w") as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 28] No space left on device: 'benchmark-results-q4.json'
