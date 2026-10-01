@@ -7424,3 +7424,63 @@ all data     -> benchmark-results-ceilj.json
 
 resume state -> benchmark-state-ceilj.json
 all data     -> benchmark-results-ceilj.json
+
+===== 2026-10-02T01:03:07 | full_benchmark.py RWKV/RWKV7-Goose-World3-2.9B-HF --rung Q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceilr.json --results-file benchmark-results-ceilr.json --force =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-02T01:03:07 +0m] family: RWKV7-Goose-World3-2.9B-HF
+  model repo : RWKV/RWKV7-Goose-World3-2.9B-HF
+  source repo: RWKV/RWKV7-Goose-World3-2.9B-HF
+  folder     : ./models/RWKV7-Goose-World3-2.9B-HF
+  --force: re-benching Q8_0 (0 stored verdict(s) cleared; files reused)
+
+  rung Q8_0:
+  [1] downloading safetensors from RWKV/RWKV7-Goose-World3-2.9B-HF (safetensors + configs only; once per family; output hidden; shown on error)
+  [1] downloads ok  (plan: safetensors from RWKV/RWKV7-Goose-World3-2.9B-HF, convert + quantize)
+[2026-10-02T01:04:49 +2m]       phase 1 done (acquire)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing RWKV7-Goose-World3-2.9B-HF-f16.gguf -> Q8_0 (output hidden; shown on error)
+  [2] rung file ready  (./models/RWKV7-Goose-World3-2.9B-HF/RWKV7-Goose-World3-2.9B-HF-Q8_0.gguf)
+[2026-10-02T01:05:09 +2m]       phase 2 done (create)
+
+=== ladder: RWKV7-Goose-World3-2.9B-HF-Q8_0 ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== RWKV7-Goose-World3-2.9B-HF-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.173.439 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260618 tok): turns t/s: 16.3, 16.4, 16.4, 16.3   worst 16.3 (mean 16.4)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 13.1, 14.4, 14.7, 14.1   (reader line 5 w/s)
+      noise at depth: 16.4, 16.3
+    memory: mapped census 5.04 GiB mapped, 0.51 GiB resident (file 0.32 + anon 0.18; smaps, addendum 23), machine cost 3.58 GiB (MemAvailable delta)
+
+  RWKV7-Goose-World3-2.9B-HF-Q8_0.gguf: WORST TURN = 16.3 t/s (worst turn; avg-of-worsts 16.3)
+  RWKV7-Goose-World3-2.9B-HF-Q8_0.gguf: NOISE AT DEPTH: worst 16.28  mean 16.33  worst/mean 0.997  (n=2)
+  RWKV7-Goose-World3-2.9B-HF-Q8_0.gguf: MEMORY: peak RSS 0.51 GiB - file 3.03 GiB, i.e. -2.53 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS [664s]
+    cold machine cost @ rung: 3.58 GiB
+  task 1/1 @ 261888 tok: 0/3 words -> MISS ('h ... ... ... ... ... ... ... ... ... ... ... ..')
+    fwe census: 0.25 GiB resident (file 0.11 + anon 0.13; smaps)
+    fwe @ depth 261888: 0/1 -> FAIL [578s]
+  RWKV7-Goose-World3-2.9B-HF-Q8_0: FAILED - the ceiling (262,144) is at or below the 262,144 start rung; the model is out pending investigation
+  RWKV7-Goose-World3-2.9B-HF-Q8_0: SCORE = 0 tokens (last rung passing both) [20.7 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-02T01:25:50 +23m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 0 tokens, worst n/a w/s, cold cost n/a GiB
+[2026-10-02T01:25:50 +23m]       phase 4 done (scored row)
+  SELECTED Q8_0 for RWKV7-Goose-World3-2.9B-HF (ladder score 0 tokens)
+
+============================================================
+[2026-10-02T01:25:50 +23m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  RWKV7-Goose-World3-2.9B-HF           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 20.7 min  FAILED (below the start rung - investigate)
+
+resume state -> benchmark-state-ceilr.json
+all data     -> benchmark-results-ceilr.json
+
+resume state -> benchmark-state-ceilr.json
+all data     -> benchmark-results-ceilr.json
