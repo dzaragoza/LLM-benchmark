@@ -66,22 +66,22 @@ family's one entry.
 | model name | rejection reason | notes |
 |---|---|---|
 | Qwen3.5-9B | no model small enough (q2, q4, q4) > ceiling | best config Q2_K + q4_0/q4_0 = 7.05 GiB predicted; the family closes at 9B |
-| gemma-4-e2b-it | training window < 256k | trained window 131,072 (verified from config.json); no rope scaling by standing rule |
+| gemma-4-e2b-it | training window < 256k | trained window 131,072, config.json verified (addendum 25): max_position_embeddings in text_config (the multimodal wrapper), rope_scaling absent |
 | mistralai/Ministral-3-3B-Instruct-2512 | no model small enough (q2, q4, q4) > ceiling | KV 104 KiB/token f16 (26 layers x 8 kv heads x 128 head_dim) -> ~7.3 GiB q4_0 KV at 262k, over the ceiling before weights; the declared 262,144 window is also YaRN rope-scaled from an original 16,384 (params.json llama_4_scaling, factor 16) - closed by the no-rope-scaling rule; first-party GGUF exists (Q4_K_M 2.00 GiB), the earlier 'repo does not exist' was a stale-name probe, corrected addendum 24 |
-| Qwen2.5-1.5B-Instruct | training window < 256k | window 32,768; the RAM would fit (1.97 GiB q4_0 KV at 262k) - the window is the wall; v4.3 score 20,992 @ Q8_0 |
+| Qwen2.5-1.5B-Instruct | training window < 256k | window 32,768, config.json verified (addendum 25), rope_scaling absent; the RAM would fit (1.97 GiB q4_0 KV at 262k) - the window is the wall; v4.3 score 20,992 @ Q8_0 |
 | Qwen3-1.7B | no model small enough (q2, q4, q4) > ceiling | KV 112 KiB/token -> q4_0 KV alone ~7.9 GiB > 4.96; window 40,960 and FWE broken at 40,704 besides |
 | Qwen3-4B | no model small enough (q2, q4, q4) > ceiling | KV 144 KiB/token -> ~10.1 GiB q4_0 KV; window 40,960 besides |
 | phi-4-mini-instruct | no model small enough (q2, q4, q4) > ceiling | KV 128 KiB/token -> ~9.0 GiB q4_0 KV; window 131,072; the deepest non-Qwen3.5 score (44,032 @ Q4_K_M) is 6x short |
 | Phi-3.5-mini-instruct | no model small enough (q2, q4, q4) > ceiling | KV 384 KiB/token -> ~27 GiB q4_0 KV; FWE zero at Q4_K_M |
 | Phi-3-mini-4k-instruct | no model small enough (q2, q4, q4) > ceiling | KV 384 KiB/token -> ~27 GiB q4_0 KV; window 4,096 |
-| phi-1 | training window < 256k | window 2,048; base/code model (type rule) - far under the 16k screen |
+| phi-1 | training window < 256k | window 2,048, config.json verified (addendum 25), rope_scaling absent; base/code model (type rule) - far under the 16k screen |
 | phi-2 | no model small enough (q2, q4, q4) > ceiling | KV 320 KiB/token -> ~22.5 GiB q4_0 KV; window 2,048 besides |
 | granite-3.0-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 4,096; 4,096-class score |
 | granite-3.1-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; Q4 counting fell off the cliff (12,288 -> 6,144) |
 | granite-3.2-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; score 15,360 |
 | granite-3.3-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; score 26,624 |
-| granite-4.0-350m | training window < 256k | window 32,768; RAM would fit (1.97 GiB q4_0 KV); never passed the 16k screen on the f4k grid (quality) |
-| granite-4.0-h-350m | training window < 256k | window 32,768; RAM would fit (2.25 GiB q4_0 KV); never passed the 16k screen (quality) |
+| granite-4.0-350m | training window < 256k | window 32,768, config.json verified (addendum 25), rope_scaling absent; RAM would fit (1.97 GiB q4_0 KV); never passed the 16k screen on the f4k grid (quality) |
+| granite-4.0-h-350m | training window < 256k | window 32,768, config.json verified (addendum 25), rope_scaling absent; RAM would fit (2.25 GiB q4_0 KV); never passed the 16k screen (quality) |
 | granite-4.0-1b | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072 |
 | granite-4.0-micro | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; MoE hybrid |
 | granite-4.0-h-micro | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; MoE hybrid |
@@ -91,21 +91,21 @@ family's one entry.
 | MiniCPM-1B-sft | no model small enough (q2, q4, q4) > ceiling | KV 104 KiB/token -> ~7.3 GiB q4_0 KV; window 4,096; 4,096-class score |
 | MiniCPM-2B-sft | no model small enough (q2, q4, q4) > ceiling | KV 360 KiB/token -> ~25.3 GiB q4_0 KV; window 4,096 |
 | MiniCPM3-4B | no model small enough (q2, q4, q4) > ceiling | KV 620 KiB/token -> ~43.6 GiB q4_0 KV; window 32,768 |
-| MiniCPM4-0.5B | training window < 256k | window 32,768; RAM would fit (0.84 GiB q4_0 KV); never passed the 16k screen (quality) |
-| MiniCPM5-1B | training window < 256k | window 131,072; RAM would fit (1.69 GiB q4_0 KV) - the window is the wall |
-| MiniCPM5-2B | training window < 256k | window 131,072; RAM would fit (~4.2 GiB whole config at q4_0 KV) - the window is the wall; also FWE zero at Q4_K_M |
+| MiniCPM4-0.5B | training window < 256k | window 32,768, config.json verified (addendum 25): rope_scaling present (longrope) - the window is doubly closed (trained short, extension rejected); RAM would fit (0.84 GiB q4_0 KV); never passed the 16k screen (quality) |
+| MiniCPM5-1B | training window < 256k | window 131,072, config.json verified (addendum 25), rope_scaling absent; RAM would fit (1.69 GiB q4_0 KV) - the window is the wall |
+| MiniCPM5-2B | training window < 256k | window 131,072, config.json verified (addendum 25), rope_scaling absent; RAM would fit (~4.2 GiB whole config at q4_0 KV) - the window is the wall; also FWE zero at Q4_K_M |
 | AI21-Jamba-Reasoning-3B | thinking cannot be disabled | the reasoning tune has no non-thinking mode; same 262,144 window and thin KV as Jamba2-3B but the wrong shape for the gates |
 | AI21-Jamba2-Mini | no model small enough (q2, q4, q4) > ceiling | 12B MoE (16 experts, 2 active): Q2_K weights alone ~4.75 GiB, over the ceiling before KV; window 262,144 |
-| openai/gpt-oss-20b | training window < 256k | window 131,072; KV 48 KiB/token (3.38 GiB q4_0 KV at 262k) - window binds first (addendum-20 sweep) |
-| HuggingFaceTB/SmolLM3-3B | training window < 256k | window 65,536; KV 72 KiB/token -> ~5.1 GiB q4_0 KV would also exceed the ceiling |
-| tencent/Hunyuan-A13B-Instruct | training window < 256k | window 32,768; MoE |
-| LGAI-EXAONE/EXAONE-4.0-32B | training window < 256k | window 131,072; KV 256 KiB/token (~18 GiB q4_0 KV) would also exceed the ceiling |
-| inclusionAI/Ling-lite-1.5B | training window < 256k | window 32,768 (addendum-20 sweep) |
-| zai-org/GLM-4.5-Air | training window < 256k | window 131,072 |
-| meta-llama/Llama-3.2-1B-Instruct | training window < 256k | window 131,072 (author-verified from the gated repo); RAM would fit - KV 32 KiB/token f16 (16 layers x 8 kv heads x 64 head_dim) -> ~2.25 GiB q4_0 KV, whole config ~3.75 GiB - the window is the wall |
+| openai/gpt-oss-20b | training window < 256k | window 131,072, config.json verified (addendum 25): rope_scaling present (factor 32) - doubly closed; MoE besides (21B total, 3.6B active - Q2_K weights far over the ceiling); the addendum-20 KV note (48 KiB/token) stands |
+| HuggingFaceTB/SmolLM3-3B | training window < 256k | window 65,536, config.json verified (addendum 25), rope_scaling absent; KV 72 KiB/token -> ~5.1 GiB q4_0 KV would also exceed the ceiling |
+| tencent/Hunyuan-A13B-Instruct | training window < 256k | window 32,768, config.json verified (addendum 25): rope_scaling present (factor 8) - doubly closed; MoE (80B total, 13B active) besides |
+| LGAI-EXAONE/EXAONE-4.0-32B | training window < 256k | window 131,072, config.json verified (addendum 25): rope_scaling present (factor 16) - doubly closed; KV 256 KiB/token (~18 GiB q4_0 KV) would also exceed the ceiling |
+| inclusionAI/Ling-lite | training window < 256k | window 32,768, config.json verified (addendum 25), rope_scaling absent; KV 56 KiB/token -> ~3.9 GiB q4_0 at 262k would nearly fit - the window is the wall; the addendum-20 row carried a wrong repo name (Ling-lite-1.5B does not exist), corrected |
+| zai-org/GLM-4.5-Air | training window < 256k | window 131,072, config.json verified (addendum 25), rope_scaling absent; MoE (106B total, 12B active) besides |
+| meta-llama/Llama-3.2-1B-Instruct | training window < 256k | window 131,072, config.json verified by the author (addendum 22, gated repo); RAM would fit - KV 32 KiB/token f16 (16 layers x 8 kv heads x 64 head_dim) -> ~2.25 GiB q4_0 KV, whole config ~3.75 GiB - the window is the wall |
 | meta-llama/Llama-3.1-8B-Instruct | no model small enough (q2, q4, q4) > ceiling | KV 128 KiB/token f16 (32 layers x 8 kv heads x 128 head_dim) -> ~9 GiB q4_0 KV at 262k, over the ceiling before weights; window 131,072 < 262,144 besides (both disqualifiers bind; size first per the fair-chance order); gated repo, numbers from the public model card |
-| google/gemma-3-1b-it | training window < 256k | window 32,768 (author-verified); 1 kv head - thin KV, but the window binds hard |
-| google/gemma-3-4b-it | training window < 256k | window 131,072 class (the author's pull shows the config nests it in text_config - the gemma-3 wrapper; text models are 128k per the model card) |
+| google/gemma-3-1b-it | training window < 256k | window 32,768, config.json verified by the author (addendum 22, gated repo); 1 kv head - thin KV, but the window binds hard |
+| google/gemma-3-4b-it | training window < 256k | window 131,072, config.json verified by the author's pull (gated repo; the value nests in text_config - the gemma-3 multimodal wrapper); KV geometry not extractable from the author's pull output (layers/kv_heads printed None in the wrapper) - the window binds regardless |
 | Qwen3-30B-A3B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but MoE: Q2_K weights alone far over the ceiling; KV 96 KiB/token -> 6.75 GiB q4_0 KV besides |
 | Qwen3-4B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but KV 144 KiB/token -> ~10.1 GiB q4_0 KV (the 2507 refresh dropped the hybrid interval) |
 | DSpark/EAGLE3 draft heads (RadixArk, z-lab, incoai, lightseekorg, Inferact, skt repos) | other | speculative-decoding DRAFT MODELS, not instruct models - sweep false positives, never candidates |
