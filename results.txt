@@ -6614,3 +6614,51 @@ all data     -> benchmark-results-kvq8-q4.json
 
 resume state -> benchmark-state-kvq8-q4.json
 all data     -> benchmark-results-kvq8-q4.json
+
+===== 2026-10-01T13:37:20 | full_benchmark.py Qwen/Qwen3.5-4B --rung Q4_K_M --kv-quant-v q4_0 --min-rung 65536 --force --state-file benchmark-state-kvq4-q4.json --results-file benchmark-results-kvq4-q4.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T13:37:20 +0m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+  --force: re-benching Q4_K_M (1 stored verdict(s) cleared; files reused)
+
+  rung Q4_K_M:
+
+=== ladder: Qwen3.5-4B-Q4_K_M ===
+  gallop from 65536 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+  ERROR: server did not become healthy; skipping
+  --- server log tail (./models/Qwen3.5-4B/Qwen3.5-4B-Q4_K_M.gguf.server.log) ---
+  [server] error while handling argument "-fa": error: unknown value for --flash-attn: '--cache-type-k'
+  [server] 
+  [server] 
+  [server] usage:
+  [server] -fa,   --flash-attn [on|off|auto]       set Flash Attention use ('on', 'off', or 'auto', default: 'auto')
+  [server]                                         (env: LLAMA_ARG_FLASH_ATTN)
+  [server] 
+  [server] 
+  [server] to show complete usage, run with -h
+  rung 65536: speed FAIL [1s]
+    speed verdict: {"error": "no turns measured (server launch failed)", "launch_failed": true, "window_cap": null}
+  Qwen3.5-4B-Q4_K_M: FAILED - a server launch failed (bad flags/build or load-time crash); this is NOT a model score, the family stays unselected - fix the launch and re-run with --force
+  Qwen3.5-4B-Q4_K_M: SCORE = 0 tokens (last rung passing both) [0.0 min wall, measured]
+  [3] ladder ok  (score: 0 tokens)
+[2026-10-01T13:37:21 +0m]       phase 3 done (ladder)
+[2026-10-01T13:37:21 +0m]       phase 4 done (launch failed - not selectable)
+  note: roster families without a selection (excluded from the ranking): Qwen3.5-4B
+
+============================================================
+[2026-10-01T13:37:21 +0m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-4B                           score       0 tokens | scored-rung worst   n/a w/s | cold   n/a GiB | 0.0 min  FAILED (below the start rung - investigate)
+
+resume state -> benchmark-state-kvq4-q4.json
+all data     -> benchmark-results-kvq4-q4.json
+
+resume state -> benchmark-state-kvq4-q4.json
+all data     -> benchmark-results-kvq4-q4.json
