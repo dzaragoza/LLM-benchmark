@@ -194,10 +194,13 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
     def balance_no_underflow(text: str) -> str | None:
         # a region may OPEN a delimiter that closes after it (an edit
         # that inserts a call whose closing paren lands on a later
-        # line), so unclosed-at-end is fine here; the real failure
-        # modes - a mismatched closer or an unclosed quote - are not.
+        # line) or CLOSE one that opened before it (a replace that
+        # starts inside a parameter list and ends with ") -> ..."),
+        # so unclosed-at-end AND closer-underflow are both fine here;
+        # the real failure modes - a MISMATCHED closer or an unclosed
+        # quote - are not.
         problem = balance(text)
-        if problem and ("unbalanced" in problem or "quote" in problem):
+        if problem and ("quote" in problem):
             return problem
         return None
 
