@@ -16,6 +16,12 @@ following reader; FWE is an instruction-following extraction task).
 One type per model in the whole document: the instruct tune; base
 (pretrained) variants are rejected on type, not re-evaluated.
 
+ONE-MODEL-ONE-TABLE, with the author's exception (addendum 20): a
+model appears at most once per table, in exactly one table - EXCEPT
+the CANDIDATES table, where a model may appear MULTIPLE TIMES, once
+per settings configuration (a candidate is a model+configuration
+pair, not a model).
+
 ---
 
 ## PASS (both gates at 262,144)
@@ -36,6 +42,8 @@ One type per model in the whole document: the instruct tune; base
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | THE EDGE: 100% of ceiling, RAM PASS by 0.01 GiB; speed straddler (the 4B wall was 6.07 w/s at 131k with f16 KV); Q2_K quality the wild card |
+| AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.52 GiB | ~7 | THE NEW FAMILY (addendum 20): window 262,144; hybrid mamba-attention, only 2 full-attention layers x 1 KV head x 128 head_dim -> ~1 KiB/token f16 (0.25 GiB at 262k), the thinnest KV ever screened - the mamba state is constant-size; Q8_0 at 91% of ceiling; non-thinking instruct, Apache-2.0, GGUF tooling verified (bartowski 3.17 GiB); risks: llama.cpp jamba-arch support level, FWE at depth unproven |
+| AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | the same model at Q6_K (the addendum-20 multi-config exception): 77% of ceiling, headroom if the Q8_0 run grazes the ceiling; probe only if the Q8_0 config passes or the ceiling measurement surprises |
 
 ## REJECTED
 
@@ -47,6 +55,9 @@ One type per model in the whole document: the instruct tune; base
 | Ministral 3B | gated repo (HTTP 401) and 128k-class window |
 | Qwen3.5-2B-Base | BASE type, not instruct (addendum 18): the benchmark is conversation- and instruction-shaped (the speed gate is a live conversation, FWE is an instruction-following task); the instruct 2B is already PASS - only one type per model |
 | Qwen3.5-4B-Base | BASE type, not instruct (addendum 18): same reason; the instruct 4B is the candidate the study probes |
+| MiniCPM5-2B-Base | BASE type, not instruct (addendum 18); the addendum-20 sweep found its config declares a 524,288 window - the only sub-ceiling-RAM window > 262,144 in the whole hub sweep - but the type rule closes it: the instruct MiniCPM5-2B (window 131,072) is the family's one type and it is already rejected on window |
+| AI21-Jamba-Reasoning-3B | THINKING model (rule 3: the study carries non-thinking only); same 262,144 window and thin KV as Jamba2-3B but the reasoning tune is the wrong shape for the gates |
+| AI21-Jamba2-Mini | 12B MoE (16 experts, 2 active): Q2_K weights alone ~4.75 GiB, over the ceiling before KV; window 262,144 and non-thinking, but no configuration fits |
 | Qwen2.5-1.5B-Instruct | retro-analysis (addendum 19): trained window 32,768 < 262,144, no rope scaling; v4.3 score 20,992 @ Q8_0 - the RAM would fit (1.97 GiB q4_0 KV at 262k), the window is the wall |
 | Qwen3-1.7B | retro-analysis (addendum 19): KV geometry 112 KiB/token f16 -> q4_0 KV alone ~7.9 GiB > 4.96 ceiling (plus window 40,960 and FWE broken at 40,704) |
 | Qwen3-4B | retro-analysis (addendum 19): KV 144 KiB/token -> q4_0 KV ~10.1 GiB, triple the ceiling; window 40,960 besides |
