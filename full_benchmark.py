@@ -816,6 +816,7 @@ def process_family(
             results_dir=os.path.join(models_dir, "ladder-results"),
             seed=state.get("ladder_seed", 1024),
             min_rung=state.get("ladder_min_rung", RUNG_BASE),
+            max_rung=state.get("ladder_max_rung"),
             kv_quant_k=state.get("kv_quant_k"),
             kv_quant_v=state.get("kv_quant_v"),
         )
@@ -973,6 +974,15 @@ def build_parser() -> argparse.ArgumentParser:
         "climbs the same grid",
     )
     ap.add_argument(
+        "--max-rung",
+        type=int,
+        default=None,
+        help="session 35 (addendum 9): the gallop's hard stop - the ladder "
+        "never climbs past this rung. With --min-rung N --max-rung N the run "
+        "is a single-rung probe: speed + fwe at exactly N, pass or fail, no "
+        "search; stored in the state as ladder_max_rung",
+    )
+    ap.add_argument(
         "--no-thinking",
         action="store_true",
         help="hybrid models, non-thinking category: "
@@ -1001,6 +1011,8 @@ def main() -> None:
     state = load_state(args.state_file)
     if args.min_rung:
         state["ladder_min_rung"] = args.min_rung
+    if args.max_rung:
+        state["ladder_max_rung"] = args.max_rung
     if args.kv_quant_k:
         state["kv_quant_k"] = args.kv_quant_k
     if args.kv_quant_v:

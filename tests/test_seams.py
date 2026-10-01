@@ -362,6 +362,43 @@ def test_code_edit_blocks_apply_in_order(tmp_path):
         assert f.read() == "x = 2\ny = x + 1\n"
 
 
+def test_code_edit_insert_forces_newline_at_join(tmp_path):
+    """Session 35, addendum 9 (register entry 6): insert_after with a
+    multi-line anchor whose last line has no trailing newline fused the
+    inserted text onto the anchor's last line, corrupting the file.
+    The separator is forced; an explicit \n in the new text is kept."""
+    p = tmp_path / "mod.py"
+    p.write_text("def f():\n    x = 1\n")
+    code_edit.edit(
+        str(p),
+        [
+            (
+                "insert_after",
+                "def f():\n    x = 1",
+                "\ndef g():\n    pass",
+            )
+        ],
+    )
+    with open(str(p)) as f:
+        assert f.read() == "def f():\n    x = 1\ndef g():\n    pass\n"
+
+
+def test_code_edit_insert_no_double_newline_when_new_starts_with_one(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    code_edit.edit(str(p), [("insert_after", "x = 1", "\ny = 2")])
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\ny = 2\n"
+
+
+def test_code_edit_insert_before_forces_newline_at_join(tmp_path):
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    code_edit.edit(str(p), [("insert_before", "x = 1", "y = 0")])
+    with open(str(p)) as f:
+        assert f.read() == "y = 0\nx = 1\n"
+
+
 def test_code_edit_transaction_all_or_nothing(tmp_path):
     """Addendum 20: when the SECOND block fails verification, the FIRST
     block must not leak into the file either."""
@@ -999,4 +1036,46 @@ def test_run_ladder_launch_failure_is_failed_not_a_score(tmp_path, monkeypatch):
     )
     assert ladder["failed"] is True
     assert ladder["launch_failed"] is True
+    assert ladder["score"] == 0
+
+
+def test_run_ladder_single_rung_probe(tmp_path, monkeypatch, capsys):
+    # session 35, addendum 9: min_rung == max_rung is the single-rung
+    # probe - speed + fwe at exactly N, no gallop, no search. A pass at
+    # N scores N; a fail is the floor rule (FAILED, investigate).
+    model = tmp_path / "P.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={262144: (True, {"worst": 8.2})},
+        fwe_results={262144: (True, {"depth": 262016, "correct": 1, "n": 1})},
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=262144,
+        max_rung=262144,
+    )
+    assert ladder["score"] == 262144
+    assert ladder["failed"] is False
+    assert [c["rung"] for c in ladder["rungs"]] == [262144]
+
+
+def test_run_ladder_single_rung_probe_fail_is_failed(tmp_path, monkeypatch):
+    model = tmp_path / "P.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={262144: (False, {"worst": 3.1})},
+        fwe_results={},
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=262144,
+        max_rung=262144,
+    )
+    assert ladder["failed"] is True
     assert ladder["score"] == 0
