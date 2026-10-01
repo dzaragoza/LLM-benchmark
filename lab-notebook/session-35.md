@@ -357,3 +357,9 @@ BUILT (author ruling: "please build it"): etc/registry_data.py + the checked-in 
 THE STORE'S FIRST CATCH, SAME DAY: the RWKV candidate row carried a wrong repo name - RWKV/RWKV7-World-2.9B does not exist; the official repo is RWKV/RWKV7-Goose-World3-2.9B-HF (the mradermacher quant's source lineage). Its HF config also declares max_position_embeddings 2048 - a TRAINING-DATA relic, not an architectural cap: the recurrent state carries the context and the serving context is set by -c, so the transformer window rule does not mechanically apply; the candidate row now states this explicitly rather than letting the 2048 look like a window rejection.
 
 CURRENT STORE STATE: 44/48 hub extracts, 4 gated/paper-sourced (gemma-3-1b/4b, Llama-3.2-1B author pulls; Llama-3.1-8B public card), 0 fetch errors; all 48 roster ids present in models.md.
+
+## Session 35, addendum 27 - the 2B quant-raise restored to the CANDIDATES table
+
+THE AUTHOR'S CATCH ("the qwen 2b candidate is missing, we were trying an improvement to see if we can get it closer to 256k"): the addendum-15 one-model-one-table ruling had pushed the 2B's quant-raise into its PASS notes - but a candidate is a MODEL+CONFIGURATION pair (the addendum-20 exception), and Q8_0+q8_0/q8_0 is a different configuration from the PASS'd Q4_K_M+q5_0/q5_0. The row is restored to CANDIDATES with its predicted values (Q8_0 file 1.43 GiB, predicted RAM 4.78 GiB - 96% of ceiling; w/s ~9 predicted to hold). The multi-config exception was written for exactly this shape; the registry now shows it correctly.
+
+THE OVERNIGHT RUN (the author runs it tonight): four probes, one per candidate configuration - 2B quant-raise, 4B edge, Jamba2-3B, RWKV7-2.9B. Dry-run block first (each dry-run is also the tooling gate for its probe: Jamba and RWKV are the unproven-arch integrations; a dry-run failure there means the probe never starts and nothing enters FAIL unless a 256k attempt actually ran).

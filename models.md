@@ -42,6 +42,8 @@ pair, not a model).
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | THE EDGE: 100% of ceiling, RAM PASS by 0.01 GiB; speed straddler (the 4B wall was 6.07 w/s at 131k with f16 KV); Q2_K quality the wild card |
+
+| Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.43 | 4.78 GiB | ~9 | THE QUANT-RAISE (addendum 12, restored to the table addendum 27): the PASS'd RAM champion (3.48 GiB at Q4_K_M+q5_0) re-probed at the top rung to close the gap to its ceiling - 96% of ceiling, 1.30 GiB of headroom spent on precision; w/s predicted to hold (the Q4 worst turn was 15.2 t/s, Q8 KV halves the cache cost the Q4 config paid); the champion-vs-2B quality question rides on this probe |
 | AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.52 GiB | ~7 | THE NEW FAMILY (addendum 20): window 262,144; hybrid mamba-attention, only 2 full-attention layers x 1 KV head x 128 head_dim -> ~1 KiB/token f16 (0.25 GiB at 262k), the thinnest KV ever screened - the mamba state is constant-size; Q8_0 at 91% of ceiling; non-thinking instruct, Apache-2.0, GGUF tooling verified (bartowski 3.17 GiB); risks: llama.cpp jamba-arch support level, FWE at depth unproven |
 | AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | the same model at Q6_K (the addendum-20 multi-config exception): 77% of ceiling, headroom if the Q8_0 run grazes the ceiling; probe only if the Q8_0 config passes or the ceiling measurement surprises |
 
