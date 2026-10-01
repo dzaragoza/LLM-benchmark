@@ -59,3 +59,12 @@ CODE_EDIT (three fixes, each hit during this addendum):
 PRETTIER now owns the page formatting (prettier 3.3.3, print-width 100): both pickers reformatted; the check runs on every page edit from here on.
 
 THE WITNESS (author ruling): the witness is Qwen3.5-4B at Q4_K_M - the cache encoding varies (KV q8_0 vs KV q4_0, weight quant fixed at Q4_K_M). The commands are with the author (fresh state/results pairs: benchmark-state-kvq8-q4.json etc).
+
+
+## Session 35, addendum 5 - the witness runs died at launch; the log tail now prints
+
+BOTH KV-variant witness runs (4B @ Q4_K_M, KV q8_0 and KV q4_0) failed identically in ~1s: "server did not become healthy" at the 4,096 start rung, speed verdict {"error": "no turns measured"}, ladder FAILED at floor - a FALSE zero (the same file scored 123,904 in the baseline Q4 run). The launch died at argument parsing or model load, and the reason was in the server log, which stayed on the author's disk.
+
+THE FIX (pushed): both launch sites now dump the last 15 lines of the server log into results.txt when the server never becomes healthy (speed_gate.bench_model via _dump_log_tail; full_benchmark.fwe_pass inline). The addendum-33 lesson, applied: never leave the diagnosis on the author's disk.
+
+PRIME SUSPECT: the -fa flag. Recent llama.cpp builds made flash attention the default and REMOVED -fa; passing it is a hard argument-parse error that kills the server in ~1s - exactly this signature. The fix, once the log confirms it, is to drop -fa and keep only --cache-type-k/--cache-type-v (quantized caches are the default-kernel path in those builds). Rerun the same two commands after the pull.
