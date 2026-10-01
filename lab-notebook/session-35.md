@@ -363,3 +363,11 @@ CURRENT STORE STATE: 44/48 hub extracts, 4 gated/paper-sourced (gemma-3-1b/4b, L
 THE AUTHOR'S CATCH ("the qwen 2b candidate is missing, we were trying an improvement to see if we can get it closer to 256k"): the addendum-15 one-model-one-table ruling had pushed the 2B's quant-raise into its PASS notes - but a candidate is a MODEL+CONFIGURATION pair (the addendum-20 exception), and Q8_0+q8_0/q8_0 is a different configuration from the PASS'd Q4_K_M+q5_0/q5_0. The row is restored to CANDIDATES with its predicted values (Q8_0 file 1.43 GiB, predicted RAM 4.78 GiB - 96% of ceiling; w/s ~9 predicted to hold). The multi-config exception was written for exactly this shape; the registry now shows it correctly.
 
 THE OVERNIGHT RUN (the author runs it tonight): four probes, one per candidate configuration - 2B quant-raise, 4B edge, Jamba2-3B, RWKV7-2.9B. Dry-run block first (each dry-run is also the tooling gate for its probe: Jamba and RWKV are the unproven-arch integrations; a dry-run failure there means the probe never starts and nothing enters FAIL unless a 256k attempt actually ran).
+
+## Session 35, addendum 28 - the dry-run gate catches a bad command
+
+THE AUTHOR'S REPORT ("the dry run gave an error"): three of the four dry-runs PASSED clean (2B quant-raise, 4B edge, RWKV - each acquire+create phases verified, rung files ready). The Jamba command FAILED at argument parse: --kv-quant-k f16 is not a CLI choice (q8_0, q4_0, q4_1, q5_0, q5_1, iq4_nl only). THE ERROR WAS MINE (the addendum-27 block): f16 K/V is the DEFAULT - it is what the server runs when NO kv-quant flag is passed (verified in full_benchmark.py's launch path: extra_args gains --cache-type-k/v only when the flags are set; the champion's Q8_0+f16 config ran exactly so). The corrected Jamba command omits the flags:
+
+  python3 full_benchmark.py ai21labs/AI21-Jamba2-3B --rung Q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceilj.json --results-file benchmark-results-ceilj.json --force
+
+The corrected REAL-RUN block is the addendum-27 block with the Jamba line replaced by this line; the other three commands stand verbatim as dry-run-verified. THE REGISTER: the dry-run gate did its job - a bad flag killed the probe at parse time, before any download or server launch; the tooling gate for the unproven arches (Jamba, RWKV) is exactly where it belongs.
