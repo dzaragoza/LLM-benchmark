@@ -623,6 +623,22 @@ def noise_sample(
     return recs
 
 
+def _dump_log_tail(log_path: str, lines: int = 15) -> None:
+    """session 35, addendum 5: a server that never becomes healthy died
+    at argument parsing or model load - the reason is in its log, and
+    the log stays local unless we print it (the addendum-33 lesson:
+    never leave the diagnosis on the author's disk)."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            tail = f.read().splitlines()[-lines:]
+    except OSError:
+        return
+    if tail:
+        print(f"  --- server log tail ({log_path}) ---")
+        for ln in tail:
+            print(f"  [server] {ln}")
+
+
 def bench_model(
     model: str,
     corpus_file: str,
@@ -677,6 +693,7 @@ def bench_model(
     try:
         if not healthy:
             print("  ERROR: server did not become healthy; skipping")
+            _dump_log_tail(log_path)
             return all_turns, None, mem_reports
         actual_ctx = report_server_ctx(log_path, ctx)
         if actual_ctx is None:

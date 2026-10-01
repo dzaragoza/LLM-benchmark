@@ -217,6 +217,13 @@ def fwe_pass(
     )
     try:
         if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            print("    ERROR: fwe server did not come up; log tail:")
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as f:
+                    for ln in f.read().splitlines()[-15:]:
+                        print(f"    [server] {ln}")
+            except OSError:
+                pass
             return False, {"error": "fwe server did not come up", "depth": depth}
         row = ruler_gate.run_fwe_depth(
             port, label, depth, 1, csv_path, seed0=seed, no_thinking=True
