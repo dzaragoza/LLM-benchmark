@@ -1079,3 +1079,118 @@ def test_run_ladder_single_rung_probe_fail_is_failed(tmp_path, monkeypatch):
     )
     assert ladder["failed"] is True
     assert ladder["score"] == 0
+
+
+def test_code_edit_md_gate_blocks_new_table_violation(tmp_path):
+    """Session 35, addendum 16: a markdown edit that introduces a
+    GitHub-rendering violation (no blank line before a table) fails
+    BEFORE the write - the file stays untouched."""
+    p = tmp_path / "doc.md"
+    p.write_text("# Title\n\nSome prose.\n")
+    try:
+        code_edit.edit(
+            str(p),
+            [
+                (
+                    "replace",
+                    "Some prose.",
+                    "Some prose.\n| a | b |\n|---|---|\n| 1 | 2 |",
+                )
+            ],
+        )
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "markdown-lint" in str(e) and "MD058" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "# Title\n\nSome prose.\n"
+
+
+def test_code_edit_md_gate_allows_clean_table(tmp_path):
+    """The gate must not over-block: a properly blank-lined table
+    passes and the file is written."""
+    p = tmp_path / "doc.md"
+    p.write_text("# Title\n\nSome prose.\n")
+    code_edit.edit(
+        str(p),
+        [
+            (
+                "replace",
+                "Some prose.",
+                "Some prose.\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+            )
+        ],
+    )
+    with open(str(p)) as f:
+        assert "| 1 | 2 |" in f.read()
+
+
+def test_code_edit_md_gate_ignores_preexisting_violations(tmp_path):
+    """Only NEW violations fail the edit; a pre-existing ragged table
+    elsewhere in the file does not block an unrelated clean edit."""
+    p = tmp_path / "doc.md"
+    p.write_text("# T\n\nprose\n\n| a | b |\n|---|---|\n| 1 | 2 | 3 |\n")
+    code_edit.edit(str(p), [("replace", "prose", "more prose")])
+    with open(str(p)) as f:
+        assert "more prose" in f.read()
+
+
+def test_code_edit_md_gate_ragged_table_blocked(tmp_path):
+    """MD056: an edit introducing a ragged (uneven cell count) table
+    fails before the write."""
+    p = tmp_path / "doc.md"
+    p.write_text("# T\n\nprose\n")
+    try:
+        code_edit.edit(
+            str(p),
+            [("replace", "prose", "prose\n\n| a | b |\n|---|---|\n| 1 |\n")],
+        )
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "MD056" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "# T\n\nprose\n"
+
+
+def test_code_edit_md_gate_unclosed_fence_blocked(tmp_path):
+    """Fence balance: an edit that leaves an unclosed code fence fails
+    before the write."""
+    p = tmp_path / "doc.md"
+    p.write_text("# T\n\nprose\n")
+    try:
+        code_edit.edit(
+            str(p),
+            [("replace", "prose", "prose\n\n```python\nx = 1\n")],
+        )
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "unclosed code fence" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "# T\n\nprose\n"
+
+
+def test_code_edit_md_gate_double_trailing_newline_blocked(tmp_path):
+    """MD047: an edit leaving two trailing newlines fails (single
+    trailing newline only)."""
+    p = tmp_path / "doc.md"
+    p.write_text("# T\n\nprose\n")
+    try:
+        code_edit.edit(str(p), [("replace", "prose\n", "prose\n\n")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "MD047" in str(e)
+    assert raised
+    with open(str(p)) as f:
+        assert f.read() == "# T\n\nprose\n"
+
+
+def test_code_edit_md_gate_not_applied_to_python(tmp_path):
+    """The gate is md-only: a python file with pipe characters is
+    untouched by it."""
+    p = tmp_path / "mod.py"
+    p.write_text("x = 1\n")
+    code_edit.edit(str(p), [("replace", "x = 1", "y = 'a|b'")])
+    with open(str(p)) as f:
+        assert f.read() == "y = 'a|b'\n"

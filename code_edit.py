@@ -165,6 +165,25 @@ def _file_type(path: str) -> str:
     return "code"
 
 
+def _check_markdown(src: str, out: str, path: str) -> None:
+    """The md-linter gate (session 35, addendum 16): a markdown edit
+    must not INTRODUCE a GitHub-rendering violation. The lint rules
+    run on the in-memory result BEFORE the write; only NEW problems
+    fail the edit - pre-existing violations in the surrounding file
+    are not the edit's fault and stay flagged for pre-commit."""
+    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
+        return
+    import md_check
+
+    before = {p.split(": ", 1)[-1] for p in md_check.check_text(path, src)}
+    new = [p for p in md_check.check_text(path, out) if p.split(": ", 1)[-1] not in before]
+    if new:
+        raise CodeEditError(
+            f"{path}: the edit introduces markdown-lint violations "
+            "(md_check rules, session 35 addendum 16):\n  " + "\n  ".join(new)
+        )
+
+
 def _strip_apostrophes(text: str) -> str:
     """Drop single quotes so the balance check ignores prose
     apostrophes inside markup files, while DOUBLE quotes (HTML/JS
@@ -612,6 +631,7 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     _last_edit_regions.clear()
     _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
     _check_delimiters(src, out, path)
+    _check_markdown(src, out, path)
     # verify every post-condition against the IN-MEMORY result BEFORE
     # touching disk (session 35, addendum 4: these checks used to run
     # after the write, so a failed verify left the file MODIFIED and
@@ -686,6 +706,7 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
     _check_delimiters(src, out, path)
+    _check_markdown(src, out, path)
     return "".join(
         difflib.unified_diff(
             src.splitlines(keepends=True),

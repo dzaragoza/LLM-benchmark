@@ -24,12 +24,17 @@ SEPARATOR = re.compile(r"^\|[-\s|]+\|$")
 
 
 def check(path: str) -> list[str]:
-    problems: list[str] = []
     try:
         text = open(path, encoding="utf-8").read()
     except (OSError, UnicodeDecodeError) as e:
         return [f"{path}: unreadable: {e}"]
+    return check_text(path, text)
+
+
+def check_text(path: str, text: str) -> list[str]:
+    """The same rules, run on in-memory text (code_edit's pre-write gate)."""
     lines = text.split("\n")
+    problems: list[str] = []
     problems.extend(check_md047(path, text))
     problems.extend(check_fences(path, lines))
     problems.extend(check_tables(path, lines))
