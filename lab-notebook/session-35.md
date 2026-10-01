@@ -190,3 +190,39 @@ THE 2B QUANT RAISE (author ruling: disk space is plentiful; raise the 2B's weigh
   python3 full_benchmark.py Qwen/Qwen3.5-2B --rung Q8_0 --kv-quant-k q5_0 --kv-quant-v q5_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-p2q8.json --results-file benchmark-results-p2q8.json --force
 The first FAILED rung stops the walk (the standing rule: a FAIL is never selected; the family keeps its last PASS config). The K/V pair stays q5_0/q5_0 (already the study's pick for the 2B; raising K/V to q8_0 costs ~0.9 GiB and is out unless the weights walk completes with headroom). Pre-registered predictions: Q5_K_M PASS (~4.0 GiB), Q6_K PASS (~4.3 GiB), Q8_0 STRADDLER (~4.9 GiB - the ceiling's edge; 50/50).
 THE PAGES: both pickers now carry BOTH survivors - Qwen3.5-2B (Q4_K_M, 3.48 GiB, 9.5 w/s, depth 262,144) and the 0.8B champion (Q8_0, 4.96 GiB, 9.3 w/s, depth 262,144) - with the 2B flagged as pending its quant-raise re-probe. The smallest-RAM notes updated (3.48 GiB, the 2B); the min-bandwidth comment updated (worst w/s 9.5 -> ~54 GB/s floor). Prettier 3.9.9 clean on both; md_check and the 117-test suite pass.
+
+## Session 35, addendum 13 - the retired rules are deleted; the ceiling predictor is registered; the 4-model ceiling chase
+THE DOCUMENTS (author ruling: "delete the retired rules, they just pollute" + "align the documents"):
+- MODEL-SELECTION.md is REWRITTEN: the retired rules (old 2, 7, 8, 9, 14, 15 - and the misnumbered sentinel block) are DELETED, not struck through; the survivors renumber 1-10. New rule 2 registers the ceiling predictor (below). Data hygiene (new rule 7) updated v3.1 -> v4.3 (the author's point 10, mis-mapped to the sentinel block in addendum 12 - corrected here). Rule 1 (ceiling first, then screen) and rule 10 (the 256k goal) are the load-bearing pair.
+- PROTOCOL.md registry rows aligned: "Roster ceiling" is now the measured 4.96 GiB at 262,144 (champion config; supersedes the v3.1 5.27 GiB size ceiling, history addendum 88); "Selection mechanism" is ceiling-first-then-predictor; the ARC row is retired and replaced by the ceiling-predictor row; the candidate-pool row carries the two v4.3 survivors (the v3.1 7-member pool is history).
+- README roster-selection summary rewritten to point at the ten rules.
+THE CEILING PREDICTOR (registered, new rule 2; the author's ask: "good estimate of getting as close as possible, but under, to the machine ceiling"):
+  cost = file(rung) + KV_eff(262144) x kvquant + overhead
+  - file(rung) = file_Q8_0 x bpw(rung)/8.5 (RUNG_BITS, single-sourced in hf_download.py)
+  - KV_eff = 262144 x L x 2 x kv_heads x head_dim / full_attention_interval - only the full-attention layers hold the whole window (Qwen3.5 interval 4: 24 layers -> 6 full -> 12.0 KiB/token for the 0.8/2B, 32.0 for the 4B)
+  - kvquant: f16 1.0, q8_0 0.53125, q5_0 0.34375, q4_0 0.28125
+  - overhead = 1.10 GiB ([P], fitted on the two measured anchors)
+  VALIDATION: the champion (0.8B Q8_0 + f16: 0.86 + 3.00 + 1.10 = 4.96 vs measured 4.96 - EXACT) and the 2B (Q4_K_M + q5_0: 1.18 + 1.03 + 1.10 = 3.31 vs measured 3.48 - the predictor UNDER-predicts by 5%, the safe direction for a screen; the residual is the KV-quant block granularity, q5_0 blocks round up). Every probe grades it.
+THE CANDIDATE SPACE (the honest finding): the HF sweep for >= 262,144-window, non-MoE, accessible, non-gated models finds ONE family - Qwen3.5 (window 262,144; 12.0-32.0 KiB/token effective KV, 3-11x thinner than every other family). gemma-4-e2b is WINDOW-DISQUALIFIED (max_position_embeddings 131,072 - the addendum-10 ~35% pipeline entry is dead); Ministral 3B is gated (401) and 128k-class; granite/Nemotron/EXAONE/etc. are gated or fat-KV or sub-262k. So the "three new models" are the Qwen3.5 variants never benched: 0.8B-Base, 2B-Base, and the 4B at its floor config (the addendum-10 pending probe, now with the predictor's blessing at 4.95 GiB). Base models carry a quality risk (FWE at depth on a non-instruct model is unproven) - that risk is the experiment.
+THE 4-MODEL CEILING CHASE (pre-registered; the big run, ~4 h wall at ~55-60 min per probe):
+
+| # | model | config | file | KV | predicted | % of ceiling | prediction |
+|---|---|---|---|---|---|---|---|
+| 1 | Qwen3.5-2B (instruct) | Q8_0 + K/V q8_0 | 2.09 | 1.59 | 4.78 GiB | 96% | RAM PASS; speed ~8.5 w/s (file 2.09 GiB, law); FWE PASS (instruct family proven at depth) |
+| 2 | Qwen3.5-0.8B-Base | Q8_0 + K/V f16 | 0.81 | 3.00 | 4.91 GiB | 99% | RAM PASS (edge); speed ~9.3 w/s class; FWE UNCERTAIN (base model, never benched) |
+| 3 | Qwen3.5-2B-Base | Q8_0 + K/V q8_0 | 2.09 | 1.59 | 4.78 GiB | 96% | RAM PASS; speed ~8.5 w/s; FWE UNCERTAIN (base) |
+| 4 | Qwen3.5-4B (instruct) | Q2_K + K/V q4_0 | 1.60 | 2.25 | 4.95 GiB | 100% | THE EDGE: predictor says 4.95 vs ceiling 4.96 - RAM PASS by 0.01; Q2_K quality is the wild card; FWE PASS if the family pattern holds |
+
+The 2B-instruct row SUPERSEDES the addendum-12 quant-raise walk (Q5_K_M/Q6_K/Q8_0 at q5_0 KV): with the predictor registered, the best-under-ceiling config is known in advance - Q8_0 + q8_0/q8_0 at 4.78 GiB - so the walk is skipped and the ceiling config is probed directly. The walk commands of addendum 12 are RETIRED without running.
+THE COMMANDS (two blocks, verbatim; fresh state/results pairs; --force where a family carries a prior selection):
+DRY-RUN BLOCK (read the reports, then run the real block):
+  python3 full_benchmark.py Qwen/Qwen3.5-2B --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil1.json --results-file benchmark-results-ceil1.json --force --dry-run
+  python3 full_benchmark.py Qwen/Qwen3.5-0.8B-Base --rung Q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil2.json --results-file benchmark-results-ceil2.json --dry-run
+  python3 full_benchmark.py Qwen/Qwen3.5-2B-Base --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil3.json --results-file benchmark-results-ceil3.json --dry-run
+  python3 full_benchmark.py Qwen/Qwen3.5-4B --rung Q2_K --kv-quant-k q4_0 --kv-quant-v q4_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil4.json --results-file benchmark-results-ceil4.json --force --dry-run
+REAL-RUN BLOCK (the big run; ~4 h; leave the machine):
+  python3 full_benchmark.py Qwen/Qwen3.5-2B --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil1.json --results-file benchmark-results-ceil1.json --force
+  python3 full_benchmark.py Qwen/Qwen3.5-0.8B-Base --rung Q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil2.json --results-file benchmark-results-ceil2.json
+  python3 full_benchmark.py Qwen/Qwen3.5-2B-Base --rung Q8_0 --kv-quant-k q8_0 --kv-quant-v q8_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil3.json --results-file benchmark-results-ceil3.json
+  python3 full_benchmark.py Qwen/Qwen3.5-4B --rung Q2_K --kv-quant-k q4_0 --kv-quant-v q4_0 --min-rung 262144 --max-rung 262144 --state-file benchmark-state-ceil4.json --results-file benchmark-results-ceil4.json --force
+ORDER NOTE: the 4B is last (its 0.01-GiB edge is the most likely RAM FAIL; a fail costs nothing but time). A launch failure records FAIL, never a selection (addendum 7). Machine state per the addendum-11 log: THP always, amd-pstate-epp performance, AC advised.
