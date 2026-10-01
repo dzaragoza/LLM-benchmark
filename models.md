@@ -45,21 +45,26 @@ pair, not a model).
 | AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.52 GiB | ~7 | THE NEW FAMILY (addendum 20): window 262,144; hybrid mamba-attention, only 2 full-attention layers x 1 KV head x 128 head_dim -> ~1 KiB/token f16 (0.25 GiB at 262k), the thinnest KV ever screened - the mamba state is constant-size; Q8_0 at 91% of ceiling; non-thinking instruct, Apache-2.0, GGUF tooling verified (bartowski 3.17 GiB); risks: llama.cpp jamba-arch support level, FWE at depth unproven |
 | AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | the same model at Q6_K (the addendum-20 multi-config exception): 77% of ceiling, headroom if the Q8_0 run grazes the ceiling; probe only if the Q8_0 config passes or the ceiling measurement surprises |
 
+| RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 4.13 GiB | ~8 | THE RECURRENT FAMILY (addendum 23): constant-size state - no KV growth at all, context bounded only by the machine; conversational chat tune, first-party RWKV org weights, Goose paper (arXiv 2504.03289, verified), community GGUF verified (mradermacher Q8_0 3.03 GiB); risks: llama.cpp rwkv7 support level, FWE-through-recurrent-state unproven, community GGUF not first-party quant |
+| RWKV7-World-2.9B | Q6_K | n/a | n/a | 2.39 | 3.49 GiB | ~9 | the same model at Q6_K (multi-config exception): 70% of ceiling, headroom config under the Jamba Q8_0 |
+
 ## REJECTED
 
-Strict reason list (author ruling, addendum 21): no research paper |
-no model small enough (q2, q4, q4) > ceiling | training window < 256k
-| other. A model is rejected on the FIRST reason that binds in the
-fair-chance order: if even the floor config (Q2_K + K/V q4_0/q4_0)
-predicts RAM above the 4.96 GiB ceiling, the size binds; if the RAM
-fits but the trained window is under 262,144 (no rope scaling), the
-window binds; everything else is other.
+Strict reason list (author ruling, addendum 21, extended addendum 23):
+no research paper | no model small enough (q2, q4, q4) > ceiling |
+training window < 256k | thinking cannot be disabled | other. A model
+is rejected on the FIRST reason that binds in the fair-chance order:
+if even the floor config (Q2_K + K/V q4_0/q4_0) predicts RAM above the
+4.96 GiB ceiling, the size binds; if the RAM fits but the trained
+window is under 262,144 (no rope scaling), the window binds; thinking
+tunes whose reasoning cannot be turned off close as thinking cannot
+be disabled; everything else is other. BASE variants of an
+already-instruct model are not recorded (author ruling, addendum 23):
+the type rule implies their rejection - the instruct tune is the
+family's one entry.
 
 | model name | rejection reason | notes |
 |---|---|---|
-| Qwen3.5-0.8B-Base | other | BASE type (addendum 18); identical RAM geometry to the measured champion config (Q8_0 + f16, 4.96 GiB) - not worth an hour (addendum 14) |
-| Qwen3.5-2B-Base | other | BASE type (addendum 18); the instruct 2B is already PASS - one type per model |
-| Qwen3.5-4B-Base | other | BASE type (addendum 18); the instruct 4B is the candidate the study probes |
 | Qwen3.5-9B | no model small enough (q2, q4, q4) > ceiling | best config Q2_K + q4_0/q4_0 = 7.05 GiB predicted; the family closes at 9B |
 | gemma-4-e2b-it | training window < 256k | trained window 131,072 (verified from config.json); no rope scaling by standing rule |
 | Ministral 3B | other | the repo does not exist on the hub (author-authenticated pull: RepositoryNotFoundError; the agent's unauthenticated 401 masked it); no first-party Ministral-3B weights to screen |
@@ -89,8 +94,7 @@ window binds; everything else is other.
 | MiniCPM4-0.5B | training window < 256k | window 32,768; RAM would fit (0.84 GiB q4_0 KV); never passed the 16k screen (quality) |
 | MiniCPM5-1B | training window < 256k | window 131,072; RAM would fit (1.69 GiB q4_0 KV) - the window is the wall |
 | MiniCPM5-2B | training window < 256k | window 131,072; RAM would fit (~4.2 GiB whole config at q4_0 KV) - the window is the wall; also FWE zero at Q4_K_M |
-| MiniCPM5-2B-Base | other | BASE type (addendum 18); the addendum-20 sweep found its config declares a 524,288 window - the only sub-ceiling-RAM window > 262,144 on the hub - but the type rule closes it: the instruct tune is the family's one type |
-| AI21-Jamba-Reasoning-3B | other | THINKING model (rule 3: non-thinking only); same 262,144 window and thin KV as Jamba2-3B but the wrong shape for the gates |
+| AI21-Jamba-Reasoning-3B | thinking cannot be disabled | the reasoning tune has no non-thinking mode; same 262,144 window and thin KV as Jamba2-3B but the wrong shape for the gates |
 | AI21-Jamba2-Mini | no model small enough (q2, q4, q4) > ceiling | 12B MoE (16 experts, 2 active): Q2_K weights alone ~4.75 GiB, over the ceiling before KV; window 262,144 |
 | openai/gpt-oss-20b | training window < 256k | window 131,072; KV 48 KiB/token (3.38 GiB q4_0 KV at 262k) - window binds first (addendum-20 sweep) |
 | HuggingFaceTB/SmolLM3-3B | training window < 256k | window 65,536; KV 72 KiB/token -> ~5.1 GiB q4_0 KV would also exceed the ceiling |
