@@ -6959,3 +6959,56 @@ Traceback (most recent call last):
     time.sleep(delay)
     ~~~~~~~~~~^^^^^^^
 KeyboardInterrupt
+
+===== 2026-10-01T16:42:44 | full_benchmark.py Qwen/Qwen3.5-0.8B --rung Q8_0 --min-rung 262144 --max-rung 262144 --force --state-file benchmark-state-o8probe.json --results-file benchmark-results-o8probe.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T16:42:44 +0m] family: Qwen3.5-0.8B
+  model repo : Qwen/Qwen3.5-0.8B
+  source repo: Qwen/Qwen3.5-0.8B
+  folder     : ./models/Qwen3.5-0.8B
+  --force: re-benching Q8_0 (0 stored verdict(s) cleared; files reused)
+  [1] local rung file found - no download needed  (./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf)
+  [2] rung file ready  (./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf)
+
+  rung Q8_0:
+
+=== ladder: Qwen3.5-0.8B-Q8_0 ===
+  gallop from 262144 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-0.8B-Q8_0.gguf ===
+  starting server...
+    [server] 0.01.862.873 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 262144, kv_unified = 'false'
+    [server] actual n_ctx = 262144 (requested 262144)
+    conv 1 (blob 260616 tok): turns t/s: 14.9, 14.9, 14.8, 14.9   worst 14.8 (mean 14.9)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 10.1, 9.3, 9.3, 9.8   (reader line 5 w/s)
+      noise at depth: 14.8, 14.9
+    memory: mapped census 6.70 GiB mapped, 0.63 GiB resident (file 0.38 + anon 0.25; smaps, addendum 23), machine cost 4.96 GiB (MemAvailable delta)
+
+  Qwen3.5-0.8B-Q8_0.gguf: WORST TURN = 14.8 t/s (worst turn; avg-of-worsts 14.8)
+  Qwen3.5-0.8B-Q8_0.gguf: NOISE AT DEPTH: worst 14.84  mean 14.86  worst/mean 0.999  (n=2)
+  Qwen3.5-0.8B-Q8_0.gguf: MEMORY: peak RSS 0.66 GiB - file 0.78 GiB, i.e. -0.11 GiB beyond the file (KV + buffers + runtime)
+  rung 262144: speed PASS [1473s]
+    cold machine cost @ rung: 4.96 GiB
+  task 1/1 @ 261888 tok: 3/3 words -> HIT ('Based on the coded text provided, here is the an')
+    fwe census: 0.33 GiB resident (file 0.21 + anon 0.12; smaps)
+    fwe @ depth 261888: 1/1 -> PASS [1432s]
+  Qwen3.5-0.8B-Q8_0: SCORE = 262144 tokens (last rung passing both) [48.4 min wall, measured]
+  [3] ladder ok  (score: 262144 tokens)
+[2026-10-01T17:31:10 +48m]       phase 3 done (ladder)
+  [4] scored-rung row: depth 262144 tokens, worst 9.3 w/s, cold cost 4.96 GiB
+[2026-10-01T17:31:10 +48m]       phase 4 done (scored row)
+  SELECTED Q8_0 for Qwen3.5-0.8B (ladder score 262144 tokens)
+
+============================================================
+[2026-10-01T17:31:10 +48m] PROTOCOL v4 ladder table (depth score; n=1 screen - addendum 137h)
+  Qwen3.5-0.8B                         score 262,144 tokens | scored-rung worst   9.3 w/s | cold  4.96 GiB | 48.4 min
+
+resume state -> benchmark-state-o8probe.json
+all data     -> benchmark-results-o8probe.json
+
+resume state -> benchmark-state-o8probe.json
+all data     -> benchmark-results-o8probe.json
