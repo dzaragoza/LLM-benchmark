@@ -165,22 +165,57 @@ def _file_type(path: str) -> str:
     return "code"
 
 
+SEPARATOR_LIKE = re.compile(r"^\|[-\s|]+\|$")
+
+
+def _fix_markdown(out: str, path: str) -> str:
+    """The md auto-fixer (session 35, addendum 17, author ruling: the
+    editor FIXES the mechanical rules instead of failing): a blank
+    line before a table header (MD058) and after a table body
+    (MD058), and the single trailing newline (MD047), are inserted
+    automatically. These are exactly the rules whose fix is unique
+    and unambiguous; the judgement rules (MD056 ragged tables, MD055
+    row pipes, fence balance) have no safe automatic fix and stay
+    lint failures."""
+    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
+        return out
+    lines = out.split("\n")
+    fixed: list[str] = []
+    for line in lines:
+        row = line.startswith("|")
+        prev = fixed[-1] if fixed else ""
+        prev_blank = prev.strip() == ""
+        prev_sep = bool(prev) and bool(SEPARATOR_LIKE.match(prev))
+        prev_table = prev.startswith("|")
+        if row and not prev_blank and not prev_table:
+            fixed.append("")
+        if not row and prev_table and not prev_blank and line.strip() != "":
+            fixed.append("")
+        fixed.append(line)
+    out = "\n".join(fixed)
+    if out:
+        out = out.rstrip("\n") + "\n"
+    return out
+
+
 def _check_markdown(src: str, out: str, path: str) -> None:
-    """The md-linter gate (session 35, addendum 16): a markdown edit
-    must not INTRODUCE a GitHub-rendering violation. The lint rules
-    run on the in-memory result BEFORE the write; only NEW problems
-    fail the edit - pre-existing violations in the surrounding file
-    are not the edit's fault and stay flagged for pre-commit."""
+    """The md-linter gate (session 35, addendum 16, revised 17): the
+    mechanical rules (MD058 blank lines around tables, MD047 trailing
+    newline) are AUTO-FIXED by _fix_markdown; what remains is the
+    judgement class - a markdown edit must not INTRODUCE a violation
+    with no safe automatic fix (MD056 ragged tables, MD055 row
+    pipes, fence balance). Only NEW problems fail the edit;
+    pre-existing violations stay flagged for pre-commit."""
     if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
         return
     import md_check
 
     before = {p.split(": ", 1)[-1] for p in md_check.check_text(path, src)}
-    new = [p for p in md_check.check_text(path, out) if p.split(": ", 1)[-1] not in before]
+    new = [q for q in md_check.check_text(path, out) if q.split(": ", 1)[-1] not in before]
     if new:
         raise CodeEditError(
             f"{path}: the edit introduces markdown-lint violations "
-            "(md_check rules, session 35 addendum 16):\n  " + "\n  ".join(new)
+            "(md_check rules, session 35 addendum 17):\n  " + "\n  ".join(new)
         )
 
 
@@ -631,13 +666,19 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     _last_edit_regions.clear()
     _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
     _check_delimiters(src, out, path)
-    _check_markdown(src, out, path)
     # verify every post-condition against the IN-MEMORY result BEFORE
     # touching disk (session 35, addendum 4: these checks used to run
     # after the write, so a failed verify left the file MODIFIED and
     # broke the file-untouched contract). They are all deterministic
     # against out, so they belong here.
     _verify_result(out, blocks, path)
+    # the md auto-fixer runs AFTER the verify (addendum 17): the
+    # post-conditions check the RAW inserted text, then the fixer
+    # normalizes the mechanical whitespace (blank lines around
+    # tables, the trailing newline) - a fixer pass may legitimately
+    # reflow what a block inserted.
+    out = _fix_markdown(out, path)
+    _check_markdown(src, out, path)
     _atomic_write_sync(path, out)
     with open(path, encoding="utf-8") as f:
         now = f.read()
@@ -689,7 +730,9 @@ def _verify_result(out: str, blocks: Sequence[tuple], path: str) -> None:
 def write(path: str, content: str) -> None:
     """Create or overwrite a file with the same atomic, synced write
     as edit(); the ONLY path for new files (an edit on a missing file
-    is still an error - write is deliberate)."""
+    is still an error - write is deliberate). Markdown content runs
+    through the auto-fixer (session 35, addendum 17)."""
+    content = _fix_markdown(content, path)
     _atomic_write_sync(path, content)
     with open(path, encoding="utf-8") as f:
         if f.read() != content:
@@ -706,6 +749,7 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
     _check_delimiters(src, out, path)
+    out = _fix_markdown(out, path)
     _check_markdown(src, out, path)
     return "".join(
         difflib.unified_diff(
