@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Registry data store: every models.md model's own config.json extract,
+kept checked-in so audits are a git diff, not 50 hub fetches.
+
+Usage:
+  python3 etc/registry_data.py fetch        # re-pull configs -> etc/registry_data.json
+  python3 etc/registry_data.py check        # verify models.md rows against the store
+  python3 etc/registry_data.py geometry ID  # print derived geometry for one model
+
+The JSON carries the RAW config fields plus derived geometry (window,
+KV KiB/token, q4_0 KV at 262,144) and the source repo. models.md notes
+cite the store; the store never edits models.md.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+STORE = ROOT / "etc" / "registry_data.json"
+
+CEILING_DEPTH = 262144
+KV_QUANT_F16 = 1.0
+KV_QUANT_Q40 = 0.28125
+GIB = 2**30
+
+# models.md roster -> source repo. measured: config pulled at fetch time.
+ROSTER = {
+    "Qwen3.5-0.8B": "Qwen/Qwen3.5-0.8B",
+    "Qwen3.5-2B": "Qwen/Qwen3.5-2B",
+    "Qwen3.5-4B": "Qwen/Qwen3.5-4B",
+    "Qwen3.5-9B": "Qwen/Qwen3.5-9B",
+    "AI21-Jamba2-3B": "ai21labs/AI21-Jamba2-3B",
+    "AI21-Jamba-Reasoning-3B": "ai21labs/AI21-Jamba-Reasoning-3B",
+    "AI21-Jamba2-Mini": "ai21labs/AI21-Jamba2-Mini",
+    "RWKV7-World-2.9B": "RWKV/RWKV7-Goose-World3-2.9B-HF",
+    "Qwen2.5-1.5B-Instruct": "Qwen/Qwen2.5-1.5B-Instruct",
+    "Qwen3-1.7B": "Qwen/Qwen3-1.7B",
+    "Qwen3-4B": "Qwen/Qwen3-4B",
+    "Qwen3-4B-Instruct-2507": "Qwen/Qwen3-4B-Instruct-2507",
+    "Qwen3-30B-A3B-Instruct-2507": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "phi-1": "microsoft/phi-1",
+    "phi-2": "microsoft/phi-2",
+    "phi-4-mini-instruct": "microsoft/phi-4-mini-instruct",
+    "Phi-3.5-mini-instruct": "microsoft/Phi-3.5-mini-instruct",
+    "Phi-3-mini-4k-instruct": "microsoft/Phi-3-mini-4k-instruct",
+    "granite-3.0-2b-instruct": "ibm-granite/granite-3.0-2b-instruct",
+    "granite-3.1-2b-instruct": "ibm-granite/granite-3.1-2b-instruct",
+    "granite-3.2-2b-instruct": "ibm-granite/granite-3.2-2b-instruct",
+    "granite-3.3-2b-instruct": "ibm-granite/granite-3.3-2b-instruct",
+    "granite-4.0-350m": "ibm-granite/granite-4.0-350m",
+    "granite-4.0-h-350m": "ibm-granite/granite-4.0-h-350m",
+    "granite-4.0-1b": "ibm-granite/granite-4.0-1b",
+    "granite-4.0-micro": "ibm-granite/granite-4.0-micro",
+    "granite-4.0-h-micro": "ibm-granite/granite-4.0-h-micro",
+    "granite-4.0-h-1b": "ibm-granite/granite-4.0-h-1b",
+    "granite-4.1-3b": "ibm-granite/granite-4.1-3b",
+    "granite-4.2-3b": "ibm-granite/granite-4.2-3b",
+    "MiniCPM-1B-sft": "openbmb/MiniCPM-1B-sft-bf16",
+    "MiniCPM-2B-sft": "openbmb/MiniCPM-2B-sft-bf16",
+    "MiniCPM3-4B": "openbmb/MiniCPM3-4B",
+    "MiniCPM4-0.5B": "openbmb/MiniCPM4-0.5B",
+    "MiniCPM5-1B": "openbmb/MiniCPM5-1B",
+    "MiniCPM5-2B": "openbmb/MiniCPM5-2B",
+    "gemma-4-e2b-it": "google/gemma-4-e2b-it",
+    "gemma-3-1b-it": "google/gemma-3-1b-it",
+    "gemma-3-4b-it": "google/gemma-3-4b-it",
+    "Ministral-3-3B-Instruct-2512": "mistralai/Ministral-3-3B-Instruct-2512",
+    "Llama-3.2-1B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
+    "Llama-3.1-8B-Instruct": "meta-llama/Llama-3.1-8B-Instruct",
+    "gpt-oss-20b": "openai/gpt-oss-20b",
+    "SmolLM3-3B": "HuggingFaceTB/SmolLM3-3B",
+    "Hunyuan-A13B-Instruct": "tencent/Hunyuan-A13B-Instruct",
+    "EXAONE-4.0-32B": "LGAI-EXAONE/EXAONE-4.0-32B",
+    "Ling-lite": "inclusionAI/Ling-lite",
+    "GLM-4.5-Air": "zai-org/GLM-4.5-Air",
+}
+
+# gated repos the study cannot fetch; geometry from the author's pull / public cards.
+# kept explicit so `check` knows why a row has no hub extract.
+GATED = {
+    "gemma-3-1b-it": "author pull (addendum 22)",
+    "gemma-3-4b-it": "author pull (addendum 22)",
+    "Llama-3.2-1B-Instruct": "author pull (addendum 22)",
+    "Llama-3.1-8B-Instruct": "public model card (addendum 24)",
+}
+
+FETCH_FIELDS = [
+    "max_position_embeddings",
+    "num_hidden_layers",
+    "num_attention_heads",
+    "num_key_value_heads",
+    "head_dim",
+    "hidden_size",
+    "intermediate_size",
+    "full_attention_interval",
+    "rope_scaling",
+    "rope_theta",
+    "sliding_window",
+    "num_experts",
+    "num_experts_per_tok",
+    "moe_intermediate_size",
+    "architectures",
+    "model_type",
+]
+
+
+def unwrap(config):
+    """Return the text config (multimodal wrappers nest it)."""
+    c = config
+    trail = []
+    while isinstance(c, dict):
+        if c.get("max_position_embeddings") is not None:
+            return c, trail
+        nxt = c.get("text_config") or c.get("language_model")
+        if not nxt:
+            return c, trail
+        c = nxt
+        trail.append("text_config")
+    return c, trail
+
+
+def geometry(c):
+    L = c.get("num_hidden_layers")
+    heads = c.get("num_attention_heads")
+    kvh = c.get("num_key_value_heads", heads)
+    hd = c.get("head_dim")
+    if hd is None and c.get("hidden_size") and heads:
+        hd = c["hidden_size"] // heads
+    interval = c.get("full_attention_interval") or 1
+    if not (L and kvh and hd):
+        return None
+    per_token = L * 2 * kvh * hd * 2
+    return {
+        "layers": L,
+        "kv_heads": kvh,
+        "head_dim": hd,
+        "kv_bytes_per_token_f16": per_token,
+        "kv_kib_per_token_f16": round(per_token / 1024, 1),
+        "full_attention_interval": interval,
+        "kv_q4_0_gib_at_262144": round(
+            CEILING_DEPTH * per_token / interval * KV_QUANT_Q40 / GIB, 2
+        ),
+        "window": c.get("max_position_embeddings"),
+        "rope_scaling": c.get("rope_scaling"),
+    }
+
+
+def fetch():
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        hf_hub_download = None
+
+    out = {"_meta": {"roster_size": len(ROSTER), "gated": GATED}}
+    for name, repo in ROSTER.items():
+        if name in GATED:
+            out[name] = {"repo": repo, "source": GATED[name], "extract": None}
+            continue
+        if hf_hub_download is None:
+            out[name] = {
+                "repo": repo,
+                "source": "FETCH ERROR huggingface_hub not installed",
+                "extract": None,
+            }
+            continue
+        try:
+            raw = json.load(open(hf_hub_download(repo, "config.json")))
+            c, trail = unwrap(raw)
+            extract = {k: c.get(k) for k in FETCH_FIELDS}
+            out[name] = {
+                "repo": repo,
+                "source": "hub config.json" + (f" ({'/'.join(trail)})" if trail else ""),
+                "extract": extract,
+                "geometry": geometry(c),
+            }
+        except Exception as e:
+            out[name] = {"repo": repo, "source": f"FETCH ERROR {type(e).__name__}", "extract": None}
+    STORE.write_text(json.dumps(out, indent=1) + "\n")
+    ok = sum(1 for v in out.values() if isinstance(v, dict) and v.get("extract"))
+    print(
+        f"store written: {STORE.relative_to(ROOT)}"
+        f" ({ok}/{len(ROSTER)} hub extracts, {len(GATED)} gated/paper-sourced)"
+    )
+
+
+def check():
+    store = json.loads(STORE.read_text())
+    models_md = (ROOT / "models.md").read_text()
+    missing, unsourced = [], []
+    for name in ROSTER:
+        if (
+            name not in models_md
+            and name.replace(
+                "Ministral-3-3B-Instruct-2512", "mistralai/Ministral-3-3B-Instruct-2512"
+            )
+            not in models_md
+        ):
+            missing.append(name)
+    for name, v in store.items():
+        if name == "_meta":
+            continue
+        if v.get("source", "").startswith("FETCH ERROR"):
+            unsourced.append(name)
+    print(
+        f"store: {len(store) - 1} models; roster missing from models.md:"
+        f" {missing or 'none'}; fetch errors: {unsourced or 'none'}"
+    )
+    return 1 if (missing or unsourced) else 0
+
+
+def show(name):
+    store = json.loads(STORE.read_text())
+    if name not in store:
+        print(f"unknown id {name}; ids: {', '.join(k for k in store if k != '_meta')}")
+        return 1
+    print(json.dumps(store[name], indent=1))
+    return 0
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "check"
+    if cmd == "fetch":
+        fetch()
+    elif cmd == "geometry":
+        return show(sys.argv[2]) if len(sys.argv) > 2 else 1
+    elif cmd == "check":
+        return check()
+    else:
+        print(__doc__)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
