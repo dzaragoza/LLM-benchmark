@@ -6662,3 +6662,190 @@ all data     -> benchmark-results-kvq4-q4.json
 
 resume state -> benchmark-state-kvq4-q4.json
 all data     -> benchmark-results-kvq4-q4.json
+
+===== 2026-10-01T13:44:55 | full_benchmark.py Qwen/Qwen3.5-4B --rung Q4_K_M --kv-quant-v q8_0 --min-rung 65536 --force --state-file benchmark-state-kvq8-q4.json --results-file benchmark-results-kvq8-q4.json =====
+  python : /home/daniela/technical_reports/LLM-benchmark/.venv/bin/python3
+  [0] no stale llama-server found
+
+============================================================
+[2026-10-01T13:44:55 +0m] family: Qwen3.5-4B
+  model repo : Qwen/Qwen3.5-4B
+  source repo: Qwen/Qwen3.5-4B
+  folder     : ./models/Qwen3.5-4B
+  --force: re-benching Q4_K_M (1 stored verdict(s) cleared; files reused)
+
+  rung Q4_K_M:
+
+=== ladder: Qwen3.5-4B-Q4_K_M ===
+  gallop from 65536 in 2x steps, then binary search (protocol v4.3)
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.156.088 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'false'
+    [server] actual n_ctx = 65536 (requested 65536)
+    conv 1 (blob 64010 tok): turns t/s: 14.2, 14.3, 14.3, 14.3   worst 14.2 (mean 14.3)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 8.6, 8.4, 8.4, 9.0   (reader line 5 w/s)
+      noise at depth: 14.3, 14.3
+    memory: mapped census 7.27 GiB mapped, 0.86 GiB resident (file 0.20 + anon 0.65; smaps, addendum 23), machine cost 5.40 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 14.2 t/s (worst turn; avg-of-worsts 14.2)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 14.30  mean 14.30  worst/mean 1.000  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.86 GiB - file 2.59 GiB, i.e. -1.74 GiB beyond the file (KV + buffers + runtime)
+  rung 65536: speed PASS [381s]
+    cold machine cost @ rung: 5.40 GiB
+  task 1/1 @ 65280 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.37 GiB resident (file 0.18 + anon 0.18; smaps)
+    fwe @ depth 65280: 1/1 -> PASS [304s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.325.808 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 131072, kv_unified = 'false'
+    [server] actual n_ctx = 131072 (requested 131072)
+    conv 1 (blob 129545 tok): turns t/s: 10.3, 10.3, 10.3, 10.2   worst 10.2 (mean 10.3)
+      reader wall (catch-up events): 0, 1, 0, 0   [reader waited 0.28s on the worst turn]
+      words/s (diagnostic): 6.1, 6.1, 6.1, 7.4   (reader line 5 w/s)
+      noise at depth: 10.2, 10.3
+    memory: mapped census 8.91 GiB mapped, 0.85 GiB resident (file 0.20 + anon 0.66; smaps, addendum 23), machine cost 7.03 GiB (MemAvailable delta)
+  note: 1 wall-failing turn(s) recorded - the verdict is the stall rate (protocol v3.1, addendum 73; recomputed from deltas at analyze time)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 10.2 t/s (worst turn; avg-of-worsts 10.2)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 10.22  mean 10.26  worst/mean 0.997  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.87 GiB - file 2.59 GiB, i.e. -1.72 GiB beyond the file (KV + buffers + runtime)
+  rung 131072: speed FAIL [1022s]
+    cold machine cost @ rung: 7.03 GiB
+    speed verdict: {"worst": 6.074344850275071, "mean": 6.421970066028937, "sigma": 0.0, "threshold": 5.0, "verdict": "FAIL", "stall_rate": 0.25, "stall_rate_max": 0.05, "wall_fail_turns": 1, "catchup_events": 1, "worst
+  binary search between 65536 (pass) and 131072 (fail) - speed+fwe
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.160.241 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 98304, kv_unified = 'false'
+    [server] actual n_ctx = 98304 (requested 98304)
+    conv 1 (blob 96783 tok): turns t/s: 12.0, 12.0, 12.0, 12.0   worst 12.0 (mean 12.0)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 7.5, 6.9, 7.4, 7.8   (reader line 5 w/s)
+      noise at depth: 11.9, 12.0
+    memory: mapped census 8.07 GiB mapped, 0.83 GiB resident (file 0.19 + anon 0.64; smaps, addendum 23), machine cost 6.24 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 12.0 t/s (worst turn; avg-of-worsts 12.0)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 11.94  mean 11.98  worst/mean 0.997  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.83 GiB - file 2.59 GiB, i.e. -1.76 GiB beyond the file (KV + buffers + runtime)
+  rung 98304: speed PASS (ceiling) [677s]
+    cold machine cost @ rung: 6.24 GiB
+  task 1/1 @ 98048 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.42 GiB resident (file 0.19 + anon 0.23; smaps)
+    fwe @ depth 98048: 1/1 -> PASS [567s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.229.839 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 114688, kv_unified = 'false'
+    [server] actual n_ctx = 114688 (requested 114688)
+    conv 1 (blob 113163 tok): turns t/s: 11.1, 11.1, 11.1, 11.1   worst 11.1 (mean 11.1)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.7, 6.3, 6.2, 8.5   (reader line 5 w/s)
+      noise at depth: 11.1, 11.1
+    memory: mapped census 8.49 GiB mapped, 0.80 GiB resident (file 0.19 + anon 0.61; smaps, addendum 23), machine cost 6.44 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 11.1 t/s (worst turn; avg-of-worsts 11.1)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 11.09  mean 11.12  worst/mean 0.998  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.81 GiB - file 2.59 GiB, i.e. -1.78 GiB beyond the file (KV + buffers + runtime)
+  rung 114688: speed PASS (ceiling) [843s]
+    cold machine cost @ rung: 6.44 GiB
+  task 1/1 @ 114432 tok: 3/3 words -> HIT ('Based on the analysis of the coded text provided')
+    fwe census: 0.41 GiB resident (file 0.19 + anon 0.22; smaps)
+    fwe @ depth 114432: 1/1 -> PASS [736s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.331.864 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 122880, kv_unified = 'false'
+    [server] actual n_ctx = 122880 (requested 122880)
+    conv 1 (blob 121359 tok): turns t/s: 10.7, 10.7, 10.7, 10.7   worst 10.7 (mean 10.7)
+      reader wall (catch-up events): 0, 0, 0, 0   [reader never waited]
+      words/s (diagnostic): 6.7, 7.0, 6.5, 6.8   (reader line 5 w/s)
+      noise at depth: 10.7, 10.7
+    memory: mapped census 8.70 GiB mapped, 0.81 GiB resident (file 0.19 + anon 0.62; smaps, addendum 23), machine cost 6.65 GiB (MemAvailable delta)
+
+  Qwen3.5-4B-Q4_K_M.gguf: WORST TURN = 10.7 t/s (worst turn; avg-of-worsts 10.7)
+  Qwen3.5-4B-Q4_K_M.gguf: NOISE AT DEPTH: worst 10.70  mean 10.70  worst/mean 0.999  (n=2)
+  Qwen3.5-4B-Q4_K_M.gguf: MEMORY: peak RSS 0.84 GiB - file 2.59 GiB, i.e. -1.76 GiB beyond the file (KV + buffers + runtime)
+  rung 122880: speed PASS (ceiling) [934s]
+    cold machine cost @ rung: 6.65 GiB
+  task 1/1 @ 122624 tok: 3/3 words -> HIT ('Based on a frequency analysis of the coded text ')
+    fwe census: 0.43 GiB resident (file 0.19 + anon 0.24; smaps)
+    fwe @ depth 122624: 1/1 -> PASS [816s]
+
+=== Qwen3.5-4B-Q4_K_M.gguf ===
+  starting server...
+    [server] 0.02.308.791 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 126976, kv_unified = 'false'
+    [server] actual n_ctx = 126976 (requested 126976)
+    memory: mapped census 8.61 GiB mapped, 0.63 GiB resident (file 0.19 + anon 0.44; smaps, addendum 23), machine cost 6.56 GiB (MemAvailable delta)
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1364, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1012, in main
+    failed_families = sweep_families(args, state)
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1115, in sweep_families
+    process_family(
+    ~~~~~~~~~~~~~~^
+        spec,
+        ^^^^^
+    ...<9 lines>...
+        args.rung,
+        ^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 812, in process_family
+    ladder = run_ladder(
+        path,
+    ...<6 lines>...
+        kv_quant_v=state.get("kv_quant_v"),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 466, in run_ladder
+    sc, sc_cap = run_speed(mid)
+                 ~~~~~~~~~^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 339, in run_speed
+    ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant_k, kv_quant_v)
+               ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 134, in speed_pass
+    turns, _, mem_reports = speed_gate.bench_model(
+                            ~~~~~~~~~~~~~~~~~~~~~~^
+        model,
+        ^^^^^^
+    ...<7 lines>...
+        kv_quant_v=kv_quant_v,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/speed_gate.py", line 734, in bench_model
+    res, conv_history = run_conversation(
+                        ~~~~~~~~~~~~~~~~^
+        port,
+        ^^^^^
+    ...<7 lines>...
+        reader_wps=reader_wps,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/speed_gate.py", line 413, in run_conversation
+    for text, t_arr in llama_server.stream_completion(port, payload, meta=meta):
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/llama_server.py", line 377, in stream_completion
+    for chunk in resp:
+                 ^^^^
+  File "/usr/lib64/python3.13/http/client.py", line 727, in readline
+    return super().readline(limit)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib64/python3.13/http/client.py", line 719, in peek
+    return self._peek_chunked(n)
+           ~~~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib64/python3.13/http/client.py", line 757, in _peek_chunked
+    chunk_left = self._get_chunk_left()
+  File "/usr/lib64/python3.13/http/client.py", line 603, in _get_chunk_left
+    chunk_left = self._read_next_chunk_size()
+  File "/usr/lib64/python3.13/http/client.py", line 554, in _read_next_chunk_size
+    line = self.fp.readline(_MAXLINE + 1)
+  File "/usr/lib64/python3.13/socket.py", line 723, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+KeyboardInterrupt
