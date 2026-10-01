@@ -138,7 +138,7 @@ def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
     fwe_results map rung -> (ok, verdict); caps maps rung -> window."""
     caps = caps or {}
 
-    def speed_pass(m, r, c, p, d, kv_quant=None):
+    def speed_pass(m, r, c, p, d, kv_quant=None, kv_quant_k=None, kv_quant_v=None):
         ok, v = speed_results[r]
         v = dict(v)
         v["window_cap"] = caps.get(r)
@@ -147,7 +147,7 @@ def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
             v["ceiling_rung"] = worst is not None and 5.0 <= worst < 7.5
         return ok, v
 
-    def fwe_pass(m, r, d, s, p, kv_quant=None):
+    def fwe_pass(m, r, d, s, p, kv_quant=None, kv_quant_k=None, kv_quant_v=None):
         ok, v = fwe_results[r]
         v = dict(v)
         v["window_cap"] = caps.get(r)
@@ -843,7 +843,7 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     monkeypatch.setattr(
         fb,
         "speed_pass",
-        lambda model, rung, corpus, port, results_dir, kv_quant=None: (
+        lambda model, rung, corpus, port, results_dir, kv_quant=None, k=None, v=None: (
             True,
             {"worst": 20.0, "stall_rate": 0.0, "ceiling_rung": False},
         ),
@@ -851,7 +851,7 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     monkeypatch.setattr(
         fb,
         "fwe_pass",
-        lambda model, rung, results_dir, seed, port, kv_quant=None: (
+        lambda model, rung, results_dir, seed, port, kv_quant=None, k=None, v=None: (
             True,
             {"depth": rung - 256, "correct": 1, "n": 1},
         ),
@@ -973,3 +973,30 @@ def test_code_edit_check_pre_flights_without_writing(tmp_path):
     except code_edit.CodeEditError as e:
         raised = "not found" in str(e)
     assert raised
+
+
+def test_run_ladder_launch_failure_is_failed_not_a_score(tmp_path, monkeypatch):
+    # session 35, addendum 7: a server that never becomes healthy is a
+    # LAUNCH failure - the ladder reports failed+launch_failed and the
+    # score is not a model score (the false-zero selection bug)
+    model = tmp_path / "X.gguf"
+    model.write_bytes(b"fake")
+    _ladder_stub(
+        monkeypatch,
+        speed_results={
+            65536: (
+                False,
+                {"error": "no turns measured (server launch failed)", "launch_failed": True},
+            )
+        },
+        fwe_results={},
+    )
+    ladder = fb.run_ladder(
+        str(model),
+        corpus=str(tmp_path / "corpus.json"),
+        results_dir=str(tmp_path / "res"),
+        min_rung=65536,
+    )
+    assert ladder["failed"] is True
+    assert ladder["launch_failed"] is True
+    assert ladder["score"] == 0

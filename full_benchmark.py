@@ -116,6 +116,8 @@ def speed_pass(
     port: int,
     results_dir: str,
     kv_quant: str | None = None,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """One speed-gate cell at ctx=rung, n=1 conversation: real blob,
     real turns, the v3.1 verdict from those turns only (reduced rules:
@@ -139,6 +141,8 @@ def speed_pass(
         True,
         n_conversations=1,
         kv_quant=kv_quant,
+        kv_quant_k=kv_quant_k,
+        kv_quant_v=kv_quant_v,
     )
     # the launch's banner: when the server capped the -c DOWN to the
     # trained window, bench_model's banner guard refused to bench (no
@@ -158,7 +162,11 @@ def speed_pass(
         if window_cap is not None and window_cap < rung:
             print(f"    trained window {window_cap:,} caps the requested -c {rung:,}")
             return False, {"error": "capped to the window", "window_cap": window_cap}
-        return False, {"error": "no turns measured", "window_cap": window_cap}
+        return False, {
+            "error": "no turns measured (server launch failed)",
+            "launch_failed": True,
+            "window_cap": window_cap,
+        }
     label = os.path.splitext(os.path.basename(model))[0]
     dump = os.path.join(results_dir, f"{label}-rung{rung}-speed.json")
     with open(dump, "w") as f:
@@ -191,6 +199,8 @@ def fwe_pass(
     seed: int,
     port: int,
     kv_quant: str | None = None,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """One FWE cell at depth=rung-2x headroom, n=1, on its own server
     launch at exactly the rung's ctx (ruler_gate's launch shape: one
@@ -209,6 +219,12 @@ def fwe_pass(
     extra_args = ["-c", str(rung), "--parallel", "1"]
     if kv_quant:
         extra_args += ["-fa", "--cache-type-k", kv_quant, "--cache-type-v", kv_quant]
+    if kv_quant_k or kv_quant_v:
+        extra_args += ["-fa"]
+        if kv_quant_k:
+            extra_args += ["--cache-type-k", kv_quant_k]
+        if kv_quant_v:
+            extra_args += ["--cache-type-v", kv_quant_v]
     proc, healthy = llama_server.start_server(
         model,
         port=port,
@@ -272,6 +288,8 @@ def run_ladder(
     max_rung: int | None = None,
     min_rung: int = RUNG_BASE,
     kv_quant: str | None = None,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
 ) -> dict[str, Any]:
     """One model's PROTOCOL v4.3 ladder (session 34 addendum 19): the
     gallop (2x steps) finds the floor and the ceiling, then a binary
@@ -322,7 +340,7 @@ def run_ladder(
         this rung is not scored)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant)
+        ok_s, sv = speed_pass(model, r, corpus, port, results_dir, kv_quant, kv_quant_k, kv_quant_v)
         t_speed = time.monotonic() - t0
         tag = " (ceiling)" if sv.get("ceiling_rung") else ""
         print(
@@ -339,6 +357,8 @@ def run_ladder(
             speed_s=t_speed,
             ceiling_rung=bool(sv.get("ceiling_rung")),
         )
+        if sv.get("launch_failed"):
+            cell["launch_failed"] = True
         if not ok_s:
             print(f"    speed verdict: {json.dumps(sv)[:200]}")
         cap = sv.get("window_cap")
@@ -353,7 +373,7 @@ def run_ladder(
         """Bench FWE at rung r. Returns (cell, window_cap)."""
         cell = cell_for(r)
         t0 = time.monotonic()
-        ok_f, fv = fwe_pass(model, r, results_dir, seed, port, kv_quant)
+        ok_f, fv = fwe_pass(model, r, results_dir, seed, port, kv_quant, kv_quant_k, kv_quant_v)
         t_fwe = time.monotonic() - t0
         print(
             f"    fwe @ depth {fv.get('depth')}: "
@@ -466,7 +486,20 @@ def run_ladder(
 
     # ---- the floor rule (refinement 4): any ceiling below the start
     # rung is a BASE FAILURE - not a score, a flag for the author.
-    if floor <= 0 or (ceiling is not None and ceiling < start):
+    # A LAUNCH failure (server never became healthy - bad flags, bad
+    # build, OOM at load) is NOT a model score either, and it must not
+    # be selectable: the run is FAILED with the reason (session 35,
+    # addendum 7 - the false-zero selection bug).
+    launch_failed = any(c.get("launch_failed") for c in rungs)
+    if launch_failed:
+        failed = True
+        score = 0
+        print(
+            f"  {label}: FAILED - a server launch failed (bad flags/build or "
+            "load-time crash); this is NOT a model score, the family stays "
+            "unselected - fix the launch and re-run with --force"
+        )
+    if not launch_failed and (floor <= 0 or (ceiling is not None and ceiling < start)):
         failed = True
         score = 0
         why = ceiling if ceiling is not None else floor
@@ -499,6 +532,7 @@ def run_ladder(
         "model": label,
         "score": score,
         "failed": failed,
+        "launch_failed": launch_failed,
         "wall_min": wall_min,
         "rungs": rungs,
         "file_gib": round(os.path.getsize(model) / (1024**3), 3),
@@ -787,6 +821,8 @@ def process_family(
             seed=state.get("ladder_seed", 1024),
             min_rung=state.get("ladder_min_rung", RUNG_BASE),
             kv_quant=state.get("kv_quant"),
+            kv_quant_k=state.get("kv_quant_k"),
+            kv_quant_v=state.get("kv_quant_v"),
         )
         run["ladder"] = ladder
         run["phases_done"].append(3)
@@ -807,6 +843,22 @@ def process_family(
             run["phases_done"].append(4)
             save_state(state_path, state)
             stamp("      phase 4 done (invalid - flicker)")
+            return
+        if ladder and ladder.get("launch_failed"):
+            # session 35, addendum 7: a launch failure is not a score -
+            # the family stays UNSELECTED (the false-zero bug: the
+            # crashed witness runs recorded "PASS (ladder score 0)" and
+            # the resume skipped the family)
+            run["verdict"] = (
+                "FAIL (server launch failed - bad flags/build or load-time "
+                "crash; fix the launch and re-run with --force)"
+            )
+            run["rung"] = rung
+            run["score"] = 0
+            run["launch_failed"] = True
+            run["phases_done"].append(4)
+            save_state(state_path, state)
+            stamp("      phase 4 done (launch failed - not selectable)")
             return
         if ladder:
             row = scored_row(ladder)
@@ -885,15 +937,30 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--force", action="store_true", help="redo families that already have a selection"
     )
+    _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant",
         default=None,
-        choices=["q8_0", "q4_0"],
+        choices=_KV_CHOICES,
         help="session 35: quantize the KV cache (K and V both) to this type - "
         "launches with -fa (required for quantized caches). Rides the state "
         "file (kv_quant) so every rung of the ladder launches the same way; "
         "use a FRESH --state-file/--results-file pair so the variant never "
         "contaminates the baseline grids.",
+    )
+    ap.add_argument(
+        "--kv-quant-k",
+        default=None,
+        choices=_KV_CHOICES,
+        help="session 35, addendum 7: quantize ONLY the K cache to this type "
+        "(V keeps its own setting; both None = default f16).",
+    )
+    ap.add_argument(
+        "--kv-quant-v",
+        default=None,
+        choices=_KV_CHOICES,
+        help="session 35, addendum 7: quantize ONLY the V cache to this type "
+        "(K keeps its own setting; both None = default f16).",
     )
     ap.add_argument(
         "--thinking",
@@ -951,6 +1018,10 @@ def main() -> None:
         state["ladder_min_rung"] = args.min_rung
     if args.kv_quant:
         state["kv_quant"] = args.kv_quant
+    if args.kv_quant_k:
+        state["kv_quant_k"] = args.kv_quant_k
+    if args.kv_quant_v:
+        state["kv_quant_v"] = args.kv_quant_v
 
     if not args.families:
         ap.error("no family specs given")

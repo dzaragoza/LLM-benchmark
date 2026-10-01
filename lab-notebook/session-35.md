@@ -80,3 +80,15 @@ THE REGISTER (this addendum, in order):
 3. A multi-block transaction rolled back on a duplicate anchor (block 2 matched two places) - correct behavior, but it took a failed edit to find out. FIX: check() pre-flights a whole block set WITHOUT writing: verify + delimiters + result checks, returns the preview diff, raises with the exact block and reason on failure.
 
 DESIGN NOTE: the failure modes are now all pre-write. The transactional contract (file untouched on ANY error) holds; check() exists so a bad block set never even reaches the write path.
+
+
+## Session 35, addendum 7 - separate K/V cache quants; the false-zero selection fixed; the witness rides a 64k floor
+
+THE RESUME RERUNS NEVER RAN: the fresh state files carried the crashed launches as "PASS (ladder score 0 tokens)" selections, so the family was skipped ("already selected... --force to redo"). Two bugs, both fixed:
+
+1. THE FALSE-ZERO SELECTION: a speed verdict with error "no turns measured" (the server never became healthy) now carries launch_failed=True; run_ladder reports failed+launch_failed and phase 4 records FAIL ("server launch failed") instead of PASS - the family stays UNSELECTED. A launch crash is not a model score.
+2. code_edit region check: a replace that starts INSIDE an open delimiter (a parameter list) and ends with its closer was false-positived; the region check now allows both directions (openers that close later, closers that opened earlier) - the real signals, mismatched closers and unclosed quotes, remain. Register entry 4.
+
+SEPARATE K/V CACHE QUANTS (author ruling): --kv-quant-k and --kv-quant-v (choices q8_0, q4_0, q4_1, q5_0, q5_1, iq4_nl) ride the state file like --kv-quant. The witness design: K stays DEFAULT (f16), only V quantizes - community wisdom says V-quantization is nearly free quality-wise, K is where the damage shows. If V-only works, K-only is the follow-up.
+
+64K FLOOR for the witness runs: --min-rung 65536 (persisted as ladder_min_rung in the state file) - the witness is speed-wall-bound near 123k, so the 4k-32k rungs are wasted machine time; the ladder starts at 64k and gallops up.

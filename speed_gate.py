@@ -651,6 +651,8 @@ def bench_model(
     reader_wps: float | None = None,
     n_conversations: int | None = None,
     kv_quant: str | None = None,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
 ) -> tuple[list[dict[str, Any]], tuple[str, float, float] | None, list[dict[str, Any]]]:
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
@@ -676,12 +678,19 @@ def bench_model(
     log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
     print("  starting server...", flush=True)
     extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
+    # session 35, addendum 7: K and V quantize SEPARATELY (a None leaves
+    # that cache at the default f16). kv_quant quantizes both at once
+    # (the original flag, kept for back-compat with the state files).
+    # -fa is kept: quantized caches need the FA kernels, and FA tiles
+    # the O(n^2) score matrix (never materialized).
     if kv_quant:
-        # session 35: the KV-cache variant. -fa is REQUIRED for quantized
-        # caches (the non-FA kernels do not implement them) and shrinks
-        # the attention compute buffers at deep ctx (the O(n^2) score
-        # matrix is tiled with a running softmax, never materialized).
         extra += ["-fa", "--cache-type-k", kv_quant, "--cache-type-v", kv_quant]
+    if kv_quant_k or kv_quant_v:
+        extra += ["-fa"]
+        if kv_quant_k:
+            extra += ["--cache-type-k", kv_quant_k]
+        if kv_quant_v:
+            extra += ["--cache-type-v", kv_quant_v]
     if thinking:
         extra += ["--reasoning-format", "deepseek"]
     if no_thinking:
