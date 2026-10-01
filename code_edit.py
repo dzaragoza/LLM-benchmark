@@ -313,10 +313,51 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
     _ = changed_lines  # kept for clarity; per-line comparison handled above
 
 
+_KINDS = (
+    "replace",
+    "replace_all",
+    "replace_n",
+    "replace_regex",
+    "replace_regex_all",
+    "replace_region",
+    "delete",
+    "delete_lines",
+    "insert_before",
+    "insert_after",
+    "set_lines",
+    "insert_lines",
+    "append",
+    "prepend",
+    "indent",
+    "dedent",
+)
+
+
+def _normalize_block(block: tuple) -> tuple:
+    """Accept the bare (old, new) / (old,) shorthand (session 35,
+    addendum 6): a 2/3-tuple whose first element is not a known kind
+    is a replace/delete in disguise - the kind tag is inferred, not
+    an error."""
+    if not block:
+        raise CodeEditError("block: empty tuple")
+    kind = block[0]
+    if isinstance(kind, str) and kind in _KINDS:
+        return tuple(block)
+    if len(block) == 2:
+        return ("replace", block[0], block[1])
+    if len(block) == 3 and all(isinstance(x, str) for x in block):
+        raise CodeEditError(
+            f"block: first element {kind!r} is not a known kind {_KINDS} - "
+            "did you forget the kind tag, or is the target not unique?"
+        )
+    raise CodeEditError(f"block: cannot interpret {block!r} - expected (kind, old, new)")
+
+
 def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
     """Check every block against src, in order, simulating the apply."""
     buf = src
     for i, block in enumerate(blocks):
+        block = _normalize_block(block)
         if len(block) < 2:
             raise CodeEditError(f"block {i}: expected (kind, old, new) - got {block!r}")
         kind = block[0]
@@ -547,6 +588,7 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     """
     with open(path, encoding="utf-8") as f:
         src = f.read()
+    blocks = [_normalize_block(tuple(b)) for b in blocks]
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
     _last_edit_regions.clear()
@@ -661,6 +703,22 @@ def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
                 raise CodeEditError(
                     f"{path}: disk content diverged after write - the file may be corrupt; re-check"
                 )
+
+
+def check(path: str, blocks: Sequence[tuple]) -> str:
+    """Pre-flight a block set WITHOUT writing (session 35, addendum 6):
+    runs every check edit() would run (verify, delimiters, result) and
+    returns the preview diff. A failing check raises CodeEditError with
+    the exact block and reason. Use this to validate blocks before
+    committing to the write."""
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    blocks = [_normalize_block(tuple(b)) for b in blocks]
+    _verify_blocks(src, blocks)
+    out = _apply(src, blocks)
+    _check_delimiters(src, out, path)
+    _verify_result(out, blocks, path)
+    return preview(path, blocks)
 
 
 def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:

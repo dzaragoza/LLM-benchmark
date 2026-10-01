@@ -945,3 +945,31 @@ def test_code_edit_verify_failure_leaves_the_file_untouched(tmp_path):
     assert raised
     with open(str(p)) as f:
         assert f.read() == "x = 1\n"
+
+
+def test_code_edit_accepts_the_bare_replace_shorthand(tmp_path):
+    # session 35, addendum 6: (old, new) without the kind tag is a
+    # replace - the tag is inferred, not an error
+    p = tmp_path / "code.py"
+    p.write_text("x = 1\ny = 2\n")
+    code_edit.edit(str(p), [("x = 1", "x = 42")])
+    with open(str(p)) as f:
+        assert "x = 42" in f.read()
+
+
+def test_code_edit_check_pre_flights_without_writing(tmp_path):
+    # session 35, addendum 6: check() runs every check edit() would
+    # run, returns the preview diff, and leaves the file untouched;
+    # a bad block raises with the reason
+    p = tmp_path / "code.py"
+    p.write_text("x = 1\ny = 2\n")
+    diff = code_edit.check(str(p), [("y = 2", "y = 3")])
+    assert "+y = 3" in diff
+    with open(str(p)) as f:
+        assert f.read() == "x = 1\ny = 2\n"  # untouched
+    try:
+        code_edit.check(str(p), [("nope", "z")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = "not found" in str(e)
+    assert raised

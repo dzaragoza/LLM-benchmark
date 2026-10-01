@@ -68,3 +68,15 @@ BOTH KV-variant witness runs (4B @ Q4_K_M, KV q8_0 and KV q4_0) failed identical
 THE FIX (pushed): both launch sites now dump the last 15 lines of the server log into results.txt when the server never becomes healthy (speed_gate.bench_model via _dump_log_tail; full_benchmark.fwe_pass inline). The addendum-33 lesson, applied: never leave the diagnosis on the author's disk.
 
 PRIME SUSPECT: the -fa flag. Recent llama.cpp builds made flash attention the default and REMOVED -fa; passing it is a hard argument-parse error that kills the server in ~1s - exactly this signature. The fix, once the log confirms it, is to drop -fa and keep only --cache-type-k/--cache-type-v (quantized caches are the default-kernel path in those builds). Rerun the same two commands after the pull.
+
+
+## Session 35, addendum 6 - code_edit: the shorthand, the pre-flight, and the standing report rule
+
+AUTHOR RULING (standing): every code_edit issue is reported to the author the moment it happens, before moving on. This addendum opens the register.
+
+THE REGISTER (this addendum, in order):
+1. Bare (old, new) tuples failed with the cryptic "unknown kind" error - the kind tag was required. FIX: _normalize_block infers the kind: a 2-tuple whose first element is not a known kind IS a replace; a 3-string-tuple without a kind gets a CLEAR error naming the kind list. Both edit() and check() normalize.
+2. _KINDS was written from memory and MISSED five real kinds (replace_regex_all, replace_region, delete_lines, indent, dedent) - 7 tests failed until it was synced against _verify_blocks. FIX: the list is now complete; a test would have caught this (see 4).
+3. A multi-block transaction rolled back on a duplicate anchor (block 2 matched two places) - correct behavior, but it took a failed edit to find out. FIX: check() pre-flights a whole block set WITHOUT writing: verify + delimiters + result checks, returns the preview diff, raises with the exact block and reason on failure.
+
+DESIGN NOTE: the failure modes are now all pre-write. The transactional contract (file untouched on ANY error) holds; check() exists so a bad block set never even reaches the write path.
