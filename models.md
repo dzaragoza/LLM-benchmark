@@ -47,40 +47,62 @@ pair, not a model).
 
 ## REJECTED
 
-| model name | reason for rejection |
-|---|---|
-| Qwen3.5-0.8B-Base | identical RAM geometry to the champion 0.8B already measured (Q8_0 + f16, 4.96 GiB); only the tuning differs - not worth an hour (addendum 14) |
-| Qwen3.5-9B | no configuration fits under the 4.96 GiB ceiling (best: Q2_K + q4_0/q4_0 = 7.05 GiB predicted) - the family closes at 9B |
-| gemma-4-e2b-it | trained window 131,072 < 262,144 (verified from config.json); no rope scaling by standing rule |
-| Ministral 3B | gated repo (HTTP 401) and 128k-class window |
-| Qwen3.5-2B-Base | BASE type, not instruct (addendum 18): the benchmark is conversation- and instruction-shaped (the speed gate is a live conversation, FWE is an instruction-following task); the instruct 2B is already PASS - only one type per model |
-| Qwen3.5-4B-Base | BASE type, not instruct (addendum 18): same reason; the instruct 4B is the candidate the study probes |
-| MiniCPM5-2B-Base | BASE type, not instruct (addendum 18); the addendum-20 sweep found its config declares a 524,288 window - the only sub-ceiling-RAM window > 262,144 in the whole hub sweep - but the type rule closes it: the instruct MiniCPM5-2B (window 131,072) is the family's one type and it is already rejected on window |
-| AI21-Jamba-Reasoning-3B | THINKING model (rule 3: the study carries non-thinking only); same 262,144 window and thin KV as Jamba2-3B but the reasoning tune is the wrong shape for the gates |
-| AI21-Jamba2-Mini | 12B MoE (16 experts, 2 active): Q2_K weights alone ~4.75 GiB, over the ceiling before KV; window 262,144 and non-thinking, but no configuration fits |
-| Qwen2.5-1.5B-Instruct | retro-analysis (addendum 19): trained window 32,768 < 262,144, no rope scaling; v4.3 score 20,992 @ Q8_0 - the RAM would fit (1.97 GiB q4_0 KV at 262k), the window is the wall |
-| Qwen3-1.7B | retro-analysis (addendum 19): KV geometry 112 KiB/token f16 -> q4_0 KV alone ~7.9 GiB > 4.96 ceiling (plus window 40,960 and FWE broken at 40,704) |
-| Qwen3-4B | retro-analysis (addendum 19): KV 144 KiB/token -> q4_0 KV ~10.1 GiB, triple the ceiling; window 40,960 besides |
-| phi-4-mini-instruct | retro-analysis (addendum 19): KV 128 KiB/token -> q4_0 KV ~9.0 GiB > ceiling; window 131,072 (the deepest non-Qwen3.5 score, 44,032 @ Q4_K_M, is 6x short of the goal) |
-| Phi-3.5-mini-instruct | retro-analysis (addendum 19): KV 384 KiB/token -> q4_0 KV ~27 GiB, 5x the ceiling; window 131,072; also FWE zero at Q4_K_M |
-| Phi-3-mini-4k-instruct | retro-analysis (addendum 19): window 4,096; KV 384 KiB/token -> ~27 GiB q4_0 KV at 262k |
-| phi-1 | retro-analysis (addendum 19): window 2,048; base/code model (type rule); far under the 16k screen |
-| phi-2 | retro-analysis (addendum 19): window 2,048; KV 320 KiB/token -> ~22.5 GiB q4_0 KV at 262k |
-| granite-3.0-2b-instruct | retro-analysis (addendum 19): window 4,096; KV 80 KiB/token -> ~5.6 GiB q4_0 KV; 4,096-class score |
-| granite-3.1-2b-instruct | retro-analysis (addendum 19): window 131,072 < 262,144; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; Q4 counting fell off the cliff (12,288 -> 6,144) |
-| granite-3.2-2b-instruct | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 15,360 |
-| granite-3.3-2b-instruct | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 26,624 |
-| granite-4.0-350m | retro-analysis (addendum 19): window 32,768; never passed the 16k screen on the f4k grid (quality) |
-| granite-4.0-h-350m | retro-analysis (addendum 19): window 32,768; never passed the 16k screen on the f4k grid (quality) |
-| granite-4.0-1b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling |
-| granite-4.0-micro | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
-| granite-4.0-h-micro | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
-| granite-4.0-h-1b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; MoE hybrid |
-| granite-4.1-3b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; score 18,432 |
-| granite-4.2-3b | retro-analysis (addendum 19): window 131,072; KV 80 KiB/token -> ~5.6 GiB q4_0 KV > ceiling; also corrupted f16 file in the Q4 resume, out of that sweep |
-| MiniCPM-1B-sft | retro-analysis (addendum 19): window 4,096; sft = instruct-tuned (type OK) but KV 104 KiB/token -> ~7.3 GiB q4_0 KV > ceiling; 4,096-class score |
-| MiniCPM-2B-sft | retro-analysis (addendum 19): window 4,096; KV 360 KiB/token -> ~25.3 GiB q4_0 KV; 4,096-class score |
-| MiniCPM3-4B | retro-analysis (addendum 19): window 32,768 (no usable rope scaling); KV 620 KiB/token -> ~43.6 GiB q4_0 KV |
-| MiniCPM4-0.5B | retro-analysis (addendum 19): window 32,768; KV 12 KiB/token (RAM would fit) but never passed the 16k screen on the f4k grid (quality) |
-| MiniCPM5-1B | retro-analysis (addendum 19): window 131,072 < 262,144; RAM would fit (1.69 GiB q4_0 KV) but the window is the wall (no rope scaling by rule) |
-| MiniCPM5-2B | retro-analysis (addendum 19): window 131,072; KV 42 KiB/token -> 2.95 GiB q4_0 KV, weights+KV+overhead ~4.2 GiB - would fit, but the window is the wall; also FWE zero at Q4_K_M |
+Strict reason list (author ruling, addendum 21): no research paper |
+no model small enough (q2, q4, q4) > ceiling | training window < 256k
+| other. A model is rejected on the FIRST reason that binds in the
+fair-chance order: if even the floor config (Q2_K + K/V q4_0/q4_0)
+predicts RAM above the 4.96 GiB ceiling, the size binds; if the RAM
+fits but the trained window is under 262,144 (no rope scaling), the
+window binds; everything else is other.
+
+| model name | rejection reason | notes |
+|---|---|---|
+| Qwen3.5-0.8B-Base | other | BASE type (addendum 18); identical RAM geometry to the measured champion config (Q8_0 + f16, 4.96 GiB) - not worth an hour (addendum 14) |
+| Qwen3.5-2B-Base | other | BASE type (addendum 18); the instruct 2B is already PASS - one type per model |
+| Qwen3.5-4B-Base | other | BASE type (addendum 18); the instruct 4B is the candidate the study probes |
+| Qwen3.5-9B | no model small enough (q2, q4, q4) > ceiling | best config Q2_K + q4_0/q4_0 = 7.05 GiB predicted; the family closes at 9B |
+| gemma-4-e2b-it | training window < 256k | trained window 131,072 (verified from config.json); no rope scaling by standing rule |
+| Ministral 3B | other | gated repo (HTTP 401) and no research paper for Ministral; 128k-class window suspected but unverified - the author can un-reject with hub access |
+| Qwen2.5-1.5B-Instruct | training window < 256k | window 32,768; the RAM would fit (1.97 GiB q4_0 KV at 262k) - the window is the wall; v4.3 score 20,992 @ Q8_0 |
+| Qwen3-1.7B | no model small enough (q2, q4, q4) > ceiling | KV 112 KiB/token -> q4_0 KV alone ~7.9 GiB > 4.96; window 40,960 and FWE broken at 40,704 besides |
+| Qwen3-4B | no model small enough (q2, q4, q4) > ceiling | KV 144 KiB/token -> ~10.1 GiB q4_0 KV; window 40,960 besides |
+| phi-4-mini-instruct | no model small enough (q2, q4, q4) > ceiling | KV 128 KiB/token -> ~9.0 GiB q4_0 KV; window 131,072; the deepest non-Qwen3.5 score (44,032 @ Q4_K_M) is 6x short |
+| Phi-3.5-mini-instruct | no model small enough (q2, q4, q4) > ceiling | KV 384 KiB/token -> ~27 GiB q4_0 KV; FWE zero at Q4_K_M |
+| Phi-3-mini-4k-instruct | no model small enough (q2, q4, q4) > ceiling | KV 384 KiB/token -> ~27 GiB q4_0 KV; window 4,096 |
+| phi-1 | training window < 256k | window 2,048; base/code model (type rule) - far under the 16k screen |
+| phi-2 | no model small enough (q2, q4, q4) > ceiling | KV 320 KiB/token -> ~22.5 GiB q4_0 KV; window 2,048 besides |
+| granite-3.0-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 4,096; 4,096-class score |
+| granite-3.1-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; Q4 counting fell off the cliff (12,288 -> 6,144) |
+| granite-3.2-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; score 15,360 |
+| granite-3.3-2b-instruct | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; score 26,624 |
+| granite-4.0-350m | training window < 256k | window 32,768; RAM would fit (1.97 GiB q4_0 KV); never passed the 16k screen on the f4k grid (quality) |
+| granite-4.0-h-350m | training window < 256k | window 32,768; RAM would fit (2.25 GiB q4_0 KV); never passed the 16k screen (quality) |
+| granite-4.0-1b | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072 |
+| granite-4.0-micro | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; MoE hybrid |
+| granite-4.0-h-micro | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; MoE hybrid |
+| granite-4.0-h-1b | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; MoE hybrid |
+| granite-4.1-3b | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; score 18,432 |
+| granite-4.2-3b | no model small enough (q2, q4, q4) > ceiling | KV 80 KiB/token -> ~5.6 GiB q4_0 KV; window 131,072; also corrupted f16 file in the Q4 resume |
+| MiniCPM-1B-sft | no model small enough (q2, q4, q4) > ceiling | KV 104 KiB/token -> ~7.3 GiB q4_0 KV; window 4,096; 4,096-class score |
+| MiniCPM-2B-sft | no model small enough (q2, q4, q4) > ceiling | KV 360 KiB/token -> ~25.3 GiB q4_0 KV; window 4,096 |
+| MiniCPM3-4B | no model small enough (q2, q4, q4) > ceiling | KV 620 KiB/token -> ~43.6 GiB q4_0 KV; window 32,768 |
+| MiniCPM4-0.5B | training window < 256k | window 32,768; RAM would fit (0.84 GiB q4_0 KV); never passed the 16k screen (quality) |
+| MiniCPM5-1B | training window < 256k | window 131,072; RAM would fit (1.69 GiB q4_0 KV) - the window is the wall |
+| MiniCPM5-2B | training window < 256k | window 131,072; RAM would fit (~4.2 GiB whole config at q4_0 KV) - the window is the wall; also FWE zero at Q4_K_M |
+| MiniCPM5-2B-Base | other | BASE type (addendum 18); the addendum-20 sweep found its config declares a 524,288 window - the only sub-ceiling-RAM window > 262,144 on the hub - but the type rule closes it: the instruct tune is the family's one type |
+| AI21-Jamba-Reasoning-3B | other | THINKING model (rule 3: non-thinking only); same 262,144 window and thin KV as Jamba2-3B but the wrong shape for the gates |
+| AI21-Jamba2-Mini | no model small enough (q2, q4, q4) > ceiling | 12B MoE (16 experts, 2 active): Q2_K weights alone ~4.75 GiB, over the ceiling before KV; window 262,144 |
+| openai/gpt-oss-20b | training window < 256k | window 131,072; KV 48 KiB/token (3.38 GiB q4_0 KV at 262k) - window binds first (addendum-20 sweep) |
+| HuggingFaceTB/SmolLM3-3B | training window < 256k | window 65,536; KV 72 KiB/token -> ~5.1 GiB q4_0 KV would also exceed the ceiling |
+| tencent/Hunyuan-A13B-Instruct | training window < 256k | window 32,768; MoE |
+| LGAI-EXAONE/EXAONE-4.0-32B | training window < 256k | window 131,072; KV 256 KiB/token (~18 GiB q4_0 KV) would also exceed the ceiling |
+| inclusionAI/Ling-lite-1.5B | training window < 256k | window 32,768 (addendum-20 sweep) |
+| zai-org/GLM-4.5-Air | training window < 256k | window 131,072 |
+| meta-llama/Llama-3.2-1B-Instruct | other | gated (HTTP 401); Llama-3.x is 128k-class - window-capped if the author verifies hub access |
+| meta-llama/Llama-3.1-8B-Instruct | other | gated (HTTP 401); 128k-class window |
+| google/gemma-3-1b-it | other | gated (HTTP 401); gemma-3 small models are 32k-128k class - window-capped if verified |
+| google/gemma-3-4b-it | other | gated (HTTP 401); 128k-class window |
+| Qwen3-30B-A3B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but MoE: Q2_K weights alone far over the ceiling; KV 96 KiB/token -> 6.75 GiB q4_0 KV besides |
+| Qwen3-4B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but KV 144 KiB/token -> ~10.1 GiB q4_0 KV (the 2507 refresh dropped the hybrid interval) |
+| DSpark/EAGLE3 draft heads (RadixArk, z-lab, incoai, lightseekorg, Inferact, skt repos) | other | speculative-decoding DRAFT MODELS, not instruct models - sweep false positives, never candidates |
+| community finetunes (NeoHorse-1-4B, JevK5, test tinies, reformer) | other | rule 5 (first-party weights) / not instruct models - sweep false positives |
