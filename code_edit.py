@@ -147,12 +147,28 @@ def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
     return a, a + tail.index(end)
 
 
+_last_edit_regions: list[tuple[str, str]] = []
+
+
 def _check_delimiters(src: str, out: str, path: str) -> None:
     """Sanity check that the edit did not unbalance quotes, brackets,
     braces or parens. Per line when lines are short (most code); on
     the whole buffer for minified/long-line files (HTML pickers) -
     where a line legitimately spans many statements, only the whole
     buffer must balance."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    closers = set(pairs.values())
+
+    def balance_no_underflow(text: str) -> str | None:
+        # a region may OPEN a delimiter that closes after it (an edit
+        # that inserts a call whose closing paren lands on a later
+        # line), so unclosed-at-end is fine here; the real failure
+        # modes - a mismatched closer or an unclosed quote - are not.
+        problem = balance(text)
+        if problem and ("unbalanced" in problem or "quote" in problem):
+            return problem
+        return None
+
     pairs = {"(": ")", "[": "]", "{": "}"}
     closers = set(pairs.values())
 
@@ -214,18 +230,34 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
                     "the buffer was balanced before; likely a duplicated or truncated fragment"
                 )
     else:
-        src_lines = src.splitlines()
-        out_lines = out.splitlines()
-        n_src, n_out = len(src_lines), len(out_lines)
-        for idx in range(n_out):
-            old = src_lines[idx] if idx < n_src and (idx + 1 < n_src or n_src == n_out) else None
-            if idx >= n_src or (old is not None and old != out_lines[idx]):
-                problem = balance(out_lines[idx])
-                if problem:
-                    raise CodeEditError(
-                        f"{path}: delimiter balance check failed on line {idx + 1} "
-                        f"({problem}) - likely a duplicated or truncated fragment"
-                    )
+        # region-based, not line-based (session 35: a per-line check
+        # blames legitimate multi-line code - a lone "print(", an
+        # ap.add_argument( block's closing ")" - for pre-existing
+        # per-line imbalance. The failure mode the check exists for is
+        # a TRUNCATED or DUPLICATED fragment, and that is a property of
+        # the edited REGION, not of any single line: each region must
+        # balance as a unit.)
+        src2, regions = src, []
+        for old_text, new_text in _last_edit_regions:
+            i = src2.find(old_text)
+            j = out.find(new_text)
+            if i >= 0 and j >= 0:
+                regions.append((j, j + len(new_text)))
+            src2 = src2.replace(old_text, "", 1)
+        covered = list(regions)
+        if not covered and balance(src) is None:
+            # insert/delete-only edit: like with like - the whole-buffer
+            # check applies only when the source already balanced
+            covered = [(0, len(out))]
+        for j0, j1 in covered:
+            region = out[j0:j1]
+            problem = balance_no_underflow(region)
+            if problem:
+                raise CodeEditError(
+                    f"{path}: delimiter balance check failed in the edited "
+                    f"region (offset {j0}, {problem}) - likely a duplicated "
+                    "or truncated fragment"
+                )
     _ = changed_lines  # kept for clarity; per-line comparison handled above
 
 
@@ -465,6 +497,8 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
         src = f.read()
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
+    _last_edit_regions.clear()
+    _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
     _check_delimiters(src, out, path)
     _atomic_write_sync(path, out)
     # re-read from disk and re-verify the post-conditions

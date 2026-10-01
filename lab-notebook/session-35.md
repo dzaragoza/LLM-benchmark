@@ -27,3 +27,20 @@ THE FINDINGS (Q4 vs Q8, the 12-family partial grid):
 WHICH QUANTS NEXT, FOR WHICH MODELS: the interesting frontier is the top of the table, where depth is KV-bound and the weights are a small fraction of the cost. Q5_K_M and Q6_K on the two Qwen3.5 families answer "how much counting capability does a bit of precision buy back" - Qwen3.5-4B Q5_K_M is the single most interesting cell (its Q8 65,536 vs Q4 123,904 bracket is wide; Q5/Q6 pin where the FWE cliff sits). Q3_K_M on Qwen3.5-0.8B tests whether the 262,144 champion survives further compression. Q2_K is likely a waste of machine time (the Q4 zeros show the counting floor is near). The granite/MiniCPM mid-table is speed-band-limited, not precision-limited - low priority. The f16 files are kept on disk (the quant source; lz4-style tools buy only ~5-10% on f16, quantization is the real compression).
 
 THE RESUME IS RUNNING: the four-family Q4 resume (session 35, addendum 1's command) is running now; the pages will be re-checked against its results when it lands (phi-4-mini and granite-3.3-2b may flip to Q4 rows; granite-4.2-3b and granite-3.0-2b scored 4,096 at Q8 so they only flip if Q4 beats that).
+
+
+## Session 35, addendum 3 - the KV-cache quantization variant (FA required)
+
+The author wants to take the Qwen3.5 family to the limit. The context is the dominant factor on this bandwidth class, so the next lever is the KV cache itself: quantize the KV cache to halve (q8_0) or quarter (q4_0) its size, which at 262k tokens is the memory term that scales with context.
+
+Why flash attention (-fa) is REQUIRED for a quantized cache: the non-FA attention kernels in llama.cpp do not implement the quantized-cache code paths - the server refuses or ignores --cache-type-k/--cache-type-v without -fa. FA itself is the memory-saving rewrite of attention: the naive kernel materializes the full O(n^2) score matrix (n = context tokens); FA tiles the computation and runs the softmax online, never materializing the score matrix. So -fa is both the enabler of the quantized cache and a memory win in its own right at deep contexts.
+
+The experiment design (author rulings):
+- The 4B is the WITNESS: it is speed-wall-bound (131,072 failed at 5.74 w/s worst), so a smaller KV may push the wall deeper. We run it first at both weight quants (Q8_0 and Q4_K_M) with the KV cache at q8_0, to see the effect on the wall before touching the winner.
+- The 0.8B is the TWEAK TARGET: it is window-capped (its 262,144 ceiling IS the training window at Q4), so KV quant cuts the machine cost at the winning rung rather than the depth. We only tweak it after the witness validates the variant.
+- Variants ride FRESH state/results file pairs (benchmark-state-kvq8-q4.json / benchmark-results-kvq8-q4.json and the -q8 twins) so they never contaminate the baseline grids.
+
+Implementation (pushed with this addendum):
+- full_benchmark.py gains --kv-quant {q8_0,q4_0}; it is persisted in the state file (kv_quant) so every rung of the ladder launches the same way, and it plumbs through run_ladder -> speed_pass/fwe_pass -> speed_gate.bench_model; both launch sites add -fa --cache-type-k <q> --cache-type-v <q> to the server args.
+- code_edit.py: the delimiter balance check goes REGION-based (session 35, addendum 3: a per-line check blamed legitimate multi-line code). Each replaced region must balance as a unit; insert/delete-only edits fall back to the whole buffer only when the source was balanced; a region may OPEN a delimiter that closes after it (an inserted call whose closing paren lands on a later line) - the real failure modes, a mismatched closer or an unclosed quote, still fail. The test stubs for speed_pass/fwe_pass gained the kv_quant parameter.
+- The witness commands (dry-run first, then real, Q4_K_M then Q8_0) are with the author; the results land in fresh results.txt sections read back here.
