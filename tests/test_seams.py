@@ -867,3 +867,31 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     assert ladder["score"] == 0 and ladder["failed"] is True
     out = capsys.readouterr().out
     assert "INVALID" in out
+
+
+def test_convert_quant_deletes_tensors_after_f16(tmp_path, monkeypatch):
+    # addendum 42: the safetensors are dead weight once the f16 exists;
+    # create() deletes safetensors-source only after the conversion is
+    # verified on disk, and never when the f16 was already local
+    import convert_quant
+
+    famdir = tmp_path / "fam"
+    famdir.mkdir()
+    (famdir / "safetensors-source").mkdir()
+    (famdir / "safetensors-source" / "model.safetensors").write_text("x")
+    out_f16 = famdir / "fam-f16.gguf"
+    out_q = famdir / "fam-Q4_K_M.gguf"
+    monkeypatch.setattr(convert_quant.hf_download, "local_rung", lambda d, r: None)
+    monkeypatch.setattr(convert_quant.hf_download, "resolve_f16_local", lambda d: None)
+    monkeypatch.setattr(
+        convert_quant,
+        "run_quiet",
+        lambda cmd, log, phase, rung, what: (
+            (out_f16.write_text("f16"), out_q.write_text("q4"), 0)[2]
+            if cmd[1] == str(famdir / "safetensors-source") or "--outfile" in cmd
+            else (out_q.write_text("q4"), 0)[1]
+        ),
+    )
+    got = convert_quant.create("fam", str(famdir), "Q4_K_M")
+    assert got == str(out_q)
+    assert not (famdir / "safetensors-source").exists(), "tensors deleted after f16"
