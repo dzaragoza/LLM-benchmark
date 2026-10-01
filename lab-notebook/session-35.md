@@ -311,3 +311,12 @@ THE AUTHOR'S RULING: the REJECTED table gains a NOTES column (model name | rejec
 THE REMAP (all 32 existing rows re-classified): the granite-3.x/4.x-1b+/MiniCPM fat-KV families to reason 2 (q4_0 KV alone 5.6-43.6 GiB); the RAM-fits-but-window-capped set (Qwen2.5-1.5B, granite-4.0-350m/h-350m, MiniCPM4-0.5B, MiniCPM5-1B/2B, gemma-4-e2b) to reason 3; the type closes (three Qwen3.5 Base variants, MiniCPM5-2B-Base, Jamba-Reasoning-3B) and the gated closes (Ministral 3B, Llama-3.x, gemma-3) to reason 4. The addendum-20 sweep finds are added on the same list: gpt-oss-20b (window 131,072), SmolLM3-3B (65,536), Hunyuan-A13B (32,768), EXAONE-4.0-32B (131,072), Ling-lite (32,768), GLM-4.5-Air (131,072), Qwen3-4B-Instruct-2507 and Qwen3-30B-A3B-Instruct-2507 (window 262,144 but fat KV / MoE size - reason 2), and the sweep's false-positive classes (DSpark/EAGLE3 draft heads, community finetunes, test tinies) to OTHER in grouped rows.
 
 OPEN ITEM FOR THE AUTHOR: the gated repos (Ministral-3B, Llama-3.2-1B, gemma-3) are rejected as OTHER/gated; if the author verifies their windows with hub access, any that are >= 262,144 get a fair-chance screen; the expectation is 128k-class (all close on window).
+
+## Session 35, addendum 22 - the gated set verified by the author
+
+THE AUTHOR RAN THE GATED PULL (authenticated): the four open items close on record.
+- Ministral 3B: RepositoryNotFoundError even authenticated - the repo does not exist; the agent's unauthenticated 401 had masked a nonexistent repo. Stays REJECTED (other): no first-party Ministral-3B weights to screen.
+- meta-llama/Llama-3.2-1B-Instruct: window 131,072, 16 layers, 8 kv heads (head_dim 64 -> KV 32 KiB/token f16, ~2.25 GiB q4_0 at 262k; whole floor config ~3.75 GiB would FIT). Re-classified to TRAINING WINDOW < 256k - the window is the wall; the gated guess replaced by the verified number.
+- google/gemma-3-1b-it: window 32,768, 1 kv head. Re-classified to TRAINING WINDOW < 256k.
+- google/gemma-3-4b-it: the config nests the text fields in text_config (the gemma-3 multimodal wrapper); text window 131,072 class. Re-classified to TRAINING WINDOW < 256k.
+The REJECTED table now carries zero unverified guesses; the gated reason no longer appears - every row binds on a checked number.

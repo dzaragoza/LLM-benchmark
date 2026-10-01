@@ -62,7 +62,7 @@ window binds; everything else is other.
 | Qwen3.5-4B-Base | other | BASE type (addendum 18); the instruct 4B is the candidate the study probes |
 | Qwen3.5-9B | no model small enough (q2, q4, q4) > ceiling | best config Q2_K + q4_0/q4_0 = 7.05 GiB predicted; the family closes at 9B |
 | gemma-4-e2b-it | training window < 256k | trained window 131,072 (verified from config.json); no rope scaling by standing rule |
-| Ministral 3B | other | gated repo (HTTP 401) and no research paper for Ministral; 128k-class window suspected but unverified - the author can un-reject with hub access |
+| Ministral 3B | other | the repo does not exist on the hub (author-authenticated pull: RepositoryNotFoundError; the agent's unauthenticated 401 masked it); no first-party Ministral-3B weights to screen |
 | Qwen2.5-1.5B-Instruct | training window < 256k | window 32,768; the RAM would fit (1.97 GiB q4_0 KV at 262k) - the window is the wall; v4.3 score 20,992 @ Q8_0 |
 | Qwen3-1.7B | no model small enough (q2, q4, q4) > ceiling | KV 112 KiB/token -> q4_0 KV alone ~7.9 GiB > 4.96; window 40,960 and FWE broken at 40,704 besides |
 | Qwen3-4B | no model small enough (q2, q4, q4) > ceiling | KV 144 KiB/token -> ~10.1 GiB q4_0 KV; window 40,960 besides |
@@ -98,10 +98,10 @@ window binds; everything else is other.
 | LGAI-EXAONE/EXAONE-4.0-32B | training window < 256k | window 131,072; KV 256 KiB/token (~18 GiB q4_0 KV) would also exceed the ceiling |
 | inclusionAI/Ling-lite-1.5B | training window < 256k | window 32,768 (addendum-20 sweep) |
 | zai-org/GLM-4.5-Air | training window < 256k | window 131,072 |
-| meta-llama/Llama-3.2-1B-Instruct | other | gated (HTTP 401); Llama-3.x is 128k-class - window-capped if the author verifies hub access |
+| meta-llama/Llama-3.2-1B-Instruct | training window < 256k | window 131,072 (author-verified from the gated repo); RAM would fit - KV 32 KiB/token f16 (16 layers x 8 kv heads x 64 head_dim) -> ~2.25 GiB q4_0 KV, whole config ~3.75 GiB - the window is the wall |
 | meta-llama/Llama-3.1-8B-Instruct | other | gated (HTTP 401); 128k-class window |
-| google/gemma-3-1b-it | other | gated (HTTP 401); gemma-3 small models are 32k-128k class - window-capped if verified |
-| google/gemma-3-4b-it | other | gated (HTTP 401); 128k-class window |
+| google/gemma-3-1b-it | training window < 256k | window 32,768 (author-verified); 1 kv head - thin KV, but the window binds hard |
+| google/gemma-3-4b-it | training window < 256k | window 131,072 class (the author's pull shows the config nests it in text_config - the gemma-3 wrapper; text models are 128k per the model card) |
 | Qwen3-30B-A3B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but MoE: Q2_K weights alone far over the ceiling; KV 96 KiB/token -> 6.75 GiB q4_0 KV besides |
 | Qwen3-4B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but KV 144 KiB/token -> ~10.1 GiB q4_0 KV (the 2507 refresh dropped the hybrid interval) |
 | DSpark/EAGLE3 draft heads (RadixArk, z-lab, incoai, lightseekorg, Inferact, skt repos) | other | speculative-decoding DRAFT MODELS, not instruct models - sweep false positives, never candidates |
