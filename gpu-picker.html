@@ -90,12 +90,12 @@ Serving from system RAM instead? <a href="cpu-picker.html">System RAM picker</a>
   <p class="footnote">VRAM figures are nominal card capacity; a small fraction is consumed by the
   display/OS. Bandwidth figures are the card's theoretical peak (memory type &times; bus).
   Quant: each family appears once, at its best-scoring quant (Q4_K_M where the Q4 run
-  scored deeper, Q8_0 otherwise; session 34, addendum 43).</p></p>
+  scored deeper, Q8_0 otherwise; session 35, addendum 2).</p></p>
 </div>
 
 <script>
 "use strict";
-// Measured records (v4.3-scored, best quant per family - addendum 43) - identical to cpu-picker.html. wps = the WORST
+// Measured records (v4.3-scored, best quant per family - session 35, addendum 2) - identical to cpu-picker.html. wps = the WORST
 // TURN at the model's deepest speed-measured rung (session 34, addendum 33). cost = minimum
 // RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
 // measured - used here as a conservative VRAM requirement.
@@ -157,7 +157,7 @@ var MAX_COST = CANDIDATES.reduce(function (a, c) { return Math.max(a, c.cost); }
 var TIERS = VRAM_TIERS.filter(function (t) { return t.v >= MIN_COST; });
 
 // default: the capacity needed to run the highest-scoring model (Qwen3.5-0.8B Q4_K_M,
-// depth 262,144 - its measured minimum RAM, addendum 43)
+// depth 262,144 - its measured minimum RAM, session 35, addendum 2)
 var TOP_MODEL = CANDIDATES.reduce(function (a, c) { return (c.depth || 0) > (a.depth || 0) ? c : a; });
 var DEFAULT_TIER = TIERS.filter(function (t) { return t.v >= TOP_MODEL.cost; })[0] || TIERS[TIERS.length - 1];
 
