@@ -114,3 +114,41 @@ VERDICT: V q8_0 does NOT push the speed wall deeper. The wall is bandwidth/compu
 THE SIMPLER MEASUREMENT (author ruling): we are not running full ladders per tweak. run_ladder already takes max_rung (the gallop's hard stop) - it is now exposed as --max-rung (persisted as ladder_max_rung). --min-rung N --max-rung N is the single-rung probe: speed + fwe at exactly N, pass or fail, no gallop, no search. A pass scores N; a fail is the floor rule (FAILED, investigate).
 
 code_edit register entry 6: insert_after with a multi-line anchor FUSED the new text onto the anchor's last line (no newline at the join) - two corrupted lines in full_benchmark.py, and --check did not catch it (the check verifies anchors, not the join). FIX: _sep() forces a newline at the join whenever the edges would fuse (insert_before too); regression tests added; the corruption repaired. Register reminder stands: the delimiter check does not lint the JOIN - the pre-write _verify_result now sees the fused buffer, but a syntax check would have been the real guard here (future improvement).
+
+## Session 35, addendum 10 - the roster collapses to one survivor: the 256k goal, the champion config, and the full rejection log
+
+THE NEW GOAL (author ruling): the study's target context is fixed at 262,144 tokens (256k) - "finding anything higher than 256k is out of scope due to time constraints". The roster question becomes binary: which models can serve a 300-wpm reader AND count (FWE) at exactly 262,144, under the RAM ceiling the champion sets. A model either passes the single-rung probe (--min-rung 262144 --max-rung 262144, addendum 9) or it is retired. The full ladder per model is no longer run - the probe IS the test.
+
+THE CHAMPION: Qwen3.5-0.8B at Q8_0, f16 KV, 262,144 deep - speed PASS (worst turn 14.8 t/s, scored-rung worst 9.3 w/s, zero stalls, reader never waited), FWE 3/3 HIT at depth 261,888, cold machine cost 4.96 GiB, 48.4 min wall. This closes the 0.8 RAM-max question: the quant CAP is Q8 (author ruling - F16 was the next rung at a predicted 5.78 GiB, but the wall time is too long to wait for). The passing RAM range at 256k is 4.44 (Q4_K_M) to 4.96 (Q8_0) GiB, both measured; the ceiling the roster screens against is the champion's 4.96 GiB.
+
+HOW WE REACHED 262,144 (the context size): the 0.8's own training window is 262,144 (the server never capped its -c; the window rule, session 34 addendum 6, has nothing to cap). The v4.3 ladder scored the 0.8 at its window under the Q4 sweep (262,144, 8.1 w/s, 4.44 GiB) - the deepest score any family ever posted, 2.1x the next-best (the 4B's 123,904). The probe at the window then confirmed both gates hold at Q8_0 too. So 262,144 is not an arbitrary round number: it is the champion's trained window, the only depth at which we have a measured existence proof of pass-both-gates in this RAM class.
+
+THE 4B IS STILL PENDING, WITH A PREDICTION: its floor config (Q2_K weights + K q4_0 + V q4_0) is estimated at ~5.0 GiB - just above the ceiling. It stays on the candidate list (the author's hypothesis: match 0.8's footprint and the 4B might pass), but the arithmetic says the fixed mass (1.37 GiB Q2_K weights + ~1.1 GiB overhead) already exceeds the 0.8's entire Q4_K_M footprint. The honest prediction: the 4B cannot pass at 262,144 under this ceiling; the probe will settle it.
+
+THE REJECTION LOG - every family benched under v4.x, why each failed the 256k screen, and the screen's three disqualifiers (predicted RAM at 262,144 in the model's BEST config - the smallest weights/K/V combination it can run - versus the champion's ceiling; KV slopes fit from the measured cold-cost rungs):
+
+WINDOW-DISQUALIFIED (trained window below 262,144 - unreachable without rope scaling, which the study rejects):
+- Qwen2.5-1.5B-Instruct (window 32k class; v4.3 score 20,992 @ Q8_0) - the only other family whose RAM would fit; the window is the wall.
+- Qwen3-4B (window 32k; score 16,384 @ Q4_K_M).
+- phi-4-mini (window 16k; score 44,032 @ Q4_K_M - the deepest non-Qwen3.5 score, but 6x short of the goal).
+- MiniCPM-1B/2B-sft, granite-3.0/3.1-2b, granite-4.2-3b (4,096-class scores; windows far below the goal and/or quality broken shallow).
+
+KV-GEOMETRY-DISQUALIFIED (window possibly fine, but the KV cache at 262,144 exceeds the ceiling even at q4_0/q4_0):
+- Qwen3-1.7B (KV ~100 KiB/token f16 -> ~7.3 GiB at q4_0 alone; v4.3 score 34,816, FWE broken at 40,704 anyway).
+- granite-3.3-2b (~90 KiB/token -> ~6.6 GiB; score 26,624).
+- granite-4.1-3b (~97 KiB/token -> ~7.1 GiB; score 18,432).
+- granite-3.2-2b, MiniCPM5-2B, Phi-3.5-mini (same class; scores 15,360 / 12,288 / 7,168).
+- Qwen3.5-4B (~34.5 KiB/token, the thinnest KV in the pool after the 0.8's 12.9 - but 2.59 GiB of Q4_K_M weights plus ~1.1 overhead leaves no budget for a 2.5+ GiB q4_0 cache at 262k; its v4.3 score is 123,904, the best in the pool; the probe at its floor config is the pending test).
+
+QUALITY-DISQUALIFIED (FWE refusal/failure far below the goal - "we are not changing the benchmark to fit a model"):
+- Qwen2.5-3B-Instruct (refused the FWE task, session 34; score 0).
+- Qwen2.5-0.5B (counting floor; retired, session 34).
+- granite-4.0-* and the other lineage-2 stragglers (never passed the 16k screen on the f4k grid).
+
+THE SCIENTIFIC FINDING: the 256k screen is decided by KV GEOMETRY (KiB/token of cache), not by parameter count or quant. Qwen3.5's ~12.9-34.5 KiB/token GQA design is 3-11x thinner than every other family's; that, plus a 262,144 trained window, is why exactly one family survives. The metric the roster now ranks on: depth per RAM byte - the 0.8 champion holds 59,041 tokens/GiB at Q4_K_M (and 52,853 at Q8_0); no retired family exceeds 8,783.
+
+THE CANDIDATE PIPELINE (pre-registered predictions, to be probed at 262,144 - skip the ladder, addendum 9): Qwen3.5-2B (Q4_K_M + K/V q5_0, predicted ~3.8 GiB - PASS ~60%); gemma-4-e2b (Q4_K_M + K/V q4_0, ~4.5 GiB, window must verify on the E2B - ~35%); Ministral 3 3B (predicted RAM fail - hold, dry-run only if the disqualification is wanted on record). Every model tested from here on gets a log line in this addendum: candidate, config, predicted RAM, probe verdict.
+
+THE WEB PAGES: both pickers carry the single survivor row (Qwen3.5-0.8B, Q8_0, depth 262,144, 4.96 GiB, 9.3 w/s) with the rejection log referenced; the sortable 16-row tables are gone with the retired families. The 15 retired model files are wiped from the author's disk (the GGUFs remain re-acquirable via the hub interface).
+
+code_edit register entry 7: replace_region was used with the anchors INCLUDED in the replacement text - but the kind is EXCLUSIVE (anchors are kept), so the anchors were duplicated and the old array tail leaked. --check passed because _verify_blocks verifies anchors, not the result's structure. FIX (agent discipline, and a tool gap recorded): the region contract is now documented in the kind's error message; the real guard still missing is a result-level sanity check (e.g. the new text must not contain the anchors) - future improvement candidate. The corrupted sections were repaired by exact replace; prettier 3.3.3 reformats both pages clean.
