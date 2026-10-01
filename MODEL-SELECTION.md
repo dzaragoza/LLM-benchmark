@@ -139,6 +139,28 @@ README's "Roster selection" section is a summary that points here.
     and unbenched skip). Any edit to full_benchmark.py that breaks a
     contract fails here first.
 
+17. **The 256k goal and the RAM ceiling (session 35, addendum 10).**
+    The study's roster question is now: which models pass BOTH gates
+    (speed at the 300-wpm line, FWE 3/3) at a context of exactly
+    **262,144 tokens** — the champion's (Qwen3.5-0.8B) trained window,
+    the only depth with a measured pass-both existence proof in this
+    RAM class. Contexts above 256k are out of scope (time budget).
+    Selection screens:
+    - **Window ≥ 262,144 trained** (no rope scaling — standing rule).
+    - **Predicted RAM at 262,144 ≤ the champion's ceiling** in the
+      model's best configuration (smallest weights/K/V combination
+      that can run): currently **4.96 GiB** (0.8B @ Q8_0, f16 KV,
+      measured). The champion sets the ceiling; a new survivor
+      raises it.
+    - **Weights quant cap: Q8_0** (author ruling, session 35 — F16
+      runs too long to wait for).
+    The **single-rung probe** (`--min-rung 262144 --max-rung 262144`)
+    is the test — the full ladder is not run for new candidates.
+    Every tested model is logged in the notebook's rejection log
+    (session 35, addendum 10): candidate, config, predicted RAM,
+    verdict, and the disqualifier (window / KV geometry / quality).
+
+
 **Future work (addendum 86):** the 51.2 GB/s-class replication run is
 OUT of this study's execution plan — the v3.1 benchmark methodology
 is too time-consuming to replicate at a second machine class. The

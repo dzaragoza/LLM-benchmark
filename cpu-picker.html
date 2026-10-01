@@ -3,7 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Local LLM picker &mdash; CPU/iGPU: which model serves your machine?</title>
+    <title>
+      Local LLM picker &mdash; CPU/iGPU: which model serves your machine?
+    </title>
     <style>
       :root {
         color-scheme: light dark;
@@ -163,24 +165,27 @@
   <body>
     <h1>Local LLM picker &mdash; CPU/iGPU</h1>
     <div class="sub">
-      The recommended model (best quant per family: Q4_K_M where it scored deeper, Q8_0 otherwise)
-      for your machine, among the models the study scored under protocol v4.3 (a depth-scored
-      ladder: per rung, a speed gate at &ge; 5 w/s for a 300-wpm reader, then a
-      frequent-word-extraction count; the score is the deepest context passing both). Lab notebook
-      study &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50. The recommendation
-      ranks by measured DEPTH (the v4.3 ladder score, session 34 addendum 33: the deepest context at
-      which the model both serves the reader and counts; n=1 everywhere, floor 4,096 &mdash; the
-      corpus structural floor, addendum 32). Serving from a GPU instead?
+      The recommended model (best quant per family: Q4_K_M where it scored
+      deeper, Q8_0 otherwise) for your machine, among the models the study
+      scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate
+      at &ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count;
+      the score is the deepest context passing both). Lab notebook study &mdash;
+      measured on a T14s (102.4 GB/s class), live-corpus cal-50. The
+      recommendation ranks by measured DEPTH (the v4.3 ladder score, session 34
+      addendum 33: the deepest context at which the model both serves the reader
+      and counts; n=1 everywhere, floor 4,096 &mdash; the corpus structural
+      floor, addendum 32). Serving from a GPU instead?
       <a href="gpu-picker.html">GPU picker</a>.
     </div>
 
     <div class="panel">
       <label for="filter"
-        >Machine configuration (DDR generation &middot; JEDEC speed &middot; channels)</label
+        >Machine configuration (DDR generation &middot; JEDEC speed &middot;
+        channels)</label
       >
       <div style="font-weight: bold; margin: 0.2rem 0">
-        Any machine with higher specs than the options below (over 102.4&nbsp;GB/s) will run the
-        same models as the default.
+        Any machine with higher specs than the options below (over
+        102.4&nbsp;GB/s) will run the same models as the default.
       </div>
       <input
         type="search"
@@ -218,7 +223,9 @@
         style="display: none"
         oninput="pick()"
       />
-      <label for="chcustom" id="chLabel" style="display: none">Custom channel count</label>
+      <label for="chcustom" id="chLabel" style="display: none"
+        >Custom channel count</label
+      >
       <input
         type="number"
         id="chcustom"
@@ -230,7 +237,15 @@
         oninput="pick()"
       />
       <label for="ram">System memory (GiB)</label>
-      <input type="number" id="ram" min="1" max="512" step="0.5" value="32" oninput="pick()" />
+      <input
+        type="number"
+        id="ram"
+        min="1"
+        max="512"
+        step="0.5"
+        value="32"
+        oninput="pick()"
+      />
       <div class="readout" id="bwout"></div>
       <div class="readout" id="classout"></div>
     </div>
@@ -240,215 +255,74 @@
 
     <div class="foot">
       <p>
-        <strong>How the recommendation is computed.</strong> Candidates are the measured members of
-        the studied lineages (qwen, granite, MiniCPM, Phi), each scored under protocol v4.3 (session
-        34, addendum 33): a depth-scored ladder that starts at the 4,096-token floor (addendum 32)
-        and doubles the context rung until the model fails &mdash; the deepest rung at which it BOTH
-        serves the reader (speed gate: n=1 conversation, worst-turn &ge; 5 w/s, &le; 5% stall rate)
-        AND counts (FWE: n=1, 3/3 coded words) is the score, refined to 1,024-token resolution by
-        binary search. A candidate is eligible iff (a) its <em>minimum RAM</em> (whole-stack machine
-        cost: weights + KV + buffers + runtime, MemAvailable-delta instrument, cold-cache at the
-        scored rung) fits your RAM, and (b) its predicted w/s at your bandwidth clears the 5.0
-        reader line. The w/s anchor is the worst turn at the model's deepest speed-measured rung.
-        Bandwidth scaling is the pre-registered halving form: w/s(BW) = w/s<sub>measured@102.4</sub>
-        &times; BW/102.4 &mdash; linear because at these sizes decode is bandwidth-dominated; for
-        the smallest members it is conservative. The recommendation is the highest-depth eligible
-        candidate.
+        <strong>How the recommendation is computed.</strong> Candidates are the
+        measured members of the studied lineages (qwen, granite, MiniCPM, Phi),
+        each scored under protocol v4.3 (session 34, addendum 33): a
+        depth-scored ladder that starts at the 4,096-token floor (addendum 32)
+        and doubles the context rung until the model fails &mdash; the deepest
+        rung at which it BOTH serves the reader (speed gate: n=1 conversation,
+        worst-turn &ge; 5 w/s, &le; 5% stall rate) AND counts (FWE: n=1, 3/3
+        coded words) is the score, refined to 1,024-token resolution by binary
+        search. A candidate is eligible iff (a) its
+        <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers +
+        runtime, MemAvailable-delta instrument, cold-cache at the scored rung)
+        fits your RAM, and (b) its predicted w/s at your bandwidth clears the
+        5.0 reader line. The w/s anchor is the worst turn at the model's deepest
+        speed-measured rung. Bandwidth scaling is the pre-registered halving
+        form: w/s(BW) = w/s<sub>measured@102.4</sub>
+        &times; BW/102.4 &mdash; linear because at these sizes decode is
+        bandwidth-dominated; for the smallest members it is conservative. The
+        recommendation is the highest-depth eligible candidate.
       </p>
 
       <p>
-        <strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting floor &mdash; it
-        cannot do FWE at any measured depth); Qwen2.5-3B-Instruct is out (task refusal; the
-        benchmark is not changed to fit a model). Models scoring zero under v4.3 rank last and
-        cannot be recommended. Quant: each family appears once, at its best-scoring quant (Q4_K_M
-        where the Q4 run scored deeper, Q8_0 otherwise; session 35, addendum 2).
+        <strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting
+        floor &mdash; it cannot do FWE at any measured depth);
+        Qwen2.5-3B-Instruct is out (task refusal; the benchmark is not changed
+        to fit a model). Models scoring zero under v4.3 rank last and cannot be
+        recommended. Quant: each family appears once, at its best-scoring quant
+        (Q4_K_M where the Q4 run scored deeper, Q8_0 otherwise; session 35,
+        addendum 2).
       </p>
 
       <p class="footnote">
-        Caveats: w/s figures are the worst turn at each model's deepest speed-measured rung (the
-        v4.3 ladder's n=1 screen &mdash; one conversation at the ranked depth). Depth scores are n=1
-        screening ranks (session 34, addendum 33). The bandwidth law is validated only at the 102.4
-        GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
+        Caveats: w/s figures are the worst turn at each model's deepest
+        speed-measured rung (the v4.3 ladder's n=1 screen &mdash; one
+        conversation at the ranked depth). Depth scores are n=1 screening ranks
+        (session 34, addendum 33). The bandwidth law is validated only at the
+        102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit
+        boundary as soft within ~1 GiB.
       </p>
     </div>
 
     <script>
       "use strict";
-      // Measured records (v4.3-scored, best quant per family - session 35, addendum 2). wps = the WORST TURN at the model's deepest
-      // speed-measured rung (session 34, addendum 33). cost = minimum RAM (whole-stack machine
-      // cost, MemAvailable delta, cold-cache at the scored rung), measured.
+      // Measured records (v4.3-scored, session 35 addendum 10: the roster is the 256k
+      // survivors - every family that cannot reach 262,144 under the RAM ceiling is
+      // retired. wps = the WORST TURN at the scored rung. cost = minimum RAM
+      // (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
+      // measured.
       var CANDIDATES = [
         {
-          name: "Qwen3.5-4B",
-          size: 2.59,
-          cost: 7.71,
-          costEst: false,
-          wps: 6.3,
-          depth: 123904,
-          family: "Qwen3.5",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "Qwen2.5-1.5B-Instruct",
-          size: 1.76,
-          cost: 2.39,
-          costEst: false,
-          wps: 18.3,
-          depth: 20992,
-          family: "Qwen2.5",
-          quant: "Q8_0",
-        },
-        {
-          name: "Qwen3-1.7B",
-          size: 1.71,
-          cost: 5.24,
-          costEst: false,
-          wps: 7.7,
-          depth: 34816,
-          family: "Qwen3",
-          quant: "Q8_0",
-        },
-        {
-          name: "phi-4-mini",
-          size: 2.4,
-          cost: 8.14,
-          costEst: false,
-          wps: 6.4,
-          depth: 44032,
-          family: "Phi",
-          quant: "Q4_K_M",
-        },
-        {
           name: "Qwen3.5-0.8B",
-          size: 0.5,
-          cost: 4.44,
+          size: 0.78,
+          cost: 4.96,
           costEst: false,
-          wps: 8.1,
+          wps: 9.3,
           depth: 262144,
           family: "Qwen3.5",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "granite-4.1-3b",
-          size: 1.96,
-          cost: 3.72,
-          costEst: false,
-          wps: 8.5,
-          depth: 18432,
-          family: "Granite",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "granite-3.2-2b",
-          size: 1.44,
-          cost: 2.62,
-          costEst: false,
-          wps: 14.7,
-          depth: 15360,
-          family: "Granite",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "granite-3.1-2b",
-          size: 2.51,
-          cost: 3.63,
-          costEst: false,
-          wps: 13.1,
-          depth: 12288,
-          family: "Granite",
-          quant: "Q8_0",
-        },
-        {
-          name: "MiniCPM5-2B",
-          size: 2.5,
-          cost: 2.86,
-          costEst: false,
-          wps: 19.9,
-          depth: 12288,
-          family: "MiniCPM",
-          quant: "Q8_0",
-        },
-        {
-          name: "granite-3.3-2b",
-          size: 1.65,
-          cost: 3.78,
-          costEst: false,
-          wps: 8.5,
-          depth: 26624,
-          family: "Granite",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "Qwen3-4B",
-          size: 2.33,
-          cost: 4.8,
-          costEst: false,
-          wps: 6.9,
-          depth: 16384,
-          family: "Qwen3",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "Phi-3.5-mini",
-          size: 3.78,
-          cost: 6.52,
-          costEst: false,
-          wps: 5.7,
-          depth: 7168,
-          family: "Phi",
-          quant: "Q8_0",
-        },
-        {
-          name: "MiniCPM-1B-sft",
-          size: 1.35,
-          cost: 1.39,
-          costEst: false,
-          wps: 21.1,
-          depth: 4096,
-          family: "MiniCPM",
-          quant: "Q8_0",
-        },
-        {
-          name: "MiniCPM-2B-sft",
-          size: 1.68,
-          cost: 3.42,
-          costEst: false,
-          wps: 18.4,
-          depth: 4096,
-          family: "MiniCPM",
-          quant: "Q4_K_M",
-        },
-        {
-          name: "granite-4.2-3b",
-          size: 3.63,
-          cost: 3.68,
-          costEst: false,
-          wps: 10.7,
-          depth: 4096,
-          family: "Granite",
-          quant: "Q8_0",
-        },
-        {
-          name: "granite-3.0-2b",
-          size: 2.61,
-          cost: 2.63,
-          costEst: false,
-          wps: 12.4,
-          depth: 4096,
-          family: "Granite",
           quant: "Q8_0",
         },
       ];
       // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
-      // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1 everywhere,
-      // floor 4096 (addendum 32, the corpus structural floor). The
-      // granite/MiniCPM/Phi rows are the lineage-2 families measured on the f4k grid
-      // (session 34, addendum 33); their w/s anchor is the deepest SPEED-MEASURED rung
-      // (fwe-only binary-search midpoints launch no speed server, refinement 1.5).
-      // Qwen3-4B's 8,192 supersedes its old 16,384 (the 5-7.5 w/s band fires at 8192 on
-      // the f4k grid, addendum 33). OUT OF THE POOL: Qwen2.5-0.5B (counting floor,
-      // 136f) and Qwen2.5-3B-Instruct (task refusal, session 34 addendum 8 - the
-      // benchmark is not changed to fit a model; a refusing model is out).
+      // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1
+      // everywhere. The single row is the 0.8B champion config: Q8_0 weights (the
+      // quant CAP is Q8 - session 35, addendum 10), f16 KV, 262,144 deep, 4.96 GiB
+      // cold, 9.3 w/s worst at the scored rung. THE RETIRED FAMILIES (session 35,
+      // addendum 10): every other pool family failed the 256k screen - training
+      // window below 262,144, KV geometry too fat under the RAM ceiling, or FWE
+      // quality already broken far shallower; the full rejection log is in the
+      // lab notebook (session 35, addendum 10).
       var CLASSES = [25.6, 51.2, 102.4];
       var REF_BW = 102.4,
         READER = 5.0;
@@ -469,9 +343,24 @@
       // server tier, 512-bit bus).
       var GENERATIONS = [
         { gen: "DDR", mts: [200, 266, 333, 400], quad: false, octa: false },
-        { gen: "DDR2", mts: [400, 533, 667, 800, 1066], quad: false, octa: false },
-        { gen: "DDR3", mts: [800, 1066, 1333, 1600, 1866, 2133], quad: true, octa: false },
-        { gen: "DDR4", mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200], quad: true, octa: true },
+        {
+          gen: "DDR2",
+          mts: [400, 533, 667, 800, 1066],
+          quad: false,
+          octa: false,
+        },
+        {
+          gen: "DDR3",
+          mts: [800, 1066, 1333, 1600, 1866, 2133],
+          quad: true,
+          octa: false,
+        },
+        {
+          gen: "DDR4",
+          mts: [1600, 1866, 2133, 2400, 2666, 2933, 3200],
+          quad: true,
+          octa: true,
+        },
         {
           gen: "DDR5",
           mts: [3200, 3600, 4000, 4400, 4800, 5200, 5600, 6400],
@@ -505,7 +394,14 @@
               var bw = perch * ch;
               if (bw < MIN_RUN_BW) return; // cannot run any measured model - not listed
               if (bw > MAX_BW) return; // above the study's top class - same models as the default
-              var chName = ch === 1 ? "single" : ch === 2 ? "dual" : ch === 4 ? "quad" : "octa";
+              var chName =
+                ch === 1
+                  ? "single"
+                  : ch === 2
+                    ? "dual"
+                    : ch === 4
+                      ? "quad"
+                      : "octa";
               MACHINES.push({
                 gen: g.gen,
                 mt: mt,
@@ -524,12 +420,18 @@
                   "-bit) \u2014 " +
                   bw.toFixed(1) +
                   " GB/s",
-                group: g.gen + " " + chName + " channel (" + 64 * ch + "-bit bus)",
+                group:
+                  g.gen + " " + chName + " channel (" + 64 * ch + "-bit bus)",
               });
             });
           });
         });
-        MACHINES.push({ gen: "custom", key: "custom", label: "custom\u2026", group: "custom" });
+        MACHINES.push({
+          gen: "custom",
+          key: "custom",
+          label: "custom\u2026",
+          group: "custom",
+        });
       }
 
       function renderList() {
@@ -553,7 +455,8 @@
             m.label +
             "</div>";
         });
-        if (!html) html = '<div class="mitem">no machine matches the filter</div>';
+        if (!html)
+          html = '<div class="mitem">no machine matches the filter</div>';
         host.innerHTML = html;
       }
 
@@ -586,7 +489,12 @@
           perch = parseFloat($("perch").value);
           ch = parseFloat($("chcustom").value);
           chLabel =
-            ch + " channel" + (ch > 1 ? "s" : "") + ", custom \u2014 " + 64 * ch + "-bit bus";
+            ch +
+            " channel" +
+            (ch > 1 ? "s" : "") +
+            ", custom \u2014 " +
+            64 * ch +
+            "-bit bus";
         } else {
           perch = m.perch;
           ch = m.ch;
@@ -633,7 +541,12 @@
 
         var rows = CANDIDATES.map(function (m) {
           var wpred = (m.wps * bw) / REF_BW;
-          return { m: m, w: wpred, fits: m.cost <= ram, passes: wpred !== null && wpred >= READER };
+          return {
+            m: m,
+            w: wpred,
+            fits: m.cost <= ram,
+            passes: wpred !== null && wpred >= READER,
+          };
         }).sort(cmpRows);
 
         var eligible = rows.filter(function (r) {
