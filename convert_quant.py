@@ -97,6 +97,15 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         if rc != 0 or not os.path.isfile(out_f16):
             fail(2, rung, f"f16 conversion failed (full log: {log})", GUIDE[2])
         f16 = out_f16
+        # the tensors are dead weight once the f16 exists (addendum 42):
+        # every further quant comes from the f16, never the safetensors.
+        # Deleted only after the conversion is verified on disk.
+        import shutil
+
+        st_dir = os.path.join(famdir, "safetensors-source")
+        if os.path.isdir(st_dir):
+            shutil.rmtree(st_dir)
+            print("  [2] safetensors-source deleted (the f16 is the quant source from here)")
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
     print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")
