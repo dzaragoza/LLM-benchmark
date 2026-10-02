@@ -1688,3 +1688,60 @@ explicitly - no writing up only what popped.
     the first time. Prediction registered in addendum 43 (2B keeps
     rank ~32,768, certifies conservative at 4-8k; 0.8B's reliable
     cell is the borderline call; gemma lands 4,096-16,384).
+
+### Addendum 46 - the n=15 round graded (the run raced the rules: it predated addenda 43-44)
+
+WHAT RAN: the author's 5h12m run (15:43-20:56) executed on the n=15
+code with the pre-gemma command list - addenda 43 (n=21) and 44
+(MiniCPM5-1B re-admitted) landed on origin DURING the run, after its
+startup pull. The resume mechanism held (seeds 1-7 RESUMED, 8-15
+fresh); gemma ran its first 15; MiniCPM5-1B stayed at n=7. The
+reliable-depth w/s step also predated - no w/s medians this round.
+The data is a VALID n=15 round; bars at n=15: reliable 10/15,
+conservative 12/15.
+
+THE HEADLINE: TWO CO-CHAMPIONS AT 32,768, with opposite profiles.
+The 2B is now a true MODE champion (5x 32,768) AND the field's only
+deep certification: reliable 16,384 (10/15), conservative 4,096
+(13/15) - its climb 15 TOPPED OUT, the field's first full hold. The
+0.8B is the MEDIAN co-champion via four 262,144-or-top climbs (a
+2.4x jump in its deep-hold count vs n=7), but its certified floor
+is only 4,096 (11/15): spectacular and untrustworthy. Mode says
+they tie; certification separates them: 16,384 vs 4,096.
+
+PREDICTIONS vs MEASURED (addenda 40/43):
+- 2B keeps rank ~32,768: HIT (mode now, stronger).
+- 2B conservative at 4,096-8,192: HIT at 4,096 (13/15), 8,192 at
+  10/15 misses the 12/15 bar.
+- 0.8B reliable cell unlocks: HIT (4,096 at 11/15) - the borderline
+  call went the other way from n=7.
+- RWKV floor-bound: HIT (4/15 at floor, nothing above; the seed-6
+  8,192 was an outlier, not a trend - 3 more seeds all fell).
+- gemma 4,096-16,384: PARTIAL - rank 4,096, ceiling 16,384 via ONE
+  lucky climb (seed 2); the single-kv-head shape is the field's
+  weakest FWE retriever (1/15 at the floor). The 26.6 KB/token
+  architecture question is answered NEGATIVELY for gemma.
+
+FALLERS: Jamba2-3B drops 8,192 -> 4,096 (its n=5 rank was seed
+luck - though it topped out on climb 11 and holds 3/15 at 16,384,
+so it is a genuine mid-lister, not a floor model). Llama-3.2-1B
+fades to no-certification-anywhere.
+
+THE TEN QUESTIONS (addendum 45), preliminary at n=15:
+1. Reliable: the 2B (16,384; conservative 4,096), the 0.8B and
+   Jamba2 (4,096). Everyone else: zero certification.
+2. Field size: the field is separating into 3 tiers - certified
+   (2B), ceiling-only (0.8B, Jamba2), floor-adjacent (the rest).
+   A coverage field of 3-4 models looks plausible, not 8.
+3. Lineage: Qwen3.5 holds ranks 1-2 - the lineage question leans
+   Qwen, pending the n=21 completion.
+4-9: pending the completion (w/s unmeasured this round; the rest
+   firms up at n=21).
+10. The recommendation preview: at 16k context the 2B is the only
+    certified answer; at 4k the 2B/0.8B/Jamba2 are certified; at
+    32k+ NOTHING is certified - the co-champions' ranks are
+    uncertified claims.
+
+NEXT: the completion run - seeds 16-21 for the 8 n=15 families,
+seeds 8-21 for MiniCPM5-1B, then the reliable-depth w/s step fires
+for the certified. Same command as addendum 44 (all 9 families).
