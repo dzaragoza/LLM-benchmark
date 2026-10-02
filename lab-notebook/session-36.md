@@ -1184,17 +1184,11 @@ repo basenames match the state keys exactly.
 
 THE COMMANDS (two blocks, dry-run first - the WoW):
 
-DRY RUN:
-python3 full_benchmark.py --tournament --dry-run \
-  meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B \
-  openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B \
-  RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
+DRY RUN (fish, one line - no backslash continuations):
+python3 full_benchmark.py --tournament --dry-run meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
 
-REAL RUN (2-5 h estimated, addendum 28):
-python3 full_benchmark.py --tournament \
-  meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B \
-  openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B \
-  RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
+REAL RUN (fish, one line; 2-5 h estimated, addendum 28):
+python3 full_benchmark.py --tournament meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
 
 Pre-registered predictions (wow.md section 1, before the run):
 - MiniCPM5-2B (the dead-on 4.96 entry): rank 32,768 or better -
