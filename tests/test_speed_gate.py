@@ -95,15 +95,23 @@ def test_tournament_rank_mode():
     # majority-vs-mode split: 3 top, 2 fall at 131072 - mode is 'top'
     r = fb.tournament_rank([131072, 131072, None, None, None], depths)
     assert r["rank_depth"] == 262144  # mode agrees with the old majority rule
-    # mode tie: two top, two at 65536, one at 32768 - tie breaks to the deeper
+    # NO-MODE cases fall back to the MEDIAN (addendum 20), never the max:
+    # mode tie two top / two at 65536 / one at 32768 -> median 65536
     r = fb.tournament_rank([None, None, 65536, 65536, 32768], depths)
-    assert r["rank_depth"] == 262144
-    # mode tie between two fall depths: two at 65536, two at 32768 - deeper wins
+    assert r["rank_depth"] == 65536 and r["rank_statistic"] == "median-fallback"
+    # mode tie between two fall depths: two at 65536, two at 32768, one 131072
+    # -> sorted [32768, 32768, 65536, 65536, 131072], median 65536
     r = fb.tournament_rank([65536, 65536, 32768, 32768, 131072], depths)
-    assert r["rank_depth"] == 65536
+    assert r["rank_depth"] == 65536 and r["rank_statistic"] == "median-fallback"
+    # all five distinct -> median (3rd of sorted), NOT the deepest climb
+    r = fb.tournament_rank([4096, 8192, 32768, 65536, 131072], depths)
+    assert r["rank_depth"] == 32768 and r["rank_statistic"] == "median-fallback"
+    # two tops is already a mode (top x2) - no fallback needed
+    r = fb.tournament_rank([4096, 65536, None, None, 131072], depths)
+    assert r["rank_depth"] == 262144 and r["rank_statistic"] == "mode"
     # unanimous early fall: mode is the floor
     r = fb.tournament_rank([4096] * 5, depths)
-    assert r["rank_depth"] == 4096
+    assert r["rank_depth"] == 4096 and r["rank_statistic"] == "mode"
 
 
 def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):

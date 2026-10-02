@@ -870,3 +870,32 @@ families still compete at their selected (already-validated) rungs.
 The addendum-18 asymmetric K/V sweep is the k/v independence in
 action; this ruling extends the same freedom to the weights rung
 (Q2-Q8) and fixes the legal vocabulary of both axes.
+
+### Addendum 20 - median if there is no mode
+
+The author found the hole in the addendum-15 mode rank: WHAT IS THE
+MODE OF 5 DIFFERENT VALUES? There is none - every value appears
+exactly once. Worse, the addendum-15 tie-break-to-deeper rule made
+the all-distinct case silently degenerate into the MAXIMUM - one
+lucky climb would set the rank, exactly what the five repetitions
+were designed to prevent.
+
+The ruling: MEDIAN IF THERE IS NO MODE, MARKED CLEARLY IN THE
+RESULTS. `tournament_rank` now reports `rank_statistic`:
+
+- 'mode' - when a most-common value exists (count >= 2, unique
+  plurality; ties on count still break to the deeper outcome);
+- 'median-fallback' - when every value is distinct (or the count
+  ties): the middle of the sorted climbs, top encoded as top+1 so
+  it sorts above every fall. The tie-break-to-deeper rule is NOT
+  applied in the no-mode case - the median is the honest summary,
+  never the maximum in disguise.
+
+The statistic is printed in the family summary ("rank depth N tokens
+[mode]") and in the tournament table, and stored in the state record.
+`test_tournament_rank_mode` covers the boundary: all-distinct ->
+median (NOT the deepest climb), the 3-vs-2 count tie -> median, the
+4-vs-1 and unanimous cases -> mode, and the two-tops case (already a
+mode - no fallback). 131 passed, ruff clean. The finished runs
+re-grade from stored fall_depths - the statistic change is pure,
+again.
