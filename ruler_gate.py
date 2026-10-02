@@ -513,6 +513,13 @@ def main() -> None:
         "ladder's fwe_pass launches with - both None = default f16)",
     )
     p.add_argument(
+        "--stop-on-miss",
+        action="store_true",
+        help="session 36, addendum 10 (the tournament): stop the depth "
+        "sweep at the first depth whose score is below perfect - a "
+        "climb ends the moment it falls; the depths above are not run",
+    )
+    p.add_argument(
         "--fwe-top-k",
         type=int,
         default=None,
@@ -619,6 +626,12 @@ def main() -> None:
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
                 f"correct (acc {row['acc']:.0%})"
             )
+            if args.stop_on_miss and row["acc"] < 1.0:
+                print(
+                    f"  CLIMB OVER at {depth} tok - the score fell below "
+                    f"perfect; depths above {depth} are not run"
+                )
+                break
     finally:
         llama_server.stop_server(proc, args.port)
 

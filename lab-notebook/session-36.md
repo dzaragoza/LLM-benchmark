@@ -489,3 +489,71 @@ addendum 6/8, plus this addendum's contingency):
   n=5 repetitions at k=3 (this addendum's plan).
 - refusal-shaped 0 anywhere: the answer-prefix question opens
   before any difficulty verdict.
+
+### Session 36, addendum 10 - the tournament: upstream parameters, dyadic climbs, ranked by fall depth
+
+THE NEW DIRECTION (author design): the k-axis is set aside (the
+k=10 cell never ran - the local checkout predated the flag; the
+addendum-9 collapse hypothesis stays UNRESOLVED, ungraded). The
+instrument is now the TOURNAMENT: upstream RULER parameters exactly
+(k=3, alpha=2.0, vocab depth/50, wordlen 6 - the addendum-7/8
+verification: our grid IS upstream's), with the study's own n.
+
+THE RULES (author-registered):
+- PARTICIPANTS: the three PASS configs - 0.8B Q8_0 (the champion),
+  2B Q4_K_M, Jamba2-3B Q8_0.
+- TASK: FWE at upstream parameters, n=5 PER DEPTH.
+- THE CLIMB: each participant's turn is a DYADIC LADDER starting at
+  4,096 tokens - the depths 4096, 8192, 16384, 32768, 65536,
+  131072, 262144, each depth an n=5 cell, the climb ends THE MOMENT
+  a depth scores less than 5/5 (perfect required to climb on); then
+  it is the next participant's turn.
+- THE RANK: by the depth where the climb ended - deeper fall = more
+  perfect depths = higher rank. Ties break on the partial at the
+  fall depth (4/5 outranks 3/5), then on the miss texts
+  (refusal-shaped vs degenerate - the qualitative separator).
+- SCORING FORM: unchanged - all-or-nothing per task, partial as
+  the diagnostic; a depth holds only at 5/5.
+- COST BOUND: worst case per participant 7 depths x 5 tasks, but
+  the dyadic cells below ~32k are cheap (small prefills); the
+  expensive depths only run while the climb holds. The early stop
+  is the point: a fall at 65,536 means no 131,072 or 262,144 cells
+  are ever paid.
+
+TOOLING (this addendum): ruler_gate gains --stop-on-miss (the
+climb-end flag: stop the depth sweep at the first depth below
+perfect; verified, 128 tests). Depth cells cache per
+(results-dir, depth): use a FRESH --results-dir per participant
+(ruler-results-tournament-<name>) so a climb never reads another
+participant's cached CSV (the label-based cache would otherwise
+collide across configs of the same family - the 2B's Q4_K_M and
+Q8_0 rows share a label).
+
+THE COMMANDS (verbatim, one per participant, ports 8400/8401/8402;
+run in any order, the ranking is per-participant independent):
+
+- 0.8B (the champion): python3 ruler_gate.py \
+    ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf \
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144 \
+    --samples 5 --seed 1024 --arch qwen2 --stop-on-miss \
+    --results-dir ruler-results-tournament-0.8B --port 8400
+- 2B Q4_K_M: python3 ruler_gate.py \
+    ./models/Qwen3.5-2B/Qwen3.5-2B-Q4_K_M.gguf \
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144 \
+    --samples 5 --seed 1024 --arch qwen2 --stop-on-miss \
+    --results-dir ruler-results-tournament-2B --port 8401
+- Jamba2-3B: python3 ruler_gate.py \
+    ./models/AI21-Jamba2-3B/AI21-Jamba2-3B-Q8_0.gguf \
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144 \
+    --samples 5 --seed 1024 --arch jamba2 --stop-on-miss \
+    --results-dir ruler-results-tournament-jamba --port 8402
+
+PREDICTIONS, PRE-REGISTERED (the champion-first prior): the 0.8B
+holds perfect through 262,144 (it has never missed at any measured
+depth; the k=3 261,888 cell hit today again); the 2B and the Jamba
+hold through at least 65,536 (both held 261,888 at n=1 - their
+falls, if any, are noise draws, and the n=5 cell at the deep rungs
+is exactly the variance measurement that decides). The tournament
+may well end 3-way tied at the top - in which case the honest
+result is that the pool is NOT discriminable on FWE-perfect at any
+depth up to the ceiling, and the report says so.
