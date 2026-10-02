@@ -1,5 +1,3 @@
-
-
 def test_fix_markdown_collapses_blank_line_inside_table():
     import code_edit
 
