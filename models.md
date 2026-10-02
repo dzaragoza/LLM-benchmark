@@ -112,16 +112,24 @@ seed's word draws than on the depth. The comeback round (Llama-3.2-1B,
 MiniCPM5-2B, Jamba-Reasoning-3B, RWKV7-2.9B - addenda 16-18 entries)
 now has a bar to beat: 32,768.
 
-## DISQUALIFIED (the 4,096 floor rule - session 36 addendum 38)
+## DISQUALIFIED (the domination rule - session 36 addendum 44, supersedes the addendum-38 floor rule)
 
-After rounds 6-7: any participant that does not clear 4,096 tokens
-(no hold at any depth in seven climbs) is disqualified from the
-tournament and moved here; the field is refilled with new entrants to
-hold the study at 8 families (disk permitting).
+A model is disqualified ONLY when some model A is conservative-
+certified (2-sigma lower Wilson bound >= 0.5) at a depth at which
+this model has ZERO holds in the tournament sample, AND A passes the
+w/s gate at its reliable depth (measured, n=5). The trigger is the
+absence of holds, not a low ceiling (a max statistic grows with n
+and certifies nothing; zero holds after n seeds bounds the true
+probability far below certifiable - a certifiable model producing
+0/21 at a rung is ~1-in-17-billion). Data scope: THIS TOURNAMENT
+ONLY - any pre-tournament data (ladder runs, seed-1024 passes) does
+not count for or against disqualification. The floor rule
+(addendum 38) is superseded; MiniCPM5-1B is RE-ADMitted and its
+disqualification reverted - the new measurement decides.
 
 | model | config (model q, k, v) | reason |
 |---|---|---|
-| MiniCPM5-1B | (Q8_0, f16, f16) | zero holds in seven climbs (floor rule, addendum 38); the smallest model in the field never cleared 4,096 on any of seven seeds |
+| (empty - the floor rule is superseded; no model is currently disqualified) | | |
 ## REJECTED
 
 Strict reason list (author ruling, addendum 21, extended addendum 23):
