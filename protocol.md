@@ -1,4 +1,4 @@
-# PROTOCOL.md - The Constants Registry
+# protocol.md - The Constants Registry
 
 Every number the study uses, with its provenance. The registry is the
 single source of truth for the report: it appears in (or is referenced
@@ -69,10 +69,10 @@ overhead, not reading experience).
 | Thinking allowance | 2048 tokens | `speed_gate.py` THINK_ALLOWANCE | Author ruling after 82% answer_empty at 1024 - thinking tokens are the user's informed choice, measured descriptively, never gated. |
 | Determinism | temperature 0, seed 1024 | corpus + every payload | Pre-registered; seed is part of the protocol. |
 | Reader band (re-sim) | 0.6-1.5x reader speed | `session_replicate.py` | Author ruling: reading speed is variable run-to-run; the band sweep is post-hoc, no server. |
-| Roster ceiling (256k screen) | 4.96 GiB at 262,144 tokens | MODEL-SELECTION.md rule 10 | [D] Measured: the champion Qwen3.5-0.8B @ Q8_0, f16 KV, cold machine cost 4.96 GiB at 262,144 (MemAvailable delta). Supersedes the v3.1 5.27 GiB size ceiling (history: addendum 88). A new survivor raises it only if its own measured cost is higher. |
-| Selection mechanism | ceiling first, then predictor screen | MODEL-SELECTION.md rules 1-2 | [A] Author ruling (session 35, addendum 12): the machine's ceiling is measured first (gallop search on the champion config), then candidates screen by predicted RAM at 262,144 under it (the registered ceiling predictor, rule 2). The lineage-counting mechanism is retired (history: addendum 77-79). |
+| Roster ceiling (256k screen) | 4.96 GiB at 262,144 tokens | model-selection.md rule 10 | [D] Measured: the champion Qwen3.5-0.8B @ Q8_0, f16 KV, cold machine cost 4.96 GiB at 262,144 (MemAvailable delta). Supersedes the v3.1 5.27 GiB size ceiling (history: addendum 88). A new survivor raises it only if its own measured cost is higher. |
+| Selection mechanism | ceiling first, then predictor screen | model-selection.md rules 1-2 | [A] Author ruling (session 35, addendum 12): the machine's ceiling is measured first (gallop search on the champion config), then candidates screen by predicted RAM at 262,144 under it (the registered ceiling predictor, rule 2). The lineage-counting mechanism is retired (history: addendum 77-79). |
 | n=50 conversations | 50 convs / 267 turns | corpus + instrument | [A] The qualifying n, re-ruled at the v3.1 rebench (addendum ~71): n=5 was too little; at n=50 the stall-rate denominator is 267 turns (pass edge <= 13 stalls). The cal-50 corpus is the registered instrument corpus. |
-| Ceiling predictor | cost = file(rung) + KV_eff x kvquant + 1.10 GiB | MODEL-SELECTION.md rule 2 | [D] Registered (session 35, addendum 13): file(rung) = file_Q8_0 x bpw/8.5 (RUNG_BITS); KV_eff = 262144 x L x 2 x kv_heads x head_dim / full_attention_interval. Validated on two anchors (exact on the champion, -5% conservative on the 2B). |
+| Ceiling predictor | cost = file(rung) + KV_eff x kvquant + 1.10 GiB | model-selection.md rule 2 | [D] Registered (session 35, addendum 13): file(rung) = file_Q8_0 x bpw/8.5 (RUNG_BITS); KV_eff = 262144 x L x 2 x kv_heads x head_dim / full_attention_interval. Validated on two anchors (exact on the champion, -5% conservative on the 2B). |
 | Rung (ladder cut) | Q8_0 only, quant out of scope | `full_benchmark.py` RUNG = "Q8_0" | The rung walk is REMOVED (addendum 86); the study is Q8_0-only, quant out of scope by author ruling (addendum ~74: "the rung ladder is cut to only q8" / "quant is out of scope for this study") - the tool and the report answer the Q8_0 question only. History: the ladder was Q8_0, Q6_K, Q5_K_M, Q4_K_M (Q7 dropped - no 7-bit rung exists in modern llama.cpp; Q4_0 dropped, addendum 37, redundant with Q4_K_M; Q3_K_M/Q2_K dropped, addendum 49, below ~4.5 bpw the quality penalty is too steep). RUNG_BITS retains all rungs in hf_download (size arithmetic only). |
 
 ## [P] Practical limits

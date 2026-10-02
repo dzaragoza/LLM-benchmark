@@ -1,6 +1,6 @@
 """Registered-constants arithmetic (addendum 87).
 
-PROTOCOL.md is the single source of the study's registered constants.
+protocol.md is the single source of the study's registered constants.
 These tests recompute the study's headline derived numbers from them,
 so any future edit that silently drifts a constant fails here first.
 
@@ -15,7 +15,7 @@ import pytest
 
 import full_benchmark as fb
 
-# ---- the registry (PROTOCOL.md rows 100/103/124; single source) ----
+# ---- the registry (protocol.md rows 100/103/124; single source) ----
 BW_EFF = 76.5  # GiB/s, 102.4 tier
 T_INF = 74.0  # t/s
 W_T_P05_QWEN = 0.412  # the qwen-class anchor

@@ -1,9 +1,9 @@
-# MODEL-SELECTION.md — The Roster Selection Rules (pre-registered)
+# model-selection.md — The Roster Selection Rules (pre-registered)
 
 Every rule the study uses to pick which models enter a benchmark
 roster, in one place. These rules are **fixed in advance** of any
 measurement; each carries its provenance (notebook addendum or
-session ruling) and its governing constants (PROTOCOL.md registry,
+session ruling) and its governing constants (protocol.md registry,
 single-sourced).
 
 **Governance:** changing or adding a rule is a protocol change — it

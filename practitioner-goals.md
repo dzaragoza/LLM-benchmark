@@ -1,4 +1,4 @@
-# PRACTITIONER-GOALS.md — The Study's Goals, From the Author's Own Rulings
+# practitioner-goals.md — The Study's Goals, From the Author's Own Rulings
 
 What this study is for, stated as the author ruled it across the
 lab notebook. Every goal below is on record with its ruling; the
@@ -65,7 +65,7 @@ does not serve them is out of scope.
 
 8. **Pre-registered, auditable, simple.** Predictions are
    recorded before any bench; the constants registry
-   (PROTOCOL.md) is the single source of truth for every number;
+   (protocol.md) is the single source of truth for every number;
    unused constants are deleted; the predictor carries at most
    ONE new term. "Sometimes a simple predictor is better than a
    complex one." (Author, addenda 44, 51, 57.)

@@ -118,7 +118,7 @@ Standalone instruments (outside the pipeline, one-shot experiments):
 ## Roster selection (pre-registered, transparent)
 
 The roster selection rules are fixed in advance and recorded in
-full in **[MODEL-SELECTION.md](MODEL-SELECTION.md)** (ten rules).
+full in **[model-selection.md](model-selection.md)** (ten rules).
 The machine's RAM ceiling is measured FIRST (the gallop search on
 the champion config), then candidates screen by the registered
 ceiling predictor (rule 2): predicted machine cost at 262,144
@@ -126,7 +126,7 @@ tokens under the champion's ceiling (4.96 GiB), non-thinking mode
 required, speed-gate predictor, first-party weights, paper rule,
 v4.3 data hygiene, dry-run pre-flight, and verbatim commands. The
 study's practitioner goals are recorded in
-**[PRACTITIONER-GOALS.md](PRACTITIONER-GOALS.md)**. The study-#1
+**[practitioner-goals.md](practitioner-goals.md)**. The study-#1
 popularity walk-down history lives in the lab notebook.
 
 ## Reproduction guide (Windows 10/11 and Linux)
@@ -481,7 +481,7 @@ license and log in with `hf auth login`).
 
 Every constant the study uses - author rulings, practical limits,
 derived/measured values, and inherited defaults - is registered with
-its provenance in [PROTOCOL.md](PROTOCOL.md). Governance rule: a
+its provenance in [protocol.md](protocol.md). Governance rule: a
 constant is single-sourced in the code, and changing one is a
 protocol change requiring a notebook addendum.
 

@@ -1023,3 +1023,21 @@ models.md, model-selection.md, practitioner-goals.md, wow.md,
 protocol.md), ALL-CAPS reserved for README.md as the universal
 entry-point convention. The rename is proposed, not applied - the
 author decides.
+
+
+### Addendum 25 - the naming convention, decided and applied
+
+The author approved the proposal. The convention (now section 8 of
+wow.md): documents in lowercase-kebab - named artifacts like the
+code's data files; ALL-CAPS reserved for README.md alone. Applied:
+
+- PROTOCOL.md -> protocol.md
+- MODEL-SELECTION.md -> model-selection.md
+- PRACTITIONER-GOALS.md -> practitioner-goals.md
+
+with the cross-reference sweep in the same commit: models.md,
+README.md, the three renamed files themselves (internal refs),
+tests/test_registry.py (the registry's source-of-truth docstrings
+now point at protocol.md), the conversation archive, and the
+lab-notebook index. The notebook sessions keep their historical
+ALL-CAPS mentions - they are records, not live references.

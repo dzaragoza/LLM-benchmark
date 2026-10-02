@@ -2,7 +2,7 @@
 
 *Full state of the conversation for the next chat. Companion artifacts: the lab
 notebook (`lab-notebook-llms-on-102-4-gb-s-system-ram-machines.md`, addenda
-55–66 cover this conversation) and `PROTOCOL.md` (the constants registry).
+55–66 cover this conversation) and `protocol.md` (the constants registry).
 Repo: github.com/dzaragoza/LLM-benchmark, branch `main`, direct commits, no PRs.
 HEAD at close: `4a5aad5` (all work pushed).*
 
@@ -72,9 +72,9 @@ boundary — the boundary rungs ARE the selected rungs), or (b) publish the
 n=50 verdicts are already readable from the cal-dumps on disk
 (`*.cal-dump.nothink.json`) — no re-run needed to know them.
 
-## Selection rules (now in MODEL-SELECTION.md, addendum 64/65)
+## Selection rules (now in model-selection.md, addendum 64/65)
 
-Nine pre-registered rules, single-sourced in **MODEL-SELECTION.md**;
+Nine pre-registered rules, single-sourced in **model-selection.md**;
 README points there. Key rulings this conversation:
 
 1. **Family = publisher/author** (rule 2, sharpened addendum 64). Lineage
@@ -150,11 +150,11 @@ prediction recomputes mechanically.)
 
 ## Files added this conversation
 
-- **PROTOCOL.md** — the constants registry (created addendum 39 era; rows
+- **protocol.md** — the constants registry (created addendum 39 era; rows
   updated through addendum 66; change-log entries per addendum).
-- **MODEL-SELECTION.md** (addendum 64/65) — the nine roster rules with
+- **model-selection.md** (addendum 64/65) — the nine roster rules with
   provenance pointers and worked examples.
-- **PRACTITIONER-GOALS.md** (addendum 65) — nine goals from the author's
+- **practitioner-goals.md** (addendum 65) — nine goals from the author's
   rulings: the MY-hardware question; reader as final judge; within-model
   q4–q8 ladder; right-sizing over flagships; class-exclusive benchmarking;
   tokenizer aim; general cheap predictor + trust band; pre-registration /
@@ -182,8 +182,8 @@ prediction recomputes mechanically.)
 6. **Addendum 64**: family/lineage ruling (family = publisher/author;
    lineage = genetic caveat); picks revised to granite-3.3-8b and
    OLMo-2-7B; structural finding (trusted-pass class family-blocked).
-7. **Addendum 65**: class-exclusive rule (rule 9); MODEL-SELECTION.md +
-   PRACTITIONER-GOALS.md created.
+7. **Addendum 65**: class-exclusive rule (rule 9); model-selection.md +
+   practitioner-goals.md created.
 8. **Addendum 66**: calibration graded — anchors (qwen UPDATE 0.412,
    mistral VALIDATED 0.366, llama grows 0.491 superseding the 0.144
    joke-turn row, phi hold 0.418); pooled 0.366; HEADLINE: qwen and
