@@ -1379,3 +1379,32 @@ the TOURNAMENT table already carries the comeback round (models.md:77) and
 the REJECTED table already carries the window reason.
 
 Registered: 2026-10-02, after addendum 35. No code changes, no tests.
+
+### Addendum 37 - rounds 6 and 7: the tournament is resumable, and the full-holds column is retired
+
+Author rulings: (1) the full-holds column is RETIRED from the results -
+overly optimistic; it remains in the rank dict only as an internal
+tie-break (a topped-out climb is still the deepest outcome), but it is
+no longer printed or tabulated. (2) ALL participants get climbs 6 and
+7 - TOURNAMENT_CLIMBS 5 -> 7 (seeds 6 and 7).
+
+THE RESUME MECHANISM (the enabling change): each climb's fall depth is
+now persisted in the family state (tournament_falls, seed = climb
+number, saved after every climb). A climb already recorded is RESUMED,
+never re-run - extending the tournament runs ONLY the new seeds. The
+climbs 1-5 falls of all 8 families were backfilled into
+state/benchmark-state-tournament.json from the recorded results
+(models.md and the state's tournament records), so the author's run
+executes only seeds 6 and 7 per family (2 climbs x 8 families - at
+~7 min per floor-fall family and more for the climbers, an estimate
+of 20-60 min, dominated by the 2B whose climbs reach deep).
+
+CODE-EDIT REPORT (wow.md section 4): the first search_replace of this
+addendum FAILED on two blocks (multi-line old_str mismatch) - no
+corruption, applied instead via a scripted replace with asserts.
+Test fixes along the way (three iterations on the new resume test:
+the fake's seed-7 hold count, the entry-config 7-climb count, and a
+wrong mode assertion - the mode of [4096x4, 8192, 32768, top] is 4096,
+caught by the tests before anything shipped). 135 tests green.
+
+No models.md results yet - the tables await the author's run.

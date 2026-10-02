@@ -141,12 +141,51 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     }
     models_dir = str(tmp_path)
     tour = fb.tournament_family("fam", models_dir, state, str(tmp_path / "st.json"), 8210, False)
-    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-5
-    # hold every depth (7 calls each) -> 29 total
-    assert len(calls) == 29
-    assert tour["fall_depths"] == [4096, None, None, None, None]
-    assert tour["full_holds"] == 4
-    assert tour["rank_depth"] == 262144  # 4/5 majority at the top rung
+    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-7
+    # hold every depth (7 calls each) -> 43 total
+    assert len(calls) == 43
+    assert tour["fall_depths"] == [4096, None, None, None, None, None, None]
+    assert tour["full_holds"] == 6
+    assert tour["rank_depth"] == 262144  # mode of 6 x top (addendum 37)
+
+
+def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
+    """The addendum-37 resume rule: climbs already recorded in the
+    family state (tournament_falls, seed = climb number) are NOT
+    re-run - extending the tournament (5 -> 7) runs only the new
+    seeds, and the rank covers all seven climbs."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        calls.append(seed)
+        assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
+        return seed > 6, {"correct": 1 if seed > 6 else 0, "depth": rung}
+
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    model = tmp_path / "fam-Q8_0.gguf"
+    model.write_bytes(b"x")
+    state = {
+        "families": {
+            "fam": {
+                "selected": "Q8_0",
+                "runs": {"Q8_0": {"file": str(model)}},
+                "tournament_falls": {"1": 4096, "2": 4096, "3": 4096, "4": 8192, "5": 32768},
+            }
+        }
+    }
+    models_dir = str(tmp_path)
+    state_path = str(tmp_path / "st.json")
+    tour = fb.tournament_family("fam", models_dir, state, state_path, 8210, False)
+    # only seeds 6 and 7 ran: seed 6 falls at 4096 (1 call), seed 7
+    # holds all seven depths (7 calls) - climbs 1-5 were resumed
+    assert calls == [6] + [7] * 7
+    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096, None]
+    saved = state["families"]["fam"]["tournament_falls"]
+    assert saved == {"1": 4096, "2": 4096, "3": 4096, "4": 8192, "5": 32768, "6": 4096, "7": None}
+    # mode of the seven climbs: 4 x 4096 beats 1 x top (None)
+    assert tour["rank_statistic"] == "mode" and tour["rank_mode"] == 4096
 
 
 def test_tournament_entry_config(tmp_path, monkeypatch):
@@ -188,8 +227,8 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
         8210,
         False,
     )
-    assert out["rank_depth"] == 262144 and out["full_holds"] == 5
-    assert len(calls) == 5 * len(fb.TOURNAMENT_DEPTHS)
+    assert out["rank_depth"] == 262144 and out["full_holds"] == 7
+    assert len(calls) == 7 * len(fb.TOURNAMENT_DEPTHS)
     assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
 
 

@@ -33,7 +33,7 @@ pair, not a model).
 ## PASS (both gates at 262,144)
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | notes |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|
 | Qwen3.5-0.8B | Q8_0 | f16 | f16 | 0.86 | 4.96 GiB | 9.3 | THE CHAMPION; sets the 4.96 GiB ceiling; trained window 262,144; speed PASS zero stalls, FWE 3/3 at 261,888 |
 | Qwen3.5-2B | Q4_K_M | q5_0 | q5_0 | 1.22 | 3.48 GiB | 9.5 | the RAM champion (half the champion's cost); speed PASS 15.2 t/s worst turn, FWE 3/3; the quant-raise probe (Q8_0+q8_0) FAILED - 5.22 GiB over ceiling, FWE 0/3 (session 36 addendum 1); this Q4_K_M config is the 2B's ceiling config |
 | AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.42 GiB | 6.1 | PASS on its first probe (session 36 addendum 1): 89% of ceiling, speed PASS 6.08 w/s worst turn (reader never waited), FWE 3/3 at 261,888; the FIRST NON-TRANSFORMER PASS in the study (hybrid mamba-attention, 2 full-attention layers carried the retrieval); predictor 4.40 GiB - off by 0.02 (0.5%) |
@@ -41,7 +41,7 @@ pair, not a model).
 ## FAIL
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | reason for failure |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|
 | Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.93 | 5.22 GiB | 8.2 | FWE 0/3 at 261,888 (speed PASS 8.18 w/s); the 5.22 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3: the ceiling is always an estimate); the quant-raise is closed (session 36 addendum 1) |
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.82 | 5.81 GiB | 7.3 | TimeoutError at +94m into the FWE phase after a speed PASS at 262,144 (7.3 w/s); the 5.81 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3); analysis in session 36 addendum 3; the family closes at 4B for this machine (Q2_K is its floor config) |
 | RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 3.58 GiB | 13.1 | FWE degeneration 0/3 at 261,888 - single-character repetition output, no extraction attempted; RAM and speed PASS (3.58 GiB, 13.11 w/s - the fastest depth-scorer in the study); pure recurrence cannot carry FWE at 256k (session 36 addendum 1) |
@@ -53,7 +53,7 @@ author ruling - a cheaper config of a passing family adds nothing;
 the pool is settled for the report)
 
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|
 
 
 ## TOURNAMENT (the ranking instrument - session 36 addenda 10-20)
@@ -64,21 +64,21 @@ early stop at the first non-perfect cell. Rank = mode of the climbs,
 median fallback (marked). The speed gate is assumed passed (measured
 at 256k for all participants), falsified when a ranking step needs it.
 
-| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | full holds | rank statistic | notes |
-|---|---|---|---|---|---|---|---|
-| 1 | Qwen3.5-2B | (Q4_K_M, q5_0, q5_0) | 65536, 4096, 32768, 262144, 16384 | [4 4 3 2 1 1 0] | 0/5 | median-fallback | THE TOURNAMENT CHAMPION (32,768 tok); the deepest climber - climb 4 is the only climb in the field to reach 262,144 (falling 1/3), and the most volatile (climb 2 fell at 4096); highest variance, highest ceiling |
-| 2 | AI21-Jamba2-3B | (Q8_0, f16, f16) | 8192, 4096, 4096, 65536, 8192 | [3 1 1 1 0 0 0] | 0/5 | median-fallback | second at 8,192 tok; climb 4 reached 65,536 (2/3 partial) - the hybrid's retrieval held mid-deepths on two of five seeds |
-| 3 | Qwen3.5-0.8B | (Q8_0, f16, f16) | 4096, 4096, 4096, 8192, 32768 | [2 1 1 0 0 0 0] | 0/5 | mode | THE FORMER CHAMPION, third at 4,096 tok; the 256k PASS (seed 1024, FWE 3/3 at 261,888) is SEED-CONDITIONAL - seeds 1-3 fell at 4,096 (2/3 partials, deep-scanning misses, not refusals); climb 5 reached 32,768 |
+| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | rank statistic | notes |
+|---|---|---|---|---|---|---|
+| 1 | Qwen3.5-2B | (Q4_K_M, q5_0, q5_0) | 65536, 4096, 32768, 262144, 16384 | [4 4 3 2 1 1 0] | median-fallback | THE TOURNAMENT CHAMPION (32,768 tok); the deepest climber - climb 4 is the only climb in the field to reach 262,144 (falling 1/3), and the most volatile (climb 2 fell at 4096); highest variance, highest ceiling |
+| 2 | AI21-Jamba2-3B | (Q8_0, f16, f16) | 8192, 4096, 4096, 65536, 8192 | [3 1 1 1 0 0 0] | median-fallback | second at 8,192 tok; climb 4 reached 65,536 (2/3 partial) - the hybrid's retrieval held mid-deepths on two of five seeds |
+| 3 | Qwen3.5-0.8B | (Q8_0, f16, f16) | 4096, 4096, 4096, 8192, 32768 | [2 1 1 0 0 0 0] | mode | THE FORMER CHAMPION, third at 4,096 tok; the 256k PASS (seed 1024, FWE 3/3 at 261,888) is SEED-CONDITIONAL - seeds 1-3 fell at 4,096 (2/3 partials, deep-scanning misses, not refusals); climb 5 reached 32,768 |
 
 THE COMEBACK ROUND (session 36, addendum 35 - the author's run, 23 min):
 
-| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | full holds | rank statistic | notes |
-|---|---|---|---|---|---|---|---|
-| 4 | Llama-3.2-1B-Instruct | (Q8_0, q4_0, q4_0) | 16384, 4096, 4096, 32768, 32768 | [3 3 2 0 0 0 0] | 0/5 | median-fallback | THE COMEBACK CHAMPION (16,384 tok) - the only newcomer past the floor; climb 1 reached 16,384 and climb 4/5 reached 32,768; two 0/3 refusal-shaped misses ("I can't fulfill this request.") on seed 1 |
-| 5 | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | 8192, 4096, 16384, 4096, 4096 | [2 1 0 0 0 0 0] | 0/5 | mode | 4,096 tok; the reasoning tune climbs no deeper than its PASS sibling (8,192) - the thinking shape neither helps nor hurts FWE retrieval |
-| 6 | MiniCPM5-2B | (Q8_0, f16, q4_0) | 8192, 4096, 4096, 4096, 4096 | [1 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok - the dead-on-ceiling entry did NOT buy depth; predicted deepest (32,768+), measured the floor: prediction FAILED |
-| 7 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x5 | [0 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok; zero holds anywhere - the smallest model in the field |
-| 8 | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | 4096 x5 | [0 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok; the structural hypothesis CONFIRMED at five seeds (all-4096 as predicted) - but the miss shape CHANGED: no single-character degeneration this time, instead "Sure, I understand. Please provide the text" confabulation (0/3) and partial scans (2/3, 1/3) - pure recurrence fails FWE, but HOW it fails is prompt-dependent |
+| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | rank statistic | notes |
+|---|---|---|---|---|---|---|
+| 4 | Llama-3.2-1B-Instruct | (Q8_0, q4_0, q4_0) | 16384, 4096, 4096, 32768, 32768 | [3 3 2 0 0 0 0] | median-fallback | THE COMEBACK CHAMPION (16,384 tok) - the only newcomer past the floor; climb 1 reached 16,384 and climb 4/5 reached 32,768; two 0/3 refusal-shaped misses ("I can't fulfill this request.") on seed 1 |
+| 5 | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | 8192, 4096, 16384, 4096, 4096 | [2 1 0 0 0 0 0] | mode | 4,096 tok; the reasoning tune climbs no deeper than its PASS sibling (8,192) - the thinking shape neither helps nor hurts FWE retrieval |
+| 6 | MiniCPM5-2B | (Q8_0, f16, q4_0) | 8192, 4096, 4096, 4096, 4096 | [1 0 0 0 0 0 0] | mode | 4,096 tok - the dead-on-ceiling entry did NOT buy depth; predicted deepest (32,768+), measured the floor: prediction FAILED |
+| 7 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x5 | [0 0 0 0 0 0 0] | mode | 4,096 tok; zero holds anywhere - the smallest model in the field |
+| 8 | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | 4096 x5 | [0 0 0 0 0 0 0] | mode | 4,096 tok; the structural hypothesis CONFIRMED at five seeds (all-4096 as predicted) - but the miss shape CHANGED: no single-character degeneration this time, instead "Sure, I understand. Please provide the text" confabulation (0/3) and partial scans (2/3, 1/3) - pure recurrence fails FWE, but HOW it fails is prompt-dependent |
 
 NOBODY beat the bar (32,768, the first tournament's rank). The overall
 field ranking stands: Qwen3.5-2B (32,768) > Jamba2-3B (8,192) >
