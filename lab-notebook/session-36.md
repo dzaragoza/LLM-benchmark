@@ -135,3 +135,68 @@ stays n=1 for scores). The diagnostic, pre-registered:
 Jamba2 acknowledged (request 2, no action beyond the record): the
 first non-transformer PASS - a genuinely distinct model class in the
 pool, carried by 2 full-attention layers over 1 KV head.
+
+### Session 36, addendum 4 - author review of addendum 3; n justified, predictor discipline, timeout out of scope
+
+THE BLANK-INSIDE-TABLE RULE IS MARKED BEYOND-THE-REFERENCE (request 1,
+answered): the reference linter is markdownlint, and its MD058
+(blanks-around-tables) checks blanks AROUND tables. On our exact
+breakage - a blank between the delimiter row and the data row - the
+reference linter is silent BY CONSTRUCTION: in its parse the blank
+line already split the table, and the orphaned pipe rows below are not
+a table at all (GFM requires a delimiter row), so there is nothing
+for MD058 to be "around". Our check is a deliberate extension, kept
+under the MD058 ID because it is the same failure class (GitHub
+renders a broken table) and the same fix. md_check.py's docstring now
+marks the rule with its derivation: markdownlint-covered vs
+beyond-the-reference, and why. The checker and the auto-fixer stand
+as shipped in addendum 3 (127 tests).
+
+WHY n=5, NOT n=3 OR n=10 (request 3, the justification): what each
+repetition buys is DISENTANGLING two hypotheses that n=1 cannot
+separate -
+
+  H-noise:  q8_0-KV quantization noise - the answer is right in the
+            cache but a task draw flips it; per-task hit prob p_high,
+            near 1, i.i.d. draws.
+  H-cap:    capability drop at the higher quant - p_low, near 0.
+
+The statistic that improves with n is the CONFUSION between these:
+observing k hits out of n, the likelihood ratio between the two
+hypotheses sharpens as n grows. With one anchor each - the PASS
+config holds 3/3 and the overnight config went 0/3 - the realistic
+posterior puts p_high around 0.9 (PASS-side) and p_low around 0.1
+(fail-side). n=5 discriminates them decisively: under p=0.9, P(0 or 1
+hits in 5) ~ 0.0009 - a 0-1/5 result is essentially impossible for
+H-noise; under p=0.1, P(>=4 hits) ~ 0.0005 - a 4-5/5 result is
+essentially impossible for H-cap. n=3 leaves the middle open (2/3 is
+compatible with both at small likelihood cost), n=5 is the smallest n
+whose BOTH tails are < 0.001, and beyond n=5 the tails shrink
+exponentially but the decision boundary does not move - the extra
+tasks buy no new discrimination. Cost side: each task is one
+261,888-token prefill + 128-token generation at 8.2 w/s - a few
+minutes of machine time; five tasks per arm, two arms (probe +
+control) is the whole diagnostic. n=5 is not arbitrary - it is the
+smallest n that closes both tails at the 1-in-1000 level with the
+study's own anchors as the priors.
+
+THE PREDICTOR STAYS UNDER TUNING (request 4, registered as standing
+discipline): the calibration is now a PER-FACTOR one-anchor fit
+(q8_0 0.665 from the 2B, q4_0 0.400 from the 4B, f16 1.0 from three
+near-exact anchors). Each new measured config with a quantized KV
+cache lands as a second anchor for its factor: if the two anchors
+disagree by more than 5 percent, the single factor splits into a
+per-model-class factor (the block sizes differ across families).
+q5_0 is unmeasured and still carries its theoretical 0.34375 - the
+first q5_0 probe grades it the same way. The predictor's calibration
+status is now a living part of rule 2, updated every probe
+(pre-registration discipline, unchanged).
+
+THE 4B TIMEOUT INVESTIGATION IS OUT OF SCOPE (request 6, author
+ruling): the timeout explanation stands as registered in addendum 3
+(the harness's 1800s non-streaming budget vs the 4B's 262k prefill
+rate), but the follow-up - raising post_json's timeout for
+depth-262k FWE cells or streaming the FWE prefill - will NOT be
+pursued; the 4B family stays closed on this machine due to time
+constraints. The harness-side fix note stays in the notebook for
+whomever revisits the family; no code change.
