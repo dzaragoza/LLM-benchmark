@@ -1502,3 +1502,13 @@ The state entry is registered; the dry run verifies the acquisition
 plan (safetensors -> convert_quant) on the author's machine - the
 sandbox venv lacks the study packages so the entry smoke is the
 author's dry run. Tests updated for n=15 (135 passed).
+
+### Addendum 41 - the rank column carries the rank value
+
+Author ruling: in the models.md tournament tables, the rank column
+now shows both the ordinal and the rank depth - "1 (32,768)" not
+just "1" - so the ranking is readable from the first column alone
+(the value was previously buried in the notes). Applied to all three
+tables (rounds 1-5, the comeback, rounds 6-7 - 16 rows). No code
+change: the printed table already shows the depth per row; this is a
+models.md presentation fix.
