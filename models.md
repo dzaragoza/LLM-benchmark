@@ -9,6 +9,12 @@ RAM = cold whole-stack machine cost (MemAvailable delta) at depth
 registered ceiling predictor (MODEL-SELECTION.md rule 2):
 `cost = file(rung) + KV_eff(262144) x kvquant + 1.10 GiB`.
 
+RAM OVER CEILING IS NOT A FAIL REASON (author ruling, session 36
+addendum 3): the 4.96 GiB ceiling is always an estimate - a measured
+RAM over ceiling is a NEW CEILING WITH A PASS, recorded as a
+measurement; the fail reason is whatever the gates say (FWE, timeout).
+Predicted-over at screen time still rejects (REJECTED, size reason).
+
 TYPE RULE (author ruling, session 35 addendum 18): only INSTRUCT
 models are suited to this benchmark - both gates are
 instruction-shaped (the speed gate is a live conversation with a
@@ -36,15 +42,14 @@ pair, not a model).
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | reason for failure |
 |---|---|---|---|---|---|---|---|
-| Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.93 | 5.22 GiB | 8.2 | RAM over ceiling (5.22 > 4.96, +0.26) AND FWE 0/3 at 261,888; speed PASS 8.18 w/s; the quant-raise is closed (session 36 addendum 1) |
-| Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.82 | 5.81 GiB | 7.3 | RAM over ceiling (5.81 > 4.96, +0.85 - the predictor's 4.95 was 15% optimistic); speed PASS at 262,144 then TimeoutError at +94m into the FWE phase; the family closes at 4B for this machine (Q2_K is its floor config) |
+| Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.93 | 5.22 GiB | 8.2 | FWE 0/3 at 261,888 (speed PASS 8.18 w/s); the 5.22 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3: the ceiling is always an estimate); the quant-raise is closed (session 36 addendum 1) |
+| Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.82 | 5.81 GiB | 7.3 | TimeoutError at +94m into the FWE phase after a speed PASS at 262,144 (7.3 w/s); the 5.81 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3); analysis in session 36 addendum 3; the family closes at 4B for this machine (Q2_K is its floor config) |
 | RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 3.58 GiB | 13.1 | FWE degeneration 0/3 at 261,888 - single-character repetition output, no extraction attempted; RAM and speed PASS (3.58 GiB, 13.11 w/s - the fastest depth-scorer in the study); pure recurrence cannot carry FWE at 256k (session 36 addendum 1) |
 
 ## CANDIDATES (predicted values)
 
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
-
 | AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | THE LAST UNPICKED CONFIG: the Q8_0 PASSed (4.42 GiB) so this cheaper config is now the family's natural second probe - 77% of ceiling, 0.6 GiB under the Q8_0's measured cost; the quality question is whether Q6_K holds the FWE the Q8_0 carried |
 
 

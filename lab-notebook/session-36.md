@@ -38,3 +38,100 @@ THE ROSTER FOR THE REPORT (the author asked for the data - this is it): three PA
 plus one candidate config unpicked (Jamba2-3B Q6_K, 3.81 predicted) and the night's three measured FAILs with their numbers. The speed-vs-depth-vs-RAM story: RWKV7 measured 13.11 w/s at 262,144 (a finding even in failure - pure recurrence is the fastest decode) but fails FWE; the Jamba hybrid is the middle path that passes everything.
 
 OPEN FOR THE AUTHOR: (1) the Jamba Q6_K probe - one command, ~55 min, answers whether the family holds at 77% of ceiling; (2) the head-to-head the roster now invites: 0.8B vs 2B vs Jamba2-3B on a quality axis beyond FWE (the notebook's n=1 FWE is a screen, not a quality ranking); (3) the report itself - the roster above is the data table.
+
+### Session 36, addendum 3 - the six-point review; CANDIDATES fixed, tooling hardened, predictor recalibrated
+
+THE CANDIDATES TABLE WAS BROKEN and BOTH gates missed it (author catch,
+request 1). The breakage: a single BLANK LINE between the delimiter row
+and the data row of the Jamba Q6_K table (models.md line 47, introduced
+by the session-36 addendum-1 line-based restoration). GitHub splits a
+GFM table at a blank line, so the Jamba row rendered as an orphaned
+one-row table under a headerless pipe row - "broken". Why the tooling
+did not catch it: md_check.check_tables closes the table block at the
+blank line and validates only the header+delimiter pair (which is
+well-formed) - the orphaned data row below is NEVER inspected; and
+code_edit's auto-fixer covered MD058's "blank before header" and
+"blank after body" but had no rule for a blank INSIDE a table. Both
+fixed this session:
+
+- md_check.check_tables now emits MD058 "blank line inside the table -
+  GitHub splits the table and orphans the rows below" when the line
+  after the block is blank and the line after THAT is a pipe row.
+- code_edit._fix_markdown now AUTO-FIXES the case (the fix is unique
+  and unambiguous - pop the blank between the delimiter row and the
+  data row), keeping the addendum-17 ruling: mechanical rules are
+  fixed, judgement rules are lint failures.
+- Regression tests: test_md058_blank_line_inside_table (checker),
+  test_fix_markdown_collapses_blank_line_inside_table (fixer).
+  Suite: 127 passed (was 125).
+
+THE RULING REGISTERED (request 5): RAM OVER CEILING IS NOT A FAIL
+REASON. The 4.96 GiB ceiling is always an estimate; a measured RAM
+over ceiling is a NEW CEILING WITH A PASS - a measurement, recorded
+with the row, never the fail reason. The fail reason is whatever the
+gates say. models.md header now carries the ruling and both FAIL rows
+are re-worded: 2B Q8_0 fails on FWE 0/3 (5.22 GiB recorded as a
+new-ceiling measurement), 4B Q2_K fails on the timeout (5.81 GiB
+recorded likewise). RWKV7's reason was already FWE degeneration. The
+REJECTED table keeps its size reason for PREDICTED-over configs (the
+screen rejects on prediction; only measured attempts earn the
+new-ceiling wording).
+
+THE PREDICTOR RECALIBRATED (request 4, rule 2 rewritten): the
+theoretical bytes-per-element factors UNDERESTIMATED the quantized-KV
+rows by 9-15 percent. Backing the overhead out of the measured anchors:
+2B q8_0 4.78 predicted vs 5.22 measured -> KV term 3.29 GiB ->
+calibrated q8_0 factor 0.665 (theoretical 0.53125 x 1.25); 4B q4_0
+4.95 predicted vs 5.81 measured -> KV term 7.22 GiB -> calibrated q4_0
+factor 0.400 (theoretical 0.28125 x 1.42). The quantized cache costs
+~25 percent (q8_0) to ~42 percent (q4_0) more than raw bytes -
+quantization block book-keeping and fragmentation, not model state.
+f16 stays 1.0 (near-exact: Jamba 4.40 vs 4.42, +0.5 percent). One
+anchor per quantized factor; refine as more quantized-KV probes land.
+Validation status now five anchors, listed in rule 2.
+
+THE 4B TIMEOUT EXPLAINED (request 6): the harness's non-streaming
+POST timeout is 1800s (llama_server.post_json default, llama_server.py
+line 301). The FWE cell posts ONE non-streaming request carrying the
+whole 261,888-token prompt (ruler_gate.ask -> post_json, "stream":
+False). The FWE phase therefore needs prefill of 261,888 tokens
+INSIDE one 1800s window: it must sustain >= 145.5 tok/s prefill. The
+speed phase proves the machine could not: the speed census measured
+the 4B at 7.3 t/s DECODE, and the mapped-census line - 7.63 GiB
+mapped, 1.00 GiB resident, file 0.22 + anon 0.78 - is a
+memory-bandwidth-bound profile; the q4_0 KV cache at 262k adds
+further bandwidth pressure in prefill. The 0.01-GiB-predicted-edge
+config died in the harness, not in the model. The speed gate never
+sees this timeout because it STREAMS (speed_gate.py line 402,
+"stream": True) - the reader collides mid-stream long before any
+30-minute wall. The Jamba and 0.8B FWE cells fit the wall with
+headroom because their prefills are fast enough; the 4B at Q2_K with
+q4_0 KV could not prefill 262k in 30 minutes. Candidate discriminated:
+the timeout is the HARNESS's non-streaming 1800s budget vs the 4B's
+prefill rate at 262k with a q4_0 cache - not a capability verdict and
+not swap (32 GB total RAM, 5.81 GiB cost). Registered. If a 4B-family
+re-probe is ever wanted, the fix is harness-side: raise post_json's
+timeout for depth-262k FWE cells or stream the FWE prefill.
+
+THE FWE DIAGNOSTIC PRE-REGISTERED (request 3): the 2B Q8_0's FWE 0/3
+is unexplained - the Q4_K_M config holds FWE 3/3 at the same depth, so
+either q8_0-KV noise (a cache-fidelity effect) or a capability drop
+at the higher quant is the suspect, and n=1 per task cannot
+discriminate noise from capability. Recommendation: n=5. The
+registered precedent is the session-34 addendum-3 diagnostic (seeds
+1024-1028, full answers read from the ruler-results CSV; the ladder
+stays n=1 for scores). The diagnostic, pre-registered:
+
+- 2B Q8_0+q8_0 FWE at depth 261,888, n=5, seeds 1024-1028, fresh CSV,
+  answers read in full: 5/5 with near-miss partials -> cache-fidelity
+  noise, the config gets a second chance at n=1 in the ladder; 0-2/5
+  with miss texts like the overnight's -> capability drop, the
+  quant-raise closes for good.
+- Control arm, same session: 2B Q4_K_M+q5_0 (the PASS config) FWE at
+  261,888, n=5, seeds 1024-1028 - expected 5/5; if the control arm
+  flickers, the task itself is the noise, and the FWE cell's
+  reliability question opens ahead of the config question.
+
+Jamba2 acknowledged (request 2, no action beyond the record): the
+first non-transformer PASS - a genuinely distinct model class in the
+pool, carried by 2 full-attention layers over 1 KV head.

@@ -38,16 +38,28 @@ Their history lives in the lab notebook (session 35, addenda 10-12).
      (KiB/token × depth; the interval divides because only
      full-attention layers hold the whole window — Qwen3.5 interval
      4);
-   - `kvquant`: f16 = 1.0, q8_0 = 0.53125, q5_0 = 0.34375,
-     q4_0 = 0.28125 (bytes per element vs f16);
+   - `kvquant`: f16 = 1.0, q8_0 = 0.665, q5_0 = 0.34375,
+     q4_0 = 0.400 (session 36, addendum 3 recalibration: f16 stays
+     1.0 — measured near-exact (Jamba2 4.40 vs 4.42, +0.5%); the
+     quantized factors are CALIBRATED on the overnight anchors, not
+     the theoretical bytes-per-element (q8_0 0.53125, q4_0 0.28125),
+     which underestimated 9–15%: 2B q8_0 4.78 vs 5.22 and 4B q4_0
+     4.95 vs 5.81 back out to 0.665 and 0.400 — the quantized cache
+     costs ~25% (q8_0) to ~42% (q4_0) more than raw bytes, book-
+     keeping the quantization blocks and fragmentation; one anchor
+     each, refine as more quantized-KV probes land);
    - `overhead = 1.10 GiB` ([P] practical, fitted on the two
      measured anchors: champion 0.8B @ Q8_0/f16 → predicted 4.96 vs
      measured 4.96; 2B @ Q4_K_M/q5_0 → predicted 3.31 vs measured
      3.48, −5% conservative — the predictor never over-predicts
      RAM on the anchors, which is the safe direction for a screen).
-   Validation status: two anchors, exact on one, 5% conservative on
-   the other. Every probe grades the predictor when its measured
-   cost lands (the standing pre-registration discipline).
+   Validation status (session 36 addendum 3): five anchors — f16-KV
+   near-exact (0.8B: 4.96 vs 4.96; Jamba2: 4.40 vs 4.42, +0.5%);
+   quantized-KV underestimated under the old theoretical factors
+   (2B q8_0: 4.78 vs 5.22; 4B q4_0: 4.95 vs 5.81) and the factors
+   are now calibrated on those anchors; RWKV overhead conservative
+   (4.13 vs 3.58, −13%). Every probe grades the predictor when its
+   measured cost lands (the standing pre-registration discipline).
 
 3. **Non-thinking mode required (rationale rerouted, session 35,
    addendum 12).** Pure-reasoning models (no off switch) are
