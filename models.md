@@ -98,6 +98,29 @@ DISQUALIFIED under the floor rule (addendum 38): MiniCPM5-1B - and
 only MiniCPM5-1B. Seven climbs, zero holds at any depth. The field is
 now 7 families; one replacement entrant is owed to hold the study at 8.
 
+THE n=15 ROUND (session 36 addendum 46 - the author's run, 5h12m; seeds 8-15
+fresh via resume, gemma's first 15; bars at n=15: reliable 10/15,
+conservative 12/15):
+
+| rank | model | config (model q, k, v) | falls (climb 1-15) | passes/rung | reliable (1s) | conservative (2s) | ceiling | rank statistic | notes |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | Qwen3.5-2B | (Q4_K_M, q5_0, q5_0) | 65536, 4096, 32768, 262144, 16384, 4096, 32768, 32768, 32768, 8192, 65536, 8192, 32768, 32768, top | [13 11 10 4 2 2 1] | 16,384 | 4,096 | 262,144 | mode | CO-CHAMPION (32,768, now a true MODE - 5x) and the field's only deep certification: reliable 16,384 (10/15), conservative 4,096 (13/15); climb 15 TOPPED OUT (the field's first full hold) |
+| 2 | Qwen3.5-0.8B | (Q8_0, f16, f16) | 4096, 4096, 4096, 8192, 32768, 262144, 32768, 262144, 262144, 4096, 16384, top, 8192, 262144, 32768 | [11 9 8 5 5 5 1] | 4,096 | 0 | 262,144 | median-fallback | CO-CHAMPION (32,768, median): four climbs at 262,144-or-top - the ceiling beast; but its certified floor is only 4,096 (11/15): spectacular and untrustworthy |
+| 3 | AI21-Jamba2-3B | (Q8_0, f16, f16) | 8192, 4096, 4096, 65536, 8192, 4096, 8192, 16384, 16384, 4096, top, 16384, 4096, 16384, 65536 | [10 7 3 3 1 1 1] | 4,096 | 0 | 262,144 | mode | DROPS from 8,192 to 4,096 (mode) - its n=5 8,192 was seed luck; climb 11 topped out; reliable only at the floor |
+| 4 | Llama-3.2-1B-Instruct | (Q8_0, q4_0, q4_0) | 16384, 4096, 4096, 32768, 32768, 8192, 4096 + 8x 4096 | [4 3 2 0 0 0 0] | 0 | 0 | 32,768 | mode | fades further at n=15 - no certification anywhere |
+| 5 | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | see state | [7 1 0 0 0 0 0] | 0 | 0 | 16,384 | mode | 7/15 at the floor - closer to reliable than its sibling was, but nothing above 8,192 |
+| 6 | gemma-3-1b-it | (Q8_0, q4_0, q4_0) | see state | [1 1 0 0 0 0 0] | 0 | 0 | 16,384 | mode | the newcomer BARELY clears the floor: one climb (seed 2) held to 16,384, fourteen fell at 4,096; the single-kv-head shape is the field's weakest FWE retriever |
+| 7 | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | see state | [4 0 0 0 0 0 0] | 0 | 0 | 8,192 | mode | 4/15 at the floor but NOTHING above - recurrence is confirmed floor-adjacent; the seed-6 8,192 hold was an outlier |
+| 8 | MiniCPM5-2B | (Q8_0, f16, q4_0) | see state | [3 0 0 0 0 0 0] | 0 | 0 | 8,192 | mode | 3/15 at the floor, nothing above |
+| 9 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x7 (n=7, seeds 8-21 pending) | [0 0 0 0 0 0 0] | 0 | 0 | 4,096 | mode | re-admitted (addendum 44); zero holds in 7 climbs so far |
+
+DOMINATION-RULE STATUS (addendum 44, n=15 data): nobody is disqualified
+yet - the 2B's conservative certification (4,096, 13/15) dominates
+only models with ZERO holds at >= 4,096, which is MiniCPM5-1B alone,
+and the rule's w/s gate is unmeasured (the reliable-depth w/s step
+ships in addendum 42's code, which this run predated). The verdict
+waits for the n=21 completion.
+
 NOBODY beat the bar (32,768, the first tournament's rank). The overall
 field ranking stands: Qwen3.5-2B (32,768) > Jamba2-3B (8,192) >
 Qwen3.5-0.8B (4,096) > Llama-3.2-1B (16,384*). NOTE: the Llama's
