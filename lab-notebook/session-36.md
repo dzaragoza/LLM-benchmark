@@ -848,3 +848,25 @@ config changes:
 The K-over-V precision principle is registered for future
 config sweeps: when the budget forces an asymmetric pair, the higher
 precision goes on K.
+
+### Addendum 19 - the tournament quant grid (rules extension)
+
+The author's ruling, added to the tournament rules:
+
+- The allowed MODEL quants are q2, q3, q4, q5, q6, q8.
+- The allowed K and V quants are q4, q5, q6, q8, f16.
+- A configuration is denoted by the triple (model q, k quant, v quant).
+- All three quant parameters are INDEPENDENT and can be freely chosen
+  to optimize model RAM usage and match the BW ceiling.
+
+Registered as constants in full_benchmark.py:
+TOURNAMENT_MODEL_QUANTS = [Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, Q8_0],
+TOURNAMENT_KV_QUANTS = [q4_0, q5_0, q6_K, q8_0, f16]. The triple
+notation (model q, k, v) is the entry-config language of the
+tournament; the predictor's job is to pick the triple that lands
+closest under the ceiling. The addendum-17 cap (Q8_0) is superseded
+by the grid's upper bound for ENTRY configs - but note the PASS
+families still compete at their selected (already-validated) rungs.
+The addendum-18 asymmetric K/V sweep is the k/v independence in
+action; this ruling extends the same freedom to the weights rung
+(Q2-Q8) and fixes the legal vocabulary of both axes.
