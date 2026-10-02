@@ -1885,3 +1885,41 @@ instrument. Built AFTER the n=21 grading, so the design fits the
 actual certified map. Doubles as the monotonicity probe design
 (addendum 49: independent per-rung tests are exactly what the
 falsification plan prescribed).
+
+### Addendum 51 - the minimal-roster retrospective: start with one model, add only when the gaps demand it
+
+The author's retrospective (accepted): we could have started with a
+MUCH smaller pool and added models only as we ran out of options.
+The optimal certification procedure, in full:
+1. Probe a SINGLE model, rung by rung, with enough sequential runs
+   per step to know it gives confidence or is a lost cause.
+2. Only when a rung has no answer from the roster, add the next
+   candidate.
+3. Stop adding when either every rung has its answer, or the model
+   supply is exhausted.
+
+THE PRACTITIONER'S QUESTION IS SINGULAR: "he wants ONE model that
+solves it well" - not five that solve it. The recommendation table's
+cell is a single name (with its config and sigma level), not a
+list. Extra certified models at a rung are redundancy, not value;
+the w/s median breaks a tie if two certify, and then the loser is
+retired from that cell.
+
+HONEST LEDGER - what the 8-family breadth bought: the breadth was
+NOT waste under the session's actual goal, which was discovery
+(addendum 45's questions 2-9): the lineage lean (Qwen holds ranks
+1-2), the architecture negatives (gemma's single-kv-head shape,
+RWKV's floor-adjacent recurrence), the seed-variance physics, the
+miss-shape taxonomy, the predictor falsification - none of these
+are answerable from a one-model roster. The mistake in retrospect
+was not the breadth; it was running the DISCOVERY instrument to
+n=15+ when the DISCOVERY questions were already answered at n=5-n=7.
+Screening needed small n; we spent large n where it bought
+certification only for 2-3 models while four families were already
+mathematically dead (addendum 48's quantification).
+
+THE DOCTRINE, COMPLETE (addenda 48 + 50 + 51):
+- Screening: small n, broad field, discovery questions.
+- Certification: minimal roster, sequential per-rung tests, one
+  model per rung, add candidates only when a gap has no answer.
+- The deliverable: per rung, ONE model + config + sigma level.
