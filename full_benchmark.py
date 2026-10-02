@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import math
 import json
 import os
 import re
@@ -310,24 +311,70 @@ def tournament_rank(fall_depths: list[int | None], depths: list[int]) -> dict[st
     modes = [fall for fall, c in counts.items() if c == highest_count]
     if len(modes) == 1 and highest_count > 1:
         mode = modes[0]
-        return {
-            "rank_depth": top_depth if mode is None else mode,
-            "rank_mode": mode,
-            "rank_statistic": "mode",
+        return _rank_extra(
+            {
+                "rank_depth": top_depth if mode is None else mode,
+                "rank_mode": mode,
+                "rank_statistic": "mode",
+                "passes": passes,
+                "fall_depths": fall_depths,
+                "full_holds": sum(1 for fall in fall_depths if fall is None),
+            },
+            depths,
+        )
+    encoded = sorted((top_depth + 1) if fall is None else fall for fall in fall_depths)
+    median = encoded[len(encoded) // 2]
+    return _rank_extra(
+        {
+            "rank_depth": top_depth if median == top_depth + 1 else median,
+            "rank_mode": None,
+            "rank_statistic": "median-fallback",
             "passes": passes,
             "fall_depths": fall_depths,
             "full_holds": sum(1 for fall in fall_depths if fall is None),
-        }
-    encoded = sorted((top_depth + 1) if fall is None else fall for fall in fall_depths)
-    median = encoded[len(encoded) // 2]
-    return {
-        "rank_depth": top_depth if median == top_depth + 1 else median,
-        "rank_mode": None,
-        "rank_statistic": "median-fallback",
-        "passes": passes,
-        "fall_depths": fall_depths,
-        "full_holds": sum(1 for fall in fall_depths if fall is None),
-    }
+        },
+        depths,
+    )
+
+
+def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
+    """The Wilson score interval at 1 sigma (addendum 42): the
+    honest CI for a binomial hold fraction at tournament n. At n=15
+    a 2-sigma interval is too wide to separate models - 1 sigma is
+    the pre-registered choice."""
+    if n == 0:
+        return 0.0, 0.0
+    p = k / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return center - half, center + half
+
+
+def _rank_extra(rank: dict[str, Any], depths: list[int]) -> dict[str, Any]:
+    """The addendum-42 recommendation statistics: reliable depth (the
+    deepest rung whose 1-sigma LOWER Wilson bound on the hold
+    probability is >= 0.5 - the rung holds FWE on most seeds, with
+    1-sigma confidence), ceiling (the deepest rung held EVER), and
+    the per-rung Wilson bounds for the table."""
+    n = len(rank["fall_depths"])
+    passes = rank["passes"]
+    floor = math.ceil(0.5 * n) if n else 0
+    reliable = 0
+    bounds: dict[int, tuple[float, float]] = {}
+    for d in depths:
+        k = passes[d]
+        lo, hi = wilson_interval(k, n)
+        bounds[d] = (round(lo, 3), round(hi, 3))
+        if k >= floor and lo >= 0.5:
+            reliable = d
+    rank["reliable_depth"] = reliable
+    rank["wilson_bounds"] = bounds
+    climb_max = [
+        (top_d := depths[-1]) if f is None else f for f in rank["fall_depths"]
+    ]
+    rank["ceiling"] = max(climb_max) if climb_max else 0
+    return rank
 
 
 def tournament_family(
@@ -454,7 +501,19 @@ def tournament_family(
         f"[{rank['rank_statistic']}] "
         f"(falls: {[f if f else 'top' for f in fall_depths]})"
     )
-    return {"family": fam, "rung": rung, "model": model, **rank}
+    print(
+        f"  {fam}: reliable depth {rank['reliable_depth']:,} tokens "
+        f"(P>=0.5 at 1 sigma) | ceiling {rank['ceiling']:,} tokens"
+    )
+    return {
+        "family": fam,
+        "rung": rung,
+        "model": model,
+        "kv_quant_k": kv_k,
+        "kv_quant_v": kv_v,
+        "corpus": CORPUS_DEFAULT,
+        **rank,
+    }
 
 
 def print_tournament_table(tours: list[dict[str, Any]]) -> None:
@@ -473,16 +532,18 @@ def print_tournament_table(tours: list[dict[str, Any]]) -> None:
         done,
         key=lambda t: (
             -t["rank_depth"],
+            -t.get("reliable_depth", 0),
             [-t["passes"][d] for d in sorted(t["passes"], reverse=True)],
-            -t["full_holds"],
+            -t.get("ceiling", 0),
         ),
     )
     for i, t in enumerate(order, 1):
         pv = " ".join(f"{t['passes'][d]}" for d in TOURNAMENT_DEPTHS)
         print(
             f"  {i}. {t['family']:24s} rank {t['rank_depth']:>7,} tok "
-            f"[{t.get('rank_statistic', 'mode')}] | "
-            f"passes/rung [{pv}]"
+            f"[{t.get('rank_statistic', 'mode')}] | reliable "
+            f"{t.get('reliable_depth', 0):>7,} tok | ceiling "
+            f"{t.get('ceiling', 0):>7,} tok | passes/rung [{pv}]"
         )
 
 
@@ -1270,6 +1331,43 @@ def main() -> None:
         state["tournament"] = tours
         save_state(args.state_file, state)
         print_tournament_table(tours)
+        # addendum 42: the recommendation path - w/s at the RELIABLE
+        # depth, n=5, for every family that HAS a reliable depth (the
+        # floor-fall families have none - there is nothing to
+        # recommend). The speed gate was assumed passed during the
+        # climbs; this measures it where the recommendation points.
+        if not args.dry_run:
+            for t in tours:
+                rd = t.get("reliable_depth") or 0
+                if rd <= 0:
+                    continue
+                stamp(f"reliable-depth w/s: {t['family']} @ {rd:,} tok (n=5)")
+                wps = []
+                for i in range(5):
+                    ok, verdict = speed_pass(
+                        t["model"],
+                        rd,
+                        t.get("corpus") or CORPUS_DEFAULT,
+                        state.get("ladder_port", 8210),
+                        os.path.join(args.models_dir, "tournament-results", t["family"]),
+                        kv_quant_k=t.get("kv_quant_k"),
+                        kv_quant_v=t.get("kv_quant_v"),
+                    )
+                    worst = verdict.get("worst")
+                    wps.append(worst)
+                    print(
+                        f"  {t['family']} @ {rd:,} tok w/s trial {i+1}/5: "
+                        f"{worst} w/s -> {'PASS' if ok else 'FAIL'}"
+                    )
+                kept = [w for w in wps if w is not None]
+                med = sorted(kept)[len(kept) // 2] if kept else None
+                t["reliable_wps_median"] = med
+                t["reliable_wps_trials"] = wps
+                print(
+                    f"  {t['family']}: reliable-depth w/s median "
+                    f"{med if med is not None else 'n/a'} w/s over {len(kept)} trials"
+                )
+            save_state(args.state_file, state)
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)

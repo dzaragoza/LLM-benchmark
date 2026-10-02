@@ -189,6 +189,37 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
     assert tour["rank_statistic"] == "mode" and tour["rank_mode"] is None
 
 
+def test_wilson_and_reliable_depth():
+    """The addendum-42 recommendation statistics: 1-sigma Wilson
+    bounds on the per-rung hold fraction, reliable depth (deepest
+    rung with lower bound >= 0.5 and count >= n/2), ceiling."""
+    import full_benchmark as fb
+
+    # wilson at the extremes and a known middle
+    assert fb.wilson_interval(0, 15) == (0.0, 0.0625)  # verified: standard score interval
+    lo, hi = fb.wilson_interval(15, 15)
+    assert lo > 0.8 and hi == 1.0
+    lo, hi = fb.wilson_interval(8, 15)
+    assert abs(lo - 0.4065) < 0.001 and abs(hi - 0.6560) < 0.001  # 8/15 at 1 sigma, verified
+
+    # a mostly-holding family: 5/7 hold 4096 (wilson lower ~0.53 >
+    # 0.5), 4/7 hold 8192 (lower ~0.36 < 0.5) -> reliable 4096
+    r = fb.tournament_rank([8192, 8192, 4096, 8192, 32768, 4096, 8192], fb.TOURNAMENT_DEPTHS)
+    assert r["reliable_depth"] == 4096
+    assert r["ceiling"] == 32768
+
+    # the 0.8B's actual rounds-6-7 pattern: only 4/7 hold 4096 ->
+    # nothing is reliable, but the ceiling is 262,144 (the near-top
+    # climb). Mode/ceiling disagree: exactly the recommendation case.
+    r = fb.tournament_rank([4096, 4096, 4096, 8192, 32768, 262144, 32768], fb.TOURNAMENT_DEPTHS)
+    assert r["reliable_depth"] == 0
+    assert r["ceiling"] == 262144
+
+    # a floor-faller: all-4096 falls -> reliable 0, ceiling 4096
+    r = fb.tournament_rank([4096] * 7, fb.TOURNAMENT_DEPTHS)
+    assert r["reliable_depth"] == 0 and r["ceiling"] == 4096
+
+
 def test_tournament_entry_config(tmp_path, monkeypatch):
     """The addendum-16 entry path: a participant WITHOUT a PASS
     selection enters on its predicted ceiling-matching config

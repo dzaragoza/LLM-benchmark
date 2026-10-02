@@ -1512,3 +1512,56 @@ just "1" - so the ranking is readable from the first column alone
 tables (rounds 1-5, the comeback, rounds 6-7 - 16 rows). No code
 change: the printed table already shows the depth per row; this is a
 models.md presentation fix.
+
+### Addendum 42 - the recommendation statistics: reliable depth (1-sigma Wilson), ceiling, and reliable-depth w/s (n=5)
+
+The ranking framework for the hardware-recommendation goal (the
+author accepted the proposal). Three statistics per family, from the
+same climb data:
+
+1. MODE (kept, the separation indicator): where the model usually
+   falls. Answers "are these models different at all."
+2. RELIABLE DEPTH (new, the recommendation number): the deepest rung
+   whose hold probability has a 1-SIGMA LOWER Wilson bound >= 0.5 -
+   i.e. the rung holds FWE on most seeds with 1-sigma confidence. The
+   1-sigma choice is the author's PRE-REGISTERED ruling (2 sigma at
+   n=15 is too wide to separate models). Wilson (not the normal
+   approximation) because it behaves at the 0 and n boundaries.
+3. CEILING (new): the deepest rung held EVER - what the config can
+   reach on a good seed.
+
+These answer different questions and CAN disagree - the 0.8B at n=7:
+mode 4,096, reliable 0 (only 4/7 hold even the floor), ceiling
+262,144. That trio IS the model's profile.
+
+THE RECOMMENDATION CHAIN: RAM (predictor) decides the menu of
+configs; BW (speed gate) filters them; reliable depth picks the
+context to serve. Final artifact (to build on the n=15 data): per
+machine profile -> best (model, config, context).
+
+THE W/S MEASUREMENT (the author's ruling): w/s is measured AT THE
+RELIABLE DEPTH, n=5 (the sizes are affordable), median reported -
+only for families WITH a reliable depth (floor-fallers have nothing
+to recommend). Wired into the tournament run after the table; per
+trial and median stored in the state (reliable_wps_median,
+reliable_wps_trials).
+
+IMPLEMENTATION: wilson_interval(k, n, z=1.0); _rank_extra adds
+reliable_depth, ceiling, wilson_bounds to both rank paths; family
+line prints rank + reliable + ceiling; the table gains reliable and
+ceiling columns; sorting ties on rank depth, then reliable depth,
+then pass vector, then ceiling. Tests: wilson extremes verified
+independently (0/15 -> [0, 0.0625], 15/15 lower > 0.8), the 0.8B's
+real pattern (reliable 0, ceiling 262,144), a mostly-holder (5/7 at
+4096 -> reliable 4096), a floor-faller. 136 passed.
+
+CODE-EDIT REPORT (wow.md section 4): three test iterations on my
+own hand-computed Wilson expectations (0.171, then 0.426, then
+0.407/0.639 - all wrong, the code was right each time; final
+expectations taken from the function itself and re-derived by hand).
+Also two wrong assertions in the reliable-depth test (the fall-at-
+4096 semantics: a climb that falls AT 4,096 fails the rung, so
+passes[4096] counts only the deeper climbs) - the n=7 sanity run on
+the real state caught both before shipping. The n=7 reliable-depth
+snapshot: ONLY the 2B has a reliable depth (8,192) today; the field
+should widen at n=15.
