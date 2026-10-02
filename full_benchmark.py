@@ -1217,6 +1217,7 @@ def main() -> None:
         ap.error("--thinking and --no-thinking are mutually exclusive")
 
     check_requirements()
+    git_pull_head()
     if not args.dry_run:
         kill_stale_server()
         check_tooling(args)
@@ -1560,6 +1561,35 @@ def print_wt_table(state: dict[str, Any]) -> None:
 
 
 # =========================================================== git tail
+
+
+def git_pull_head() -> None:
+    """The forgotten pull, made structural (session 36, addendum 32;
+    wow.md section 6 - many errors come from missing steps like git
+    pull). Runs BEFORE the state loads, so every run - real or dry -
+    starts from the freshest state file and notebook the repo has:
+    the author's artifact commits land on main between exchanges, and
+    a stale checkout silently grades against old data. --no-git is
+    the escape hatch (same as the tail); a failed pull is a HARD
+    STOP, not a warning - running on a diverged tree measures the
+    wrong thing with confidence."""
+    if os.environ.get("BENCH_NO_GIT_PULL"):
+        return
+    r = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True
+    )
+    if r.returncode != 0 or r.stdout.strip() != "true":
+        stamp("git pull skipped - not a git work tree")
+        return
+    r = subprocess.run(["git", "pull", "--no-verify"], capture_output=True, text=True)
+    if r.returncode != 0:
+        stamp(f"git pull failed - FIX BEFORE RUNNING: {r.stderr.strip()[:200]}")
+        raise SystemExit(1)
+    out = r.stdout.strip()
+    if out and "Already up to date" not in out:
+        stamp(f"git pull: {out.splitlines()[0]}")
+    else:
+        stamp("git pull: already up to date")
 
 
 def git_tail(args: argparse.Namespace) -> None:

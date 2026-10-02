@@ -191,3 +191,36 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
     assert out["rank_depth"] == 262144 and out["full_holds"] == 5
     assert len(calls) == 5 * len(fb.TOURNAMENT_DEPTHS)
     assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
+
+
+def test_git_pull_head(monkeypatch):
+    """Addendum 32: the forgotten pull, made structural - git_pull_head
+    runs before the state loads; a failed pull is a hard stop."""
+    import full_benchmark as fb
+
+    calls = []
+
+    class R:
+        def __init__(self, rc, out):
+            self.returncode = rc
+            self.stdout = out
+            self.stderr = ""
+
+    def fake_run(cmd, capture_output=True, text=True):
+        calls.append(cmd)
+        if cmd[0] == "git" and cmd[1] == "rev-parse":
+            return R(0, "true\n")
+        return R(1, "")
+
+    monkeypatch.setattr(fb.subprocess, "run", fake_run)
+    try:
+        fb.git_pull_head()
+        raise AssertionError("failed pull did not stop the run")
+    except SystemExit:
+        pass
+    assert any(c[:2] == ["git", "pull"] for c in calls)
+
+    monkeypatch.setattr(
+        fb.subprocess, "run", lambda cmd, capture_output=True, text=True: R(0, "true\n")
+    )
+    fb.git_pull_head()  # pull succeeds -> no exit
