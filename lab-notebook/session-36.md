@@ -355,3 +355,43 @@ Reading the CSV: the partial column is the graded score; the answer
 column carries the full text. The registered reading stays: refusal
 text ("Based on the provided text...") is a noise-side signature;
 empty or degenerate output is a capability-side signature.
+
+### Session 36, addendum 7 - CORRECTION: the upstream FWE values, checked from RULER's source
+
+THE ADDENDUM-6 CLAIM "upstream RULER asks for the 10 most frequent
+words" was WRONG. Checked from NVIDIA/RULER's own source
+(scripts/data/synthetic/freq_words_extraction.py +
+scripts/synthetic.yaml), the upstream FWE values are:
+
+- TOP-K IS THREE, HARDCODED: the template says "the three most
+  frequently appeared coded words" and the answer set is vocab[1:4]
+  - exactly our k=3. Our k=3 is not a local reduction; it IS the
+  upstream task. k=10 is a DELIBERATE ESCALATION beyond upstream,
+  not a fidelity restoration - addendum 6's ground 1 is withdrawn;
+  grounds 2 and 3 (the Zeta tail margin 1.22x at rank 10, the
+  11-level graded score) stand as the escalation's justification.
+- ALPHA: upstream defaults 2.0 (the script's --alpha default AND
+  synthetic.yaml's fwe.args.alpha: 2.0). OURS IS 2.07 - a slight
+  steepening whose provenance is not registered; the ladder's score
+  grid is frozen so the 2.07 stands for all scored runs, but the
+  discrepancy is NOW ON RECORD: any cross-study comparison with
+  RULER-paper numbers carries an alpha mismatch (2.07 vs 2.0, ~3.5
+  percent on rank-1 counts). No change made - changing alpha would
+  break score comparability with every measured FWE cell.
+- VOCAB SIZE: upstream vocab_size = max_seq_length // 50 - ours
+  matches (depth // 50).
+- CODED WORD LENGTH: upstream 6 letters - ours matches
+  (FWE_CODED_WORDLEN 6).
+- GENERATION BUDGET: upstream tokens_to_generate defaults 50; ours
+  is 128 (FWE_GEN_TOKENS) - MORE generous than upstream, never the
+  binding constraint.
+- SCORING: upstream scores the hit-count of expected words in the
+  reply - our all-or-nothing verdict with the partial as diagnostic
+  is the registered 136b form, stricter than upstream's average.
+
+NET EFFECT ON THE WITNESS PROTOCOL (addendum 6): unchanged in shape,
+re-labeled in spirit. The k=3 baseline IS the upstream task exactly
+(alpha aside); k=10 is the first rung of the study's OWN escalation
+ladder - the study now measures where its pool sits on a difficulty
+axis that starts at upstream and climbs. The champion-first rule and
+the step-down-to-5 rule stand as registered.
