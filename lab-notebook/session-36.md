@@ -557,3 +557,75 @@ is exactly the variance measurement that decides). The tournament
 may well end 3-way tied at the top - in which case the honest
 result is that the pool is NOT discriminable on FWE-perfect at any
 depth up to the ceiling, and the report says so.
+### Session 36, addendum 11 - tournament mechanics revised: five climbs, seed = climb number, majority rank
+
+THE AUTHOR'S REVISIONS TO THE ADDENDUM-10 MECHANICS (registered;
+the climb shape is unchanged - dyadic from 4096, early stop at the
+first non-perfect cell):
+
+- FIVE CLIMBS PER PARTICIPANT, NOT n=5 WITHIN ONE CLIMB: each
+  participant gets n=5 tries to reach the top; a try is a full
+  dyadic climb (one FWE task per depth, --samples 1, early stop).
+- THE SEED IS THE CLIMB NUMBER: seeds 1, 2, 3, 4, 5 - one per
+  climb. Every competitor faces the SAME five task ladders (climb
+  3 is the same task sequence for all participants), so the runs
+  are reproducible and directly comparable between competitors -
+  same depth, same climb number, same words.
+- THE RANK: for each ladder step, PASSES = the number of climbs
+  that scored a perfect cell at that step (a climb that stopped
+  lower counts as a miss at every step above its stop). The rank
+  score is THE HIGHEST LADDER STEP WITH MORE PASSES - the deepest
+  step where passes > misses over the five climbs (majority:
+  3-of-5 or better). Ties at the same step break on the pass count
+  at the next step up, then on miss texts as registered.
+- THE SPEED GATE: NOT measured in the tournament. The 256k w/s is
+  already known for all three (the PASS table), and no challenger
+  is expected to exceed it. The gate is ASSUMED passed and
+  falsified when needed: after the tournament, if a ranking step
+  is not known at w/s, the step is measured then - and if it fails
+  the gate, THE STEP IS DISQUALIFIED (author's falsify-when-needed
+  rule; the ranking then re-reads on the surviving steps).
+
+TOOLING NOTE: the depth-cell CSV cache is keyed on (label, depth)
+with no seed in its name, so the five climbs MUST use fresh
+results dirs (one per climb) or a later climb would replay an
+earlier climb's cached cells. The commands below carry
+--results-dir ruler-results-tournament-NAME/climbN (one dir per
+climb).
+
+THE COMMANDS (verbatim; three shell loops, one per participant;
+run in any order; substitute the loop variable for the climb
+number in both --seed and --results-dir; ports 8400/8401/8402):
+
+- 0.8B (the champion), loop s = 1..5, each iteration:
+  python3 ruler_gate.py
+    ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144
+    --samples 1 --seed S --arch qwen2 --stop-on-miss
+    --results-dir ruler-results-tournament-0.8B/climbS
+    --port 8400
+- 2B Q4_K_M, loop s = 1..5, each iteration:
+  python3 ruler_gate.py
+    ./models/Qwen3.5-2B/Qwen3.5-2B-Q4_K_M.gguf
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144
+    --samples 1 --seed S --arch qwen2 --stop-on-miss
+    --results-dir ruler-results-tournament-2B/climbS
+    --port 8401
+- Jamba2-3B, loop s = 1..5, each iteration:
+  python3 ruler_gate.py
+    ./models/AI21-Jamba2-3B/AI21-Jamba2-3B-Q8_0.gguf
+    --task fwe --depths 4096 8192 16384 32768 65536 131072 262144
+    --samples 1 --seed S --arch jamba2 --stop-on-miss
+    --results-dir ruler-results-tournament-jamba/climbS
+    --port 8402
+
+GRADING (how the table will be built from the logs): per
+participant, per climb, the CLIMB OVER line gives the fall depth
+(or the climb tops out at 262,144 = full hold). The pass count at
+step D = climbs whose fall depth is > D (they scored perfect at D
+on the way past) - a climb that tops out counts as passing every
+step. The rank is the deepest D with passes > 2 (majority of 5).
+Expected outcome per the addendum-10 priors: the champion 5/5
+climbs to the top; a 3-way tie at 262,144 remains the honest
+possibility, now resolved one rung lower if any competitor's
+climb flickers on a majority.
