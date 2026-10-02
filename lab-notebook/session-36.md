@@ -1808,3 +1808,41 @@ pre-registration would muddy the ten-question grading). The
 sequential controller (per-rung, early-stopping, bottom-up) is
 named FUTURE WORK for its own addendum. Every experiment after the
 n=21 completion is designed bottom-up.
+
+### Addendum 49 - the monotonicity assumption: artifact vs empirical claim, and its falsification plan
+
+The author's challenge (accepted): our pass vectors CANNOT contradict
+monotonicity by construction - "holds 4,096" is DEFINED as "fell
+deeper than 4,096," so within-climb monotonicity is bookkeeping, not
+a finding. The EMPIRICAL claim - that FWE capability is monotone in
+context (passes high => passes low) - is an assumption nothing in the
+theory guarantees. Two live scenarios:
+- SMALL-CONTEXT PATHOLOGY: a model retrieves at 65k but struggles
+  at 4k (prompt-format effects on tiny haystacks).
+- SWEET SPOT: a model with a working band (say 8k-32k) degrading at
+  BOTH ends - our early-stop design is blind to it: a climb that
+  fails 4k never tests 8k, so floor-dead models may hide above-floor
+  capability. This is a coverage hole in the recommendation table.
+
+CONSEQUENCE FOR THE SEQUENTIAL CONTROLLER (addendum 48): bottom-up
+pruning and downward certification-inheritance both LEAN on the
+assumption. If it can fail, the honest design is INDEPENDENT
+PER-RUNG TESTING: each rung of interest gets its own sequential
+test - no inheritance, no floor-pruning. More compute, spent only
+where a question demands it (the doctrine).
+
+FALSIFICATION PLAN (cheap, two probes, minutes of compute):
+1. BELOW-CERTIFICATION SPOT-CHECK: the 2B (certified 16,384) tested
+   DIRECTLY at 4,096, fresh seeds - holds ~= inherited count
+   supports monotonicity where it matters (a certified model's low
+   rungs).
+2. ABOVE-FLOOR PROBE: gemma-3-1b-it and RWKV7 (floor-dead) tested
+   DIRECTLY at 8,192, fresh seeds - a meaningful hold rate CONFIRMS
+   the sweet-spot scenario and voids floor-pruning for that class.
+   Both probes are INDEPENDENT single-rung tests (no early stop
+   downward - the whole point is to test the rung the climb never
+   reached).
+
+STATUS: assumption registered; probes named; the sequential
+controller's design (inheritance vs independence) follows the probe
+results. Not scheduled - the author allocates the compute.
