@@ -6,7 +6,7 @@ every probe; the lab notebook carries the full narrative.
 
 RAM = cold whole-stack machine cost (MemAvailable delta) at depth
 262,144. w/s = the scored-rung worst turn. Predictions use the
-registered ceiling predictor (MODEL-SELECTION.md rule 2):
+registered ceiling predictor (model-selection.md rule 2):
 `cost = file(rung) + KV_eff(262144) x kvquant + 1.10 GiB`.
 
 RAM OVER CEILING IS NOT A FAIL REASON (author ruling, session 36

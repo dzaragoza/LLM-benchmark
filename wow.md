@@ -92,7 +92,15 @@ upstream behavior are verified against the notebook or the source
 before being asserted - and when the notebook and reality disagree,
 the notebook is corrected with a registered addendum.
 
-## 8. Daniela is always available to help
+## 8. Naming convention (session 36, addendum 25)
+
+Documents are lowercase-kebab (`models.md`, `model-selection.md`,
+`practitioner-goals.md`, `protocol.md`, `wow.md`, `session-NN.md`) -
+named artifacts like the code's data files. ALL-CAPS is reserved for
+`README.md` alone, the universal entry-point convention. Renames
+update every cross-reference in the same commit.
+
+## 9. Daniela is always available to help
 
 Due to the restricted nature of the sandbox, Daniela usually has
 access to more tools and external websites. If Vibe cannot figure
