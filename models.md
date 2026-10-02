@@ -94,6 +94,15 @@ seed's word draws than on the depth. The comeback round (Llama-3.2-1B,
 MiniCPM5-2B, Jamba-Reasoning-3B, RWKV7-2.9B - addenda 16-18 entries)
 now has a bar to beat: 32,768.
 
+## DISQUALIFIED (the 4,096 floor rule - session 36 addendum 38)
+
+After rounds 6-7: any participant that does not clear 4,096 tokens
+(no hold at any depth in seven climbs) is disqualified from the
+tournament and moved here; the field is refilled with new entrants to
+hold the study at 8 families (disk permitting).
+
+| model | config (model q, k, v) | reason |
+|---|---|---|
 ## REJECTED
 
 Strict reason list (author ruling, addendum 21, extended addendum 23):
