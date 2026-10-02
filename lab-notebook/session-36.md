@@ -807,3 +807,17 @@ Implementation:
 
 The comeback round still WAITS for the first tournament's results
 (addendum 15 ruling).
+
+### Addendum 17 - the model-quant cap: Q8_0
+
+The author's ruling: the limit for the model quant is Q8_0. The
+predictor discipline for entry configs is unchanged (closest under
+the ceiling), but the weights rung can no longer be raised past
+Q8_0. The F16 entry config for Llama-3.2-1B-Instruct (addendum 16)
+is superseded: at the cap, its closest-under-ceiling config is
+Q8_0 + q4_0/q4_0 = 1.33 + 4.00x0.400 + 1.10 = 4.03 GiB predicted
+(q8_0 KV = 5.09 over the ceiling, f16 = 6.43 far over). The
+tournament state's entry record is updated; the other three
+participants were already at or under the cap (MiniCPM5-2B Q8_0 +
+q8_0/q8_0 = 4.88 GiB - the closest-under-ceiling config in the
+comeback field; Jamba-Reasoning-3B and RWKV7 both Q8_0).
