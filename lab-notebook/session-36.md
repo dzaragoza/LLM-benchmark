@@ -1745,3 +1745,27 @@ THE TEN QUESTIONS (addendum 45), preliminary at n=15:
 NEXT: the completion run - seeds 16-21 for the 8 n=15 families,
 seeds 8-21 for MiniCPM5-1B, then the reliable-depth w/s step fires
 for the certified. Same command as addendum 44 (all 9 families).
+
+### Addendum 47 - the artifact tail pulls before pushing (the stale-data lesson)
+
+The author's diagnosis of the addendum-46 staleness: the artifact
+push at the end of a long run can RACE origin - rules and grading
+addenda land on main while the run is still going, the artifact
+commit pushes into a moved main, the push fails (or the data lands
+behind), and the grading side reads stale state. THE FIX (the
+author's instruction): git_tail now runs
+
+    commit -> git pull --rebase --autostash -> git push
+
+The rebase replays the artifact commit on top of whatever landed
+during the run; the autostash covers any tree dirt; a failed pull
+leaves the push attempt anyway (both failures print the manual
+command: git pull --rebase --autostash; and git push). Test
+test_git_tail_pulls_before_push asserts the ordering
+(inspect.getsource index comparison, same pattern as
+test_git_pull_before_tee). 137 passed.
+
+This complements addendum 34 (the startup pull, before the tee) and
+addendum 32 (the pull gate): the run is now bracketed - pull at
+start, pull-rebase before the artifact push at end. The next
+artifact push (the n=21 completion) will exercise it live.
