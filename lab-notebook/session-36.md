@@ -395,3 +395,56 @@ re-labeled in spirit. The k=3 baseline IS the upstream task exactly
 ladder - the study now measures where its pool sits on a difficulty
 axis that starts at upstream and climbs. The champion-first rule and
 the step-down-to-5 rule stand as registered.
+
+### Session 36, addendum 8 - alpha confirmed 2.0 (already upstream); the paper's own FWE measurement settings
+
+FIRST, A BOOKKEEPING CORRECTION TO ADDENDUM 7: our FWE_ALPHA was
+ALREADY 2.0 - the "ours is 2.07" reading was a display artifact of
+the collapso-tooling, not a real discrepancy. The addendum-7 alpha
+item is VACATED: the ladder's grid (alpha 2.0, k=3, vocab depth/50,
+wordlen 6) matches upstream's defaults exactly, and has since the
+136c implementation (upstream values, copied verbatim). No change
+was needed; no scores are affected.
+
+THE RULER PAPER'S OWN FWE MEASUREMENT SETTINGS (arXiv 2404.06654v3,
+Section 3.3 + Section 4, checked this addendum):
+
+- K = 3, AND THE PAPER SAYS WHY: "In FWE, we set K to 3, as
+  increasing K leads to poor performance even at small context
+  sizes for most models." Upstream chose k=3 BECAUSE larger k
+  collapsed their 17-model pool - which is exactly the
+  discrimination we want. The paper confirms the mechanism behind
+  our knob 1: k=3 is upstream's FLOOR setting, chosen to keep the
+  task solvable, not a calibration ceiling.
+- ALPHA = 2: Table 2 lists FWE's configuration as "alpha = 2,
+  num_word proportional to context length" - matching the repo
+  defaults (and ours).
+- N = 500 SAMPLES PER LENGTH, NOT 1: the paper generates 500
+  examples per context length (4K, 8K, ..., 128K) per task. Our
+  ladder's FWE cell is n=1 by design (the study's cost ceiling);
+  the n=5 diagnostic was our compromise. Upstream's recall-based
+  accuracy over 500 samples is the variance-killing version of our
+  partial-credit argument - they pay 500 prefills per cell, we pay
+  1 and read the partial.
+- SCORING: recall-based accuracy - "check the presence of the
+  target output" in the reply, with an ANSWER PREFIX appended to
+  the input to suppress refusals/explanations. Our
+  all-or-nothing-with-partial form is stricter than upstream's
+  per-word recall average.
+- SETUP: vLLM, BFloat16, 8x A100, greedy decoding - the deep-model
+  regime the study deliberately does not replicate (CPU, GGUF,
+  llama-server). The comparison point is the TASK, not the
+  hardware.
+
+THE AUTHOR'S POINT STANDS AND IS NOW SHARPER (defaults do not
+discriminate - 3/3 or 0/3): upstream's own paper is the evidence.
+They set k=3 because larger k "leads to poor performance even at
+small context sizes for most models" - the knob has headroom BELOW
+collapse for a capable pool. The study's pool is a 3-model PASS
+roster at k=3; the discrimination question is where each config
+sits on the k axis. The k=10 rung stays registered (Zeta margin
+1.21x at alpha 2.0, 11-level partial score), with the paper's
+warning as the prior: if all three configs collapse at k=10, that
+REPLICATES upstream's finding on this pool at 256k - itself a
+result, and the step-down to k=5 (margin 1.44x) is the registered
+fallback.
