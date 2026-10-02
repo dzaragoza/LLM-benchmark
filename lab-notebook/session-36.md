@@ -821,3 +821,30 @@ tournament state's entry record is updated; the other three
 participants were already at or under the cap (MiniCPM5-2B Q8_0 +
 q8_0/q8_0 = 4.88 GiB - the closest-under-ceiling config in the
 comeback field; Jamba-Reasoning-3B and RWKV7 both Q8_0).
+
+### Addendum 18 - asymmetric K/V quants
+
+The author's notice: the k and v quants can be set separately - they
+do not need to match. The closest-under-ceiling sweep widens from the
+4 symmetric pairs to the full 16-combination grid, and one entry
+config changes:
+
+- MiniCPM5-2B: Q8_0 + f16/q4_0 = 2.40 + 2.08x(1.0+0.400)/2 + 1.10 =
+  4.96 GiB predicted - DEAD ON THE CEILING, up from the symmetric
+  q8_0/q8_0 (4.88). The asymmetry is principled, not arbitrary: in
+  FWE retrieval the KEYS do the matching (K precision governs whether
+  the needle positions are found), the VALUES only carry the found
+  content out - so the f16 goes on K, the q4_0 on V. The mirrored
+  q4_0/f16 predicts the same 4.96 but puts the low precision on the
+  matching tensors.
+- Llama-3.2-1B-Instruct: unchanged at Q8_0 + q4_0/q4_0 (4.03) - any
+  f16 in its fat 4.0 GiB KV_eff pushes over (f16/q5_0 = 5.12), so the
+  asymmetric grid adds nothing.
+- AI21-Jamba-Reasoning-3B: unchanged - already at its ceiling-matching
+  config (Q8_0 + f16/f16, 4.42 measured by its PASS sibling; weights
+  capped at Q8_0, KV already f16 - nothing left to raise).
+- RWKV7-World-2.9B: unchanged - no KV cache to quantize.
+
+The K-over-V precision principle is registered for future
+config sweeps: when the budget forces an asymmetric pair, the higher
+precision goes on K.
