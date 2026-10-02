@@ -40,7 +40,7 @@ the quantity bandwidth actually reads):
 
 Usage (from the repo root, on the machine that ran the benchmark):
 
-    python3 law_fit.py                          # ./benchmark-state.json
+    python3 law_fit.py                          # ./state/benchmark-state.json
     python3 law_fit.py --state-file a.json --state-file b.json
     python3 law_fit.py --reader fast --bw-theoretical 102.4
     python3 law_fit.py --reader fast --words-per-token 0.49 --bw-theoretical 102.4
@@ -195,7 +195,7 @@ def main() -> None:
         "--state-file",
         action="append",
         default=[],
-        help="pipeline state file (repeatable); default ./benchmark-state.json",
+        help="pipeline state file (repeatable); default ./state/benchmark-state.json",
     )
     ap.add_argument(
         "--point",
@@ -275,7 +275,7 @@ def main() -> None:
     ap.add_argument("--json", default=None, help="write the fit to this JSON file")
     args = ap.parse_args()
 
-    state_files = args.state_file or ["./benchmark-state.json"]
+    state_files = args.state_file or ["./state/benchmark-state.json"]
     pts = harvest_state(state_files) + parse_points(args.point)
     if len(pts) < 2:
         sys.exit("need at least 2 measured points to fit (pass state files and/or --point entries)")

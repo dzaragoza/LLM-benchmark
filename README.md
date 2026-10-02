@@ -67,7 +67,7 @@ That single command runs the **entire study** for the four families:
 - **Stage C — ranking**: exact **McNemar** pairwise tests; the final
   output is the ranking with separation verdicts.
 
-The script is **idempotent and resumable**: `benchmark-state.json` is
+The script is **idempotent and resumable**: `state/benchmark-state.json` is
 saved after every phase. If anything fails, it stops with guidance;
 fix the cause and **rerun the exact same command** — completed phases
 are never repeated. Use `--dry-run` to preview the plan without
@@ -258,7 +258,7 @@ observation for the report, not a protocol constant.)
 
 | File | What it is |
 |---|---|
-| `benchmark-state.json` | resume state (safe to delete to start over) |
+| `state/benchmark-state.json` | resume state (safe to delete to start over) |
 | `benchmark-results.json` | full results: selection history, ARC scores, McNemar ranking |
 | `arc-results/*.csv` | per-question ARC results (pairwise analysis, timings) |
 | `models/<family>/*.live-dump.json` | per-turn speed-gate data for every rung tested |
@@ -394,7 +394,7 @@ categories stay independent:
 
 ```
 python3 full_benchmark.py --thinking \
-  --state-file benchmark-state-thinking.json \
+  --state-file state/benchmark-state-thinking.json \
   --results-file benchmark-results-thinking.json \
   "Qwen/Qwen3.5-4B" \
   "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
