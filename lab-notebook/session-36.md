@@ -200,3 +200,90 @@ depth-262k FWE cells or streaming the FWE prefill - will NOT be
 pursued; the 4B family stays closed on this machine due to time
 constraints. The harness-side fix note stays in the notebook for
 whomever revisits the family; no code change.
+
+### Session 36, addendum 5 - the FWE n=5 diagnostic registered; the pool settled
+
+THE POOL IS SETTLED (author rulings): the Jamba Q6_K candidate is
+REMOVED from CANDIDATES - a cheaper config of a family that already
+PASSES adds nothing (the Q8_0 PASS is the family's record at 89% of
+ceiling); CANDIDATES is now empty and the roster for the report is
+the three PASS configs. The speed gate does NOT rerun for the
+diagnostic (author: it already passed) - this is FWE-only.
+
+THE RUN: FWE n=5 at depth 261,888, seeds 1024-1028, all three PASS
+configs plus the rejected 2B quant-raise (four arms - the failed
+config re-tested under the diagnostic, and the PASS trio as the
+control baseline). Tool: the standalone ruler_gate (task fwe,
+--samples 5 --seed 1024), which now carries --kv-quant-k/v (added
+this addendum: the standalone gate's server launch was fixed-shape
+and could not reproduce the ladder's cache flags - the 2B quant-raise
+arm needs them; f16 arms omit the flags). Depth 261,888 = 262,144 -
+2 x ANSWER_HEADROOM, the ladder's own FWE depth; the gate computes
+wanted_ctx = depth + 2 x ANSWER_HEADROOM = 262,144 itself from
+--depths 261888. Verbatim blocks (dry-run shape: the gate's port
+check + fresh results dir IS the pre-flight; run each command as-is,
+the server per launch):
+
+- 0.8B (PASS control): python3 ruler_gate.py \
+    ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf \
+    --task fwe --depths 261888 --samples 5 --seed 1024 \
+    --arch qwen2 --results-dir ruler-results-n5 --port 8300
+- 2B Q4_K_M (PASS control): python3 ruler_gate.py \
+    ./models/Qwen3.5-2B/Qwen3.5-2B-Q4_K_M.gguf \
+    --task fwe --depths 261888 --samples 5 --seed 1024 \
+    --arch qwen2 --results-dir ruler-results-n5 --port 8301
+- 2B Q8_0+q8_0 (the diagnostic arm): python3 ruler_gate.py \
+    ./models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf \
+    --task fwe --depths 261888 --samples 5 --seed 1024 \
+    --arch qwen2 --results-dir ruler-results-n5 --port 8302 \
+    --kv-quant-k q8_0 --kv-quant-v q8_0
+- Jamba2-3B (PASS control): python3 ruler_gate.py \
+    ./models/AI21-Jamba2-3B/AI21-Jamba2-3B-Q8_0.gguf \
+    --task fwe --depths 261888 --samples 5 --seed 1024 \
+    --arch jamba2 --results-dir ruler-results-n5 --port 8303
+
+Read the four CSVs in full after the run (the answers are in the
+rows; the addendum-3 miss text "Based on the provided text..." is the
+signature of a refusal-shaped miss, not a retrieval miss).
+
+THE n=5 JUSTIFICATION FOR THE STUDY (recorded, from addendum 4):
+what each repetition buys is the likelihood-ratio tails between
+H-noise (q8_0-KV task-draw noise; p ~ 0.9, anchored on the PASS
+config's 3/3) and H-cap (capability drop; p ~ 0.1, anchored on the
+overnight 0/3). n=5 is the smallest n whose BOTH tails are < 1/1000
+(P(<=1 hits | p=0.9) = 0.0005; P(>=4 hits | p=0.1) = 0.0005; n=3
+leaves 2/3 compatible with both, and past n=5 the boundary does not
+move). Decision rule: the 2B Q8_0 arm at 5/5 or near-miss partials
+-> cache-fidelity noise, the config earns a ladder re-probe at n=1;
+at 0-2/5 -> capability drop, the quant-raise closes for good. If any
+PASS control arm flickers (a miss in its five), the TASK's
+reliability question opens ahead of the config question.
+
+CAN FWE DIFFICULTY INCREASE BEYOND REPETITIONS? Yes - three
+registered escalations, in the RULER spirit (the task is the
+Challenge-tier FWE, upstream's generate_input_output):
+
+1. RAISE FWE_TOP_K (now 3): the answer set grows (top-5, top-10);
+   partial credit already reports per-word, so the escalation is
+   graded continuously. This is upstream's own knob - RULER scores
+   FWE at variable k.
+2. RAISE THE ALPHA EXPONENT (FWE_ALPHA, the Zeta count law): a
+   steeper law concentrates counts on fewer words - the answer
+   words are rarer in the text, the discrimination between
+   frequency ranks sharpens. This is the cleanest difficulty knob:
+   it changes the STATISTICS of the corpus, not the format, so the
+   task stays the same instruction with a harder underlying
+   distribution.
+3. SHRINK THE MARGIN between the k-th and (k+1)-th words: with a
+   Zeta law the margin is whatever the draw gives; a deliberate
+   near-tie (count(rank 3) ~= count(rank 4)) tests exact
+   aggregation rather than robust retrieval - the model must
+   actually COUNT, not just notice which words are common. This is
+   the step beyond "retrieval through noise": it is the first true
+   AGGREGATION stressor, and where a 256k window should start to
+   matter independent of KV fidelity.
+
+Difficulty escalation is REGISTERED but NOT scheduled: the n=5
+diagnostic first; the escalations are the follow-up if the diagnostic
+comes back noise (the config is exonerated and the question moves to
+the task).

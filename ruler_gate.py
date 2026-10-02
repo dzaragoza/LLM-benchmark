@@ -501,6 +501,21 @@ def main() -> None:
         help="let hybrid models think (default: enable_thinking False, "
         "the study's non-thinking mode - reasoning burns the budget)",
     )
+    _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
+    p.add_argument(
+        "--kv-quant-k",
+        default=None,
+        choices=_KV_CHOICES,
+        help="quantize the K cache to this type (session 36, addendum 5: "
+        "the standalone FWE diagnostic needs the same cache flags the "
+        "ladder's fwe_pass launches with - both None = default f16)",
+    )
+    p.add_argument(
+        "--kv-quant-v",
+        default=None,
+        choices=_KV_CHOICES,
+        help="quantize the V cache to this type (same as --kv-quant-k)",
+    )
     args = p.parse_args()
 
     label = os.path.splitext(os.path.basename(args.model))[0]
@@ -522,18 +537,22 @@ def main() -> None:
         pass
     wanted_ctx = max(args.depths) + 2 * ANSWER_HEADROOM
     log_path = os.path.join(args.results_dir, f"{label}-server.log")
+    extra_args = [
+        "-c",
+        str(wanted_ctx),
+        "--parallel",
+        "1",
+        "--override-kv",
+        f"{args.arch}.context_length=int:{wanted_ctx}",
+    ]
+    if args.kv_quant_k or args.kv_quant_v:
+        extra_args += ["-fa", "on"]
+        if args.kv_quant_k:
+            extra_args += ["--cache-type-k", args.kv_quant_k]
+        if args.kv_quant_v:
+            extra_args += ["--cache-type-v", args.kv_quant_v]
     proc, healthy = llama_server.start_server(
-        args.model,
-        port=args.port,
-        extra_args=[
-            "-c",
-            str(wanted_ctx),
-            "--parallel",
-            "1",
-            "--override-kv",
-            f"{args.arch}.context_length=int:{wanted_ctx}",
-        ],
-        log_path=log_path,
+        args.model, port=args.port, extra_args=extra_args, log_path=log_path
     )
     if not healthy or not llama_server.wait_healthy(args.port, proc=proc):
         llama_server.stop_server(proc, args.port)
