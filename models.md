@@ -29,26 +29,24 @@ pair, not a model).
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | notes |
 |---|---|---|---|---|---|---|---|
 | Qwen3.5-0.8B | Q8_0 | f16 | f16 | 0.86 | 4.96 GiB | 9.3 | THE CHAMPION; sets the 4.96 GiB ceiling; trained window 262,144; speed PASS zero stalls, FWE 3/3 at 261,888 |
-| Qwen3.5-2B | Q4_K_M | q5_0 | q5_0 | 1.22 | 3.48 GiB | 9.5 | the RAM champion (half the champion's cost); speed PASS 15.2 t/s worst turn, FWE 3/3; pending its quant-raise re-probe (Q8_0 + q8_0/q8_0, predicted 4.78 GiB — 96% of ceiling) |
+| Qwen3.5-2B | Q4_K_M | q5_0 | q5_0 | 1.22 | 3.48 GiB | 9.5 | the RAM champion (half the champion's cost); speed PASS 15.2 t/s worst turn, FWE 3/3; the quant-raise probe (Q8_0+q8_0) FAILED - 5.22 GiB over ceiling, FWE 0/3 (session 36 addendum 1); this Q4_K_M config is the 2B's ceiling config |
+| AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.42 GiB | 6.1 | PASS on its first probe (session 36 addendum 1): 89% of ceiling, speed PASS 6.08 w/s worst turn (reader never waited), FWE 3/3 at 261,888; the FIRST NON-TRANSFORMER PASS in the study (hybrid mamba-attention, 2 full-attention layers carried the retrieval); predictor 4.40 GiB - off by 0.02 (0.5%) |
 
 ## FAIL
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | reason for failure |
 |---|---|---|---|---|---|---|---|
-| | | | | | | | |
+| Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.93 | 5.22 GiB | 8.2 | RAM over ceiling (5.22 > 4.96, +0.26) AND FWE 0/3 at 261,888; speed PASS 8.18 w/s; the quant-raise is closed (session 36 addendum 1) |
+| Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.82 | 5.81 GiB | 7.3 | RAM over ceiling (5.81 > 4.96, +0.85 - the predictor's 4.95 was 15% optimistic); speed PASS at 262,144 then TimeoutError at +94m into the FWE phase; the family closes at 4B for this machine (Q2_K is its floor config) |
+| RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 3.58 GiB | 13.1 | FWE degeneration 0/3 at 261,888 - single-character repetition output, no extraction attempted; RAM and speed PASS (3.58 GiB, 13.11 w/s - the fastest depth-scorer in the study); pure recurrence cannot carry FWE at 256k (session 36 addendum 1) |
 
 ## CANDIDATES (predicted values)
 
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
-| Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.60 | 4.95 GiB | ~5 | THE EDGE: 100% of ceiling, RAM PASS by 0.01 GiB; speed straddler (the 4B wall was 6.07 w/s at 131k with f16 KV); Q2_K quality the wild card |
 
-| Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.43 | 4.78 GiB | ~9 | THE QUANT-RAISE (addendum 12, restored to the table addendum 27): the PASS'd RAM champion (3.48 GiB at Q4_K_M+q5_0) re-probed at the top rung to close the gap to its ceiling - 96% of ceiling, 1.30 GiB of headroom spent on precision; w/s predicted to hold (the Q4 worst turn was 15.2 t/s, Q8 KV halves the cache cost the Q4 config paid); the champion-vs-2B quality question rides on this probe |
-| AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.52 GiB | ~7 | THE NEW FAMILY (addendum 20): window 262,144; hybrid mamba-attention, only 2 full-attention layers x 1 KV head x 128 head_dim -> ~1 KiB/token f16 (0.25 GiB at 262k), the thinnest KV ever screened - the mamba state is constant-size; Q8_0 at 91% of ceiling; non-thinking instruct, Apache-2.0, GGUF tooling verified (bartowski 3.17 GiB); risks: llama.cpp jamba-arch support level, FWE at depth unproven |
-| AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | the same model at Q6_K (the addendum-20 multi-config exception): 77% of ceiling, headroom if the Q8_0 run grazes the ceiling; probe only if the Q8_0 config passes or the ceiling measurement surprises |
+| AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | THE LAST UNPICKED CONFIG: the Q8_0 PASSed (4.42 GiB) so this cheaper config is now the family's natural second probe - 77% of ceiling, 0.6 GiB under the Q8_0's measured cost; the quality question is whether Q6_K holds the FWE the Q8_0 carried |
 
-| RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 4.13 GiB | ~8 | THE RECURRENT FAMILY (addendum 23): constant-size state - no KV growth at all, context bounded only by the machine; conversational chat tune, first-party RWKV org weights (RWKV/RWKV7-Goose-World3-2.9B-HF, the mradermacher quant source - repo name corrected by the registry-data store, addendum 26), Goose paper (arXiv 2504.03289, verified); NOTE the HF config declares max_position_embeddings 2048 - a training-data relic, not an architectural cap (the recurrent state carries the context; the serving context is set by -c); risks: llama.cpp rwkv7 support level, FWE-through-recurrent-state unproven, community GGUF not first-party quant |
-| RWKV7-World-2.9B | Q6_K | n/a | n/a | 2.39 | 3.49 GiB | ~9 | the same model at Q6_K (multi-config exception): 70% of ceiling, headroom config under the Jamba Q8_0 |
 
 ## REJECTED
 
@@ -112,3 +110,4 @@ family's one entry.
 | Qwen3-4B-Instruct-2507 | no model small enough (q2, q4, q4) > ceiling | window 262,144 but KV 144 KiB/token -> ~10.1 GiB q4_0 KV (the 2507 refresh dropped the hybrid interval) |
 | DSpark/EAGLE3 draft heads (RadixArk, z-lab, incoai, lightseekorg, Inferact, skt repos) | other | speculative-decoding DRAFT MODELS, not instruct models - sweep false positives, never candidates |
 | community finetunes (NeoHorse-1-4B, JevK5, test tinies, reformer) | other | rule 5 (first-party weights) / not instruct models - sweep false positives |
+| RWKV7-World-2.9B (the family) | other | the Q8_0 probe measured it: pure recurrence cannot carry FWE at 256k - the state degenerated at depth (miss text single-character repetitions, session 36 addendum 1); the Q6_K config is closed with it (same constant state, smaller weights - the limitation is config-independent at this scale); the speed result stands as a finding: 13.11 w/s at 262,144, the fastest depth-scorer in the study |
