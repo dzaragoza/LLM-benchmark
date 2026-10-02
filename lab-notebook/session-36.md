@@ -1158,3 +1158,59 @@ points to early falls. DISK NOTE (the author's constraint): the
 comeback entries need the 5 model files on disk (~10 GiB total for
 the five; the participants' Q8_0/Q4_K_M files); replace-able later
 per the author's ruling.
+
+
+### Addendum 29 - the comeback round wired: acquisition + specs + the commands
+
+For the author's run-while-at-lunch request, a gap surfaced: the
+tournament mode RESOLVED entry files but never ACQUIRED them - the
+three PASS models were already on disk, the five comeback models are
+not. Fixed per wow.md section 5 (one command, not a download step
+per model): `tournament_family` now acquires a missing entry file
+through the same phase-1 path the main run uses (hf_download.acquire
++ convert_quant.create), storing the resolved path in the entry
+record. Dry-run respects the addendum-108 contract (no download, no
+conversion - it lists and reports only).
+
+REPO VERIFICATION (sandbox, anonymous): meta-llama/Llama-3.2-1B-
+Instruct and openbmb/MiniCPM5-2B / MiniCPM5-1B resolve (bin/f16
+sources - the conversion path the tool already owns); RWKV/
+RWKV7-World-2.9B is GATED (401 anonymous - the author's HF auth
+will pass; wow.md section 9, the ask-for-help rule applies if her
+token lacks it); the Jamba-Reasoning repo resolves at
+ai21labs/AI21-Jamba-Reasoning-3B (0 GGUFs, safetensors - the
+conversion path). The state's family specs are set so the command's
+repo basenames match the state keys exactly.
+
+THE COMMANDS (two blocks, dry-run first - the WoW):
+
+DRY RUN:
+python3 full_benchmark.py --tournament --dry-run \
+  meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B \
+  openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B \
+  RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
+
+REAL RUN (2-5 h estimated, addendum 28):
+python3 full_benchmark.py --tournament \
+  meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B \
+  openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B \
+  RWKV/RWKV7-World-2.9B --state-file benchmark-state-tournament.json
+
+Pre-registered predictions (wow.md section 1, before the run):
+- MiniCPM5-2B (the dead-on 4.96 entry): rank 32,768 or better -
+  the deepest predicted climber of the five (262,144 window, thin
+  KV like its 131k-window sibling's config shape).
+- Llama-3.2-1B (4.03): its window caps the ladder at 131,072 -
+  predicted to climb into the 16k-65k range, mode or median.
+- MiniCPM5-1B (3.28): too small to reach the ceiling; predicted
+  8k-32k - the size question is whether smallness costs depth.
+- Jamba-Reasoning-3B (4.42): the wildcard - the sibling PASSED at
+  seed 1024 but the tournament exposed seed variance; the
+  reasoning shape may help (more scanning) or hurt (refusal-shaped
+  misses). No point prediction; predicted NOT to top out.
+- RWKV7-2.9B (3.58): predicted to fall at 4,096 on all five seeds
+  (structural degeneration, session 36 addendum 1) - the fair
+  re-test; a single hold at any depth falsifies the structural
+  hypothesis.
+- NOBODY tops out at 262,144 except possibly MiniCPM5-2B; every
+  fall is partial (2/3 or 1/3), never 0/3, per addendum 26.
