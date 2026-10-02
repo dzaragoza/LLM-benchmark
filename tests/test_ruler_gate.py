@@ -139,3 +139,11 @@ def test_fwe_scoring_all_or_nothing_with_partial_diagnostic():
     # parametric-word failure (the paper's signature): scores zero
     ok, partial = rg.score_fwe("the a and of", ["alphaone", "betatwo", "gammathree"])
     assert ok is False and partial == 0
+
+
+def test_build_fwe_task_top_k_override():
+    import ruler_gate
+
+    assert ruler_gate.build_fwe_task.__defaults__ == (ruler_gate.FWE_TOP_K,)
+    sig = ruler_gate.build_fwe_task.__code__
+    assert "top_k" in sig.co_varnames

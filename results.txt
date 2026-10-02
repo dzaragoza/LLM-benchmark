@@ -7529,3 +7529,55 @@ options:
   --kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
                         quantize the V cache to this type (same as --kv-
                         quant-k)
+
+===== 2026-10-02T07:46:01 | ruler_gate.py --help =====
+usage: ruler_gate.py [-h] [--depths DEPTHS [DEPTHS ...]] [--samples SAMPLES]
+                     [--needles NEEDLES] [--task {niah,fwe}] [--port PORT]
+                     [--results-dir RESULTS_DIR] [--seed SEED] [--arch ARCH]
+                     [--show] [--thinking]
+                     [--kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                     [--fwe-top-k FWE_TOP_K]
+                     [--kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                     model
+
+ruler_gate.py -- quality-at-depth gate (RULER-style needle-in-a-haystack).
+
+positional arguments:
+  model                 GGUF path (the server runs this file)
+
+options:
+  -h, --help            show this help message and exit
+  --depths DEPTHS [DEPTHS ...]
+                        token depths to grade (default: the protocol depth
+                        4096)
+  --samples SAMPLES     tasks per depth
+  --needles NEEDLES     needles per haystack
+  --task {niah,fwe}     task family: niah (retrieval floor) or fwe
+                        (aggregation, RULER's Challenge tier, addendum 136b)
+  --port PORT
+  --results-dir RESULTS_DIR
+  --seed SEED
+  --arch ARCH           GGUF architecture key for --override-kv (llama-server
+                        caps the slot at the metadata context_length;
+                        overriding it IS the addendum-130 experiment -
+                        attention beyond trained context)
+  --show                print each task's conversation: the haystack window
+                        around every needle and the query tail (what the model
+                        actually read)
+  --thinking            let hybrid models think (default: enable_thinking
+                        False, the study's non-thinking mode - reasoning burns
+                        the budget)
+  --kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        quantize the K cache to this type (session 36,
+                        addendum 5: the standalone FWE diagnostic needs the
+                        same cache flags the ladder's fwe_pass launches with -
+                        both None = default f16)
+  --fwe-top-k FWE_TOP_K
+                        session 36, addendum 6: the FWE difficulty knob 1 -
+                        the answer set size (default 3; upstream RULER asks
+                        for the 10 most frequent words; the score stays all-
+                        or-nothing per task, the per-word partial is the
+                        graded 0..k diagnostic)
+  --kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        quantize the V cache to this type (same as --kv-
+                        quant-k)

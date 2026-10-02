@@ -287,3 +287,71 @@ Difficulty escalation is REGISTERED but NOT scheduled: the n=5
 diagnostic first; the escalations are the follow-up if the diagnostic
 comes back noise (the config is exonerated and the question moves to
 the task).
+
+### Session 36, addendum 6 - difficulty over repetitions; the knob-1 ladder on the champion
+
+THE RULING (author): INCREASING THE DIFFICULTY IS BETTER THAN
+REPETITIONS, and knob 1 (raise FWE_TOP_K) achieves what the n=5
+repetitions were for - the partial credit. One task at k=10 carries
+a graded 0..10 score in its per-word partial; five repetitions at
+k=3 carry five bits. The graded score IS the better statistic for
+the same machine cost (one 262k prefill each way), so the n=5
+repetition diagnostic is SUPERSEDED for the discrimination question;
+repetitions stay useful only for variance estimation, which is not
+today's question. The knobs are tested ONE BY ONE, the CHAMPION
+(0.8B, the ceiling-setter) as witness - if a knob kills the
+champion, the escalation went past the study's own floor.
+
+WHY k=10 IS THE RECOMMENDED KNOB-1 SETTING: three reasons, all
+checked this addendum.
+
+1. UPSTREAM FIDELITY: RULER's own FWE asks for the 10 most frequent
+   words. The study's k=3 was a local reduction; k=10 restores the
+   upstream task at the study's depth.
+2. THE ZETA MARGIN: with FWE_ALPHA = 2.07 the count law is
+   count(rank) ~ rank^-2.07, so the margin between the k-th and
+   (k+1)-th words SHRINKS as k grows: count(3)/count(4) = 2.31x,
+   count(10)/count(11) = 1.22x, count(15)/count(16) = 1.15x. The
+   task's aggregation difficulty concentrates exactly in the tail -
+   the answer words at k=10 are 1.22x apart, the model must actually
+   order the counts, not just spot the three loudest words. Past
+   k~15 the margins are inside tokenizer/counting noise and the task
+   degrades into coin-flips rather than measuring anything.
+3. THE SCORE RESOLUTION: k=10 gives an 11-level graded score
+   (0..10), enough resolution to SEE a partial degradation that
+   k=3's 4-level score would render as a flicker.
+
+Tooling: ruler_gate's standalone mode gains --fwe-top-k (threaded
+through build_fwe_task and run_fwe_depth; the ladder's own fwe cell
+stays at the registered k=3 - the knob is a diagnostic-tier flag,
+the ladder's score grid is frozen). Test added (128 passed).
+
+THE WITNESS PROTOCOL (registered; the champion as witness, knob 1
+first, one knob at a time - run in this order, fresh CSVs land in
+ruler-results-knobs/):
+
+- knob 1 baseline (k=3, the ladder's setting, for the partial-credit
+  reference point): python3 ruler_gate.py \
+    ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf \
+    --task fwe --depths 261888 --samples 1 --seed 1024 \
+    --arch qwen2 --results-dir ruler-results-knobs --port 8310
+- knob 1 (k=10, the recommendation): python3 ruler_gate.py \
+    ./models/Qwen3.5-0.8B/Qwen3.5-0.8B-Q8_0.gguf \
+    --task fwe --depths 261888 --samples 1 --seed 1024 \
+    --arch qwen2 --results-dir ruler-results-knobs --port 8310 \
+    --fwe-top-k 10
+- If the champion holds 10/10 (or lands 8-9/10 with the misses in
+  the tail ranks), knob 1 is CALIBRATED: run the same k=10 cell on
+  the other two PASS configs (the 2B and the Jamba - the roster
+  witnesses) and then on the 2B Q8_0+q8_0 arm, whose original
+  question (noise vs capability) the k=10 partial now answers with
+  one task: a graded 0..10 with refusal-shaped miss text is noise,
+  a flat 0 with no attempt is capability.
+- If the champion collapses at k=10 (a partial far below 8), the
+  knob is TOO HOT for the study's floor: step down to --fwe-top-k 5
+  and re-run before drawing any conclusion about the other configs.
+
+Reading the CSV: the partial column is the graded score; the answer
+column carries the full text. The registered reading stays: refusal
+text ("Based on the provided text...") is a noise-side signature;
+empty or degenerate output is a capability-side signature.

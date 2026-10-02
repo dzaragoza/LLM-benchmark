@@ -91,6 +91,7 @@ def build_fwe_task(
     port: int,
     depth_tokens: int,
     seed: int,
+    top_k: int = FWE_TOP_K,
 ) -> tuple[str, list[str]]:
     """One FWE task at ~depth_tokens: returns (prompt, top_k_words).
 
@@ -145,7 +146,7 @@ def build_fwe_task(
             break
         # the trim came in short (probe noise) - grow the word list and retry
         num_words = int(num_words * budget / max(1, n_tok))
-    return prompt, vocab[1 : 1 + FWE_TOP_K]
+    return prompt, vocab[1 : 1 + top_k]
 
 
 TEMPLATE_DEBRIS = re.compile(r"<\|[^|>]{1,32}\>|<\[/[^>]{1,32}\]>|\[INST\]|\[/INST\]")
@@ -366,6 +367,7 @@ def run_fwe_depth(
     seed0: int = 1024,
     no_thinking: bool = True,
     show: bool = False,
+    top_k: int = FWE_TOP_K,
 ) -> dict[str, Any]:
     """FWE cells: same shape as run_depth (CSV cache, per-task rows,
     ERROR rows continue the sweep), verdict all-or-nothing per task
@@ -388,7 +390,7 @@ def run_fwe_depth(
         w = csv.writer(f)
         w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
         for i in range(samples):
-            prompt, top_k = build_fwe_task(port, depth, seed=seed0 + i)
+            prompt, top_k = build_fwe_task(port, depth, seed=seed0 + i, top_k=top_k)
             if show:
                 print(f"    --- task prompt head: {prompt[:160]!r}")
                 print(f"    expected top-{FWE_TOP_K}: {top_k}")
@@ -511,6 +513,15 @@ def main() -> None:
         "ladder's fwe_pass launches with - both None = default f16)",
     )
     p.add_argument(
+        "--fwe-top-k",
+        type=int,
+        default=None,
+        help="session 36, addendum 6: the FWE difficulty knob 1 - the answer "
+        "set size (default 3; upstream RULER asks for the 10 most frequent "
+        "words; the score stays all-or-nothing per task, the per-word "
+        "partial is the graded 0..k diagnostic)",
+    )
+    p.add_argument(
         "--kv-quant-v",
         default=None,
         choices=_KV_CHOICES,
@@ -590,6 +601,7 @@ def main() -> None:
                     seed0=args.seed,
                     no_thinking=not args.thinking,
                     show=args.show,
+                    top_k=args.fwe_top_k or FWE_TOP_K,
                 )
             else:
                 row = run_depth(
