@@ -1565,3 +1565,44 @@ passes[4096] counts only the deeper climbs) - the n=7 sanity run on
 the real state caught both before shipping. The n=7 reliable-depth
 snapshot: ONLY the 2B has a reliable depth (8,192) today; the field
 should widen at n=15.
+
+### Addendum 43 - n=21 (odd, above the 2-sigma floor) and the conservative depth column
+
+The author's ruling: n = 21 - above the n=20 floor where 2-sigma
+starts working, and ODD so the mode cannot tie (a strict majority of
+21 requires 11). TOURNAMENT_CLIMBS 15 -> 21: seeds 8-21 run for the
+veterans via the resume mechanism (climbs 1-7 restored), gemma runs
+all 21 fresh.
+
+THE CONSERVATIVE DEPTH (addendum 42's "report both" option, now
+implemented): a second certified depth at 2 SIGMA - the deepest rung
+whose hold probability has a 2-sigma lower Wilson bound >= 0.5.
+Verified bars at n=21: 1-sigma reliable needs 13/21 observed holds
+at a rung; 2-sigma conservative needs 16/21. Both thresholds
+pre-registered before the run. The pair brackets the claim: reliable
+= "most seeds hold, 1-sigma confidence" (the working
+recommendation); conservative = "the claim that survives skeptical
+review." A sharp disagreement between the two for a model is itself
+a finding (the least-settled depth in the field).
+
+The table now prints: rank [statistic] | reliable | conservative |
+ceiling | passes/rung. conservative_depth stored per family in the
+state alongside reliable_depth.
+
+Pre-registered predictions for the n=21 run: the 2B keeps rank
+~32,768 and gains conservative certification at 4,096 or 8,192; the
+0.8B unlocks its reliable cell (it was reliable-0 only at n=7 - at
+13/21 holds at the floor it certifies; borderline call); RWKV stays
+floor-bound in rank but its 8192-hold count vs the 16/21 bar settles
+how structural the recurrence failure is; gemma lands 4,096-16,384
+(addendum 40).
+
+CODE-EDIT REPORT (wow.md section 4): the first test-update script
+aborted midway on a stale old_str (my addendum-40 comment edit
+shifted a line) - three edits silently unapplied, caught by the
+suite and redone against the live file. And I inverted the
+fall-vs-hold semantics TWICE in the conservative test (a climb holds
+4,096 iff it fell DEEPER - my constructions had the multiplicities
+backwards), caught by the suite both times; the bars themselves
+(13/21, 16/21) are verified against wilson_interval directly. 136
+passed.

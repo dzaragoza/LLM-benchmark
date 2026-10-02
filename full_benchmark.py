@@ -352,15 +352,18 @@ def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
 
 
 def _rank_extra(rank: dict[str, Any], depths: list[int]) -> dict[str, Any]:
-    """The addendum-42 recommendation statistics: reliable depth (the
-    deepest rung whose 1-sigma LOWER Wilson bound on the hold
+    """The addendum-42/43 recommendation statistics: reliable depth
+    (the deepest rung whose 1-sigma LOWER Wilson bound on the hold
     probability is >= 0.5 - the rung holds FWE on most seeds, with
-    1-sigma confidence), ceiling (the deepest rung held EVER), and
-    the per-rung Wilson bounds for the table."""
+    1-sigma confidence), conservative depth (the same at 2 sigma -
+    the claim that survives skeptical review; addendum 43, n=21 puts
+    the 2-sigma certify bar at 15/21 observed holds), ceiling (the
+    deepest rung held EVER), and the per-rung 1-sigma Wilson bounds."""
     n = len(rank["fall_depths"])
     passes = rank["passes"]
     floor = math.ceil(0.5 * n) if n else 0
     reliable = 0
+    conservative = 0
     bounds: dict[int, tuple[float, float]] = {}
     for d in depths:
         k = passes[d]
@@ -368,7 +371,10 @@ def _rank_extra(rank: dict[str, Any], depths: list[int]) -> dict[str, Any]:
         bounds[d] = (round(lo, 3), round(hi, 3))
         if k >= floor and lo >= 0.5:
             reliable = d
+        if k >= floor and wilson_interval(k, n, 2.0)[0] >= 0.5:
+            conservative = d
     rank["reliable_depth"] = reliable
+    rank["conservative_depth"] = conservative
     rank["wilson_bounds"] = bounds
     climb_max = [
         (top_d := depths[-1]) if f is None else f for f in rank["fall_depths"]
@@ -503,7 +509,8 @@ def tournament_family(
     )
     print(
         f"  {fam}: reliable depth {rank['reliable_depth']:,} tokens "
-        f"(P>=0.5 at 1 sigma) | ceiling {rank['ceiling']:,} tokens"
+        f"(P>=0.5 at 1 sigma) | conservative {rank['conservative_depth']:,} "
+        f"(2 sigma) | ceiling {rank['ceiling']:,} tokens"
     )
     return {
         "family": fam,
@@ -542,7 +549,8 @@ def print_tournament_table(tours: list[dict[str, Any]]) -> None:
         print(
             f"  {i}. {t['family']:24s} rank {t['rank_depth']:>7,} tok "
             f"[{t.get('rank_statistic', 'mode')}] | reliable "
-            f"{t.get('reliable_depth', 0):>7,} tok | ceiling "
+            f"{t.get('reliable_depth', 0):>7,} tok | conservative "
+            f"{t.get('conservative_depth', 0):>7,} tok | ceiling "
             f"{t.get('ceiling', 0):>7,} tok | passes/rung [{pv}]"
         )
 
@@ -844,7 +852,7 @@ RUNG_DEFAULT = "Q8_0"
 # same five task ladders. Upstream RULER FWE parameters exactly
 # (k=3, alpha 2.0 - addendum 7/8 verification).
 TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
-TOURNAMENT_CLIMBS = 15
+TOURNAMENT_CLIMBS = 21
 TOURNAMENT_MODEL_QUANTS = ["Q2_K", "Q3_K", "Q4_K", "Q5_K", "Q6_K", "Q8_0"]
 TOURNAMENT_KV_QUANTS = ["q4_0", "q5_0", "q6_K", "q8_0", "f16"]
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
