@@ -1408,3 +1408,20 @@ wrong mode assertion - the mode of [4096x4, 8192, 32768, top] is 4096,
 caught by the tests before anything shipped). 135 tests green.
 
 No models.md results yet - the tables await the author's run.
+
+### Addendum 38 - the disqualification rule: clear 4,096 or leave
+
+Author ruling, registered BEFORE the rounds 6-7 run (pre-registered
+per wow.md section 1): after rounds 6 and 7 are graded, ANY participant
+that does not clear 4,096 tokens (zero holds at any depth across all
+seven climbs) is DISQUALIFIED - moved to a new DISQUALIFIED table in
+models.md - and the field is refilled with new entrants to hold the
+study at 8 families (disk permitting). The floor-fall families are
+the obvious candidates for the cut: after five climbs the all-4096
+group is MiniCPM5-1B and RWKV7-Goose (0 holds anywhere), with
+Jamba-Reasoning and MiniCPM5-2B each holding only single steps.
+The empty DISQUALIFIED table is added to models.md ahead of the run.
+Prediction (pre-registered): at least two families fail to clear
+4,096 (MiniCPM5-1B, RWKV7-Goose), and the 0.8B champion hold pattern
+(seed-dependent 4,096-vs-deeper) makes it the interesting borderline
+case - its climb 5 reached 32,768 but three of five fell at the floor.
