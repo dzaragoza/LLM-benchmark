@@ -1757,9 +1757,19 @@ def git_tail(args: argparse.Namespace) -> None:
         stamp(f"commit failed: {r.stderr.strip()}")
         return
     stamp(f"committed: {r.stdout.strip().splitlines()[0]}")
+    # addendum 47: the artifact push can race origin (rules land on
+    # main DURING a long run - the addendum-46 lesson: stale data on
+    # my side for hours). Pull-rebase-autostash AFTER the commit and
+    # BEFORE the push, so the artifact commit replays on top of
+    # whatever landed meanwhile; the autostash covers tree dirt.
+    r = subprocess.run(
+        ["git", "pull", "--rebase", "--autostash"], capture_output=True, text=True
+    )
+    if r.returncode != 0:
+        stamp(f"pull before push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
     r = subprocess.run(["git", "push"], capture_output=True, text=True)
     if r.returncode != 0:
-        stamp(f"push failed: {r.stderr.strip()} - run: git push")
+        stamp(f"push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
     else:
         stamp("pushed")
 

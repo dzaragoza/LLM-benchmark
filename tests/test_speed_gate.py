@@ -325,3 +325,19 @@ def test_git_pull_before_tee():
     assert body.index("git_pull_head()") < body.index("tee_output.install()")
     src = inspect.getsource(fb.git_pull_head)
     assert "--autostash" in src
+
+
+def test_git_tail_pulls_before_push():
+    """Addendum 47: the artifact tail pulls AFTER the commit and
+    BEFORE the push - origin moves during long runs, and the
+    artifact commit must replay on top before pushing."""
+    import inspect
+
+    import full_benchmark as fb
+
+    src = inspect.getsource(fb.git_tail)
+    i_commit = src.index('["git", "commit", "-m", msg]')
+    i_pull = src.index('["git", "pull", "--rebase", "--autostash"]')
+    i_push = src.index('subprocess.run(["git", "push"]')
+    assert i_commit < i_pull < i_push, "order must be commit -> pull -> push"
+    assert "--autostash" in src
