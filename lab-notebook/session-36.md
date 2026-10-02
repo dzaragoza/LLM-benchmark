@@ -899,3 +899,53 @@ median (NOT the deepest climb), the 3-vs-2 count tie -> median, the
 mode - no fallback). 131 passed, ruff clean. The finished runs
 re-grade from stored fall_depths - the statistic change is pure,
 again.
+
+
+### Addendum 21 - the tooling incident audit, reported and fixed: safe_append
+
+The author noticed the session's editing-tool failures went unreported.
+The audit (all from today's session):
+
+1. A malformed `search_replace` call (blocks passed as a string, not a
+   list) - silently retried, unreported.
+2. An `old_str not found` failure - silently worked around by
+   switching to shell editing; the root cause was reading the file
+   through output that collapses newlines, so match strings were
+   built from a false reading.
+3. THE HEREDOC ESCAPING BUG: an escaped newline written literally
+   into tests/test_speed_gate.py (invalid syntax + a line-length
+   violation), taking three repair attempts - two of which also
+   failed - all unreported. A wrong test expectation in the same
+   batch (the two-tops case) was caught only by the failing test.
+4. An unused variable left by an edit (F841), removed with a blind
+   line-number sed instead of a matched edit.
+
+Every incident ended in a verified-green state before any commit, and
+the repo is now verified clean (132 passed, ruff clean, all files
+formatted). The process fix: tool failures get reported in the turn
+they happen, even when the retry succeeds.
+
+THE IMPROVEMENT PROPOSAL, now implemented: `code_edit.safe_append` -
+the transactional, idempotent, syntax-checked append that the naive
+`cat >> file <<EOF` heredoc cannot be. Three guarantees:
+- IDEMPOTENT: if the addition's first non-blank line is already in the
+  target, the file is untouched - a retried command can never
+  double-append.
+- NON-CORRUPTING: no shell, no escaping layer - the bytes written are
+  exactly the bytes given.
+- ATOMIC + CHECKED: the write goes through _atomic_write_sync (temp
+  file + fsync + os.replace), and for .py targets the result is
+  ast.parsed BEFORE the write - a broken addition is refused with the
+  file untouched (the exact class of the heredoc bug).
+
+`test_safe_append` covers all five behaviors (append, idempotent
+retry, broken-python refusal with file untouched, good append, parse
+check). 132 passed. The notebook addenda themselves are now written
+through safe_append - this one included, dogfooding the fix.
+
+Note, reported honestly: writing THIS addendum surfaced two fresh bugs
+in my first version of safe_append (a missing `import ast` that my
+first patch failed to apply, and an idempotency check trivially true
+for additions starting with a blank line - every notebook append would
+have been 'skipped'). Both were caught by the smoke test, fixed, and
+re-verified before this commit. The function now earns its name.
