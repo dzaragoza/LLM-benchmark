@@ -1115,3 +1115,46 @@ mark, notes) plus the three findings compactly: nobody topped out,
 every fall is a partial (the poles-only finding superseded), and
 seed variance at k=3 dwarfs depth effects. The comeback bar (32,768)
 is stated for the addenda 16-18 entries.
+
+
+### Addendum 28 - the fifth participant; the study tops at 8 families; the run-time estimate
+
+The author: five comeback participants (not four), the study tops at
+8 families - more is a threat to disk space; models can be replaced
+later. The FIFTH: MiniCPM5-1B - the deepest-window remaining reject
+after its 2B sibling (window 131,072, config.json verified in
+addendum 25's sweep; RAM fits). Entry config: Q8_0 + f16/f16 =
+3.28 GiB predicted (1.18 file + 1.0 KV_eff(131k) + 1.10) - the
+MAX legal config; the 1B is too small to reach the ceiling, so its
+closest-under is the grid's ceiling itself. Grafted into the
+tournament state. The five comeback participants: Llama-3.2-1B
+(Q8_0, q4_0, q4_0) 4.03; MiniCPM5-2B (Q8_0, f16, q4_0) 4.96 dead-on;
+MiniCPM5-1B (Q8_0, f16, f16) 3.28; AI21-Jamba-Reasoning-3B (Q8_0,
+f16, f16) 4.42; RWKV7-World-2.9B (Q8_0, n/a, n/a) 3.58 measured.
+
+THE RUN-TIME ESTIMATE (from the author's question: how long did the
+3-model run take, and what does 8 families x 5 climbs cost?). The
+measured run: 66 minutes for 3 families, 987,136 ladder-tokens
+processed (champion 86,016; 2B 741,376; Jamba 159,744) - a rate of
+~15,000 tokens/min on the T14s. The cost scales with where families
+FALL, not with how many families:
+
+- a family that falls immediately at 4,096 on all climbs: 102,400
+  tokens = ~7 min
+- the champion's actual (early falls): 86,016 = ~6 min
+- a family falling mid-ladder like the 2B: 741,376 = ~50 min
+- a family topping out at 262,144 on all 5 climbs: 2,600,960 = ~174 min
+
+THE 8-FAMILY ESTIMATE (3 measured + 5 comeback), honest bounds:
+- OPTIMISTIC (all five newcomers fall early like the champion):
+  ~95 min = 1.6 h
+- MID (all five climb like the 2B): ~314 min = 5.2 h
+- PESSIMISTIC (all five top out - only possible for the 262k-window
+  entries): ~936 min = 15.6 h
+Most likely 2-5 h: the two 131k-window entries (Llama, both MiniCPMs)
+are capped at half the ladder's cost even on a full top-out, and the
+first tournament's evidence (every fall partial, most falls shallow)
+points to early falls. DISK NOTE (the author's constraint): the
+comeback entries need the 5 model files on disk (~10 GiB total for
+the five; the participants' Q8_0/Q4_K_M files); replace-able later
+per the author's ruling.
