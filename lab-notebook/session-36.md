@@ -974,3 +974,52 @@ supersede the contract, but Vibe must MAKE THE AUTHOR AWARE of the
 conflict and the decision is made TOGETHER - the file is then updated
 so it never drifts stale and never changes silently. wow.md amended
 in place.
+
+
+### Addendum 24 - lineages.md retired; the naming convention question
+
+The author: lineages.md seems obsolete from a previous protocol
+version; salvage anything useful into the notebook, then remove the
+file.
+
+THE SALVAGE (what lineages.md carried that no current file does):
+
+1. The BANDS view (addendum-69 ruling): the serving-class bands
+   [5-10] wps = serves the 102.4 GB/s class, [10-20) = the 51.2
+   class, [20-40) = the 25.6 class, below 5 = clears none - one
+   T14s-predicted w/s per member assigns it to exactly one machine
+   class (the smallest class on which it clears the reader wall).
+   Useful for the REPORT (the right-sizing view), not for selection.
+2. The registered constants of the v3.1 speed law: 1/t = size/76.5 +
+   1/74 (R2 0.9996), w/t anchor p05 0.412 (n=267), Q8_0 size 1.07
+   GiB/B (measured 4B file), and the roster-window inversion: size_max
+   = BW_eff x (w/t/5.0 - 1/t_inf) = 5.27 GiB ~= 4.92B params at Q8_0.
+   Note: the law and its constants survive in MODEL-SELECTION.md's
+   predictor (same numbers), so the salvage here is the BANDS view
+   and the roster-window derivation, which exist nowhere else.
+3. The v3.1-era measured verdicts per lineage member (session-27/34
+   records) - historical; the notebook sessions already carry them
+   (sessions 27 and 34 are cross-referenced from lineages.md's
+   tables).
+4. The CORRECTIONS block (addendum-81 specs): the sft repos are
+   -bf16-suffixed and bin-only; MiniCPM3-4B has an official GGUF repo
+   with f16 (download f16 -> pinned llama-quantize -> Q8_0, provenance
+   preserved). Still relevant to acquisition if those families ever
+   come back.
+
+The file is REMOVED. Its live content is superseded by models.md
+(the registry), MODEL-SELECTION.md (the law + predictor), and the
+tournament (the ranking instrument). The pickers reference the
+lineages only in a comment string ("measured members of the studied
+lineages") - no file dependency.
+
+THE NAMING CONVENTION QUESTION: there is no stated convention - the
+repo is inconsistent (README.md, PROTOCOL.md, MODEL-SELECTION.md,
+PRACTITIONER-GOALS.md in uppercase; models.md, wow.md, notebook.md in
+lowercase; session files as session-NN.md). PROPOSAL (decided
+together per the addendum-23 meta-rule): document files in
+lowercase-kebab (they are named artifacts like the code's data files -
+models.md, model-selection.md, practitioner-goals.md, wow.md,
+protocol.md), ALL-CAPS reserved for README.md as the universal
+entry-point convention. The rename is proposed, not applied - the
+author decides.
