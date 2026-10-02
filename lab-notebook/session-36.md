@@ -769,3 +769,41 @@ The author's three rulings while the first tournament runs:
    rung from state - the comeback models need their configs grafted
    into the tournament state (rung + kv quants + local file) before
    their turn; to be wired when the first results land.
+
+### Addendum 16 - the entry-config ruling: participants enter on a predicted ceiling-matching configuration
+
+The author's ruling: a participant model enters the competition with a
+PREDICTED configuration (model quant, k quant, v quant) that matches
+the ceiling. If the participant reaches the 256k step, we reevaluate
+the predicted size against the MEASURED size and put it as a
+candidate again.
+
+Implementation:
+
+- `tournament_family` gains the ENTRY PATH: a family without a PASS
+  selection enters on its `tournament_entry` state record (rung +
+  kv_quant_k/v + file + predicted_ram_gib) instead of being skipped.
+  The entry config is announced in the run banner (ENTRY CONFIG,
+  predicted, addendum 16). PASS families are unchanged - their
+  selected rung takes precedence.
+- The four comeback participants are grafted into
+  `benchmark-state-tournament.json` with their predicted
+  ceiling-matching configs (rule-2 predictor, KV at each model's
+  own trained window where the window is 131,072):
+  - Llama-3.2-1B-Instruct: F16 + q5_0/q5_0 = 2.48 + 4.00x0.34375 +
+    1.10 = 4.96 GiB predicted - dead on the ceiling.
+  - MiniCPM5-2B: Q8_0 + q8_0/q8_0 = 2.40 + 2.08x0.665 + 1.10 =
+    4.88 GiB predicted.
+  - AI21-Jamba-Reasoning-3B: Q8_0 + f16/f16 = 4.42 GiB predicted (the
+    sibling PASS config; the reasoning tune shares the thin KV).
+  - RWKV7-World-2.9B: Q8_0, no KV cache, 3.58 GiB MEASURED (its
+    fail-table entry - the fair five-seed re-test).
+- PROMOTION RULE (registered): a participant that reaches the 256k
+  step gets its predicted size reevaluated against the measured size
+  and re-enters the candidates table.
+- `test_tournament_entry_config` (131 passed) covers the entry path:
+  an entry-only family runs all five climbs on its predicted config
+  instead of erroring out.
+
+The comeback round still WAITS for the first tournament's results
+(addendum 15 ruling).

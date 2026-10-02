@@ -79,6 +79,7 @@ def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
 
 def test_tournament_rank_mode():
     import full_benchmark as fb
+
     depths = fb.TOURNAMENT_DEPTHS
     # champion: all five top out - mode is 'top' -> rank 262144
     r = fb.tournament_rank([None] * 5, depths)
@@ -138,3 +139,47 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     assert tour["fall_depths"] == [4096, None, None, None, None]
     assert tour["full_holds"] == 4
     assert tour["rank_depth"] == 262144  # 4/5 majority at the top rung
+
+
+def test_tournament_entry_config(tmp_path, monkeypatch):
+    """The addendum-16 entry path: a participant WITHOUT a PASS
+    selection enters on its predicted ceiling-matching config
+    (tournament_entry: rung + kv quants + file) instead of being
+    skipped."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        calls.append((model, kv_quant_k, kv_quant_v))
+        return (True, {"correct": 1})
+
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    m = tmp_path / "Llama-3.2-1B-Instruct"
+    m.mkdir()
+    f = m / "Llama-3.2-1B-Instruct-F16.gguf"
+    f.write_text("x")
+    state = {
+        "families": {
+            "Llama-3.2-1B-Instruct": {
+                "tournament_entry": {
+                    "rung": "F16",
+                    "kv_quant_k": "q5_0",
+                    "kv_quant_v": "q5_0",
+                    "predicted_ram_gib": 4.96,
+                    "file": str(f),
+                }
+            }
+        }
+    }
+    out = fb.tournament_family(
+        "meta-llama/Llama-3.2-1B-Instruct",
+        str(tmp_path),
+        state,
+        str(tmp_path / "s.json"),
+        8210,
+        False,
+    )
+    assert out["rank_depth"] == 262144 and out["full_holds"] == 5
+    assert len(calls) == 5 * len(fb.TOURNAMENT_DEPTHS)
+    assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
