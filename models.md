@@ -70,6 +70,22 @@ at 256k for all participants), falsified when a ranking step needs it.
 | 2 | AI21-Jamba2-3B | (Q8_0, f16, f16) | 8192, 4096, 4096, 65536, 8192 | [3 1 1 1 0 0 0] | 0/5 | median-fallback | second at 8,192 tok; climb 4 reached 65,536 (2/3 partial) - the hybrid's retrieval held mid-deepths on two of five seeds |
 | 3 | Qwen3.5-0.8B | (Q8_0, f16, f16) | 4096, 4096, 4096, 8192, 32768 | [2 1 1 0 0 0 0] | 0/5 | mode | THE FORMER CHAMPION, third at 4,096 tok; the 256k PASS (seed 1024, FWE 3/3 at 261,888) is SEED-CONDITIONAL - seeds 1-3 fell at 4,096 (2/3 partials, deep-scanning misses, not refusals); climb 5 reached 32,768 |
 
+THE COMEBACK ROUND (session 36, addendum 35 - the author's run, 23 min):
+
+| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | full holds | rank statistic | notes |
+|---|---|---|---|---|---|---|---|
+| 4 | Llama-3.2-1B-Instruct | (Q8_0, q4_0, q4_0) | 16384, 4096, 4096, 32768, 32768 | [3 3 2 0 0 0 0] | 0/5 | median-fallback | THE COMEBACK CHAMPION (16,384 tok) - the only newcomer past the floor; climb 1 reached 16,384 and climb 4/5 reached 32,768; two 0/3 refusal-shaped misses ("I can't fulfill this request.") on seed 1 |
+| 5 | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | 8192, 4096, 16384, 4096, 4096 | [2 1 0 0 0 0 0] | 0/5 | mode | 4,096 tok; the reasoning tune climbs no deeper than its PASS sibling (8,192) - the thinking shape neither helps nor hurts FWE retrieval |
+| 6 | MiniCPM5-2B | (Q8_0, f16, q4_0) | 8192, 4096, 4096, 4096, 4096 | [1 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok - the dead-on-ceiling entry did NOT buy depth; predicted deepest (32,768+), measured the floor: prediction FAILED |
+| 7 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x5 | [0 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok; zero holds anywhere - the smallest model in the field |
+| 8 | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | 4096 x5 | [0 0 0 0 0 0 0] | 0/5 | mode | 4,096 tok; the structural hypothesis CONFIRMED at five seeds (all-4096 as predicted) - but the miss shape CHANGED: no single-character degeneration this time, instead "Sure, I understand. Please provide the text" confabulation (0/3) and partial scans (2/3, 1/3) - pure recurrence fails FWE, but HOW it fails is prompt-dependent |
+
+NOBODY beat the bar (32,768, the first tournament's rank). The overall
+field ranking stands: Qwen3.5-2B (32,768) > Jamba2-3B (8,192) >
+Qwen3.5-0.8B (4,096) > Llama-3.2-1B (16,384*). NOTE: the Llama's
+16,384 ranks it ABOVE the former champion on depth - the comeback
+champion displaces two PASS models on the ladder.
+
 FINDINGS (session 36 addendum 26): nobody topped out (0/5 full holds
 all three); every fall is a PARTIAL (2/3 or 1/3), never 0/3 - the
 session-35 "poles only" finding is superseded (n=1 artifact); seed
