@@ -1365,3 +1365,17 @@ FINDINGS:
 The 23-minute run vs the 2-5 h estimate: every newcomer fell early
 (the optimistic bound of addendum 28); the estimate's rate holds
 (~15,000 tokens/min - 1.7M tokens total across both rounds now).
+
+### Addendum 36 - the registry ruling: the comeback champion stays in TOURNAMENT
+
+Author ruling on the addendum-35 question: Llama-3.2-1B-Instruct does NOT
+move to CANDIDATES. The promotion rule (addendum 16) binds only at the 256k
+step, which the model cannot reach (window 131,072). With the whole field
+falling far below 256k, the author judged the question moot: we are not
+even close to 256k. The comeback champion is carried in the models.md
+TOURNAMENT section only (option 3 of the three options offered); the
+REJECTED entry stands with its window reason. No models.md change needed -
+the TOURNAMENT table already carries the comeback round (models.md:77) and
+the REJECTED table already carries the window reason.
+
+Registered: 2026-10-02, after addendum 35. No code changes, no tests.
