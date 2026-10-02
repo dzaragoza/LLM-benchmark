@@ -1606,3 +1606,43 @@ fall-vs-hold semantics TWICE in the conservative test (a climb holds
 backwards), caught by the suite both times; the bars themselves
 (13/21, 16/21) are verified against wilson_interval directly. 136
 passed.
+
+### Addendum 44 - the domination rule (disqualification, superseding the floor rule) and the data-scope clause
+
+The author's ruling after the ceiling debate (the flipped argument
+accepted): a model is disqualified ONLY when some model A is
+CONSERVATIVE-CERTIFIED (2-sigma lower Wilson bound >= 0.5) at a
+depth at which the model has ZERO holds in the tournament sample,
+AND A passes the w/s gate at its reliable depth (measured, n=5).
+
+THE CEILING IS DEMOTED to a descriptive column: a max statistic
+grows with n and certifies nothing (the author's lottery objection -
+a low-probability model eventually produces a spectacular ceiling).
+The substance of the trigger is the ABSENCE OF HOLDS: zero holds
+after n seeds bounds the true hold probability far below certifiable
+(0.4^21 ~ 1-in-17-billion for a certifiable model to show 0/21), so
+further seeds are lottery tickets, and every context the model
+gambles for is already served reliably by A. It is a
+resource-allocation rule, not a claim of impossibility.
+
+DATA SCOPE (the author's clause): THIS TOURNAMENT ONLY. Pre-
+tournament data (ladder runs, the seed-1024 passes, anything
+measured before the tournament instrument) does not count for or
+against disqualification.
+
+CONSEQUENCES: the floor rule (addendum 38) is SUPERSEDED.
+MiniCPM5-1B's disqualification is REVERTED - it is re-admitted for
+the n=21 run (its climbs 1-7 stand, all-4096; seeds 8-21 run - the
+cheapest family in the field, all climbs end at the first cell).
+Currently NOBODY is disqualified: no model is 2-sigma-certified at
+anything yet (needs 16/21; the data is n=7). The earliest the rule
+can fire is after the n=21 run; its most likely first target is
+MiniCPM5-1B itself (the only family with zero holds above 4,096),
+should someone certify 2-sigma at the floor. RWKV survives the rule
+(its seed-6 hold at 8,192 is tournament data and lifts its zero-
+holds bound above the floor). The 0.8B is safe by a mile (three
+holds at >= 32k).
+
+The DISQUALIFIED table in models.md is rewritten with the rule and
+emptied (re-admission noted). The command list regains MiniCPM5-1B:
+8 families in the n=21 run.
