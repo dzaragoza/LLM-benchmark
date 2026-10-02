@@ -1923,3 +1923,71 @@ THE DOCTRINE, COMPLETE (addenda 48 + 50 + 51):
 - Certification: minimal roster, sequential per-rung tests, one
   model per rung, add candidates only when a gap has no answer.
 - The deliverable: per rung, ONE model + config + sigma level.
+
+## Session 36, day close - 2026-10-02 (addenda 1-51)
+
+THE DAY IN ONE PARAGRAPH: the study grew its ranking instrument, its
+statistics, and its philosophy. The morning graded the overnight
+probes, then the TOURNAMENT was born: five seeded climbs up a dyadic
+FWE ladder, seed = climb number, early stop, rank = mode with
+median fallback (addenda 10-20, the climb-dir bug fixed in 14, the
+mode-hole found by the author in 17). The first tournament
+(addendum 26) falsified every pre-registered prediction: nobody
+topped out, the champion's 256k PASS proved seed-conditional, the
+empty middle filled with partials. The comeback round (addendum 35)
+brought four entrants on ceiling-matched entry configs - and the
+Llama window-reject outclimbed the former champion, while the
+dead-on-ceiling MiniCPM5-2B entry bought nothing: RAM was never the
+binding constraint on FWE. WOW.MD was born (addenda 22-23): the
+9-section way of working, the md-linter-aware code_edit, and
+safe_append after the tooling incident audit (addendum 21 - the
+author caught my unreported failures; every failure is now
+reported and fixed per section 4). The naming convention, the state
+directory, the git-pull gate (addenda 32-34), and the fish ruling
+(30) hardened the tooling. Then the rounds grew: 6-7 with the
+RESUME mechanism (addendum 37 - each climb's fall persisted, the
+tournament became incremental), the 4,096 floor rule (38, later
+superseded), gemma-3-1b-it entering (40). The afternoon was the
+statistics: the Wilson interval at 1 sigma (42), reliable depth
+(the recommendation number), conservative depth at 2 sigma (43),
+n=21 chosen odd and above the 2-sigma floor, the ten pre-registered
+questions (45). The domination rule (44) replaced the floor rule -
+disqualification only when a 2-sigma model covers a zero-hold
+candidate, the ceiling demoted to description (the author's lottery
+objection, answered by flipping the argument: zero holds bounds the
+true probability far below certifiable). The evening brought the
+two big runs: n=15 (5h12m - two co-champions at 32,768 with
+opposite profiles: the 2B mode + reliable 16,384 + the field's
+first full hold; the 0.8B median + four 262k climbs + a certified
+floor of only 4,096) and the git race lesson (47: commit ->
+pull-rebase -> push). And then the philosophy: the sequential-
+testing principle (48 - experiments are designed for the decision,
+not for data volume), the monotonicity challenge (49 - the pass
+vector cannot contradict it by construction; small-context
+pathology and sweet spots are live scenarios; independent per-rung
+probes named), the sequential certification phase (50 - fill the
+certified map rung by rung, cheapest-first, one model per rung),
+and the minimal-roster retrospective (51 - start with one model,
+add only when a gap has no answer; the practitioner wants ONE
+model that solves it well). The author's closing lesson: define
+clearer goals, spend less computing - hindsight is 20/20, and the
+doctrine is how we make it foresight.
+
+THE MACHINE STATE: the n=21 completion runs overnight (the
+addendum-44 command, all 9 families; the addendum-47 git flow gets
+its live exercise). The tournament state holds 8 families at n=15,
+MiniCPM5-1B at n=7 (re-admitted), gemma at n=15.
+
+THE STATE GOING INTO TOMORROW (pre-registered): grade the n=21
+completion against the ten questions (addendum 45) at the n=21 bars
+(13/21 reliable, 16/21 conservative); apply the domination rule
+with the w/s gate for the first time (the reliable-depth w/s step
+fires for the certified); read the reliable-depth w/s medians; then
+build the --certify instrument (addendum 50) and open the
+sequential certification phase - the projected map has 4k-8k
+covered, 16k the 2B's to lose, 32k+ EMPTY and unfillable by
+incumbents: the first sequential search targets new candidates
+there, tested only at the rung that matters.
+
+SESSION CLOSED 2026-10-02. The machine carries the completion run;
+the analysis and the certification phase open tomorrow's session.
