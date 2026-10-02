@@ -1,0 +1,165 @@
+
+===== 2026-10-02T10:11:28 | full_benchmark.py --help =====
+usage: full_benchmark.py [-h] [--corpus CORPUS] [--reader-wps READER_WPS]
+                         [--models-dir MODELS_DIR] [--state-file STATE_FILE]
+                         [--results-file RESULTS_FILE] [--rung RUNG]
+                         [--roster ROSTER] [--dry-run] [--force]
+                         [--kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--thinking] [--no-git] [--min-rung MIN_RUNG]
+                         [--max-rung MAX_RUNG] [--no-thinking]
+                         families [families ...]
+
+end-to-end benchmark: acquire each family's Q8_0 rung and run the protocol v4
+ladder - the depth-scored ladder table is the ranking
+
+positional arguments:
+  families              family specs: "model_repo" or "model_repo=source_repo"
+
+options:
+  -h, --help            show this help message and exit
+  --corpus CORPUS
+  --reader-wps READER_WPS
+                        the k=1 guarantee line in WORDS per second: worst turn
+                        at the reference depth must never fall below this
+                        (default 5.0 w/s = 300 wpm, Brysbaert 2019 - match the
+                        fast reader)
+  --models-dir MODELS_DIR
+  --state-file STATE_FILE
+  --results-file RESULTS_FILE
+  --rung RUNG           the quant to benchmark (default Q8_0; e.g. Q4_K_M -
+                        session 34's context-over-parameters test)
+  --roster ROSTER       restrict the run's notes to these families (comma-
+                        separated, as named in the family specs); the state
+                        file accumulates across studies (addendum 41/56)
+  --dry-run             READ-ONLY pre-flight (addendum 79): lists every repo,
+                        verifies tooling, runs the RAM/disk feasibility checks
+                        and reports each family's acquisition plan WITHOUT
+                        downloading, converting, benching or touching the
+                        state file. THE WAY OF WORKING: always run the command
+                        with --dry-run first, read the pre-flight report, then
+                        issue it without.
+  --force               redo families that already have a selection
+  --kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        session 35, addendum 7: quantize ONLY the K cache to
+                        this type (V keeps its own setting; both None =
+                        default f16).
+  --kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        session 35, addendum 7: quantize ONLY the V cache to
+                        this type (K keeps its own setting; both None =
+                        default f16).
+  --thinking            thinking-model category: benchmark with thinking
+                        enabled (same worst-turn gate; reasoning measured
+                        descriptively). Use separate --state-file/--results-
+                        file for this category.
+  --no-git              skip the git tail (session 34 addendum 15: the commit-
+                        and-push of the run's artifacts is now DEFAULT - the
+                        git interface is layer 3, like the hub and llama.cpp;
+                        the old --git-commit opt-in is superseded)
+  --min-rung MIN_RUNG   session 34 (addendum 9/10): the ladder's first rung
+                        (default: the protocol v4 base 8192); stored in the
+                        state as ladder_min_rung so every subsequent run of
+                        the family climbs the same grid
+  --max-rung MAX_RUNG   session 35 (addendum 9): the gallop's hard stop - the
+                        ladder never climbs past this rung. With --min-rung N
+                        --max-rung N the run is a single-rung probe: speed +
+                        fwe at exactly N, pass or fail, no search; stored in
+                        the state as ladder_max_rung
+  --no-thinking         hybrid models, non-thinking category: run with
+                        thinking disabled (chat-template kwargs
+                        enable_thinking=false; first-turn dump check confirms
+                        no reasoning appears)
+
+===== 2026-10-02T10:11:52 | full_benchmark.py --tournament --dry-run --no-git Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B =====
+usage: full_benchmark.py [-h] [--corpus CORPUS] [--reader-wps READER_WPS]
+                         [--models-dir MODELS_DIR] [--state-file STATE_FILE]
+                         [--results-file RESULTS_FILE] [--rung RUNG]
+                         [--roster ROSTER] [--dry-run] [--force]
+                         [--kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--thinking] [--no-git] [--min-rung MIN_RUNG]
+                         [--max-rung MAX_RUNG] [--no-thinking]
+                         families [families ...]
+full_benchmark.py: error: unrecognized arguments: --tournament
+
+===== 2026-10-02T10:12:11 | full_benchmark.py --help =====
+usage: full_benchmark.py [-h] [--corpus CORPUS] [--reader-wps READER_WPS]
+                         [--models-dir MODELS_DIR] [--state-file STATE_FILE]
+                         [--results-file RESULTS_FILE] [--rung RUNG]
+                         [--roster ROSTER] [--dry-run] [--force]
+                         [--tournament]
+                         [--kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}]
+                         [--thinking] [--no-git] [--min-rung MIN_RUNG]
+                         [--max-rung MAX_RUNG] [--no-thinking]
+                         families [families ...]
+
+end-to-end benchmark: acquire each family's Q8_0 rung and run the protocol v4
+ladder - the depth-scored ladder table is the ranking
+
+positional arguments:
+  families              family specs: "model_repo" or "model_repo=source_repo"
+
+options:
+  -h, --help            show this help message and exit
+  --corpus CORPUS
+  --reader-wps READER_WPS
+                        the k=1 guarantee line in WORDS per second: worst turn
+                        at the reference depth must never fall below this
+                        (default 5.0 w/s = 300 wpm, Brysbaert 2019 - match the
+                        fast reader)
+  --models-dir MODELS_DIR
+  --state-file STATE_FILE
+  --results-file RESULTS_FILE
+  --rung RUNG           the quant to benchmark (default Q8_0; e.g. Q4_K_M -
+                        session 34's context-over-parameters test)
+  --roster ROSTER       restrict the run's notes to these families (comma-
+                        separated, as named in the family specs); the state
+                        file accumulates across studies (addendum 41/56)
+  --dry-run             READ-ONLY pre-flight (addendum 79): lists every repo,
+                        verifies tooling, runs the RAM/disk feasibility checks
+                        and reports each family's acquisition plan WITHOUT
+                        downloading, converting, benching or touching the
+                        state file. THE WAY OF WORKING: always run the command
+                        with --dry-run first, read the pre-flight report, then
+                        issue it without.
+  --force               redo families that already have a selection
+  --tournament          session 36, addenda 10/11: run the TOURNAMENT instead
+                        of the ladder sweep - every family at its SELECTED
+                        rung (the PASS config, its stored KV quants), five
+                        climbs of the dyadic FWE ladder 4096..262144, SEED =
+                        CLIMB NUMBER, early stop at the first non-perfect
+                        cell; the majority rank is the ranking
+  --kv-quant-k {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        session 35, addendum 7: quantize ONLY the K cache to
+                        this type (V keeps its own setting; both None =
+                        default f16).
+  --kv-quant-v {q8_0,q4_0,q4_1,q5_0,q5_1,iq4_nl}
+                        session 35, addendum 7: quantize ONLY the V cache to
+                        this type (K keeps its own setting; both None =
+                        default f16).
+  --thinking            thinking-model category: benchmark with thinking
+                        enabled (same worst-turn gate; reasoning measured
+                        descriptively). Use separate --state-file/--results-
+                        file for this category.
+  --no-git              skip the git tail (session 34 addendum 15: the commit-
+                        and-push of the run's artifacts is now DEFAULT - the
+                        git interface is layer 3, like the hub and llama.cpp;
+                        the old --git-commit opt-in is superseded)
+  --min-rung MIN_RUNG   session 34 (addendum 9/10): the ladder's first rung
+                        (default: the protocol v4 base 8192); stored in the
+                        state as ladder_min_rung so every subsequent run of
+                        the family climbs the same grid
+  --max-rung MAX_RUNG   session 35 (addendum 9): the gallop's hard stop - the
+                        ladder never climbs past this rung. With --min-rung N
+                        --max-rung N the run is a single-rung probe: speed +
+                        fwe at exactly N, pass or fail, no search; stored in
+                        the state as ladder_max_rung
+  --no-thinking         hybrid models, non-thinking category: run with
+                        thinking disabled (chat-template kwargs
+                        enable_thinking=false; first-turn dump check confirms
+                        no reasoning appears)
+
+===== 2026-10-02T10:12:12 | full_benchmark.py --tournament --dry-run --no-git Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B =====
+  python : /usr/local/bin/python3
+missing python packages in this interpreter: torch, gguf, sentencepiece, pandas, hf_transfer - interpreter: /usr/local/bin/python3 - activate the study venv and/or: python3 -m pip install -r requirements.txt

@@ -276,6 +276,134 @@ def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
     return None
 
 
+def tournament_rank(fall_depths: list[int | None], depths: list[int]) -> dict[str, Any]:
+    """The majority rank (session 36, addendum 11): fall_depths is one
+    entry per climb - the depth where that climb ended (the first
+    non-perfect cell), or None for a climb that topped out at the
+    highest step (full hold). Passes at step D = climbs that scored
+    perfect at D (fall strictly ABOVE D, or topped out). The rank is
+    the DEEPEST step with a majority of passes over the climbs.
+    Ties are left to the caller (the pass vector at the next step
+    up, then miss texts, as registered)."""
+    n = len(fall_depths)
+    passes: dict[int, int] = {}
+    for d in depths:
+        passes[d] = sum(
+            1 for fall in fall_depths if fall is None or (fall is not None and fall > d)
+        )
+    ranked = [d for d in depths if passes[d] * 2 > n]
+    return {
+        "rank_depth": max(ranked) if ranked else 0,
+        "passes": passes,
+        "fall_depths": fall_depths,
+        "full_holds": sum(1 for fall in fall_depths if fall is None),
+    }
+
+
+def tournament_family(
+    spec: str,
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    port: int,
+    dry_run: bool,
+) -> dict[str, Any]:
+    """One family's tournament turn (session 36, addenda 10/11): five
+    climbs of the dyadic FWE ladder at upstream parameters, SEED =
+    CLIMB NUMBER, early stop at the first non-perfect cell. Runs at
+    the family's SELECTED rung - the PASS config - with its stored
+    KV quants (the 2B's Q4_K_M carries q5_0, per the state). The
+    speed gate is ASSUMED passed (author ruling: known at 256k for
+    all participants, falsified after the tournament if a ranking
+    step needs it)."""
+    model_repo, _, source_repo = spec.partition("=")
+    fam = os.path.basename(model_repo.rstrip("/"))
+    fst = state["families"].get(fam, {})
+    rung = fst.get("selected")
+    if not rung:
+        return {"family": fam, "error": "no selected rung - not a PASS family"}
+    run = fst["runs"].get(rung, {})
+    model = run.get("file") or local_rung(os.path.join(models_dir, fam), rung)
+    if not model or not os.path.isfile(model):
+        return {"family": fam, "error": f"rung file not found ({model})"}
+    kv_k = run.get("kv_quant_k") or state.get("kv_quant_k")
+    kv_v = run.get("kv_quant_v") or state.get("kv_quant_v")
+    depths = TOURNAMENT_DEPTHS
+    print()
+    print("=" * 60)
+    stamp(f"tournament: {fam} ({rung})")
+    print(f"  file: {model}")
+    if dry_run:
+        for s in range(1, TOURNAMENT_CLIMBS + 1):
+            print(
+                f"  would climb {s}/{TOURNAMENT_CLIMBS}: depths "
+                f"{' '.join(str(d) for d in depths)} (seed {s}, early stop)"
+            )
+        return {"family": fam, "rung": rung, "dry_run": True}
+    results_dir = os.path.join(models_dir, "tournament-results", fam)
+    os.makedirs(results_dir, exist_ok=True)
+    fall_depths: list[int | None] = []
+    for s in range(1, TOURNAMENT_CLIMBS + 1):
+        fall = None
+        for d in depths:
+            row = fwe_pass(
+                model,
+                d + 2 * ruler_gate.ANSWER_HEADROOM,
+                os.path.join(results_dir, f"climb{s}"),
+                seed=s,
+                port=port,
+                kv_quant_k=kv_k,
+                kv_quant_v=kv_v,
+            )
+            ok, fv = row
+            partial = fv.get("correct", 0)
+            print(
+                f"  climb {s}/{TOURNAMENT_CLIMBS} @ {d} tok: "
+                f"{partial}/1 -> {'HOLD' if ok else 'FALL'}"
+            )
+            if not ok:
+                fall = d
+                print(f"  CLIMB OVER at {d} tok (climb {s})")
+                break
+        if fall is None:
+            print(f"  climb {s}/{TOURNAMENT_CLIMBS}: TOPPED OUT at {depths[-1]} tok")
+        fall_depths.append(fall)
+    rank = tournament_rank(fall_depths, depths)
+    print(
+        f"  {fam}: rank depth {rank['rank_depth']:,} tokens "
+        f"({rank['full_holds']}/{TOURNAMENT_CLIMBS} full holds; "
+        f"falls: {[f if f else 'top' for f in fall_depths]})"
+    )
+    return {"family": fam, "rung": rung, "model": model, **rank}
+
+
+def print_tournament_table(tours: list[dict[str, Any]]) -> None:
+    """The tournament ranking (session 36, addendum 11): ranked by the
+    majority rank depth, ties on the pass vector at the steps above,
+    then on full holds."""
+    print()
+    print("=" * 60)
+    stamp("TOURNAMENT TABLE (majority rank - session 36 addendum 11)")
+    done = [t for t in tours if "rank_depth" in t]
+    errs = [t for t in tours if "error" in t]
+    for t in errs:
+        print(f"  {t['family']}: SKIPPED - {t['error']}")
+    order = sorted(
+        done,
+        key=lambda t: (
+            -t["rank_depth"],
+            [-t["passes"][d] for d in sorted(t["passes"], reverse=True)],
+            -t["full_holds"],
+        ),
+    )
+    for i, t in enumerate(order, 1):
+        pv = " ".join(f"{t['passes'][d]}" for d in TOURNAMENT_DEPTHS)
+        print(
+            f"  {i}. {t['family']:24s} rank {t['rank_depth']:>7,} tok | "
+            f"passes/rung [{pv}] | full holds {t['full_holds']}/{TOURNAMENT_CLIMBS}"
+        )
+
+
 def run_ladder(
     model: str,
     corpus: str,
@@ -566,6 +694,14 @@ RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # 34: the Q4 quants - context dominates this bw class, so the smaller
 # file with the deeper ladder is the hypothesis to test).
 RUNG_DEFAULT = "Q8_0"
+
+# The tournament grid and climb count (session 36, addenda 10/11): a
+# dyadic ladder from 4,096 to the 262,144 ceiling, five climbs per
+# family, SEED = CLIMB NUMBER (1..5) so every competitor faces the
+# same five task ladders. Upstream RULER FWE parameters exactly
+# (k=3, alpha 2.0 - addendum 7/8 verification).
+TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
+TOURNAMENT_CLIMBS = 5
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
 SERVER_BIN = llama_server.find_server()
 
@@ -933,6 +1069,15 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--force", action="store_true", help="redo families that already have a selection"
     )
+    ap.add_argument(
+        "--tournament",
+        action="store_true",
+        help="session 36, addenda 10/11: run the TOURNAMENT instead of the "
+        "ladder sweep - every family at its SELECTED rung (the PASS "
+        "config, its stored KV quants), five climbs of the dyadic FWE "
+        "ladder 4096..262144, SEED = CLIMB NUMBER, early stop at the "
+        "first non-perfect cell; the majority rank is the ranking",
+    )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant-k",
@@ -1020,6 +1165,31 @@ def main() -> None:
 
     if not args.families:
         ap.error("no family specs given")
+    if args.tournament:
+        tours = []
+        for spec in args.families:
+            try:
+                tours.append(
+                    tournament_family(
+                        spec,
+                        args.models_dir,
+                        state,
+                        args.state_file,
+                        state.get("ladder_port", 8210),
+                        args.dry_run,
+                    )
+                )
+            except Exception as e:
+                tours.append({"family": spec, "error": repr(e)})
+                stamp(f"TOURNAMENT FAMILY FAILED: {spec} - {e!r} (isolated; recorded)")
+        state["tournament"] = tours
+        save_state(args.state_file, state)
+        print_tournament_table(tours)
+        if not args.no_git:
+            tee_output.uninstall()
+            git_tail(args)
+        stamp("tournament complete")
+        sys.exit(0)
 
     failed_families = sweep_families(args, state)
 

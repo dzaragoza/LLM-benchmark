@@ -629,3 +629,58 @@ Expected outcome per the addendum-10 priors: the champion 5/5
 climbs to the top; a 3-way tie at 262,144 remains the honest
 possibility, now resolved one rung lower if any competitor's
 climb flickers on a majority.
+### Session 36, addendum 12 - the tournament is now THE full benchmark: --tournament in full_benchmark.py
+
+THE TOOL (author ruling: "no bash command, modify full_benchmark to
+implement the tournament. That's the new full benchmark"): the
+tournament is a MODE of full_benchmark.py, not a shell loop. The
+addendum-11 mechanics are implemented verbatim:
+
+- TOURNAMENT_DEPTHS = 4096..262144 (the dyadic grid, 7 rungs),
+  TOURNAMENT_CLIMBS = 5; SEED = CLIMB NUMBER (1..5) - the same five
+  task ladders for every competitor, reproducible and comparable.
+- tournament_family: the family's turn at its SELECTED rung (the
+  PASS config - the 2B runs Q4_K_M with its stored q5_0 K/V quants;
+  the champion and the Jamba run Q8_0/f16), five climbs, each climb
+  one FWE task per depth via fwe_pass (one server launch per cell,
+  the banner-guarded shape), EARLY STOP at the first non-perfect
+  cell (the CLIMB OVER print), per-climb results dir
+  (tournament-results/<fam>/climbN - the CSV cache has no seed in
+  its name).
+- tournament_rank (pure, unit-tested): passes at step D = climbs
+  that held D (fall strictly above, or topped out); the RANK = the
+  deepest step with a MAJORITY of passes (3-of-5 or better); ties
+  break on the pass vector at the steps above, then full holds.
+- print_tournament_table: the ranking output - rank depth, the
+  per-rung pass vector, full holds; failed families isolated and
+  recorded (the addendum-78 discipline carried into the new mode).
+- The speed gate is NOT measured (author ruling, addendum 11):
+  assumed passed, falsified after the tournament if a ranking step
+  needs its w/s measured - a step that fails the gate is
+  disqualified and the ranking re-reads.
+- --dry-run support: the tournament mode lists every family's five
+  climbs WITHOUT launching a server (the pre-flight gate carried
+  into the new mode); the requirements check fires first, as
+  always.
+- The git tail (commit + push of the artifacts) runs at tournament
+  end like any run; --no-git opts out.
+- state["tournament"] carries the full results (fall depths, pass
+  vectors, ranks) for the report.
+
+Tests: test_tournament_rank_majority (the majority boundary - all
+hold, a flicker, a fall, 3-of-5) - 129 passed. ruff clean. The
+sandbox dry-run verified up to the requirements gate (the study
+venv is the author's machine; the gate itself is the working
+feature).
+
+THE COMMAND (one line, the whole tournament; dry-run first as
+always):
+
+- pre-flight: python3 full_benchmark.py --tournament --dry-run \\
+    Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B
+- the tournament: python3 full_benchmark.py --tournament \\
+    Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B
+
+(The family specs resolve the selected rung from the state; the
+rung files are already local. A family without a selection is
+SKIPPED with the reason - the mode is for PASS families.)
