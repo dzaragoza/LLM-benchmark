@@ -207,6 +207,7 @@ def fwe_pass(
     between midpoints is caught."""
     label = os.path.splitext(os.path.basename(model))[0]
     depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
+    os.makedirs(results_dir, exist_ok=True)
     csv_path = os.path.join(results_dir, f"{label}-{depth}-fwe.csv")
     if os.path.exists(csv_path):
         os.remove(csv_path)
@@ -344,12 +345,14 @@ def tournament_family(
     os.makedirs(results_dir, exist_ok=True)
     fall_depths: list[int | None] = []
     for s in range(1, TOURNAMENT_CLIMBS + 1):
+        climb_dir = os.path.join(results_dir, f"climb{s}")
+        os.makedirs(climb_dir, exist_ok=True)
         fall = None
         for d in depths:
             row = fwe_pass(
                 model,
                 d + 2 * ruler_gate.ANSWER_HEADROOM,
-                os.path.join(results_dir, f"climb{s}"),
+                climb_dir,
                 seed=s,
                 port=port,
                 kv_quant_k=kv_k,
