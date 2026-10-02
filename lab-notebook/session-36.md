@@ -684,3 +684,32 @@ always):
 (The family specs resolve the selected rung from the state; the
 rung files are already local. A family without a selection is
 SKIPPED with the reason - the mode is for PASS families.)
+### Session 36, addendum 14 - the tournament first real run: the climb-dir bug, fixed and regression-tested
+
+THE AUTHOR'S REAL RUN FAILED INSTANTLY (all three families,
+FileNotFoundError at the first climb cell, isolated and recorded -
+the addendum-78 discipline worked as designed). The dry run passed
+because it never touches the filesystem cells; the real run does.
+
+ROOT CAUSE: tournament_family created tournament-results/<fam>/ but
+passed the PER-CLIMB subdir (tournament-results/<fam>/climbN) to
+fwe_pass WITHOUT creating it - fwe_pass never made its own
+results_dir (run_ladder does, line-level asymmetry), so the first
+CSV write crashed on the missing directory. My bug, introduced in
+addendum 12.
+
+THE FIX (two layers):
+- tournament_family now creates each climb dir before the climb
+  (os.makedirs(climb_dir, exist_ok=True)).
+- fwe_pass is HARDENED: it now makes its own results_dir like
+  run_ladder does - the class of bug (a caller passing an unmade
+  dir) can never crash a cell again.
+
+REGRESSION TEST: test_tournament_family_creates_climb_dirs - a
+mocked fwe_pass asserts EVERY results_dir it receives exists;
+climb 1 falls at 4096 (early stop), climbs 2-5 top out, and the
+returned rank is the 4/5 majority at 262,144. 130 passed.
+
+The author's failed run is preserved in the state's tournament
+record (three FileNotFoundError entries) - the artifacts commits
+stand; the re-run overwrites the tournament record.

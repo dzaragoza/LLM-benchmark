@@ -96,3 +96,38 @@ def test_tournament_rank_majority():
     r = fb.tournament_rank([65536, 65536, None, None, None], depths)
     assert r["rank_depth"] == 262144
     assert r["passes"][262144] == 3
+
+
+def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
+    """The addendum-14 bug: tournament_family passed per-climb subdirs
+    to fwe_pass without creating them - fwe_pass (now hardened too)
+    must never crash on a missing results_dir."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        calls.append(results_dir)
+        assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
+        hold = seed > 1
+        return hold, {"correct": 1 if hold else 0, "depth": rung}
+
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    model = tmp_path / "fam-Q8_0.gguf"
+    model.write_bytes(b"x")
+    state = {
+        "families": {
+            "fam": {
+                "selected": "Q8_0",
+                "runs": {"Q8_0": {"file": str(model)}},
+            }
+        }
+    }
+    models_dir = str(tmp_path)
+    tour = fb.tournament_family("fam", models_dir, state, str(tmp_path / "st.json"), 8210, False)
+    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-5
+    # hold every depth (7 calls each) -> 29 total
+    assert len(calls) == 29
+    assert tour["fall_depths"] == [4096, None, None, None, None]
+    assert tour["full_holds"] == 4
+    assert tour["rank_depth"] == 262144  # 4/5 majority at the top rung
