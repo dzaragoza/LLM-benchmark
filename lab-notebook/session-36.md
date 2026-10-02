@@ -448,3 +448,44 @@ warning as the prior: if all three configs collapse at k=10, that
 REPLICATES upstream's finding on this pool at 256k - itself a
 result, and the step-down to k=5 (margin 1.44x) is the registered
 fallback.
+
+### Session 36, addendum 9 - the author's pre-registration: collapse expected; the n=5 fallback
+
+THE AUTHOR'S HYPOTHESIS, PRE-REGISTERED BEFORE THE RUNS: the k
+escalation will COLLAPSE the pool ("my hypothesis is that it will
+collapse"). Prior basis: the RULER paper's own warning (k>3 collapsed
+their 17-model pool at small depths) and the study's pool being
+0.8B-3B - an order of magnitude under everything upstream tested.
+This is now the registered prediction the runs will grade.
+
+THE RUN SEQUENCE (author-set): k=10 FIRST, then k=5 - the greedy
+rung before the moderate one; the k=10 result contextualizes
+whatever k=5 shows (a k=10 collapse + k=5 hold locates the cliff
+between 5 and 10; both collapsing replicates upstream on this pool
+at 256k).
+
+THE FALLBACK PLAN (author-set): if the k axis collapses, the
+discrimination instrument returns to REPETITIONS - n=5 at the
+ladder's k=3, and the models are graded by HOW MANY OF THE FIVE
+they pass. This inverts the earlier difficulty-over-repetitions
+ruling in the registered order of operations, not in contradiction:
+the difficulty axis was the better instrument IF it opens a
+gradient; if it is a cliff, the gradient must come from variance
+instead - n=5 at k=3 gives a 6-level score (0..5 passes) per
+config, and the pool ranks on it. The empty-middle observation
+(session 36, the author's point) is the caveat: at k=3 outcomes
+have only ever been the poles, so the n=5 score may still saturate
+to 5/5 vs 0/5 - in which case the pool is binary at this depth and
+the honest report is that, with the engagement-level failure modes
+(refusal, degeneration) as the qualitative separators.
+
+WHAT THE RUNS WILL DECIDE (pre-registered readings, unchanged from
+addendum 6/8, plus this addendum's contingency):
+- k=10 partial 8-10/10: the author's hypothesis is WRONG, the knob
+  opens a gradient, k stays the instrument.
+- k=10 collapse + k=5 hold: cliff between 5 and 10; k=5 is the
+  score rung.
+- both collapse: hypothesis CONFIRMED; the instrument moves to
+  n=5 repetitions at k=3 (this addendum's plan).
+- refusal-shaped 0 anywhere: the answer-prefix question opens
+  before any difficulty verdict.
