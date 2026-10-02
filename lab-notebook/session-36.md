@@ -1246,3 +1246,28 @@ read as: predicted all-4096 structural (the degeneration was
 measured on the mradermacher Q8_0 quant of the SAME Goose-World3
 weights the official repo carries - the conversion reproduces the
 same lineage).
+
+
+### Addendum 32 - git pull built into full_benchmark
+
+The author's ruling: add git pull to full_benchmark - the forgotten
+step (wow.md section 6) made STRUCTURAL instead of procedural.
+`git_pull_head()` now runs at startup, BEFORE the state file loads,
+on every run (real and dry): the author's artifact commits land on
+main between exchanges, and a stale checkout silently grades against
+old state data. Design:
+
+- A FAILED PULL IS A HARD STOP (SystemExit), not a warning - running
+  on a diverged tree measures the wrong thing with confidence.
+- Escape hatches: the BENCH_NO_GIT_PULL environment variable, and a
+  non-git work tree (prints 'git pull skipped' and continues - the
+  tool must run in a plain checkout too).
+- The pull uses --no-verify (the study's standing protocol; the ty
+  hooks have environmental false positives).
+
+The git_pull step replaces the 'git pull && ...' prefix in the
+comeback commands - they shorten to the bare python3 line.
+`test_git_pull_head` covers the hard stop and the clean pass
+(133 passed). One honest report: the first patch attempt failed on
+a whitespace mismatch in the call site (asserted, nothing written);
+the second applied both edits and was verified before commit.
