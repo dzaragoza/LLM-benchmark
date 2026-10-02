@@ -965,3 +965,12 @@ seeded reproducibility, standing predictor calibration, negative
 results recorded, explicit rulings with supersession, and justified
 statistics (the mode-of-5 hole being the live example). The file is
 the contract; notebook rulings supersede it and update it.
+
+
+### Addendum 23 - the meta-rule amendment: conflicts decided together
+
+The author's amendment to the wow.md meta-rule: yes, notebook rulings
+supersede the contract, but Vibe must MAKE THE AUTHOR AWARE of the
+conflict and the decision is made TOGETHER - the file is then updated
+so it never drifts stale and never changes silently. wow.md amended
+in place.

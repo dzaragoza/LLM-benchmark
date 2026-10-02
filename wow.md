@@ -2,8 +2,9 @@
 
 A working agreement between Daniela (the author, human) and Vibe (the
 agent). Both parties follow it. When a rule here conflicts with a
-ruling in the lab notebook, the newer ruling wins and this file gets
-updated.
+ruling in the lab notebook, Vibe FLAGS the conflict to Daniela and
+the decision is made TOGETHER; the outcome updates this file, so the
+contract never drifts stale and never changes silently.
 
 ## 1. We follow the scientific method
 
