@@ -783,7 +783,7 @@ RUNG_DEFAULT = "Q8_0"
 # same five task ladders. Upstream RULER FWE parameters exactly
 # (k=3, alpha 2.0 - addendum 7/8 verification).
 TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
-TOURNAMENT_CLIMBS = 7
+TOURNAMENT_CLIMBS = 15
 TOURNAMENT_MODEL_QUANTS = ["Q2_K", "Q3_K", "Q4_K", "Q5_K", "Q6_K", "Q8_0"]
 TOURNAMENT_KV_QUANTS = ["q4_0", "q5_0", "q6_K", "q8_0", "f16"]
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT

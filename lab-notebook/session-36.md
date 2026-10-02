@@ -1467,3 +1467,38 @@ former champion and the comeback champion are now RANK-EQUAL at
 
 Registered: 2026-10-02. No code changes. models.md TOURNAMENT gains
 the rounds 6-7 table; DISQUALIFIED gains its first row.
+
+### Addendum 40 - gemma-3-1b-it enters, and the tournament goes to 15 rounds
+
+Author ruling (the replacement pick + the depth): gemma-3-1b-it
+replaces the disqualified MiniCPM5-1B, and the tournament extends to
+15 rounds - TOURNAMENT_CLIMBS 7 -> 15 (seeds 8-15 run for the seven
+veterans via the resume mechanism; gemma runs all 15 fresh).
+
+THE GEMMA ENTRY (addendum-16 format, the author's config.json data
+from the candidate search): rung Q8_0, K/V q4_0/q4_0, predicted RAM
+4.8 GiB. Arithmetic: 26 layers x 1 kv head x 256 head_dim = 26,624
+B/token f16 KV -> 6.50 GiB at 262,144 tok; q4_0 (factor 0.400) ->
+2.60 GiB; model Q8_0 ~1.1 GiB + 1.10 GiB overhead -> ~4.8 GiB, under
+the 4.96 ceiling. NOTE the ceiling cannot be reached at 256k with
+this KV shape (f16 KV alone is 6.50 GiB) - q4_0/q4_0 is the deepest
+LEGAL config, and the K-over-V principle is idle here (q4_0 KV is
+already the floor of the legal grid).
+
+PREDICTION (pre-registered): gemma clears the 4,096 floor (it is a
+trained instruct tune with 32k window; the window closes depth ABOVE
+32,768 but the floor is shallow) - rank between 4,096 and 16,384,
+most likely 8,192 [mode or median]. The interesting question is
+whether the single-kv-head shape (26.6 KB/token, the largest KV per
+token in the field) hurts retrieval at depth more than the 2B's
+many-head shape.
+
+Duration estimate: seeds 8-15 for the veterans (8 climbs x 7
+families, floor-heavy ~7-15 min per family) + 15 fresh climbs for
+gemma (~20-45 min if it falls early, more if it climbs) - order
+1.5-3 h total.
+
+The state entry is registered; the dry run verifies the acquisition
+plan (safetensors -> convert_quant) on the author's machine - the
+sandbox venv lacks the study packages so the entry smoke is the
+author's dry run. Tests updated for n=15 (135 passed).
