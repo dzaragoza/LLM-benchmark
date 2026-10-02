@@ -7,6 +7,16 @@ intended. Checks the markdownlint rule IDs that matter for our use case
   MD055  table-pipe-style    - every table row begins and ends with a pipe
   MD056  table-column-count - every row in a table has the same cell count
   MD058  blanks-around-tables - a blank line before the header (and after)
+  MD058  blank-inside-table - a blank line between the delimiter
+          row and a data row (GitHub splits the table there,
+          orphaning the rows below; session 36 addendum 3). BEYOND
+          the reference linter: markdownlint's MD058 sees blanks
+          AROUND tables - in its parse the blank already split the
+          table, and the orphaned pipe rows below are not a table
+          (GFM needs a delimiter row), so the reference linter is
+          silent on our exact breakage. Kept under the MD058 ID
+          because it is the same failure class (GitHub renders a
+          broken table) and the fix is the same blank-line edit.
   MD047  single-trailing-newline
   fence-balance (markdownlint MD048 family) - an unclosed code fence turns
           everything after it into rendered code; the worst non-table
