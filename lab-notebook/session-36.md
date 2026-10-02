@@ -1646,3 +1646,45 @@ holds at >= 32k).
 The DISQUALIFIED table in models.md is rewritten with the rule and
 emptied (re-admission noted). The command list regains MiniCPM5-1B:
 8 families in the n=21 run.
+
+### Addendum 45 - the n=21 run's pre-registered question set (what this experiment teaches)
+
+Registered BEFORE the run (the author's list 1-4 plus the additions
+5-10 agreed in discussion). The grading addendum must address each
+explicitly - no writing up only what popped.
+
+1. RELIABILITY BY CONTEXT: which models are actually reliable at
+   each context size (1-sigma reliable / 2-sigma conservative)?
+2. FIELD SIZE: how many models do we need to cover our steps? The 8
+   was a guess; the number shrinks as the data accumulates (the
+   domination rule is the shrink mechanism). Concretely: how many
+   DISTINCT certified bands does the field cover?
+3. LINEAGE QUALITY+CONTEXT: is a certain lineage best at quality and
+   context together? The practitioner deliverable is per-context
+   recommendations at two assurance levels (reliable / conservative).
+4. PREDICTOR CALIBRATION: improve the memory/t-s/w/s predictions -
+   more models studied, better the point estimates AND the
+   confidence in them. Includes the negative half: does entry-RAM
+   predict tournament outcome at all (the comeback round says no)?
+5. SEED VARIANCE QUANTIFIED: the first real per-model, per-depth
+   hold-probability vectors - how much of "context capability" is
+   model vs dice.
+6. ARCHITECTURE HYPOTHESES: gemma's single-kv-head shape (26.6
+   KB/token, the field's largest) vs the many-head shapes at matched
+   RAM; the Jamba sibling pair (thinking tune vs base); RWKV's
+   recurrence failure - almost-always (6/7) or deterministic?
+7. MISS SHAPES BY DEPTH AND MODEL: are refusals shallow (prompt
+   sensitivity) and deep-scans deep (retrieval degradation)? If so
+   the three registered failure modes are DIAGNOSTIC, not just
+   descriptive.
+8. INSTRUMENT COST MODEL: third round of run-cost data - a
+   predictive model of what a tournament round costs as a function
+   of field depth (for future n, fields, ladders).
+9. PREDICTOR FALSIFICATION AT SCALE: RAM-matching buys nothing below
+   the ceiling (comeback finding) - confirmed or refuted on eight
+   families?
+10. THE RECOMMENDATION TABLE: RAM menu x w/s filter x certified
+    depth -> per-context best config. This run fills every cell for
+    the first time. Prediction registered in addendum 43 (2B keeps
+    rank ~32,768, certifies conservative at 4-8k; 0.8B's reliable
+    cell is the borderline call; gemma lands 4,096-16,384).
