@@ -278,23 +278,31 @@ def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
 
 
 def tournament_rank(fall_depths: list[int | None], depths: list[int]) -> dict[str, Any]:
-    """The majority rank (session 36, addendum 11): fall_depths is one
-    entry per climb - the depth where that climb ended (the first
-    non-perfect cell), or None for a climb that topped out at the
-    highest step (full hold). Passes at step D = climbs that scored
-    perfect at D (fall strictly ABOVE D, or topped out). The rank is
-    the DEEPEST step with a majority of passes over the climbs.
-    Ties are left to the caller (the pass vector at the next step
-    up, then miss texts, as registered)."""
-    n = len(fall_depths)
+    """The mode rank (session 36, addendum 15, supersedes the addendum-11
+    majority): fall_depths is one entry per climb - the depth where
+    that climb ended (the first non-perfect cell), or None for a climb
+    that topped out at the highest step (full hold). THE RANK IS THE
+    MODE OF THE CLIMBS - the most common fall depth (None/top counts
+    as a value; ties break to the DEEPER outcome). The pass vector is
+    still computed for grading (who held what, and where)."""
     passes: dict[int, int] = {}
     for d in depths:
         passes[d] = sum(
             1 for fall in fall_depths if fall is None or (fall is not None and fall > d)
         )
-    ranked = [d for d in depths if passes[d] * 2 > n]
+    counts: dict[int | None, int] = {}
+    for fall in fall_depths:
+        counts[fall] = counts.get(fall, 0) + 1
+    top_depth = depths[-1] if depths else 0
+
+    def mode_key(fall: int | None) -> tuple[int, int]:
+        depth = top_depth + 1 if fall is None else fall
+        return (counts[fall], depth)
+
+    mode = max(counts, key=mode_key)
     return {
-        "rank_depth": max(ranked) if ranked else 0,
+        "rank_depth": top_depth if mode is None else mode,
+        "rank_mode": mode,
         "passes": passes,
         "fall_depths": fall_depths,
         "full_holds": sum(1 for fall in fall_depths if fall is None),
@@ -381,12 +389,12 @@ def tournament_family(
 
 
 def print_tournament_table(tours: list[dict[str, Any]]) -> None:
-    """The tournament ranking (session 36, addendum 11): ranked by the
-    majority rank depth, ties on the pass vector at the steps above,
+    """The tournament ranking (session 36, addendum 15): ranked by the
+    mode of the climbs, ties on the pass vector at the steps above,
     then on full holds."""
     print()
     print("=" * 60)
-    stamp("TOURNAMENT TABLE (majority rank - session 36 addendum 11)")
+    stamp("TOURNAMENT TABLE (mode rank - session 36 addendum 15)")
     done = [t for t in tours if "rank_depth" in t]
     errs = [t for t in tours if "error" in t]
     for t in errs:

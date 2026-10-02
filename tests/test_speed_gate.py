@@ -77,25 +77,32 @@ def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
     assert out == dump
 
 
-def test_tournament_rank_majority():
+def test_tournament_rank_mode():
     import full_benchmark as fb
-
     depths = fb.TOURNAMENT_DEPTHS
-    # champion: all five top out
+    # champion: all five top out - mode is 'top' -> rank 262144
     r = fb.tournament_rank([None] * 5, depths)
-    assert r["rank_depth"] == 262144 and r["full_holds"] == 5
-    # a flicker: one climb falls at 131072, four top out -> 131072 holds 4/5
+    assert r["rank_depth"] == 262144 and r["full_holds"] == 5 and r["rank_mode"] is None
+    # a flicker: one climb falls at 131072, four top out - mode is 'top'
     r = fb.tournament_rank([131072, None, None, None, None], depths)
-    assert r["rank_depth"] == 262144  # 4/5 majority at the top rung
+    assert r["rank_depth"] == 262144  # mode of 4 x top beats 1 x 131072
     assert r["passes"][262144] == 4 and r["passes"][65536] == 5
-    # a fall: three climbs fall at 65536, two top out -> 65536 has 2/5
+    # a fall: three climbs fall at 65536, two top out - mode is 65536
     r = fb.tournament_rank([65536, 65536, 65536, None, None], depths)
-    assert r["rank_depth"] == 32768  # 5/5 at 32768; 2/5 at 65536 fails majority
+    assert r["rank_depth"] == 65536  # mode of the climbs (3 x 65536)
     assert r["passes"][65536] == 2
-    # majority boundary: 3/5 passes
-    r = fb.tournament_rank([65536, 65536, None, None, None], depths)
+    # majority-vs-mode split: 3 top, 2 fall at 131072 - mode is 'top'
+    r = fb.tournament_rank([131072, 131072, None, None, None], depths)
+    assert r["rank_depth"] == 262144  # mode agrees with the old majority rule
+    # mode tie: two top, two at 65536, one at 32768 - tie breaks to the deeper
+    r = fb.tournament_rank([None, None, 65536, 65536, 32768], depths)
     assert r["rank_depth"] == 262144
-    assert r["passes"][262144] == 3
+    # mode tie between two fall depths: two at 65536, two at 32768 - deeper wins
+    r = fb.tournament_rank([65536, 65536, 32768, 32768, 131072], depths)
+    assert r["rank_depth"] == 65536
+    # unanimous early fall: mode is the floor
+    r = fb.tournament_rank([4096] * 5, depths)
+    assert r["rank_depth"] == 4096
 
 
 def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
