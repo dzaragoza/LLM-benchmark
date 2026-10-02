@@ -141,12 +141,12 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     }
     models_dir = str(tmp_path)
     tour = fb.tournament_family("fam", models_dir, state, str(tmp_path / "st.json"), 8210, False)
-    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-7
-    # hold every depth (7 calls each) -> 43 total
-    assert len(calls) == 43
-    assert tour["fall_depths"] == [4096, None, None, None, None, None, None]
-    assert tour["full_holds"] == 6
-    assert tour["rank_depth"] == 262144  # mode of 6 x top (addendum 37)
+    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-15
+    # hold every depth (7 calls each) -> 99 total
+    assert len(calls) == 99
+    assert tour["fall_depths"] == [4096] + [None] * 14
+    assert tour["full_holds"] == 14
+    assert tour["rank_depth"] == 262144  # mode of 14 x top (addendum 40)
 
 
 def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
@@ -178,14 +178,15 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
     models_dir = str(tmp_path)
     state_path = str(tmp_path / "st.json")
     tour = fb.tournament_family("fam", models_dir, state, state_path, 8210, False)
-    # only seeds 6 and 7 ran: seed 6 falls at 4096 (1 call), seed 7
-    # holds all seven depths (7 calls) - climbs 1-5 were resumed
-    assert calls == [6] + [7] * 7
-    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096, None]
+    # only seeds 6-15 ran: seed 6 falls at 4096 (1 call), seeds 7-15
+    # hold every depth (9 seeds x 7 calls) - climbs 1-5 were resumed
+    # each of seeds 7-15 climbs all 7 depths with ITS OWN seed number
+    assert calls == [6] + [s for s in range(7, 16) for _ in range(7)]
+    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096] + [None] * 9
     saved = state["families"]["fam"]["tournament_falls"]
-    assert saved == {"1": 4096, "2": 4096, "3": 4096, "4": 8192, "5": 32768, "6": 4096, "7": None}
-    # mode of the seven climbs: 4 x 4096 beats 1 x top (None)
-    assert tour["rank_statistic"] == "mode" and tour["rank_mode"] == 4096
+    assert len(saved) == 15 and saved["6"] == 4096 and saved["15"] is None
+    # mode of the fifteen climbs: 10 x top beats 4 x 4096
+    assert tour["rank_statistic"] == "mode" and tour["rank_mode"] is None
 
 
 def test_tournament_entry_config(tmp_path, monkeypatch):
@@ -227,8 +228,8 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
         8210,
         False,
     )
-    assert out["rank_depth"] == 262144 and out["full_holds"] == 7
-    assert len(calls) == 7 * len(fb.TOURNAMENT_DEPTHS)
+    assert out["rank_depth"] == 262144 and out["full_holds"] == 15
+    assert len(calls) == 15 * len(fb.TOURNAMENT_DEPTHS)
     assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
 
 
