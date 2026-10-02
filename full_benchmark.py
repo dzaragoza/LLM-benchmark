@@ -404,8 +404,21 @@ def tournament_family(
         return {"family": fam, "rung": rung, "dry_run": True}
     results_dir = os.path.join(models_dir, "tournament-results", fam)
     os.makedirs(results_dir, exist_ok=True)
+    # addendum 37: the tournament is RESUMABLE - each climb's fall is
+    # persisted in the family state (seed = climb number), so adding
+    # climbs (5 -> 7) runs only the new seeds, never the old ones
+    state["families"].setdefault(fam, fst)
+    saved: dict[str, int | None] = dict(fst.get("tournament_falls") or {})
     fall_depths: list[int | None] = []
     for s in range(1, TOURNAMENT_CLIMBS + 1):
+        key = str(s)
+        if key in saved:
+            fall_depths.append(saved[key])
+            print(
+                f"  climb {s}/{TOURNAMENT_CLIMBS}: RESUMED - "
+                f"{'topped out' if saved[key] is None else f'fell at {saved[key]:,} tok'}"
+            )
+            continue
         climb_dir = os.path.join(results_dir, f"climb{s}")
         os.makedirs(climb_dir, exist_ok=True)
         fall = None
@@ -432,20 +445,23 @@ def tournament_family(
         if fall is None:
             print(f"  climb {s}/{TOURNAMENT_CLIMBS}: TOPPED OUT at {depths[-1]} tok")
         fall_depths.append(fall)
+        saved[key] = fall
+        fst["tournament_falls"] = saved
+        save_state(state_path, state)
     rank = tournament_rank(fall_depths, depths)
     print(
         f"  {fam}: rank depth {rank['rank_depth']:,} tokens "
         f"[{rank['rank_statistic']}] "
-        f"({rank['full_holds']}/{TOURNAMENT_CLIMBS} full holds; "
-        f"falls: {[f if f else 'top' for f in fall_depths]})"
+        f"(falls: {[f if f else 'top' for f in fall_depths]})"
     )
     return {"family": fam, "rung": rung, "model": model, **rank}
 
 
 def print_tournament_table(tours: list[dict[str, Any]]) -> None:
-    """The tournament ranking (session 36, addendum 15): ranked by the
-    mode of the climbs, ties on the pass vector at the steps above,
-    then on full holds."""
+    """The tournament ranking (session 36, addendum 15, revised addendum
+    37): ranked by the mode of the climbs, ties on the pass vector at
+    the steps above, then on full holds (kept as an internal
+    tie-break, no longer reported - the author: overly optimistic)."""
     print()
     print("=" * 60)
     stamp("TOURNAMENT TABLE (mode rank, median fallback - session 36 addendum 20)")
@@ -466,7 +482,7 @@ def print_tournament_table(tours: list[dict[str, Any]]) -> None:
         print(
             f"  {i}. {t['family']:24s} rank {t['rank_depth']:>7,} tok "
             f"[{t.get('rank_statistic', 'mode')}] | "
-            f"passes/rung [{pv}] | full holds {t['full_holds']}/{TOURNAMENT_CLIMBS}"
+            f"passes/rung [{pv}]"
         )
 
 
@@ -767,7 +783,7 @@ RUNG_DEFAULT = "Q8_0"
 # same five task ladders. Upstream RULER FWE parameters exactly
 # (k=3, alpha 2.0 - addendum 7/8 verification).
 TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
-TOURNAMENT_CLIMBS = 5
+TOURNAMENT_CLIMBS = 7
 TOURNAMENT_MODEL_QUANTS = ["Q2_K", "Q3_K", "Q4_K", "Q5_K", "Q6_K", "Q8_0"]
 TOURNAMENT_KV_QUANTS = ["q4_0", "q5_0", "q6_K", "q8_0", "f16"]
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
