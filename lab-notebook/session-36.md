@@ -1312,3 +1312,56 @@ refused to pull. Two fixes:
 
 `test_git_pull_before_tee` asserts both the ordering (pull before
 tee, by source inspection) and the autostash flag (134 passed).
+
+
+### Addendum 35 - THE COMEBACK ROUND, graded
+
+The author's run (14:04-14:28, 23 min - far under the estimate; every
+newcomer fell early). The field ranking after two rounds:
+
+1. Qwen3.5-2B 32,768 (median) | 2. AI21-Jamba2-3B 8,192 (median) |
+3. Qwen3.5-0.8B 4,096 (mode) - then the comeback: 4. Llama-3.2-1B
+16,384 (median) - WHICH RANKS ABOVE THE FORMER CHAMPION on depth -
+5. Jamba-Reasoning 4,096 | 6. MiniCPM5-2B 4,096 | 7. MiniCPM5-1B
+4,096 | 8. RWKV7-Goose 4,096.
+
+PREDICTIONS vs MEASURED (pre-registered addendum 29):
+- MiniCPM5-2B predicted DEEPEST (32,768+): FAILED - measured 4,096
+  (one hold at 4,096, falls everywhere). The dead-on-ceiling RAM
+  config bought NOTHING - the 131k window's model cannot carry
+  FWE even at shallow depths on this seed set.
+- Llama-3.2-1B predicted 16k-65k: HIT (16,384, median-fallback).
+- MiniCPM5-1B predicted 8k-32k: MISSED LOW (4,096, zero holds
+  anywhere - the smallest model in the field).
+- Jamba-Reasoning predicted NOT to top out: HIT (4,096 mode) - and
+  the reasoning tune climbs no deeper than its PASS sibling (8,192):
+  the thinking shape neither helps nor hurts retrieval.
+- RWKV predicted all-4096 structural: HIT EXACTLY (5 x 4,096). BUT
+  THE MISS SHAPE CHANGED: not the single-character degeneration of
+  the FAIL measurement - instead "Sure, I understand. Please
+  provide the text to be analyzed" confabulation (0/3) and genuine
+  partial scans (2/3, 1/3). Pure recurrence fails FWE structurally
+  (5 seeds now), but HOW it fails is prompt/quant-dependent - the
+  original degeneration was the community quant's artifact too.
+
+FINDINGS:
+1. THE COMEBACK CHAMPION IS A REJECT: Llama-3.2-1B-Instruct -
+  rejected for window < 256k - outclimbed the former champion on
+  the tournament instrument (16,384 vs 4,096). The window rule
+  closes 256k serving; it does not close tournament depth. The
+  registry question (does the Llama move to CANDIDATES?) is the
+  author's - the promotion rule (addendum 16) binds only at the
+  256k step, which it cannot reach.
+2. RAM CEILING-MATCHING DOES NOT BUY DEPTH: the two closest-to-
+  ceiling entries (MiniCPM5-2B 4.96 dead-on, Jamba-Reasoning 4.42)
+  scored 4,096 - the floor. The predictor optimizes RAM, and RAM
+  was never the binding constraint on FWE at shallow depths.
+3. TWO MISS SHAPES NOW DISTINGUISHED: refusal-shaped ("I can't
+  fulfill this request." - the Llama's 0/3s) and confabulation
+  ("Sure, I understand. Please provide the text" - RWKV's 0/3s:
+  the model answers a DIFFERENT task). Registered with the
+  deep-scanning partials as the three failure modes of FWE.
+
+The 23-minute run vs the 2-5 h estimate: every newcomer fell early
+(the optimistic bound of addendum 28); the estimate's rate holds
+(~15,000 tokens/min - 1.7M tokens total across both rounds now).
