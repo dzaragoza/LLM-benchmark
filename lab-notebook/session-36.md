@@ -713,3 +713,59 @@ returned rank is the 4/5 majority at 262,144. 130 passed.
 The author's failed run is preserved in the state's tournament
 record (three FileNotFoundError entries) - the artifacts commits
 stand; the re-run overwrites the tournament record.
+
+### Addendum 15 - the mode ruling, the 512k physics question, the tournament opens
+
+The author's three rulings while the first tournament runs:
+
+1. THE FINAL RANK IS THE MODE OF THE CLIMBS (supersedes the addendum-11
+   majority). `tournament_rank` now computes the mode of `fall_depths`
+   (a topped-out climb counts as the value "top"); ties break to the
+   DEEPER outcome (top > any fall; deeper fall > shallower). The pass
+   vector is still computed for grading. The change is pure
+   statistics - the runs store raw `fall_depths`, so the finished run
+   re-grades without re-running. Registered in `tournament_rank` and
+   `print_tournament_table` (mode rank - session 36 addendum 15);
+   `test_tournament_rank_mode` covers the mode, the flicker, the
+   majority-vs-mode split, and both tie-break directions (130 passed).
+
+2. THE 512k QUESTION - can anyone keep up w/s at 512k? Physics says no,
+   three independent walls (all measured, no speculation):
+   - WINDOW: every participant's trained window is exactly 262,144.
+     512k is out-of-window extrapolation, closed by the no-rope-scaling
+     rule before any measurement.
+   - RAM: KV scales linearly with depth. The champion at 512k predicts
+     0.86 + 2x3.00 + 1.10 = 7.96 GiB (KV_eff f16 at 262k = 4.96 -
+     0.86 - 1.10 = 3.00 GiB), far over the 4.96 GiB ceiling. Only the
+     2B's thin q5_0 KV squeezes under (1.22 + 2x1.16 + 1.10 = 4.64
+     GiB) - it is the ONLY participant the RAM wall does not close.
+   - SPEED: the worst turn is prefill-dominated and prefill scales
+     linearly with depth, so worst-turn w/s roughly halves at 512k.
+     Champion 7.88 -> ~3.9 w/s, Jamba 6.08 -> ~3.0, both under the
+     5.0 reader floor; the 2B 9.5 -> ~4.75, marginal fail on the only
+     config that fits. CONCLUSION: 512k is a physics limit on this
+     machine - the final rung stays 262,144. Registered as a ruling.
+
+3. THE TOURNAMENT OPENS TO MORE PARTICIPANTS: four comeback candidates
+   from the rejected/fail pile, chosen for the deepest expected climb
+   (RAM fits, window as deep as possible). The author rules: wait for
+   the first tournament's results before running the comeback round.
+   The four (best-chance order):
+   - meta-llama/Llama-3.2-1B-Instruct: window 131,072 (the deepest
+     window in the rejected pile), whole config ~3.75 GiB at q8_0 KV -
+     fits with room. Expected climb: to 131,072 or fall trying.
+   - MiniCPM5-2B: window 131,072, ~4.2 GiB whole config at q4_0 KV -
+     fits. Expected climb: to 131,072.
+   - AI21-Jamba-Reasoning-3B: window 262,144, thin KV like its sibling
+     (the first non-transformer PASS); rejected for "thinking cannot
+     be disabled" - the tournament tests whether the reasoning shape
+     still carries FWE retrieval. The only reject that can top out.
+   - RWKV7-World-2.9B (from the FAIL pile, flagged): the fastest
+     depth-scorer in the study (13.1 w/s) that degenerated on FWE at
+     261,888. The tournament's five seeded climbs give it the fair
+     re-test; if pure recurrence fails all five, the failure is
+     structural, not a bad seed.
+   Admission mechanics pending: `tournament_family` reads the SELECTED
+   rung from state - the comeback models need their configs grafted
+   into the tournament state (rung + kv quants + local file) before
+   their turn; to be wired when the first results land.
