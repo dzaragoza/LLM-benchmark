@@ -1271,3 +1271,23 @@ comeback commands - they shorten to the bare python3 line.
 (133 passed). One honest report: the first patch attempt failed on
 a whitespace mismatch in the call site (asserted, nothing written);
 the second applied both edits and was verified before commit.
+
+
+### Addendum 33 - the state directory
+
+The author moved the state files to a state/ directory. The move is
+completed: all 15 per-study state files (benchmark-state-tournament
+and the 13 study files) join the author's two (benchmark-state,
+ladder-state) in state/ - git-tracked renames, history preserved.
+References updated: STATE_FILE_DEFAULT and law_fit's default now
+point at state/benchmark-state.json, README's state-file mentions
+carry the state/ prefix, and .gitignore's benchmark-state*.json
+pattern becomes state/benchmark-state*.json (the force-add flow is
+unchanged). The comeback commands' --state-file flag becomes
+--state-file state/benchmark-state-tournament.json:
+
+DRY RUN:
+python3 full_benchmark.py --tournament --dry-run meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF --state-file state/benchmark-state-tournament.json
+
+REAL RUN:
+python3 full_benchmark.py --tournament meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF --state-file state/benchmark-state-tournament.json

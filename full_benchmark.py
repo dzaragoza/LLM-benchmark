@@ -751,7 +751,7 @@ def scored_row(ladder: dict[str, Any]) -> dict[str, Any]:
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
 CORPUS_DEFAULT = speed_gate.CORPUS_DEFAULT
 MODELS_DIR_DEFAULT = "./models"
-STATE_FILE_DEFAULT = "./benchmark-state.json"
+STATE_FILE_DEFAULT = "./state/benchmark-state.json"
 RESULTS_FILE_DEFAULT = "./benchmark-results.json"
 # Q4_0 removed (author ruling, addendum 37): Q4_K_M is the single 4-bit
 # rung - "there's a q4_0 that's unnecessary since we have q4_k_m".
@@ -922,7 +922,7 @@ def process_family(
         print(f"  --force: re-benching {rung} ({cleared} stored verdict(s) cleared; files reused)")
 
     # Stale-state guard (addendum 43): a stored rung file can vanish
-    # from disk (folder deleted/moved) while benchmark-state.json still
+    # from disk (folder deleted/moved) while state/benchmark-state.json still
     # marks phases 1-2 done. Trusting the state then crashes phase 3
     # with a bare FileNotFoundError. Invalidate those phases so the
     # walk re-acquires (re-download/re-quantize; both stages are
