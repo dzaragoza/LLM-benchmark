@@ -371,6 +371,8 @@ def tournament_family(
             path, plan = hf_download.acquire(
                 fam, famdir, rung, model_repo, model_files, source_repo_eff, source_files, dry_run
             )
+            if dry_run:
+                print(f"  entry file absent - dry run plan: {plan}")
             path = path or convert_quant.create(fam, famdir, rung, plan, dry_run)
             if path and os.path.isfile(path):
                 model = path
