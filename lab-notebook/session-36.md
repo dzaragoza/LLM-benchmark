@@ -1846,3 +1846,42 @@ FALSIFICATION PLAN (cheap, two probes, minutes of compute):
 STATUS: assumption registered; probes named; the sequential
 controller's design (inheritance vs independence) follows the probe
 results. Not scheduled - the author allocates the compute.
+
+### Addendum 50 - the sequential certification phase: filling the map rung by rung, cheapest-first
+
+The author's plan for after the n=21 completion: the tournament's
+climb format COMPILED the data, but it is not the quickest way to
+answer the practitioner question - "which models give a confidence
+measure at each step?" The sequential principle (addendum 48) now
+goes into play as the CERTIFICATION PHASE.
+
+THE PROCEDURE: grade the n=21 completion first - it yields the
+certified map (which rungs have a 1-sigma or 2-sigma answer).
+Then, for each rung with NO certified model, work the gap
+CHEAPEST-FIRST:
+1. Look at the candidates likely to reach 1 sigma at that rung
+   (screening ceilings from the tournament data first - models that
+   have shown above-rung climbs - then fresh registry candidates).
+2. Test them with INDEPENDENT SINGLE-RUNG tests, seed-by-seed, with
+   early stopping: early-ACCEPT at the 1-sigma bar (13/21-style,
+   the answer publishes immediately), early-REJECT when
+   mathematically dead. Never a fixed-n batch.
+3. The moment a rung gets its 1-sigma model, move to the next gap;
+   candidates for 2 sigma are then tried on the same rung.
+
+PROJECTED MAP (from n=15 data, n=21 bars): the covered band is
+4,096-8,192 (2B banked at the floor, needs 2/6 at 8,192; 0.8B alive
+everywhere shallow), MAYBE 16,384 (the 2B needs 3/6). From 32,768
+UP the map is EMPTY and unfillable by any incumbent (the 0.8B holds
+5/15 at 32k, max 11/21) - the first sequential search will be for
+new candidates at 32k+, chosen for predicted ceiling, tested only
+at the target rung.
+
+THE INSTRUMENT: a --certify mode for full_benchmark (model + target
+rung + sigma bar; single-rung independent tests, sequential
+seed-by-seed, early accept/reject; verdicts stored per rung). The
+climb remains the SCREENING instrument; --certify is the DECISION
+instrument. Built AFTER the n=21 grading, so the design fits the
+actual certified map. Doubles as the monotonicity probe design
+(addendum 49: independent per-rung tests are exactly what the
+falsification plan prescribed).
