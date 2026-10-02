@@ -1769,3 +1769,42 @@ This complements addendum 34 (the startup pull, before the tee) and
 addendum 32 (the pull gate): the run is now bracketed - pull at
 start, pull-rebase before the artifact push at end. The next
 artifact push (the n=21 completion) will exercise it live.
+
+### Addendum 48 - the sequential-testing principle: experiments are designed for the decision, not for data volume
+
+The author's realization (accepted as STANDING DESIGN DOCTRINE for
+all future experiments): our climb design is discovery-oriented -
+it answers "what is this model's full profile?" - but the
+practitioner question is a DECISION question: "which models are a
+good fit for a given context size, at some sigma?" Decision
+questions have provably cheaper procedures: SEQUENTIAL TESTING.
+
+THE PRINCIPLE: test the bottom step first (4k), with enough runs
+per model to DETERMINE the verdict - pass the certification
+threshold, or become unable to reach it - then move to the next
+model. The moment a model reaches 2 sigma (or the design's sigma),
+the search PAUSES and the practitioner question is answered
+immediately: the model you are looking for is this one. Compute is
+spent only where it can still change an answer.
+
+THE RETROACTIVE LESSON (quantified on the n=15 data, n=21 bars):
+four families are ALREADY mathematically dead at the floor
+(Llama-3.2-1B 4/15, MiniCPM5-2B 3/15, RWKV7 4/15, gemma 1/15 -
+their max possible floor holds cannot reach 13/21); their
+remaining seeds buy nothing for certification. Under the sequential
+design those seeds would never have been spent.
+
+WHAT THE PRINCIPLE COSTS (registered honestly): the climb
+byproducts - mode/ceiling profiles, miss-shape statistics - come
+free with full climbs and are thin under early stopping. RESOLUTION:
+the climb stays as the INITIAL SCREENING pass (small n, discovery);
+sequential bottom-up testing is the CERTIFICATION phase (decisions).
+Screening explores; certification decides.
+
+STATUS: registered as doctrine, NOT applied to tonight's run - the
+author ruled the completion run proceeds as designed (it is late;
+the n=21 pre-registration stands; changing the instrument mid-
+pre-registration would muddy the ten-question grading). The
+sequential controller (per-rung, early-stopping, bottom-up) is
+named FUTURE WORK for its own addendum. Every experiment after the
+n=21 completion is designed bottom-up.
