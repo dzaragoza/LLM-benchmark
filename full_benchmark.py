@@ -354,7 +354,30 @@ def tournament_family(
     if not rung:
         return {"family": fam, "error": "no selected rung - not a PASS family"}
     run = fst.get("runs", {}).get(rung, {})
-    model = run.get("file") or entry.get("file") or local_rung(os.path.join(models_dir, fam), rung)
+    famdir = os.path.join(models_dir, fam)
+    model = run.get("file") or entry.get("file") or local_rung(famdir, rung)
+    if (not model or not os.path.isfile(model)) and entry:
+        # addendum 29: the tournament acquires its own entry files -
+        # the same phase-1 path the main run uses (wow.md: the author
+        # runs one command, not a download step per model)
+        try:
+            model_files = hf_download.list_repo_files(model_repo)
+            source_repo_eff = source_repo or model_repo
+            source_files = (
+                model_files
+                if source_repo_eff == model_repo
+                else hf_download.list_repo_files(source_repo_eff)
+            )
+            path, plan = hf_download.acquire(
+                fam, famdir, rung, model_repo, model_files, source_repo_eff, source_files, dry_run
+            )
+            path = path or convert_quant.create(fam, famdir, rung, plan, dry_run)
+            if path and os.path.isfile(path):
+                model = path
+                entry["file"] = path
+                save_state(state_path, state)
+        except Exception as e:
+            return {"family": fam, "error": f"entry acquisition failed: {e}"}
     if not model or not os.path.isfile(model):
         return {"family": fam, "error": f"rung file not found ({model})"}
     kv_k = run.get("kv_quant_k") or entry.get("kv_quant_k") or state.get("kv_quant_k")
