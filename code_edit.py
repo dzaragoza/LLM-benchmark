@@ -185,12 +185,14 @@ def _fix_markdown(out: str, path: str) -> str:
         row = line.startswith("|")
         prev = fixed[-1] if fixed else ""
         prev_blank = prev.strip() == ""
-        prev_sep = bool(prev) and bool(SEPARATOR_LIKE.match(prev))
         prev_table = prev.startswith("|")
         if row and not prev_blank and not prev_table:
             fixed.append("")
         if not row and prev_table and not prev_blank and line.strip() != "":
             fixed.append("")
+        prev2 = fixed[-2] if len(fixed) >= 2 else ""
+        if row and fixed and fixed[-1].strip() == "" and SEPARATOR_LIKE.match(prev2):
+            fixed.pop()
         fixed.append(line)
     out = "\n".join(fixed)
     if out:

@@ -69,3 +69,11 @@ def test_tilde_fence_closed_by_backticks_is_flagged(tmp_path):
 def test_deep_indented_line_is_not_a_closing_fence(tmp_path):
     problems = run(tmp_path, "```\ncode\n    ```\n")
     assert any("unclosed code fence" in p for p in problems)
+
+
+def test_md058_blank_line_inside_table(tmp_path):
+    problems = run(
+        tmp_path,
+        "| A | B |\n|---|---|\n\n| 1 | 2 |\n",
+    )
+    assert any("MD058" in p and "inside" in p for p in problems)

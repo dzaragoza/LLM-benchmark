@@ -103,8 +103,14 @@ def check_tables(path: str, lines: list[str]) -> list[str]:
                     problems.append(
                         f"{path}:{i + k}: MD055 table row does not begin and end with a pipe"
                     )
-            if j < len(lines) and lines[j].strip() != "":
-                problems.append(f"{path}:{j}: MD058 no blank line after the table")
+            if j < len(lines):
+                if lines[j].strip() == "" and j + 1 < len(lines) and lines[j + 1].startswith("|"):
+                    problems.append(
+                        f"{path}:{j + 1}: MD058 blank line inside the table - "
+                        f"GitHub splits the table and orphans the rows below"
+                    )
+                elif lines[j].strip() != "":
+                    problems.append(f"{path}:{j}: MD058 no blank line after the table")
             i = j
         else:
             i += 1
