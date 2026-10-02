@@ -328,20 +328,27 @@ def tournament_family(
     model_repo, _, source_repo = spec.partition("=")
     fam = os.path.basename(model_repo.rstrip("/"))
     fst = state["families"].get(fam, {})
-    rung = fst.get("selected")
+    entry = fst.get("tournament_entry") or {}
+    rung = fst.get("selected") or entry.get("rung")
     if not rung:
         return {"family": fam, "error": "no selected rung - not a PASS family"}
-    run = fst["runs"].get(rung, {})
-    model = run.get("file") or local_rung(os.path.join(models_dir, fam), rung)
+    run = fst.get("runs", {}).get(rung, {})
+    model = run.get("file") or entry.get("file") or local_rung(os.path.join(models_dir, fam), rung)
     if not model or not os.path.isfile(model):
         return {"family": fam, "error": f"rung file not found ({model})"}
-    kv_k = run.get("kv_quant_k") or state.get("kv_quant_k")
-    kv_v = run.get("kv_quant_v") or state.get("kv_quant_v")
+    kv_k = run.get("kv_quant_k") or entry.get("kv_quant_k") or state.get("kv_quant_k")
+    kv_v = run.get("kv_quant_v") or entry.get("kv_quant_v") or state.get("kv_quant_v")
     depths = TOURNAMENT_DEPTHS
     print()
     print("=" * 60)
     stamp(f"tournament: {fam} ({rung})")
     print(f"  file: {model}")
+    if entry and not fst.get("selected"):
+        pred = entry.get("predicted_ram_gib")
+        print(
+            f"  ENTRY CONFIG (predicted, addendum 16): {rung} + K/V "
+            f"{kv_k or 'f16'}/{kv_v or 'f16'}" + (f" - predicted RAM {pred} GiB" if pred else "")
+        )
     if dry_run:
         for s in range(1, TOURNAMENT_CLIMBS + 1):
             print(
