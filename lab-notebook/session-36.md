@@ -1103,3 +1103,15 @@ OPEN QUESTIONS (registered, unscheduled):
 
 The models.md PASS table gains a tournament column? NOT yet - the
 author decides where the tournament ranking lives in the registry.
+
+
+### Addendum 27 - the tournament results registered in models.md
+
+The author's ruling: use models.md - this is the new results. The
+registry gains a TOURNAMENT section (placed between CANDIDATES and
+REJECTED): the ranking table (rank, model, config triple, falls per
+climb, passes/rung, full holds, rank statistic with the mode/median
+mark, notes) plus the three findings compactly: nobody topped out,
+every fall is a partial (the poles-only finding superseded), and
+seed variance at k=3 dwarfs depth effects. The comeback bar (32,768)
+is stated for the addenda 16-18 entries.

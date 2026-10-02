@@ -56,6 +56,28 @@ the pool is settled for the report)
 |---|---|---|---|---|---|---|---|
 
 
+## TOURNAMENT (the ranking instrument - session 36 addenda 10-20)
+
+Five seeded climbs per participant up the dyadic ladder (4096..262144),
+upstream RULER FWE parameters (k=3, alpha 2.0), seed = climb number,
+early stop at the first non-perfect cell. Rank = mode of the climbs,
+median fallback (marked). The speed gate is assumed passed (measured
+at 256k for all participants), falsified when a ranking step needs it.
+
+| rank | model | config (model q, k, v) | falls (climb 1-5) | passes/rung | full holds | rank statistic | notes |
+|---|---|---|---|---|---|---|---|
+| 1 | Qwen3.5-2B | (Q4_K_M, q5_0, q5_0) | 65536, 4096, 32768, 262144, 16384 | [4 4 3 2 1 1 0] | 0/5 | median-fallback | THE TOURNAMENT CHAMPION (32,768 tok); the deepest climber - climb 4 is the only climb in the field to reach 262,144 (falling 1/3), and the most volatile (climb 2 fell at 4096); highest variance, highest ceiling |
+| 2 | AI21-Jamba2-3B | (Q8_0, f16, f16) | 8192, 4096, 4096, 65536, 8192 | [3 1 1 1 0 0 0] | 0/5 | median-fallback | second at 8,192 tok; climb 4 reached 65,536 (2/3 partial) - the hybrid's retrieval held mid-deepths on two of five seeds |
+| 3 | Qwen3.5-0.8B | (Q8_0, f16, f16) | 4096, 4096, 4096, 8192, 32768 | [2 1 1 0 0 0 0] | 0/5 | mode | THE FORMER CHAMPION, third at 4,096 tok; the 256k PASS (seed 1024, FWE 3/3 at 261,888) is SEED-CONDITIONAL - seeds 1-3 fell at 4,096 (2/3 partials, deep-scanning misses, not refusals); climb 5 reached 32,768 |
+
+FINDINGS (session 36 addendum 26): nobody topped out (0/5 full holds
+all three); every fall is a PARTIAL (2/3 or 1/3), never 0/3 - the
+session-35 "poles only" finding is superseded (n=1 artifact); seed
+variance at k=3 dwarfs depth effects - who passes depends more on the
+seed's word draws than on the depth. The comeback round (Llama-3.2-1B,
+MiniCPM5-2B, Jamba-Reasoning-3B, RWKV7-2.9B - addenda 16-18 entries)
+now has a bar to beat: 32,768.
+
 ## REJECTED
 
 Strict reason list (author ruling, addendum 21, extended addendum 23):
