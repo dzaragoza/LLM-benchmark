@@ -72,6 +72,10 @@ possible:
 - Make commands easy to run: formatted in the simplest way possible,
   one block per phase (all dry-runs together, then all real runs),
   copy-pasteable.
+- Daniela uses FISH, not bash. All command blocks are written for
+  fish: no backslash line-continuations (fish treats them literally) -
+  either one long line, or fish's escaped-newline continuation. Test
+  mentally against fish syntax before handing a command over.
 - Procedures are checklists: numbered steps, with the easy-to-miss
   steps (git pull, the state file flag, the dry-run first) called
   out explicitly.
