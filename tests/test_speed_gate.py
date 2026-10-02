@@ -75,3 +75,24 @@ def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
         port=1,
     )
     assert out == dump
+
+
+def test_tournament_rank_majority():
+    import full_benchmark as fb
+
+    depths = fb.TOURNAMENT_DEPTHS
+    # champion: all five top out
+    r = fb.tournament_rank([None] * 5, depths)
+    assert r["rank_depth"] == 262144 and r["full_holds"] == 5
+    # a flicker: one climb falls at 131072, four top out -> 131072 holds 4/5
+    r = fb.tournament_rank([131072, None, None, None, None], depths)
+    assert r["rank_depth"] == 262144  # 4/5 majority at the top rung
+    assert r["passes"][262144] == 4 and r["passes"][65536] == 5
+    # a fall: three climbs fall at 65536, two top out -> 65536 has 2/5
+    r = fb.tournament_rank([65536, 65536, 65536, None, None], depths)
+    assert r["rank_depth"] == 32768  # 5/5 at 32768; 2/5 at 65536 fails majority
+    assert r["passes"][65536] == 2
+    # majority boundary: 3/5 passes
+    r = fb.tournament_rank([65536, 65536, None, None, None], depths)
+    assert r["rank_depth"] == 262144
+    assert r["passes"][262144] == 3
