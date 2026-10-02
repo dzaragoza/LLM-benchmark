@@ -1208,3 +1208,41 @@ Pre-registered predictions (wow.md section 1, before the run):
   hypothesis.
 - NOBODY tops out at 262,144 except possibly MiniCPM5-2B; every
   fall is partial (2/3 or 1/3), never 0/3, per addendum 26.
+
+
+### Addendum 31 - the comeback dry run, graded: one error found and fixed
+
+The author's dry run (13:54) - the gate did its job again:
+
+1. RWKV/RWKV7-World-2.9B: "entry acquisition failed: 404
+   Repository Not Found" - THE REPO DOES NOT EXIST under that ID.
+   This was the SAME stale name the registry data store caught once
+   before (session 35 addendum 357): the official repo is
+   RWKV/RWKV7-Goose-World3-2.9B-HF (safetensors, no GGUFs - the
+   conversion path; the mradermacher Q8_0 community quant's source
+   lineage). I re-introduced the error by copying the models.md
+   fail-table row's display name instead of checking the notebook
+   (wow.md section 7 - the notebook is the source). The state family
+   is renamed to RWKV7-Goose-World3-2.9B-HF with the correct spec.
+2. The four convertible families (Llama, MiniCPM5 x2, Jamba-Reasoning)
+   correctly reported "rung file absent" - in a dry run nothing is
+   downloaded (addendum-108 contract), so the entry files cannot
+   exist yet; the real run acquires them (addendum 29). TOOLING FIX:
+   the dry run now PRINTS the acquisition plan for absent entry
+   files ("entry file absent - dry run plan: ...") instead of
+   skipping silently, so the pre-flight report shows what the real
+   run will download/convert.
+
+The corrected commands (fish, one line - RWKV repo fixed):
+
+DRY RUN:
+python3 full_benchmark.py --tournament --dry-run meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF --state-file benchmark-state-tournament.json
+
+REAL RUN:
+python3 full_benchmark.py --tournament meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF --state-file benchmark-state-tournament.json
+
+The addendum-29 pre-registered predictions stand, with RWKV's
+read as: predicted all-4096 structural (the degeneration was
+measured on the mradermacher Q8_0 quant of the SAME Goose-World3
+weights the official repo carries - the conversion reproduces the
+same lineage).
