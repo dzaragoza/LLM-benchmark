@@ -48,9 +48,12 @@ pair, not a model).
 
 ## CANDIDATES (predicted values)
 
+(empty, session 36 addendum 5: the Jamba Q6_K row removed by
+author ruling - a cheaper config of a passing family adds nothing;
+the pool is settled for the report)
+
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
 |---|---|---|---|---|---|---|---|
-| AI21-Jamba2-3B | Q6_K | f16 | f16 | 2.46 | 3.81 GiB | ~8 | THE LAST UNPICKED CONFIG: the Q8_0 PASSed (4.42 GiB) so this cheaper config is now the family's natural second probe - 77% of ceiling, 0.6 GiB under the Q8_0's measured cost; the quality question is whether Q6_K holds the FWE the Q8_0 carried |
 
 
 ## REJECTED
