@@ -949,3 +949,19 @@ first patch failed to apply, and an idempotency check trivially true
 for additions starting with a blank line - every notebook append would
 have been 'skipped'). Both were caught by the smoke test, fixed, and
 re-verified before this commit. The function now earns its name.
+
+
+### Addendum 22 - the Way of Working (wow.md)
+
+The author's ruling: a wow.md to be followed by both parties. Written
+as `wow.md` in the repo root - the working agreement between Daniela
+and Vibe. The author's eight points are all in (scientific method,
+lab notebook, always improving, code_edit + reporting, error-proof
+procedures for the human, forgotten steps, Vibe checks the notebook,
+ask for help), with the scientific-method section extended by the
+rigor practices the study already follows: pre-registration before
+measurement, one variable at a time, quantitative predictions,
+seeded reproducibility, standing predictor calibration, negative
+results recorded, explicit rulings with supersession, and justified
+statistics (the mode-of-5 hole being the live example). The file is
+the contract; notebook rulings supersede it and update it.
