@@ -60,12 +60,21 @@ DESIGN RULES
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import tempfile
 from collections.abc import Sequence
 
-__all__ = ["CodeEditError", "edit", "edit_many", "preview", "write", "apply_patch_blocks"]
+__all__ = [
+    "CodeEditError",
+    "edit",
+    "edit_many",
+    "preview",
+    "write",
+    "apply_patch_blocks",
+    "safe_append",
+]
 
 
 class CodeEditError(Exception):
@@ -628,6 +637,41 @@ def _apply(src: str, blocks: Sequence[tuple]) -> str:
         elif kind == "prepend":
             buf = block[1] + buf
     return buf
+
+
+def safe_append(path: str, addition: str) -> str:
+    """Append text to a file as one verified transaction (session 36,
+    addendum 21: born from the day's heredoc-escaping incidents - the
+    escaped-newline corruption of test files and the triple-repair
+    chain it took). Three guarantees the naive `cat >>` heredoc cannot
+    make:
+    1. IDEMPOTENT: if the addition's first line already exists in the
+       target (the exact append already landed), the file is left
+       untouched and reported as such - a retried command can never
+       double-append.
+    2. NON-CORRUPTING: no shell is involved, so no escaping layer can
+       eat the content; the bytes written are exactly the bytes given.
+    3. ATOMIC: the write goes through _atomic_write_sync (temp file +
+       fsync + os.replace) - a crash mid-append cannot leave a torn
+       file. For .py targets the result is compiled (ast.parse)
+       BEFORE the write - a syntactically broken addition is refused
+       with the file untouched.
+    Returns a report string: 'appended N line(s) to <path>' or
+    'idempotent skip: addition already present in <path>'.
+    """
+    existing = open(path, encoding="utf-8").read()
+    first_lines = [ln for ln in addition.split("\n") if ln.strip()]
+    if first_lines and first_lines[0].strip() in existing:
+        return f"idempotent skip: addition already present in {path}"
+    out = existing
+    if out and not out.endswith("\n"):
+        out += "\n"
+    out += addition
+    if _file_type(path) == "python":
+        ast.parse(out)
+    _atomic_write_sync(path, out)
+    n = addition.count("\n") + (1 if addition and not addition.endswith("\n") else 0)
+    return f"appended {n} line(s) to {path}"
 
 
 def _atomic_write_sync(path: str, content: str) -> None:
