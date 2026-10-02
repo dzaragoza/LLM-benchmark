@@ -1291,3 +1291,24 @@ python3 full_benchmark.py --tournament --dry-run meta-llama/Llama-3.2-1B-Instruc
 
 REAL RUN:
 python3 full_benchmark.py --tournament meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF --state-file state/benchmark-state-tournament.json
+
+
+### Addendum 34 - the pull-vs-tee bug, found by the author's dry run
+
+The author's dry run failed at the new gate: "git pull failed - FIX
+BEFORE RUNNING: error: cannot pull with rebase: You have unstaged
+changes." And her diagnosis is exact: AS SOON AS THE TOOL CHANGES
+results.txt, GIT PULL FAILS - tee_output.install() appended the run
+header to results.txt as main()'s FIRST statement, dirtying the tree
+before git_pull_head() ran. The tool dirtied its own tree, then
+refused to pull. Two fixes:
+
+1. ORDERING: git_pull_head() now runs BEFORE tee_output.install() -
+   nothing touches the work tree until the pull has landed.
+2. AUTOSTASH: the pull uses --rebase --autostash, so dirt from a
+   crashed previous run (uncommitted artifacts) no longer blocks it -
+   the stash is replayed after the rebase. A hard stop stays a hard
+   stop only for genuine pull failures (network, conflicts).
+
+`test_git_pull_before_tee` asserts both the ordering (pull before
+tee, by source inspection) and the autostash flag (134 passed).

@@ -1207,7 +1207,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    tee_output.install()
     ap = build_parser()
     args = ap.parse_args()
     global DRY_RUN_ACTIVE
@@ -1218,6 +1217,7 @@ def main() -> None:
 
     check_requirements()
     git_pull_head()
+    tee_output.install()
     if not args.dry_run:
         kill_stale_server()
         check_tooling(args)
@@ -1581,7 +1581,9 @@ def git_pull_head() -> None:
     if r.returncode != 0 or r.stdout.strip() != "true":
         stamp("git pull skipped - not a git work tree")
         return
-    r = subprocess.run(["git", "pull", "--no-verify"], capture_output=True, text=True)
+    r = subprocess.run(
+        ["git", "pull", "--rebase", "--autostash", "--no-verify"], capture_output=True, text=True
+    )
     if r.returncode != 0:
         stamp(f"git pull failed - FIX BEFORE RUNNING: {r.stderr.strip()[:200]}")
         raise SystemExit(1)

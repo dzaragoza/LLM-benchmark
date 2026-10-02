@@ -224,3 +224,17 @@ def test_git_pull_head(monkeypatch):
         fb.subprocess, "run", lambda cmd, capture_output=True, text=True: R(0, "true\n")
     )
     fb.git_pull_head()  # pull succeeds -> no exit
+
+
+def test_git_pull_before_tee():
+    """Addendum 34: the pull runs BEFORE tee_output.install appends to
+    results.txt - the tool must not dirty its own tree then refuse to
+    pull (the author's dry-run finding), and the pull autostashes."""
+    import inspect
+
+    import full_benchmark as fb
+
+    body = inspect.getsource(fb.main)
+    assert body.index("git_pull_head()") < body.index("tee_output.install()")
+    src = inspect.getsource(fb.git_pull_head)
+    assert "--autostash" in src
