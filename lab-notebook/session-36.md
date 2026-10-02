@@ -1041,3 +1041,65 @@ tests/test_registry.py (the registry's source-of-truth docstrings
 now point at protocol.md), the conversation archive, and the
 lab-notebook index. The notebook sessions keep their historical
 ALL-CAPS mentions - they are records, not live references.
+
+
+### Addendum 26 - THE FIRST TOURNAMENT RESULTS, graded
+
+The author's run (13:28-13:34, 66 minutes): three families, five
+climbs each, upstream parameters (k=3, alpha 2.0), seed = climb
+number. THE PRE-REGISTERED PREDICTIONS FAILED - all of them:
+
+Pre-registered (addenda 10-11): the champion holds 262,144 at 5/5;
+a 3-way tie at the top is the honest possibility; falls read on
+partials and miss shape. MEASURED: **nobody topped out - 0/5 full
+holds for all three participants.** The ranking is a complete
+inversion of expectations:
+
+| rank | family | falls (climb 1-5) | rank statistic |
+|---|---|---|---|
+| 1 | Qwen3.5-2B (Q4_K_M+q5_0) | 65536, 4096, 32768, 262144, 16384 | 32,768 [median-fallback] |
+| 2 | AI21-Jamba2-3B (Q8_0) | 8192, 4096, 4096, 65536, 8192 | 8,192 [median-fallback] |
+| 3 | Qwen3.5-0.8B (Q8_0) | 4096, 4096, 4096, 8192, 32768 | 4,096 [mode] |
+
+(Re-graded from the stored fall_depths under the addendum-20 rule -
+the author's run predated the mode/median commit; her table printed
+the addendum-11 majority. The stored fall_depths make the re-grade
+exact: 2B 16,384->32,768; Jamba 4,096->8,192; champion 0->4,096.)
+
+THE THREE FINDINGS:
+
+1. THE EMPTY MIDDLE IS FILLED. Every single fall in the tournament
+   is a PARTIAL (2/3 or 1/3), never a 0/3: the champion's three
+   4,096-falls are all 2/3; the 2B's 262,144-fall is 1/3. The
+   session-35 finding "only poles 3/3 or 0/3" is superseded - it was
+   an artifact of n=1 at one seed. The FWE verdict at k=3 carries
+   partial credit naturally; five seeds is enough to see it.
+
+2. THE CHAMPION'S 256k PASS IS SEED-CONDITIONAL. The same config that
+   scored FWE 3/3 at 261,888 (seed 1024, session 35) falls at 4,096
+   with seeds 1-3 (2/3 each) and only survives 4,096 on seeds 4-5.
+   The miss texts are the mechanism: the falls are DEEP-SCANNING
+   misses ('To answer your question, let's break down the co...'),
+   not refusals - the model tries, finds 2 of 3 words, and misses
+   one. Seed variance at k=3 is far larger than depth effects: WHO
+   WINS depends more on the seed's word draws than on the depth.
+   The seed-1024 champion measurement stands as measured, but the
+   tournament exposes it as a lucky draw.
+
+3. THE 2B IS THE DEEPEST CLIMBER (climb 4 reached 262,144 - the only
+   climb in the tournament to reach the top step, falling there
+   1/3) - and the most volatile (climb 2 fell at 4,096). Highest
+   variance, highest ceiling. The RAM champion is the depth champion
+   of the tournament.
+
+OPEN QUESTIONS (registered, unscheduled):
+- Seed variance: the champion needs an n>5 seed sweep to separate
+  its true depth from its seed luck (the FWE n=5 diagnostic of
+  addendum 3 partially exists: the seed-1024 3/3 plus five more
+  seeds from the tournament - n=6 total now).
+- Whether the comeback round (addendum 16/18 entries) can beat
+  32,768 on the same instrument. The four entries are ready in the
+  state file; the run command is the author's to give when ready.
+
+The models.md PASS table gains a tournament column? NOT yet - the
+author decides where the tournament ranking lives in the registry.
