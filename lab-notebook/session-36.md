@@ -1425,3 +1425,45 @@ Prediction (pre-registered): at least two families fail to clear
 4,096 (MiniCPM5-1B, RWKV7-Goose), and the 0.8B champion hold pattern
 (seed-dependent 4,096-vs-deeper) makes it the interesting borderline
 case - its climb 5 reached 32,768 but three of five fell at the floor.
+
+### Addendum 39 - rounds 6-7 graded: the resumable tournament works, the floor rule claims its first casualty, and two surprises
+
+The author's run (43 min, seeds 6-7 only - the resume mechanism held:
+climbs 1-5 printed RESUMED and never re-ran). Ranking at n=7:
+Qwen3.5-2B 32,768 (median) > Jamba2-3B 8,192 (median) > 0.8B 4,096
+(mode) > Llama-3.2-1B 4,096 (mode) > Jamba-R/MiniCPM5-2B/RWKV 4,096 >
+MiniCPM5-1B 4,096.
+
+DISQUALIFIED (addendum 38 floor rule): MiniCPM5-1B ONLY - zero holds
+in seven climbs, the pre-registered prediction HIT (it was one of the
+two named). RWKV7-Goose CLEARS - see the surprise below. The field is
+7 families; one replacement entrant is owed.
+
+SURPRISE 1 - THE 0.8B's CLIMB 6 NEARLY TOPPED THE LADDER: seed 6 held
+every rung to 262,144, falling AT the top (0/1 at 262,144). One cell
+from a full hold. Its mode stays 4,096 (4 of 7 climbs), so the RANK
+is unchanged, but the CEILING finding is big: the 0.8B is the only
+family besides the 2B with a 262,144-class climb. Seed variance
+remains the dominant factor at every depth.
+
+SURPRISE 2 - RWKV's CLIMB 6 HELD 8,192: the all-4096 structural
+claim (addendum 29, confirmed at n=5 in addendum 35) is FALSIFIED at
+n=7 - pure recurrence is not deterministically floor-bound; seed 6's
+word draws were retrievable. The structural conclusion must be
+weakened to: recurrence fails FWE almost always (6 of 7 seeds), but
+not deterministically. Prediction from addendum 38 PARTIALLY HIT
+(MiniCPM5-1B yes, RWKV no).
+
+PREDICTIONS vs MEASURED (addendum 38 pre-registrations): MiniCPM5-1B
+floor-fail HIT; RWKV floor-fail MISSED (cleared via seed 6).
+
+The comeback champion Llama-3.2-1B DROPS: 16,384 (median, n=5) ->
+4,096 (mode, n=7) - its seeds 6-7 fell at 8,192/4,096, collapsing
+the median. The n=5 rank was seed-luck; the mode at n=7 is the
+honest summary. (The 0.8B keeps its mode at the floor too - the
+former champion and the comeback champion are now RANK-EQUAL at
+4,096, but the 0.8B is ordered above on the pass vector: [4 3 3 1 1
+1 0] vs [4 3 2 0 0 0 0].)
+
+Registered: 2026-10-02. No code changes. models.md TOURNAMENT gains
+the rounds 6-7 table; DISQUALIFIED gains its first row.
