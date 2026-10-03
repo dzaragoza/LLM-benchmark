@@ -183,6 +183,7 @@ figures are old-protocol records.
 | 65,536 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells | certify run 2026-10-03, rung log 13:38 |
 | 131,072 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 10/11, 1s lo 0.785) | 3 inherited + 8 fresh cells (1 MISS at run 2) | certify run 2026-10-03, rung log 15:05 |
 | 262,144 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells | certify run 2026-10-03, rung log 16:39-20:14 |
+| 8,192-262,144 | AI21-Jamba2-3B | (Q8_0, f16, f16) | GOLD at every rung (2 sigma, 1/3 pass bar): 8,192 11/11 fresh, 16,384 11/11, 32,768 11/11, 65,536 11/11, 131,072 10/11 (2s lo 0.733), 262,144 11/11 | 8 fresh cells at 8,192; the rest re-graded from stored word counts | certify run 2026-10-03, rung log 21:40-21:51 |
 | 524,288+ | EMPTY | - | - | - | the next rungs to certify (cheapest-first) |
 
 NOTE on the 16k answer (addendum 17): Jamba2 - the hybrid whose n=21
@@ -210,6 +211,17 @@ The certified-depth field ranking is now: Jamba2-3B (262,144) >
 Qwen3.5-2B (8,192) > Qwen3.5-0.8B (8,192). Jamba2's reliable w/s was
 measured at its former 4,096 reliable depth (6.84 w/s); its speed at
 262,144 is unmeasured.
+
+GOLD UPDATE (certify run, 2026-10-03, rung log 21:40-21:51): the gold
+(2 sigma) certify at the 1/3 pass bar accepts Jamba2-3B at EVERY rung
+8,192-262,144 (8 fresh cells at 8,192, all 11/11; 131,072 at 10/11,
+2s lo 0.733; the rest re-graded from stored word counts, ran 0 now).
+Jamba2-3B is the first model to hold BOTH silver and gold across the
+entire ladder. The 8,192 fresh cells all found >= 2 of 3 words
+(counts 2,2,3,3,2,3,2,3) - promising for the 2/3 tightening. The next
+claim under test: gold at the 2/3 pass bar (>= 2 of the 3 hidden
+words), the stricter form the k=1 equivalence argument says is at
+least as strong as finding the single most frequent word.
 
 FINDINGS (session 36 addendum 26): nobody topped out (0/5 full holds
 all three); every fall is a PARTIAL (2/3 or 1/3), never 0/3 - the
