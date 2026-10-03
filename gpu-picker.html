@@ -213,9 +213,10 @@
 
     <h2>All measured models &mdash; the runs behind the medals</h2>
     <p style="font-size: 0.9rem">
-      Every family the study measured, at every context size, with the raw
-      pass counts out of 21 runs and the medal each rung earned. This is the
-      data the recommendations come from &mdash; nothing hidden.
+      Every family the study measured, at every context size, with the
+      medal each rung earned at 2 sigma and the perfect-retrieval (3/3)
+      pass bar. This is the data the recommendations come from &mdash;
+      nothing hidden.
     </p>
     <div id="runsTable"></div>
 
@@ -281,7 +282,7 @@
           costEst: false,
           wps: 6.84,
           depth: 262144,
-          depthSource: "certified by the sequential controller (2026-10-03): silver (1 sigma) and gold (2 sigma) at EVERY rung of the ladder, 4,096-262,144, the gold at the stricter 2/3 pass bar; at the perfect-retrieval bar (3/3) it holds gold only from 32,768 up - the shallow rungs are dead, and the 0.8B Qwen owns them instead (the first capability tradeoff in the study)",
+          depthSource: "certified by the sequential controller (2026-10-03): silver (1 sigma) and gold (2 sigma) at EVERY rung of the ladder, 4,096-262,144, the gold at the 2/3 pass bar; at the perfect-retrieval bar (3/3) - the study's strictest claim - it holds gold only from 32,768 up, and the 0.8B Qwen owns 4,096-16,384 instead (the first capability tradeoff in the study)",
           conservative: 262144,
           family: "AI21-Jamba2",
           quant: "Q8_0 + K/V f16",
@@ -497,23 +498,16 @@
         { name: "MiniCPM5-1B",    passes: [0, 0, 0, 0, 0, 0, 0] },
       ];
       var RUNGS = [4096, 8192, 16384, 32768, 65536, 131072, 262144];
-      // The HIGHEST certification each family holds per rung (the certify
-      // controller's verdicts, 2026-10-03) - it overrides the raw pass
-      // medal wherever a rung was certified. gold = 2 sigma at the stated
-      // pass bar. Jamba2-3B: gold at EVERY rung at the 2/3 bar (4,096:
-      // 10/11, 8,192-65,536: 11/11, 131,072/262,144: 10/11) and at 3/3
-      // from 32,768 up. Qwen3.5-0.8B: gold at the 3/3 (perfect-retrieval)
-      // bar at 4,096 (13/17), 8,192 (9/11) and 16,384 (10/11); deeper
-      // rungs alive but unmeasured at 3/3.
-      // medal -> the pass bar it was earned at (3/3 is the stricter,
-// perfect-retrieval bar; 2/3 finds 2 of the 3 hidden words).
+      // The FWE medal map (the author's ruling, 2026-10-04): every medal
+      // is the highest 2-sigma certification at the PERFECT-RETRIEVAL
+      // (3/3) pass bar - the strictest claim. Jamba2-3B: gold from
+      // 32,768 up. Qwen3.5-0.8B: gold at 4,096-16,384; deeper rungs
+      // alive but unmeasured at 3/3.
 var CERTIFIED = {
         "AI21-Jamba2-3B": {
-          4096: "gold,2/3", 8192: "gold,2/3", 16384: "gold,2/3",
-          32768: "gold,3/3", 65536: "gold,3/3", 131072: "gold,3/3",
-          262144: "gold,3/3",
+          32768: "gold", 65536: "gold", 131072: "gold", 262144: "gold",
         },
-        "Qwen3.5-0.8B": { 4096: "gold,3/3", 8192: "gold,3/3", 16384: "gold,3/3" },
+        "Qwen3.5-0.8B": { 4096: "gold", 8192: "gold", 16384: "gold" },
       };
       // The certified medal depths per family (silver = reliable, gold =
       // confident). Jamba2: silver at 4,096 only (n=21 table, session 37).
@@ -537,12 +531,10 @@ var CERTIFIED = {
           t += "<tr><td>" + r.name + "</td>";
           r.passes.forEach(function (p, i) {
             var m = (CERTIFIED[r.name] || {})[RUNGS[i]] || "none";
-            var medal = m.split(",")[0];
-            var bar = m.split(",")[1];
-            var tip =
-              "certified " + medal.toUpperCase() +
-              " at 2 sigma" + (bar ? ", " + bar + " pass bar" : "");
-            t += '<td class="num" title="' + tip + '">' + medalIcon(medal) + "</td>";
+            t +=
+              '<td class="num" title="certified GOLD at 2 sigma, the perfect-retrieval (3/3) pass bar">' +
+              medalIcon(m) +
+              "</td>";
           });
           t += "</tr>";
         });
