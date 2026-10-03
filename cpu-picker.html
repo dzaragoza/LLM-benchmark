@@ -695,18 +695,8 @@ var html = "";
         RUNS.forEach(function (r) {
           t += "<tr><td>" + r.name + "</td>";
           r.passes.forEach(function (p, i) {
-            var rung = RUNGS[i];
-            var cert = (CERTIFIED[r.name] || {})[rung];
-            var m = cert || medalFor(r.name, p);
-            var tip =
-              p + "/21 tournament passes" +
-              (cert
-                ? "; certified " + cert.toUpperCase() + " (2 sigma, sequential controller)"
-                : "");
-            t +=
-              '<td class="num" title="' + tip + '">' +
-              (p === 0 && !cert ? "\u2014" : p + "/21 " + medalIcon(m)) +
-              "</td>";
+            var m = (CERTIFIED[r.name] || {})[RUNGS[i]] || "none";
+            t += '<td class="num" title="highest 2-sigma certification at this rung">' + medalIcon(m) + "</td>";
           });
           t += "</tr>";
         });
