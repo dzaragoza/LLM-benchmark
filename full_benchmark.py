@@ -673,6 +673,10 @@ def certify_rung(
         while True:
             lo, _ = wilson_interval(k, measured, z) if measured else (0.0, 0.0)
             remaining = n_total - measured
+            # the plan: how many consecutive passes certify, how many
+            # consecutive fails kill - the author's addendum-20 request
+            to_accept = None
+            to_dead = None
             if level == "at_least_one":
                 if k >= 1:
                     verdict = "accept"
@@ -680,6 +684,7 @@ def certify_rung(
                 if remaining == 0:
                     verdict = "dead"
                     break
+                to_accept = 1
             else:
                 if measured >= floor and lo >= 0.5:
                     verdict = "accept"
@@ -689,6 +694,33 @@ def certify_rung(
                 if best_lo < 0.5 or best_k < floor:
                     verdict = "dead"
                     break
+                for j in range(1, remaining + 1):
+                    lo_j, _ = wilson_interval(k + j, measured + j, z)
+                    if measured + j >= floor and lo_j >= 0.5:
+                        to_accept = j
+                        break
+                for j in range(1, remaining + 1):
+                    bk = k + (remaining - j)
+                    bl, _ = wilson_interval(bk, n_total, z)
+                    if bl < 0.5 or bk < floor:
+                        to_dead = j
+                        break
+            if ran == 0:
+                plan = (
+                    f"  PLAN @ {depth:,}: {measured}/{n_total} cells measured, "
+                    f"{remaining} left - "
+                )
+                plan += (
+                    f"{to_accept if to_accept else remaining} consecutive pass(es) certify; "
+                    if to_accept is not None or level == "at_least_one"
+                    else ""
+                )
+                plan += (
+                    f"{to_dead if to_dead else remaining} consecutive fail(s) kill"
+                    if to_dead is not None
+                    else f"cannot die this rung ({remaining} cells left)"
+                )
+                print(plan)
             if dry_run:
                 verdict = "would-run"
                 break
