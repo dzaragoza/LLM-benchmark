@@ -33,7 +33,7 @@ pair, not a model).
 ## PASS (both gates at 262,144)
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | notes |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | Qwen3.5-0.8B | Q8_0 | f16 | f16 | 0.86 | 4.96 GiB | 9.3 | THE CHAMPION; sets the 4.96 GiB ceiling; trained window 262,144; speed PASS zero stalls, FWE 3/3 at 261,888 |
 | Qwen3.5-2B | Q4_K_M | q5_0 | q5_0 | 1.22 | 3.48 GiB | 9.5 | the RAM champion (half the champion's cost); speed PASS 15.2 t/s worst turn, FWE 3/3; the quant-raise probe (Q8_0+q8_0) FAILED - 5.22 GiB over ceiling, FWE 0/3 (session 36 addendum 1); this Q4_K_M config is the 2B's ceiling config |
 | AI21-Jamba2-3B | Q8_0 | f16 | f16 | 3.17 | 4.42 GiB | 6.1 | PASS on its first probe (session 36 addendum 1): 89% of ceiling, speed PASS 6.08 w/s worst turn (reader never waited), FWE 3/3 at 261,888; the FIRST NON-TRANSFORMER PASS in the study (hybrid mamba-attention, 2 full-attention layers carried the retrieval); predictor 4.40 GiB - off by 0.02 (0.5%) |
@@ -41,7 +41,7 @@ pair, not a model).
 ## FAIL
 
 | model name | model quant | k quant | v quant | model size GiB | RAM | w/s | reason for failure |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 | Qwen3.5-2B | Q8_0 | q8_0 | q8_0 | 1.93 | 5.22 GiB | 8.2 | FWE 0/3 at 261,888 (speed PASS 8.18 w/s); the 5.22 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3: the ceiling is always an estimate); the quant-raise is closed (session 36 addendum 1) |
 | Qwen3.5-4B | Q2_K | q4_0 | q4_0 | 1.82 | 5.81 GiB | 7.3 | TimeoutError at +94m into the FWE phase after a speed PASS at 262,144 (7.3 w/s); the 5.81 GiB is a NEW-CEILING measurement, not the fail reason (author ruling, addendum 3); analysis in session 36 addendum 3; the family closes at 4B for this machine (Q2_K is its floor config) |
 | RWKV7-World-2.9B | Q8_0 | n/a | n/a | 3.03 | 3.58 GiB | 13.1 | FWE degeneration 0/3 at 261,888 - single-character repetition output, no extraction attempted; RAM and speed PASS (3.58 GiB, 13.11 w/s - the fastest depth-scorer in the study); pure recurrence cannot carry FWE at 256k (session 36 addendum 1) |
@@ -53,7 +53,7 @@ author ruling - a cheaper config of a passing family adds nothing;
 the pool is settled for the report)
 
 | model name | model quant (predicted) | k quant (predicted) | v quant (predicted) | model size GiB (predicted) | RAM (predicted) | w/s (predicted) | prediction notes |
-|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|
 
 
 ## TOURNAMENT (the ranking instrument - session 36 addenda 10-20)

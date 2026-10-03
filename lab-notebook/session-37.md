@@ -705,3 +705,32 @@ the files were restored from HEAD once. Lesson reinforced: the
 pages minified-style long lines defeat my usual small-patch
 workflow; multi-anchor regex patches on them need the JS check
 after EVERY step, not at the end.
+
+
+## Addendum 23 (2026-10-03, tooling) - the js gate is a blocking hook
+
+The author: yes, blocking. js_check.py (two layers: node --check on
+the extracted script, then a node-vm stub-DOM boot that calls pick()
+and demands a verdict) is wired into .pre-commit-config.yaml as a
+local hook on ^(cpu|gpu)-picker.html$. The addendum-22 incident class
+(duplicated blocks, spliced braces, runtime ReferenceErrors) is now
+refused at commit time, not by my manual discipline. Also: the three
+pre-existing MD056 ragged delimiters in models.md are FIXED (7-col
+delimiters under 8-col headers, lines 36/44/56) - the md hook chain
+is green again, --no-verify is no longer needed for the notebook
+commits.
+
+## Addendum 24 (2026-10-03, web) - medals as a gold-to-bronze list
+
+The author: tokens -> context size (the server setting name), and
+the medals read better as a list, gold to bronze, nothing
+highlighted. The verdict now shows a uniform <ul class=medals>:
+
+  [gold] gold - confident: 4,096 context size
+  [silver] silver - reliable: 8,192 context size
+  [bronze] bronze - it can work: 65,536 context size
+
+No depth-highlight span; each line states medal - meaning: context
+size, or none yet. Prose updated (256k tokens -> 256k context size
+in the how-paragraph). Verified by the new js gate: both pages pass
+syntax + boot.
