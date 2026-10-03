@@ -341,3 +341,56 @@ def test_git_tail_pulls_before_push():
     i_push = src.index('subprocess.run(["git", "push"]')
     assert i_commit < i_pull < i_push, "order must be commit -> pull -> push"
     assert "--autostash" in src
+
+
+def test_rescore_tournament(tmp_path, capsys):
+    """Session 37, addendum 4: the saved 3/3 falls re-scored from the
+    raw climb CSVs under 1/3 - a 1/3-or-2/3 partial cell becomes a
+    HOLD (fall moves deeper or drops for re-run), a 0/3 cell still
+    falls at the same rung."""
+    import csv as csv_mod
+    import full_benchmark as fb
+    import ruler_gate as rg
+
+    def cell(models_dir, fam, climb, depth, partial):
+        d = os.path.join(models_dir, "tournament-results", fam, f"climb{climb}")
+        os.makedirs(d, exist_ok=True)
+        path = os.path.join(d, f"fam-{depth}-fwe.csv")
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = csv_mod.writer(f)
+            w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
+            w.writerow([0, depth, "a;b;c", partial, "ans", int(partial >= 1)])
+
+    # climb 1: fell at 8192 under 3/3 (partial 2 at 8192) -> under 1/3
+    # the fall moves deeper: 16384 is a 0/3 cell -> new fall 16384
+    cell(str(tmp_path), "fam", 1, 4096, 3)
+    cell(str(tmp_path), "fam", 1, 8192, 2)
+    cell(str(tmp_path), "fam", 1, 16384, 0)
+    # climb 2: fell at 8192 with 0/3 -> the fall is UNCHANGED
+    cell(str(tmp_path), "fam", 2, 4096, 3)
+    cell(str(tmp_path), "fam", 2, 8192, 0)
+    # climb 3: fell at 4096 with a 2/3 partial -> a pass chain now; the
+    # saved fall is DROPPED so the next tournament re-runs the climb
+    cell(str(tmp_path), "fam", 3, 4096, 2)
+    state = {
+        "families": {
+            "fam": {"tournament_falls": {"1": 8192, "2": 8192, "3": 4096}}
+        }
+    }
+    state_path = str(tmp_path / "st.json")
+    fb.rescore_tournament(str(tmp_path), state, state_path, False)
+    saved = state["families"]["fam"]["tournament_falls"]
+    assert saved["1"] == 16384
+    assert saved["2"] == 8192
+    assert "3" not in saved
+    on_disk = json.load(open(state_path))
+    assert on_disk["families"]["fam"]["tournament_falls"] == saved
+    out = capsys.readouterr().out
+    assert "PASS chain" in out and "16,384" in out
+
+    # dry run: nothing written
+    state2 = {"families": {"fam": {"tournament_falls": {"1": 8192}}}}
+    fb.rescore_tournament(str(tmp_path), state2, state_path, True)
+    assert state2["families"]["fam"]["tournament_falls"] == {"1": 8192}
+    out = capsys.readouterr().out
+    assert "state NOT written" in out

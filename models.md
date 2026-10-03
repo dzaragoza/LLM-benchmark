@@ -112,6 +112,59 @@ conservative 12/15):
 | 8 | MiniCPM5-2B | (Q8_0, f16, q4_0) | see state | [3 0 0 0 0 0 0] | 0 | 0 | 8,192 | mode | 3/15 at the floor, nothing above |
 | 9 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x7 (n=7, seeds 8-21 pending) | [0 0 0 0 0 0 0] | 0 | 0 | 4,096 | mode | re-admitted (addendum 44); zero holds in 7 climbs so far |
 
+THE n=21 ROUND (session 37 addendum 5 - the author's run, 5h03m,
+21:50-02:53, seeds 16-21 fresh via resume; bars at n=21: reliable
+13/21, conservative 16/21; collected under the OLD 3/3 criterion -
+the run predated the 1/3 ruling, so this table is the LOWER-BOUND
+picture; the addendum-4 re-score revises it under 1/3):
+
+| rank | model | config (model q, k, v) | passes/rung | reliable (1s) | conservative (2s) | ceiling | rank | rank statistic | w/s @ reliable | notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Qwen3.5-0.8B | (Q8_0, f16, f16) | [17 14 12 8 8 8 2] | 8,192 | 4,096 | 262,144 | 262,144 | mode | 34.85 w/s | SOLE CHAMPION at n=21 (262,144, mode 2x + median-deep tail): six climbs at 262,144-or-top, two full holds (seeds 12, 20); its reliable depth climbs from 4,096 to 8,192 (14/21) - the spectacular model is now the trustworthy one too |
+| 2 | Qwen3.5-2B | (Q4_K_M, q5_0, q5_0) | [16 14 11 5 3 3 1] | 8,192 | 4,096 | 262,144 | 32,768 | mode | 27.79 w/s | the n=15 co-champion keeps the true mode (32,768) but loses the deep certification: reliable DROPS from 16,384 to 8,192 (14/21), conservative stays 4,096 (16/21); seeds 16-21 added two more 4,096 falls (climbs 16, 18, 20) |
+| 3 | AI21-Jamba2-3B | (Q8_0, f16, f16) | [15 12 5 5 3 3 3] | 4,096 | 0 | 262,144 | 16,384 | mode | 6.84 w/s | the only family whose mode ROSE (4,096 -> 16,384, 4x): seeds 16-21 added a 16,384-heavy tail (16,384 x3, top x2, 4096) - the hybrid recovers depth with more samples; reliable stays 4,096, conservative 0 (12/21 short of 16/21) |
+| 4 | Llama-3.2-1B-Instruct | (Q8_0, q4_0, q4_0) | [6 5 4 2 0 0 0] | 0 | 0 | 65,536 | 4,096 | mode | n/a | fades to pure floor - seeds 16-21 are 4,096 x4 + 65,536 x2; its n=5 16,384 was seed luck, confirmed dead at n=21 |
+| 5 | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | [10 1 0 0 0 0 0] | 0 | 0 | 16,384 | 4,096 | mode | n/a | 10/21 at the floor, nothing above 8,192 - the floor-heavy sibling shape is stable |
+| 6 | gemma-3-1b-it | (Q8_0, q4_0, q4_0) | [2 1 0 0 0 0 0] | 0 | 0 | 16,384 | 4,096 | mode | n/a | 2/21 at the floor - the single-kv-head shape stays the field's weakest FWE retriever |
+| 7 | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | [7 0 0 0 0 0 0] | 0 | 0 | 8,192 | 4,096 | mode | n/a | 7/21 at the floor, nothing above - the addendum-39 8,192 was an outlier, recurrence is floor-adjacent |
+| 8 | MiniCPM5-2B | (Q8_0, f16, q4_0) | [3 0 0 0 0 0 0] | 0 | 0 | 8,192 | 4,096 | mode | n/a | 3/21 at the floor, nothing above |
+| 9 | MiniCPM5-1B | (Q8_0, f16, f16) | [0 0 0 0 0 0 0] | 0 | 0 | 4,096 | 4,096 | mode | n/a | 0/21 - seeds 8-21 confirmed: zero holds in twenty-one climbs under 3/3; the re-score decides its fate under 1/3 |
+
+n=21 GRADE (the addendum-45 questions, 3/3 criterion):
+1. RELIABILITY BY CONTEXT: at n=21 two families certify RELIABLE
+   (1 sigma): 0.8B at 8,192 (14/21), 2B at 8,192 (14/21); Jamba2 at
+   4,096 (15/21). CONSERVATIVE (2 sigma): 0.8B and 2B at 4,096
+   (17/21, 16/21). 16k+ is EMPTY of certification at n=21 - the
+   deepest certified rung under 1 sigma is 8,192.
+2. FIELD SIZE: the certified map needs TWO families (0.8B and 2B
+   cover 4k-8k both sigma levels); the author's 8-family guess held
+   the study but 7 of 9 families certify nothing.
+3. LINEAGE: the Qwen3.5 lineage takes both certified rungs; the two
+   MiniCPM variants and both Jambas show architecture (hybrid
+   attention/recurrence) beats pure recurrence for FWE retrieval.
+4. PREDICTOR CALIBRATION: gemma's entry prediction (4,096-16,384)
+   was PARTIAL - it hit 16,384 as ceiling but never as mode or
+   certification; the 0.8B's n=15 "spectacular and untrustworthy"
+   called its n=21 promotion correctly.
+5. SEED VARIANCE: the 0.8B's climb-to-climb spread is the field's
+   widest (4,096 to top); the 2B's mode is stable 32,768 across
+   n=7/15/21 - mode convergence happened for the champions.
+6. ARCHITECTURE: pure recurrence (RWKV) holds only at the floor
+   (7/21); hybrid (Jamba) recovers depth with samples; full
+   attention + wide training window (Qwen3.5) dominates.
+7. MISS SHAPES: every fall was a partial (addendum 26) - the 1/3
+   criterion change re-scores those holds (addendum 4).
+8. INSTRUMENT COST: 5h03m for 6 seeds x 9 families (~50 min/seed
+   across the field) + the first reliable-depth w/s medians (0.8B
+   34.85, 2B 27.79, Jamba2 6.84 w/s at 4,096-8,192).
+9. PREDICTOR FALSIFICATION: none of the addendum-43 pre-registrations
+   survived intact: the 2B's conservative 4-8k HIT (4,096), the 0.8B
+   reliable-cell borderline called WRONG (it certified 8,192), gemma
+   partial.
+10. THE RECOMMENDATION TABLE (n=21, 3/3): 4k -> 0.8B (conservative
+    4,096, 34.85 w/s); 8k -> 0.8B (reliable 8,192); 16k+ -> EMPTY -
+    the certification phase (session 36 addendum 50) fills it.
+
 The domination rule is retired (session 37, addendum 2); a replacement policy is pending from the author.
 
 NOBODY beat the bar (32,768, the first tournament's rank). The overall

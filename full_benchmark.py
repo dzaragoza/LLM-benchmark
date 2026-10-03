@@ -42,6 +42,7 @@ non-thinking category - benchmarks with thinking disabled
 from __future__ import annotations
 
 import argparse
+import csv
 import glob
 import math
 import json
@@ -523,6 +524,104 @@ def tournament_family(
         "corpus": CORPUS_DEFAULT,
         **rank,
     }
+
+
+def rescore_tournament(
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    dry_run: bool,
+) -> None:
+    """Session 37, addendum 4 (the author's re-score ruling): the saved
+    tournament_falls were collected under the 3/3 criterion; under the
+    relaxed 1/3 criterion (addendum 2) every recorded fall is a LOWER
+    BOUND on the true one (all recorded falls were 1/3 or 2/3 partials,
+    addendum 26 - a 0/3 fall would fall under both criteria). This
+    re-derives each climb's fall from the raw per-cell CSVs the climbs
+    wrote: a cell passes at partial >= 1; the re-scored fall is the
+    first rung whose cell fails; a climb whose every recorded cell
+    passes re-runs from just above its old fall (the early stop never
+    wrote the cells above). Without --rescore-apply the state is only
+    REPORTED, never written; with it, tournament_falls is rewritten
+    under the new criterion and the family's remaining depths run
+    the next --tournament as fresh seeds' resume."""
+    depths = TOURNAMENT_DEPTHS
+    for fam, fst in sorted(state.get("families", {}).items()):
+        saved = fst.get("tournament_falls") or {}
+        if not saved:
+            print(f"  {fam}: no saved climbs - nothing to re-score")
+            continue
+        results_dir = os.path.join(models_dir, "tournament-results", fam)
+        print(f"  {fam}: re-scoring {len(saved)} climbs under the 1/3 criterion")
+        changed = 0
+        if dry_run:
+            saved = dict(saved)
+        for key in sorted(saved, key=int):
+            s = int(key)
+            climb_dir = os.path.join(results_dir, f"climb{s}")
+            old_fall = saved[key]
+            new_fall = None
+            for d in depths:
+                csv_path = os.path.join(climb_dir, f"-{d}-fwe.csv")
+                label = None
+                if not os.path.isfile(csv_path):
+                    matches = sorted(glob.glob(os.path.join(climb_dir, f"*-{d}-fwe.csv")))
+                    csv_path = matches[0] if matches else csv_path
+                if not os.path.isfile(csv_path):
+                    if old_fall is not None and d <= old_fall:
+                        print(
+                            f"    climb {s}: MISSING cell at {d:,} tok "
+                            f"({csv_path}) - cannot re-score; keeping the "
+                            f"recorded fall"
+                        )
+                        new_fall = old_fall
+                        break
+                    break
+                with open(csv_path, encoding="utf-8") as f:
+                    rows = list(csv.DictReader(f))
+                partial = None
+                for r in rows:
+                    if r.get("partial") not in (None, ""):
+                        partial = int(r["partial"])
+                if partial is None:
+                    print(
+                        f"    climb {s}: cell at {d:,} tok has no partial "
+                        f"count - cannot re-score; keeping the recorded fall"
+                    )
+                    new_fall = old_fall
+                    break
+                if partial < 1:
+                    new_fall = d
+                    break
+            if new_fall is None and old_fall is not None:
+                # every recorded cell passes under 1/3 - the true fall is
+                # ABOVE the recorded one, and the cells above were never
+                # written (early stop). The climb needs re-running from
+                # just above its old fall; the rescore marks it UNKNOWN
+                # by dropping the saved entry so the next --tournament
+                # run resumes it as a fresh climb.
+                print(
+                    f"    climb {s}: old fall {old_fall:,} is now a PASS "
+                    f"chain - the true fall is above it and unmeasured; "
+                    f"the saved fall is DROPPED so the next tournament "
+                    f"run re-runs the whole climb under 1/3"
+                )
+                del saved[key]
+                changed += 1
+                continue
+            if new_fall != old_fall:
+                changed += 1
+                print(
+                    f"    climb {s}: fall {old_fall if old_fall is None else format(old_fall, ',')} -> "
+                    f"{new_fall if new_fall is None else format(new_fall, ',')} tok"
+                )
+                saved[key] = new_fall
+        if dry_run:
+            print(f"  {fam}: dry run - {changed} climbs would change (state NOT written)")
+        else:
+            fst["tournament_falls"] = saved
+            save_state(state_path, state)
+            print(f"  {fam}: {changed} climbs changed - state saved")
 
 
 def print_tournament_table(tours: list[dict[str, Any]]) -> None:
@@ -1233,6 +1332,21 @@ def build_parser() -> argparse.ArgumentParser:
         "ladder 4096..262144, SEED = CLIMB NUMBER, early stop at the "
         "first non-perfect cell; the majority rank is the ranking",
     )
+    ap.add_argument(
+        "--rescore",
+        action="store_true",
+        help="session 37, addendum 4: re-derive every saved climb's fall "
+        "from the raw per-cell CSVs under the relaxed 1/3 criterion "
+        "(addendum 2) instead of running the tournament. Read-only by "
+        "default; --rescore-apply rewrites tournament_falls (a climb "
+        "whose recorded fall is now a pass chain is DROPPED so the next "
+        "--tournament re-runs it under 1/3)",
+    )
+    ap.add_argument(
+        "--rescore-apply",
+        action="store_true",
+        help="with --rescore: write the re-scored falls to the state file",
+    )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant-k",
@@ -1321,6 +1435,9 @@ def main() -> None:
 
     if not args.families:
         ap.error("no family specs given")
+    if args.rescore:
+        rescore_tournament(args.models_dir, state, args.state_file, not args.rescore_apply)
+        return
     if args.tournament:
         tours = []
         for spec in args.families:
