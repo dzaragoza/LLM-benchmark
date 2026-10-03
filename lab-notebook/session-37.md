@@ -627,3 +627,13 @@ Tests: 3 new (at_least_one accepts from a historical top-out cell
 with zero fresh cells and skips the rest; at_least_one with 21
 measured fails is DEAD; 2_sigma early-reject with the 2s bound in
 the message). 147 pass.
+
+
+## Addendum 19 (2026-10-03, incident + fix) - --rungs goes comma-form
+
+The author hit the bug: argparse nargs='+' on --rungs swallowed the
+positional families (Qwen/... parsed as an int). Fix: --rungs takes ONE
+comma-separated string (--rungs 32768,65536,131072,262144), split and
+int-parsed in main() with a clean ap.error on garbage. Per wow.md: a
+procedure error a human could make is a tooling defect - the comma form
+is impossible to get wrong, no -- separator to remember. 147 pass.
