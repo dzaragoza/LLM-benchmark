@@ -364,3 +364,33 @@ Tests: `test_tournament_rank_mode` -> `test_tournament_rank_sigma_only`
 - the flicker 4/5 and distinct-falls 4/5-at-4096 shapes are both
 reliable at 1 sigma, the suite taught the real bars), and the two
 family tests assert reliable_depth instead of rank_depth. 134 pass.
+
+## Addendum 11: the web pages updated for the practitioner (2026-10-03)
+
+AUTHOR'S RULING: update the pickers with the practitioner-facing
+information, written for readers who have NOT read the report ("CI in
+sigmas always better" - the mode was a good size heuristic, but the
+confidence interval is the recommendation).
+
+IMPLEMENTED (cpu-picker.html + gpu-picker.html, both JS-checked):
+- The pool is the three CERTIFIED families (n=21, 1/3 rule): Qwen3.5-
+  0.8B (reliable 8,192 / conservative 4,096, 34.85 w/s at reliable),
+  Qwen3.5-2B (8,192 / 4,096, 27.79 w/s), AI21-Jamba2-3B (8,192 / no
+  2-sigma claim, 6.84 w/s). The six uncertified families are excluded
+  with a plain-language "why only three models" note (they did not
+  pass reliably at any rung - including some with large advertised
+  windows) instead of stale rejection-log references.
+- depth is now the RELIABLE depth (1 sigma, Wilson lo >= 0.5); a new
+  conservative column (2 sigma) is in both the verdict and the table.
+  "None at 1-sigma/2-sigma" replaces "counting floor" zero-handling.
+- w/s values are the reliable-depth medians (n=5), not the old n=1
+  worst turns; the reader-line scaling law is unchanged.
+- All protocol v4.3 / addendum / "n=1 screen" jargon removed from the
+  reader-facing prose; "How the recommendation is computed" now
+  explains the 21-runs-per-rung ladder, the 1-of-3-words pass rule,
+  and both sigma levels in plain language, with the caveats stated
+  (16k+ certification in progress = "not yet certified", not
+  "failed").
+- cpu-picker's machine-list floor is recomputed from the new pool:
+  the most bandwidth-forgiving certified model is now the 0.8B
+  (34.85 w/s), so the list floor drops to ~14.7 GB/s.
