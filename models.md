@@ -179,7 +179,11 @@ figures are old-protocol records.
 | 4,096 | Qwen3.5-0.8B | (Q8_0, f16, f16) | gold (conservative 4,096, 17/21 at 1s) | n=21 tournament | session 36 addendum 42 |
 | 8,192 | Qwen3.5-0.8B | (Q8_0, f16, f16) | silver (reliable 8,192, 14/21 at 1s) | n=21 tournament | session 36 addendum 42 |
 | 16,384 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells (runs 9-21 never measured) | certify run 2026-10-03, addendum 17 |
-| 32,768+ | EMPTY | - | - | - | the next rungs to certify (cheapest-first) |
+| 32,768 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells | certify run 2026-10-03, rung log 13:00 |
+| 65,536 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells | certify run 2026-10-03, rung log 13:38 |
+| 131,072 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 10/11, 1s lo 0.785) | 3 inherited + 8 fresh cells (1 MISS at run 2) | certify run 2026-10-03, rung log 15:05 |
+| 262,144 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells | certify run 2026-10-03, rung log 16:39-20:14 |
+| 524,288+ | EMPTY | - | - | - | the next rungs to certify (cheapest-first) |
 
 NOTE on the 16k answer (addendum 17): Jamba2 - the hybrid whose n=21
 mode ROSE to 16,384 - certifies the rung at 11/11 with ZERO failures;
@@ -197,6 +201,15 @@ field ranking stands: Qwen3.5-2B (32,768) > Jamba2-3B (8,192) >
 Qwen3.5-0.8B (4,096) > Llama-3.2-1B (16,384*). NOTE: the Llama's
 16,384 ranks it ABOVE the former champion on depth - the comeback
 champion displaces two PASS models on the ladder.
+
+UPDATE (certify run, 2026-10-03, rung log 13:00-20:14): Jamba2-3B beat
+the bar and then some - it certified 32,768, 65,536, 131,072 AND
+262,144 at 1 sigma in one sequential run (11/11, 11/11, 10/11, 11/11;
+the single 131,072 MISS was the only fresh-cell failure of the run).
+The certified-depth field ranking is now: Jamba2-3B (262,144) >
+Qwen3.5-2B (8,192) > Qwen3.5-0.8B (8,192). Jamba2's reliable w/s was
+measured at its former 4,096 reliable depth (6.84 w/s); its speed at
+262,144 is unmeasured.
 
 FINDINGS (session 36 addendum 26): nobody topped out (0/5 full holds
 all three); every fall is a PARTIAL (2/3 or 1/3), never 0/3 - the
