@@ -227,6 +227,22 @@ GOLD at 2/3 UPDATE (re-grade, 2026-10-03, from committed evidence): the gold (2 
 
 FULL-LADDER GOLD (certify run 2026-10-03, rung log 22:30-22:36): the 4,096 rung - the tournament floor, never before a certify rung - accepts Jamba2-3B at gold too (10/11 cells at the 2/3 bar, 2s lo 0.616; 3 inherited cells re-graded from the climb CSVs + 7 fresh, every fresh cell finding >= 2 of 3 words). RWKV7 and Jamba-Reasoning were mathematically dead before Jamba2's turn (best possible 2s lo 0.450 and 0.405). The certified ladder is now COMPLETE bottom to top: Jamba2-3B holds silver and gold at every rung 4,096-262,144. The next frontier is 524,288 (EMPTY).
 
+GOLD at 3/3 UPDATE (certify runs 2026-10-03, rung logs 22:57-23:55): the
+perfect-retrieval bar (>= 3 of 3 hidden words, 2 sigma) SPLITS the field
+where k=3 never could - and by an unexpected axis. Jamba2-3B is
+MATHEMATICALLY DEAD at the shallow rungs (4,096: 10/16, 8,192: 9/15,
+16,384: 7/13 - even a perfect finish cannot reach 2s lo 0.5) but GOLD at
+32,768 (9/11, lo 0.517), 65,536 (9/11, 0.517), 131,072 (11/14, 0.519)
+and 262,144 (10/11, 0.616). Qwen3.5-0.8B is the exact mirror: GOLD at
+4,096 (13/17, lo 0.522), 8,192 (9/11, 0.517) and 16,384 (10/11, 0.616),
+with only 2 cells measured deeper (alive, unmeasured - 19 fresh cells
+from certifying). NEITHER model holds the whole ladder at 3/3 on current
+evidence: perfect recall at depth is a TRADEOFF between models at this
+scale, the study's first genuine capability curve. The certified map at
+3/3: Jamba2 owns the deep half, the 0.8B owns the shallow half. FWE at
+k=3 is declared SATURATED for separation; the registered follow-ups
+(addendum 79) are the VT pilot and the difficulty knobs.
+
 HONESTY NOTE on the 2/3 bar (the k=1 equivalence): 2/3 does NOT guarantee the model found the single most frequent (rank-1) word - qwen2.5-0.5b's counterexample finds the 2nd and 3rd words without the rank-1. The certified claim is a DIFFICULTY claim only: passing 2/3 is at least as hard as finding any single word (k=1), because any 2-of-3 set contains at least one of the three and the rank-1 word is the most likely by the zeta-law draw. It is NOT a claim that the model always retrieves the most frequent word specifically.
 
 FINDINGS (session 36 addendum 26): nobody topped out (0/5 full holds
