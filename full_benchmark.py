@@ -592,9 +592,14 @@ def certify_rung(
     EARLY ACCEPT (1-sigma Wilson lower bound >= 0.5 over the measured
     cells, count >= half of n=21) or EARLY REJECT (mathematically
     dead: even passing every remaining cell cannot reach the bar).
-    On accept the rung's w/s is measured (n=5 median, addendum 42).
-    The first accepted candidate ANSWERS the rung; the rest are
-    skipped (the practitioner wants ONE model per rung)."""
+    The RAM-ceiling assumption replaces the w/s measurement
+    (session 37, addendum 15): a config selected under the ceiling
+    has enough bandwidth to clear the 5 w/s reader line - w/s is
+    not measured in the benchmark (a waste of time; the author's
+    ruling); a speed falsification probe stays available for later
+    if a recommendation is ever doubted. The first accepted
+    candidate ANSWERS the rung; the rest are skipped (the
+    practitioner wants ONE model per rung)."""
     n_total = TOURNAMENT_CLIMBS
     floor = math.ceil(0.5 * n_total)
     order: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
@@ -700,20 +705,6 @@ def certify_rung(
                 f"  ACCEPT at {k}/{measured} - 1-sigma lower bound "
                 f"{lo:.3f} >= 0.5 - {fam} answers the {depth:,} rung"
             )
-            if not dry_run:
-                stamp(f"certified-rung w/s: {fam} @ {depth:,} tok (n=5)")
-                wps = []
-                for i in range(5):
-                    ok_s, sv = speed_pass(
-                        model, depth, CORPUS_DEFAULT, port, results_dir, kv_k, kv_v
-                    )
-                    w = sv.get("worst")
-                    wps.append(w)
-                    print(f"  {fam} @ {depth:,} tok w/s trial {i+1}/5: {w} w/s -> {'PASS' if ok_s else 'FAIL'}")
-                kept = [w for w in wps if w is not None]
-                med = sorted(kept)[len(kept) // 2] if kept else None
-                entry["wps_median"] = med
-                print(f"  {fam}: certified-rung w/s median {med} w/s over {len(kept)} trials")
             answered = True
         elif verdict == "dead":
             entry["verdict"] = "dead"
@@ -1566,8 +1557,7 @@ def build_parser() -> argparse.ArgumentParser:
         "cell by cell (a cell is model x run x step, NEVER re-measured; "
         "historical climb cells are inherited) until it certifies "
         "(1-sigma Wilson lower bound >= 0.5, n=21) or is mathematically "
-        "dead; the first accepted model answers the rung (w/s measured, "
-        "n=5 median), the rest are skipped",
+        "dead; the first accepted model answers the rung; the rest are skipped",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
@@ -1706,43 +1696,12 @@ def main() -> None:
         state["tournament"] = tours
         save_state(args.state_file, state)
         print_tournament_table(tours)
-        # addendum 42: the recommendation path - w/s at the RELIABLE
-        # depth, n=5, for every family that HAS a reliable depth (the
-        # floor-fall families have none - there is nothing to
-        # recommend). The speed gate was assumed passed during the
-        # climbs; this measures it where the recommendation points.
-        if not args.dry_run:
-            for t in tours:
-                rd = t.get("reliable_depth") or 0
-                if rd <= 0:
-                    continue
-                stamp(f"reliable-depth w/s: {t['family']} @ {rd:,} tok (n=5)")
-                wps = []
-                for i in range(5):
-                    ok, verdict = speed_pass(
-                        t["model"],
-                        rd,
-                        t.get("corpus") or CORPUS_DEFAULT,
-                        state.get("ladder_port", 8210),
-                        os.path.join(args.models_dir, "tournament-results", t["family"]),
-                        kv_quant_k=t.get("kv_quant_k"),
-                        kv_quant_v=t.get("kv_quant_v"),
-                    )
-                    worst = verdict.get("worst")
-                    wps.append(worst)
-                    print(
-                        f"  {t['family']} @ {rd:,} tok w/s trial {i+1}/5: "
-                        f"{worst} w/s -> {'PASS' if ok else 'FAIL'}"
-                    )
-                kept = [w for w in wps if w is not None]
-                med = sorted(kept)[len(kept) // 2] if kept else None
-                t["reliable_wps_median"] = med
-                t["reliable_wps_trials"] = wps
-                print(
-                    f"  {t['family']}: reliable-depth w/s median "
-                    f"{med if med is not None else 'n/a'} w/s over {len(kept)} trials"
-                )
-            save_state(args.state_file, state)
+        # session 37, addendum 15: the reliable-depth w/s measurement
+        # (addendum 42) is RETIRED - the RAM-ceiling assumption
+        # replaces it (a config selected under the ceiling has the
+        # bandwidth to clear the reader line); w/s is not measured in
+        # the benchmark. The historical wps medians in state stay as
+        # records of what was measured under the old protocol.
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)

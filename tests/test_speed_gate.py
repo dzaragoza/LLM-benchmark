@@ -458,7 +458,6 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         # runs 9-21 are fresh (13 seeds), never re-measured
         assert sorted(ran) == [9, 10, 11]
         assert first["cells_measured"] == 11 and first["passes"] == 11
-        assert first["wps_median"] == 30.0
         other = [r for r in res if r["family"] == "other"][0]
         assert other.get("skipped") == "rung already answered"
         # direct cells persisted

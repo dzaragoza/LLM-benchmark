@@ -487,3 +487,43 @@ A TOOL LESSON (addendum 12 upheld): all page edits went through
 code_edit.replace_verified; the exact-count assert caught a
 non-unique anchor mid-patch (the transaction rolled back cleanly,
 no partial state) - the tool working as designed.
+
+
+## Addendum 15: w/s measurement REMOVED from the benchmark (2026-10-03)
+
+AUTHOR'S RULING (interrupting the certify run): we agreed NOT to
+measure w/s as a disqualifier; counting w/s in the benchmark is a
+waste of time. The assumption in place: a configuration selected
+under the RAM ceiling has enough bandwidth to achieve 5 w/s.
+
+IMPLEMENTED: both w/s measurement paths removed from
+full_benchmark.py -
+1. The CERTIFY accept path (addendum 8): on accept the controller
+   no longer runs the n=5 speed trials; an accepted candidate
+   answers the rung immediately.
+2. The TOURNAMENT recommendation path (addendum 42): the
+   reliable-depth n=5 w/s block is retired; the RAM-ceiling
+   assumption replaces it. The historical wps medians in state and
+   models.md stay as records of what was measured under the old
+   protocol - the 34.85/27.79/6.84 numbers on the web pages remain
+   valid historical measurements.
+The speed falsification stays available as a separate probe for
+later if a recommendation is ever doubted (the session-36 doctrine:
+assume the speed gate passes, falsify when needed - now it is not
+even measured in the benchmark loop).
+The certify summary print keeps reading a historical wps_median
+from state (compat with old runs); new runs produce none.
+
+COST SAVED: on the 16k certify run, ~5 speed conversations per
+accepted candidate; on tournaments, 5 per family with a reliable
+depth (up to 45 conversations per full run).
+
+INCIDENT (code_edit, reported per wow.md section 4): my first
+help-text replacement inserted a literal newline INSIDE a python
+string literal -> SyntaxError at import; caught by the test run
+before commit and fixed. The editor cannot catch this class (the
+string was legally edited, just semantically broken) - the ast.parse
+gate in safe_append has the same class for appends. NOTE: edit()
+does NOT compile .py targets after replace; PROPOSAL: extend the
+post-write verify to ast-parse .py results. Flagged for the author.
+140 tests pass.
