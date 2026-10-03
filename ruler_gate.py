@@ -596,22 +596,34 @@ def main() -> None:
             "for the reason (silent context reduction: KV/memory budget, "
             "build flags) and re-run with a grid that fits."
         )
-    print(f"ruler gate: {label} (fwe, depths {args.depths}, samples {args.samples})")
+    print(f"ruler gate: {label} ({args.task}, depths {args.depths}, samples {args.samples})")
     try:
         for depth in args.depths:
-            csv_path = os.path.join(args.results_dir, f"{label}-{depth}-fwe.csv")
-            row = run_fwe_depth(
-                args.port,
-                label,
-                depth,
-                args.samples,
-                csv_path,
-                seed0=args.seed,
-                no_thinking=not args.thinking,
-                show=args.show,
-                top_k=args.fwe_top_k or FWE_TOP_K,
-                min_words=args.fwe_pass_min or FWE_PASS_MIN,
-            )
+            csv_path = os.path.join(args.results_dir, f"{label}-{depth}-{args.task}.csv")
+            if args.task == "vt":
+                row = run_vt_depth(
+                    args.port,
+                    label,
+                    depth,
+                    args.samples,
+                    csv_path,
+                    seed0=args.seed,
+                    no_thinking=not args.thinking,
+                    show=args.show,
+                )
+            else:
+                row = run_fwe_depth(
+                    args.port,
+                    label,
+                    depth,
+                    args.samples,
+                    csv_path,
+                    seed0=args.seed,
+                    no_thinking=not args.thinking,
+                    show=args.show,
+                    top_k=args.fwe_top_k or FWE_TOP_K,
+                    min_words=args.fwe_pass_min or FWE_PASS_MIN,
+                )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
                 f"correct (acc {row['acc']:.0%})"
