@@ -185,3 +185,46 @@ Reported and fixed per the standing rule:
    (already in wow.md): scripted replaces bypass the editor's
    auto-fixes, so every scripted md edit must be followed by
    md_check before commit - done here.
+
+### Addendum 7 - the re-score dry-run report (read-only; the 1/3 criterion vs the 3/3 falls)
+
+The author ran the --rescore report (no --rescore-apply, so the
+state is unchanged - the next step is the apply). RESULT: 110 of 189
+climbs are PASS CHAINS (their 3/3 fall cell was a 1/3-or-2/3
+partial), ZERO falls moved to a deeper 0/3 cell, ZERO missing CSVs -
+the cell data is intact and every recorded fall was either a
+partial (now a hold) or a 0/3 (unchanged). Per family (chains/21):
+
+    Qwen3.5-2B        20  (only its climb-15 top is kept)
+    gemma-3-1b-it     20
+    Qwen3.5-0.8B      19
+    AI21-Jamba2-3B    17
+    MiniCPM5-2B        6
+    Jamba-Reasoning    9
+    Llama-3.2-1B       9
+    RWKV7-2.9B         9
+    MiniCPM5-1B         1  (20 of its 21 falls are TRUE 0/3 - the
+                          zero-hold profile is real under 1/3 too)
+
+FINDINGS: (1) the 3/3 criterion was hiding MOST of the field's
+retrieval - 58% of all falls were partials; the n=21 3/3 table
+(models.md addendum 5) is a deep lower bound. (2) The miss-shape
+split is now measured: Qwen/gemma/Jamba2 fail by partial (find some
+words, not all); MiniCPM5-1B fails by zero - a retrieval failure,
+not an aggregation one. (3) COST WARNING: the apply drops 110 saved
+falls, and the resume run re-runs all 110 climbs under 1/3 with
+DEEPER early stops than before - at the n=15 pace (~5.5 min/climb
+at 3/3 depths) this is well beyond the 5h overnight window; the
+deeper the climbs go the more cells each costs. The sequential
+doctrine (session 36 addendum 48) applies: the re-run's purpose is
+the CERTIFIED MAP, not the full table - the contenders are the 0.8B,
+the 2B and Jamba2 (the families with a reliable depth); the
+floor-dead families' modes will not change the map. THE AUTHOR
+DECIDES the roster for the re-run (all 9 for the record, or the 3
+contenders first).
+
+NEXT (the author runs, fish, one line each):
+
+    python3 full_benchmark.py --rescore --rescore-apply Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF google/gemma-3-1b-it --state-file state/benchmark-state-tournament.json
+
+    python3 full_benchmark.py --tournament <same 9 families> --state-file state/benchmark-state-tournament.json
