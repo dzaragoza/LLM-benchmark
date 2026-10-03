@@ -9,6 +9,8 @@ import json
 import os
 import time
 
+import pytest
+
 import speed_gate as sg
 
 
@@ -394,3 +396,118 @@ def test_rescore_tournament(tmp_path, capsys):
     assert state2["families"]["fam"]["tournament_falls"] == {"1": 8192}
     out = capsys.readouterr().out
     assert "state NOT written" in out
+
+
+def test_certify_cells_inherit_from_falls():
+    """Addendum 8: the cell model - climb s measured every rung up to
+    and including its fall; a fall DEEPER than the rung means the
+    cell passed, a fall AT the rung means it failed, a fall SHALLOWER
+    means the cell was never reached (unmeasured)."""
+    import full_benchmark as fb
+
+    fst = {
+        "tournament_falls": {
+            "1": 8192,   # fell at 8192: cell(1, 8192)=False, cell(1,4096)=True
+            "2": None,   # topped out: every cell True
+            "3": 4096,   # cell(3, 8192) unmeasured, cell(3,4096)=False
+        },
+        "certify": {"8192": {"3": True}},
+    }
+    cells = fb.certify_cells(fst, 8192)
+    assert cells == {1: False, 2: True, 3: True}
+    cells4k = fb.certify_cells(fst, 4096)
+    assert cells4k == {1: True, 2: True, 3: False}
+
+
+def test_certify_rung_accepts_and_skips(tmp_path, capsys):
+    """The sequential controller: the promising candidate certifies
+    from historical cells + fresh ones (never re-measuring a used
+    run), the rung is ANSWERED, the rest are skipped."""
+    import full_benchmark as fb
+
+    ran = []
+
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return True, {"correct": 1, "depth": rung}
+
+    def fake_speed_pass(model, rung, corpus, port, results_dir, kv_quant_k=None, kv_quant_v=None):
+        return True, {"worst": 30.0}
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(fb, "speed_pass", fake_speed_pass)
+    try:
+        model = tmp_path / "good-Q8_0.gguf"
+        model.write_bytes(b"x")
+        # candidate A: 8 passing cells at 8192 historically; the
+        # accept bar fires EARLY - at 11/11 measured cells
+        # (lo(11,11)=0.917 >= 0.5, count 11 >= floor 11)
+        state = {
+            "families": {
+                "good": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": {
+                        "1": None, "2": None, "3": None, "4": None,
+                        "5": 16384, "6": 16384, "7": 16384, "8": 16384,
+                    },
+                },
+                "other": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": {},
+                },
+            }
+        }
+        res = fb.certify_rung(
+            8192, ["good", "other"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+        )
+        first = [r for r in res if r["family"] == "good"][0]
+        assert first["verdict"] == "accept"
+        # historical cells at 8192: climbs 1-4 top + 5-8 fell deeper = 8 passes
+        # runs 9-21 are fresh (13 seeds), never re-measured
+        assert sorted(ran) == [9, 10, 11]
+        assert first["cells_measured"] == 11 and first["passes"] == 11
+        assert first["wps_median"] == 30.0
+        other = [r for r in res if r["family"] == "other"][0]
+        assert other.get("skipped") == "rung already answered"
+        # direct cells persisted
+        direct = state["families"]["good"]["certify"]["8192"]
+        assert direct == {str(r): True for r in (9, 10, 11)}
+    finally:
+        monkeypatch.undo()
+
+
+def test_certify_rung_dead(tmp_path, capsys):
+    """Early reject: a candidate whose remaining cells cannot reach
+    the 1-sigma bar is declared DEAD without running a single cell."""
+    import full_benchmark as fb
+
+    ran = []
+
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return True, {"correct": 1, "depth": rung}
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    try:
+        model = tmp_path / "dead-Q8_0.gguf"
+        model.write_bytes(b"x")
+        # 9 climbs FELL AT 8192 (9 measured fails, 12 remaining):
+        # best case 12/21 passes, lo(12,21)=0.463 < 0.5 -> dead
+        falls = {str(i): 8192 for i in range(1, 10)}
+        state = {"families": {"dead": {
+            "selected": "Q8_0",
+            "runs": {"Q8_0": {"file": str(model)}},
+            "tournament_falls": falls,
+        }}}
+        res = fb.certify_rung(
+            8192, ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+        )
+        assert res[0]["verdict"] == "dead"
+        assert ran == []
+        assert "DEAD" in capsys.readouterr().out
+    finally:
+        monkeypatch.undo()

@@ -228,3 +228,53 @@ NEXT (the author runs, fish, one line each):
     python3 full_benchmark.py --rescore --rescore-apply Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF google/gemma-3-1b-it --state-file state/benchmark-state-tournament.json
 
     python3 full_benchmark.py --tournament <same 9 families> --state-file state/benchmark-state-tournament.json
+
+### Addendum 8 - the practitioner takes the helm; the certify controller built
+
+The author will play the practitioner from now on - the study's
+requests come as a practitioner's sequence, and every experiment
+must answer one. The first sequence, answered from current data:
+
+Q1 (a list per step with at least one pass): ANSWERED from the
+n=21 state - every rung 4k-262k has 3-8 models with >=1 hold
+(models.md's n=21 passes/rung vectors). Caveat given: a single hold
+is weak evidence (the Llama n=5 lesson).
+
+Q2 (the same table with a RELIABLE model per step): PARTIALLY
+ANSWERED - 4k and 8k are certified (0.8B both; 2B both at 1 sigma),
+16k+ is EMPTY at the n=21 1-sigma bar; the 0.8B's 12/21 at 16,384
+is one hold short. The 1/3 re-run is the cheap path to fill it
+(most recorded falls were partials).
+
+Q3 (the practitioner's spec, verbatim intent): "a smart benchmark
+that per step picks the most promising candidates and tests them
+until they pass reliably or fail enough times to never pass at the
+fixed n; then the next candidate. A model cannot be re-measured in
+a cell it already measured - the cell being (model, run, step)."
+
+IMPLEMENTED (the addendum-50 --certify instrument, now specified):
+
+    python3 full_benchmark.py --certify 16384 <families> --state-file state/benchmark-state-tournament.json
+
+- THE CELL MODEL: a cell is (model, run number, step), never
+  measured twice. Historical cells are INHERITED from
+  tournament_falls: climb s measured every rung up to and including
+  its fall - cell passed iff the fall is deeper (or topped out),
+  failed iff the fall IS the rung, unmeasured iff the climb stopped
+  below. Direct certify cells persist in fst["certify"][depth].
+- THE CONTROLLER: candidates ordered by promise (existing passes at
+  the rung, then reliable depth); each is tested cell by cell
+  (seed = run number, the lowest unmeasured run) until EARLY ACCEPT
+  (1-sigma Wilson lower bound >= 0.5 over measured cells, count >=
+  11 = half of n=21) or EARLY REJECT (mathematically dead: even
+  passing every remaining cell cannot reach the bar). On accept the
+  rung's w/s is measured (n=5 median); the first accepted model
+  ANSWERS the rung and the rest are SKIPPED (one model per rung).
+- OBSERVATION from the tests: the early-accept bar can fire before
+  21 cells (11/11 accepts, lo=0.917) - sequential testing pays;
+  the dead check uses the FULL n=21 horizon (best possible k/n),
+  not the measured subset.
+
+Tests: cell inheritance, accept+skip, early-reject-dead (the
+fall-at-rung vs fell-below distinction caught a fixture bug - the
+suite now pins it). 133 pass.
