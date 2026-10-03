@@ -511,3 +511,30 @@ def test_certify_rung_dead(tmp_path, capsys):
         assert "DEAD" in capsys.readouterr().out
     finally:
         monkeypatch.undo()
+
+
+def test_diagnose_fwe(tmp_path, capsys):
+    """Addendum 9: the per-rank diagnostic reads the climb CSVs -
+    which of the 3 expected words the found-words actually are, and
+    the pass rate at every threshold (>=1, >=2, 3 of 3)."""
+    import csv as csv_mod
+    import full_benchmark as fb
+
+    d = tmp_path / "tournament-results" / "fam" / "climb1"
+    d.mkdir(parents=True)
+    # cell 1: finds rank-1 only; cell 2: perfect; cell 3: nothing
+    rows = [
+        ["task", "depth", "top_k", "partial", "answer", "correct"],
+        [0, 4096, "aaa;bbb;ccc", 1, "the word is aaa", 1],
+        [0, 4096, "aaa;bbb;ccc", 3, "aaa bbb ccc", 1],
+        [0, 4096, "aaa;bbb;ccc", 0, "the a and of", 0],
+    ]
+    with open(d / "fam-4096-fwe.csv", "w", newline="", encoding="utf-8") as f:
+        csv_mod.writer(f).writerows(rows)
+    fb.diagnose_fwe(str(tmp_path), {"families": {"fam": {}}})
+    out = capsys.readouterr().out
+    assert "3 cells" in out
+    assert "rank-1 word found in 2/3" in out
+    assert "3/3: 1/3" in out
+    assert ">=2/3: 1/3" in out
+    assert ">=1/3: 2/3" in out
