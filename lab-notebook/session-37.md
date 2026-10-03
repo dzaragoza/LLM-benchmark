@@ -560,3 +560,36 @@ Tests: 4 new (the addendum-15 reproduction refused with the line
 number and the file untouched; repair-of-broken-python allowed;
 clean python unaffected; the check() preflight runs the same gate).
 144 pass.
+
+
+## Addendum 17 (2026-10-03, grading) - the 16,384 rung is answered
+
+The author: "results are in." The --certify 16384 run (commits 82c81be,
+f1e69eb) is graded.
+
+THE ANSWER: the 16,384 rung goes to AI21-Jamba2-3B (Q8_0, f16, f16) at
+SILVER - accepted at 11/11 fresh cells, 1-sigma Wilson lo = 0.917.
+3 historical top-out cells inherited (the cell controller never
+re-measures); runs 9-21 never measured (early accept). The other 8
+families were skipped - ~95% compute saved vs the 189-cell worst case.
+
+COST: the first run measured 8 fresh cells then the author
+interrupted during the w/s trials (KeyboardInterrupt in results.txt) -
+w/s is no longer a certification input (addendum 15), so nothing was
+lost. One w/s trial had already recorded 7.2 w/s at 16,384 (PASS) -
+kept as a bonus record, not a certification input. The rerun after
+the interruption took 1 minute: everything inherited, 0 fresh cells,
+8 families skipped.
+
+GRADED INTO THE ARTIFACTS:
+- models.md: the practitioner table (session 37) - 4,096 -> Qwen3.5-0.8B
+  gold (17/21 at 1s); 8,192 -> 0.8B silver (14/21); 16,384 -> Jamba2
+  silver (accept 11/11, lo 0.917); 32,768+ -> EMPTY (in progress).
+- Both web pages: Jamba2 depth 16,384 with depthSource "certified 11/11
+  by the sequential controller (2026-10-03)"; conservative corrected to
+  0 (15/21 at 4k is short of the 16/21 gold bar); caveats now "32k and
+  deeper in progress". node --check and boot smoke test pass on both.
+
+NEXT RUNG (cheapest-first): --certify 32768 on the same 9 families,
+state/benchmark-state-tournament.json. All 9 stay candidates - early
+stop never measured most deep cells.
