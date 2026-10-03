@@ -101,3 +101,87 @@ Code: ruler_gate.score_fwe, ruler_gate.run_fwe_depth (words_found),
 full_benchmark tournament climb print. Tests: score_fwe relaxed
 criterion (1/3, 2/3, 3/3 pass; 0/3 fails) in test_ruler_gate and
 test_seams. 138 pass.
+
+### Addendum 3 - NIAH removed, superseded by FWE
+
+The author's ruling: the niah_single task is deleted from
+ruler_gate.py. FWE superseded it - every quality verdict since
+addendum 136b is FWE, and the tournament never runs NIAH. Removed:
+WORD_BANK, NEEDLE_TEMPLATE, QUERY_TEMPLATE, KEYS, make_needle,
+haystack_paragraphs, build_task, show_task, score_answer, run_depth,
+the --needles and --task CLI args (ruler_gate is now FWE-only; the
+CSV name is fixed at *-fwe.csv), and the seven NIAH tests. The
+ladder-results/*-niah.csv artifacts stay (they are history, not
+code). ANSWER_HEADROOM stays - FWE uses it. 122 -> 130 tests (the
+rescore test adds one below).
+
+### Addendum 4 - the re-score instrument (the author's ruling: re-score)
+
+The author chose option (b) from addendum 2: re-score the saved
+falls from the raw per-cell CSVs. rescore_tournament (new
+full_benchmark mode):
+
+    python3 full_benchmark.py --rescore --state-file state/benchmark-state-tournament.json <families>
+
+Read-only by default: it walks every family's tournament_falls,
+reads each climb's cell CSVs (models/tournament-results/<fam>/
+climbN/*-fwe.csv, the partial column), and re-derives each fall
+under 1/3: a cell with partial >= 1 is a HOLD, so a fall recorded at
+a 1/3-or-2/3 cell moves deeper to the first 0/3 cell; a climb whose
+recorded fall cell now passes is a PASS CHAIN - the true fall is
+above it and unmeasured (the early stop never wrote the cells
+above), so its saved fall is DROPPED and the next --tournament run
+re-runs the whole climb under 1/3 (the resume mechanism treats a
+missing key as fresh). A 0/3 fall is unchanged under both criteria.
+--rescore-apply writes the re-scored falls; the plain --rescore
+never touches state (verified by test). MISSING cells below a
+recorded fall abort that climb's re-score (keep the recorded fall)
+- the CSVs are the authority only where they exist.
+
+THE AUTHOR RUNS (her machine has the CSVs) - read-only report
+first, then apply, then the usual --tournament resume for the
+dropped climbs (fish, one line each):
+
+    python3 full_benchmark.py --rescore Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF google/gemma-3-1b-it --state-file state/benchmark-state-tournament.json
+
+    python3 full_benchmark.py --rescore --rescore-apply Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B AI21/AI21-Jamba2-3B meta-llama/Llama-3.2-1B-Instruct openbmb/MiniCPM5-2B openbmb/MiniCPM5-1B ai21labs/AI21-Jamba-Reasoning-3B RWKV/RWKV7-Goose-World3-2.9B-HF google/gemma-3-1b-it --state-file state/benchmark-state-tournament.json
+
+### Addendum 5 - the n=21 round graded (3/3 criterion - the run predated the 1/3 ruling)
+
+The author's run: 5h03m, seeds 16-21 fresh via resume, all 9
+families at n=21, the first reliable-depth w/s medians. Table and
+the ten-question grade are in models.md (THE n=21 ROUND). HEADLINES:
+(1) SOLE CHAMPION - Qwen3.5-0.8B at 262,144 (mode 2x, median-deep
+tail, two full holds): the n=15 co-champion is alone at the top and
+its reliable depth ROSE to 8,192. (2) The 2B keeps the mode 32,768
+but its reliable depth DROPPED 16,384 -> 8,192 - seeds 16-21 were
+4,096-heavy. (3) Jamba2 is the only family whose mode rose
+(4,096 -> 16,384). (4) The certified map at n=21: 4k covered at
+both sigma levels (0.8B, 2B), 8k reliable (0.8B, 2B), 16k+ EMPTY.
+(5) Seven of nine families certify nothing - the minimal-roster
+retrospective (session 36 addendum 51) is confirmed by the data.
+CAVEAT: all of the above is the 3/3 picture; the addendum-4
+re-score re-derives it under 1/3 and will move falls deeper
+(every recorded fall was a partial).
+
+### Addendum 6 - code_edit incidents (wow.md section 4)
+
+Reported and fixed per the standing rule:
+1. The multi-block search_replace tool failed twice on
+   multi-line old_str that was unique in the file but rendered with
+   wrapped lines (the tool's error message shows wrapped text, not
+   the file's actual lines) - worked around with scripted replaces
+   with asserts (the established pattern; the sandbox quirk list
+   already recommends it).
+2. My first re-score implementation had two real bugs caught by
+   its own new test: the CSV filename was derived as depth-minus-
+   headroom (the climb CSVs are named at the raw depth), and the
+   dry-run mutated the in-memory state (violating the read-only
+   contract). Both fixed; the test pins them.
+3. The code_edit.py md auto-fixer itself is sound (blank lines
+   around tables, trailing newline); the models.md MD058 that
+   appeared mid-session came from my own scripted edit BYPASSING
+   code_edit - caught by md_check before commit and fixed. LESSON
+   (already in wow.md): scripted replaces bypass the editor's
+   auto-fixes, so every scripted md edit must be followed by
+   md_check before commit - done here.
