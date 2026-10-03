@@ -162,12 +162,14 @@ def strip_template_debris(answer: str) -> str:
 
 def score_fwe(answer: str, top_k: list[str]) -> tuple[bool, int]:
     """Upstream scores FWE as the hit-count of expected words in the
-    reply; the study's verdict form (registered 136b) is all-or-nothing
-    per task, with the per-word count returned as the diagnostic.
-    Template debris is stripped first (ruling 1a, addendum 30)."""
+    reply; the study's verdict form (registered 136b) was all-or-nothing
+    per task. Session 37, addendum 2 ruling (a): a task passes at
+    >= 1/3 words found (partial retrieval counts); the per-word count
+    remains the graded 0..k diagnostic. Template debris is stripped
+    first (ruling 1a, addendum 30)."""
     clean = strip_template_debris(answer)
     found = [w for w in top_k if w in re.sub(r"\s+", "", clean)]
-    return len(found) == len(top_k), len(found)
+    return len(found) >= 1, len(found)
 
 
 KEYS = (
@@ -370,22 +372,29 @@ def run_fwe_depth(
     top_k: int = FWE_TOP_K,
 ) -> dict[str, Any]:
     """FWE cells: same shape as run_depth (CSV cache, per-task rows,
-    ERROR rows continue the sweep), verdict all-or-nothing per task
-    with the per-word partial credit as the diagnostic (registered
-    136b)."""
+    ERROR rows continue the sweep), verdict >= 1/3 words per task
+    (session 37, addendum 2) with the per-word partial credit as the
+    diagnostic (registered 136b)."""
     if os.path.exists(csv_path):
         with open(csv_path, encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         if len(rows) >= samples and all(r.get("correct") is not None for r in rows):
             hits = sum(r["correct"] == "1" for r in rows[:samples])
+            partials = [
+                int(r["partial"])
+                for r in rows[:samples]
+                if r.get("partial") not in (None, "")
+            ]
             return {
                 "label": label,
                 "depth": depth,
                 "n": len(rows[:samples]),
                 "correct": hits,
                 "acc": hits / samples,
+                "words_found": partials,
             }
     hits = 0
+    partial_list: list[int] = []
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
@@ -402,12 +411,20 @@ def run_fwe_depth(
                 continue
             ok, partial = score_fwe(answer, top_k)
             hits += ok
+            partial_list.append(partial)
             w.writerow([i, depth, ";".join(top_k), partial, answer, int(ok)])
             print(
                 f"  task {i + 1}/{samples} @ {depth} tok: {partial}/{len(top_k)} words "
                 f"-> {'HIT' if ok else 'MISS'} ({answer.strip()[:48]!r})"
             )
-    return {"label": label, "depth": depth, "n": samples, "correct": hits, "acc": hits / samples}
+    return {
+        "label": label,
+        "depth": depth,
+        "n": samples,
+        "correct": hits,
+        "acc": hits / samples,
+        "words_found": partial_list,
+    }
 
 
 def run_depth(
@@ -525,8 +542,8 @@ def main() -> None:
         default=None,
         help="session 36, addendum 6: the FWE difficulty knob 1 - the answer "
         "set size (default 3; upstream RULER asks for the 10 most frequent "
-        "words; the score stays all-or-nothing per task, the per-word "
-        "partial is the graded 0..k diagnostic)",
+        "words; the score is >= 1/3 words per task (session 37, addendum 2), "
+        "the per-word partial is the graded 0..k diagnostic)",
     )
     p.add_argument(
         "--kv-quant-v",

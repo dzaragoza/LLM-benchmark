@@ -51,3 +51,53 @@ OPEN DESIGN QUESTIONS (to settle before any implementation):
 
 STATUS: idea registered; no design decisions made; not scheduled.
 The certification phase (addendum 50, session 36) has priority.
+
+### Addendum 2 - the FWE pass criterion relaxed to 1/3; the disqualified mechanism retired
+
+Timestamp: 2026-10-03 (before the n=21 completion run). The author's
+two rulings, both implemented before the run so its data is collected
+under the new rules.
+
+RULING (a) - FWE passes at >= 1/3 words. The verdict form (registered
+136b) was all-or-nothing: a cell passed only on a perfect 3/3. The
+relaxation: a task passes when >= 1 of the 3 expected words is found
+(partial retrieval counts). Implementation: score_fwe returns
+len(found) >= 1 (the per-word count stays the 0..k diagnostic);
+run_fwe_depth now also returns words_found (the per-task partial list,
+both from fresh runs and from the CSV cache) so the 1/3 vs 2/3 vs 3/3
+distinction survives into results; the tournament climb print shows
+"{words}/3 words -> HOLD/FALL". The n=1 cell semantics are unchanged
+otherwise (fwe_pass returns acc == 1.0; one sample, one verdict).
+
+DATA-CONSISTENCY FLAG (the meta rule - decided together, not silently):
+all tournament data so far (n=15/n=7) was collected under 3/3. The
+saved tournament_falls encode the OLD criterion, and under 1/3 some
+recorded falls become holds (the addendum-26 finding: every fall so
+far was a partial 1/3 or 2/3, never 0/3 - so under the new criterion
+the recorded fall depths are LOWER BOUNDS on the true ones, and the
+resume mechanism would skip climbs whose fall cells need re-scoring).
+Options for the n=21 run: (a) fresh start - wipe tournament_falls and
+re-run all 21 climbs per family under 1/3 (cleanest, ~5-6 h at the
+n=15 pace, but discards resume); (b) re-score the saved climbs from
+the raw per-cell CSVs (the partial counts are in the climb CSVs on the
+author's machine) and resume from the re-scored falls; (c) keep the
+historical falls as-is and collect only the new climbs under 1/3
+(INCONSISTENT - mixing criteria in one rank statistic; not
+recommended, listed for completeness). My recommendation is (b) if
+the CSVs are intact, else (a). THE AUTHOR DECIDES before the run.
+
+RULING (b) - the disqualified mechanism is RETIRED. Both rules are
+gone: the addendum-38 floor rule (zero holds in seven climbs) and the
+addendum-44 domination rule (2-sigma-certified A vs zero-hold
+candidate, w/s-gated, tournament-data-only). No model is disqualified
+by tournament data; MiniCPM5-1B stays in the field on its measurement
+alone. The DISQUALIFIED section is deleted from models.md; the stale
+verdict prose (the rounds 6-7 floor-rule verdict, the n=15
+domination-rule status block) is removed - retired rules pollute. The
+author will supply a NEW policy; it is NOT invented here and will be
+registered as its own addendum when given.
+
+Code: ruler_gate.score_fwe, ruler_gate.run_fwe_depth (words_found),
+full_benchmark tournament climb print. Tests: score_fwe relaxed
+criterion (1/3, 2/3, 3/3 pass; 0/3 fails) in test_ruler_gate and
+test_seams. 138 pass.

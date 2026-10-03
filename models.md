@@ -92,11 +92,9 @@ tournament is resumable so only seeds 6-7 ran):
 | 5 (4,096) | AI21-Jamba-Reasoning-3B | (Q8_0, f16, f16) | 8192, 4096, 16384, 4096, 4096, 4096, 4096 | [2 1 0 0 0 0 0] | mode | 4,096 tok; clears the floor but only just |
 | 6 (4,096) | MiniCPM5-2B | (Q8_0, f16, q4_0) | 8192, 4096, 4096, 4096, 4096, 8192, 4096 | [2 0 0 0 0 0 0] | mode | 4,096 tok; clears the floor |
 | 7 (4,096) | RWKV7-Goose-World3-2.9B-HF | (Q8_0, n/a, n/a) | 4096, 4096, 4096, 4096, 4096, 8192, 4096 | [1 0 0 0 0 0 0] | mode | 4,096 tok; climb 6 (seed 6) HELD 8,192 - the first crack in the all-4096 structural claim: pure recurrence is not deterministically floor-bound, seed 6's word draws were retrievable |
-| 8 (4,096) | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x7 | [0 0 0 0 0 0 0] | mode | DISQUALIFIED - zero holds in seven climbs; the floor rule's first casualty |
+| 8 (4,096) | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x7 | [0 0 0 0 0 0 0] | mode | 4,096 tok; zero holds in seven climbs (the disqualification this round produced was later reverted - addendum 44, mechanism retired session 37) |
 
-DISQUALIFIED under the floor rule (addendum 38): MiniCPM5-1B - and
-only MiniCPM5-1B. Seven climbs, zero holds at any depth. The field is
-now 7 families; one replacement entrant is owed to hold the study at 8.
+The disqualification verdicts this round produced were later reverted (addendum 44); the disqualified mechanism is retired entirely (session 37, addendum 2 - a replacement policy is pending).
 
 THE n=15 ROUND (session 36 addendum 46 - the author's run, 5h12m; seeds 8-15
 fresh via resume, gemma's first 15; bars at n=15: reliable 10/15,
@@ -114,12 +112,7 @@ conservative 12/15):
 | 8 | MiniCPM5-2B | (Q8_0, f16, q4_0) | see state | [3 0 0 0 0 0 0] | 0 | 0 | 8,192 | mode | 3/15 at the floor, nothing above |
 | 9 | MiniCPM5-1B | (Q8_0, f16, f16) | 4096 x7 (n=7, seeds 8-21 pending) | [0 0 0 0 0 0 0] | 0 | 0 | 4,096 | mode | re-admitted (addendum 44); zero holds in 7 climbs so far |
 
-DOMINATION-RULE STATUS (addendum 44, n=15 data): nobody is disqualified
-yet - the 2B's conservative certification (4,096, 13/15) dominates
-only models with ZERO holds at >= 4,096, which is MiniCPM5-1B alone,
-and the rule's w/s gate is unmeasured (the reliable-depth w/s step
-ships in addendum 42's code, which this run predated). The verdict
-waits for the n=21 completion.
+The domination rule is retired (session 37, addendum 2); a replacement policy is pending from the author.
 
 NOBODY beat the bar (32,768, the first tournament's rank). The overall
 field ranking stands: Qwen3.5-2B (32,768) > Jamba2-3B (8,192) >
@@ -135,24 +128,8 @@ seed's word draws than on the depth. The comeback round (Llama-3.2-1B,
 MiniCPM5-2B, Jamba-Reasoning-3B, RWKV7-2.9B - addenda 16-18 entries)
 now has a bar to beat: 32,768.
 
-## DISQUALIFIED (the domination rule - session 36 addendum 44, supersedes the addendum-38 floor rule)
+The disqualified mechanism (floor rule addendum 38, domination rule addendum 44) is RETIRED (session 37, addendum 2): no model is disqualified by tournament data; a replacement policy is pending from the author and will be registered when given.
 
-A model is disqualified ONLY when some model A is conservative-
-certified (2-sigma lower Wilson bound >= 0.5) at a depth at which
-this model has ZERO holds in the tournament sample, AND A passes the
-w/s gate at its reliable depth (measured, n=5). The trigger is the
-absence of holds, not a low ceiling (a max statistic grows with n
-and certifies nothing; zero holds after n seeds bounds the true
-probability far below certifiable - a certifiable model producing
-0/21 at a rung is ~1-in-17-billion). Data scope: THIS TOURNAMENT
-ONLY - any pre-tournament data (ladder runs, seed-1024 passes) does
-not count for or against disqualification. The floor rule
-(addendum 38) is superseded; MiniCPM5-1B is RE-ADMitted and its
-disqualification reverted - the new measurement decides.
-
-| model | config (model q, k, v) | reason |
-|---|---|---|
-| (empty - the floor rule is superseded; no model is currently disqualified) | | |
 ## REJECTED
 
 Strict reason list (author ruling, addendum 21, extended addendum 23):

@@ -486,10 +486,12 @@ def tournament_family(
                 kv_quant_v=kv_v,
             )
             ok, fv = row
-            partial = fv.get("correct", 0)
+            words = fv.get("words_found", [fv.get("correct", 0)])
+            partial = words[0] if words else 0
             print(
                 f"  climb {s}/{TOURNAMENT_CLIMBS} @ {d} tok: "
-                f"{partial}/1 -> {'HOLD' if ok else 'FALL'}"
+                f"{partial}/{ruler_gate.FWE_TOP_K} words -> "
+                f"{'HOLD' if ok else 'FALL'}"
             )
             if not ok:
                 fall = d

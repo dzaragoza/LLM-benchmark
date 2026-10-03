@@ -833,6 +833,13 @@ def test_score_fwe_strips_template_debris():
     assert not ok2 and n2 == 0
 
 
+def test_score_fwe_one_third_pass_rule():
+    # session 37, addendum 2 ruling (a): 1/3 or higher passes
+    top_k = ["nysskz", "swucem", "tvjzpa"]
+    ok, n = ruler_gate.score_fwe("only nysskz found", top_k)
+    assert ok and n == 1
+
+
 def test_resolve_f16_local_never_returns_a_quantized_file(tmp_path):
     # the MiniCPM-*-sft-bf16 bug (addendum 30): 'bf16' in the FAMILY
     # name made the family's own -Q8_0.gguf match the f16 glob
