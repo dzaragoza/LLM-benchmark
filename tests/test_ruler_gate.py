@@ -131,9 +131,13 @@ def test_fwe_vocab_and_counts_follow_upstream_constants(monkeypatch):
     assert counts[1] > counts[2] > counts[3] > counts[4]
 
 
-def test_fwe_scoring_all_or_nothing_with_partial_diagnostic():
+def test_fwe_scoring_relaxed_one_third():
+    # session 37, addendum 2 ruling (a): >= 1/3 words is a pass;
+    # partial retrieval counts, the parametric-word 0/3 still fails
     ok, partial = rg.score_fwe("the top words are: alphaone", ["alphaone", "betatwo", "gammathree"])
-    assert ok is False and partial == 1
+    assert ok is True and partial == 1
+    ok, partial = rg.score_fwe("alphaone betatwo", ["alphaone", "betatwo", "gammathree"])
+    assert ok is True and partial == 2
     ok, partial = rg.score_fwe("alphaone betatwo gammathree", ["alphaone", "betatwo", "gammathree"])
     assert ok is True and partial == 3
     # parametric-word failure (the paper's signature): scores zero
