@@ -674,6 +674,48 @@ def safe_append(path: str, addition: str) -> str:
     return f"appended {n} line(s) to {path}"
 
 
+def replace_verified(path: str, replaces: Sequence[tuple[str, str]], count: int = 1) -> None:
+    """Scripted replaces with asserts, as a first-class transaction
+    (session 37, addendum 12). Born from the session-37 incident class
+    (notebook addendum 6): when the conversational edit tool fails on
+    wrapped-line old_str, the established workaround was a hand-rolled
+    `python3 open/write` script with asserts - which BYPASSES every
+    guarantee of this tool (the md auto-fixer, the md-lint gate, the
+    delimiter check, the atomic synced write). The addendum-6 MD058
+    escaped to git exactly that way. This function is that pattern
+    done right, so there is never a reason to bypass the editor:
+
+    replaces: a list of (old, new) pairs. Each old must occur EXACTLY
+    `count` times in the file (count=1 default: unique; the assert is
+    the scripted-replace assert, enforced by the tool now). Pairs
+    apply in order against the running buffer, so a later pair may
+    match text a earlier pair inserted. On ANY assert failure the file
+    is untouched (nothing is written until every pair verifies).
+
+    The full edit() pipeline runs on the assembled result: the md
+    auto-fixer (blank lines around tables, trailing newline), the
+    md-lint no-new-violations gate, and the delimiter balance check -
+    a scripted replace can no longer smuggle a lint break into git.
+    """
+    blocks: list[tuple] = []
+    for i, (old, new) in enumerate(replaces):
+        n = src_count(path, old)
+        if n != count:
+            raise CodeEditError(
+                f"{path}: replace pair {i} assert failed: old text occurs "
+                f"{n} time(s), expected exactly {count}"
+            )
+        blocks.append(("replace_n", old, new, 1) if count == 1 else ("replace_all", old, new))
+    edit(path, blocks)
+
+
+def src_count(path: str, text: str) -> int:
+    """How many times text occurs in path right now (the assert helper
+    for replace_verified; exposed for callers that build their own
+    conditions)."""
+    return open(path, encoding="utf-8").read().count(text)
+
+
 def _atomic_write_sync(path: str, content: str) -> None:
     """Write to a temp file in the same directory, fsync it, os.replace
     over the target, then fsync the DIRECTORY entry - the rename is

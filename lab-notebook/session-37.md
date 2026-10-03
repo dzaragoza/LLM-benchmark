@@ -394,3 +394,37 @@ IMPLEMENTED (cpu-picker.html + gpu-picker.html, both JS-checked):
 - cpu-picker's machine-list floor is recomputed from the new pool:
   the most bandwidth-forgiving certified model is now the 0.8B
   (34.85 w/s), so the list floor drops to ~14.7 GB/s.
+
+## Addendum 12: code_edit gap FIXED - replace_verified (2026-10-03)
+
+AUTHOR'S RULING (wow.md section 4): the incidents were reported but
+not FIXED - always fix, and propose improvements.
+
+ROOT CAUSE of the addendum-6 incident class: the session's
+workaround pattern for wrapped-line old_str failures was a
+hand-rolled `python3 open/write` script with asserts. That pattern
+BYPASSES code_edit entirely - no md auto-fixer, no md-lint gate, no
+delimiter check, no atomic synced write. The MD058 that escaped to
+git mid-session came from exactly one of those scripts (reported in
+addendum 6 item 3, but the FIX was only "run md_check after" - a
+discipline rule, not a mechanism; discipline rules fail when
+forgotten, and wow.md says we make procedures error-proof instead).
+
+THE FIX (mechanism, not discipline): `code_edit.replace_verified(
+path, [(old, new), ...], count=1)` - the scripted-replace pattern as
+a first-class transaction. Each old must occur EXACTLY count times
+(the scripted assert, now enforced by the tool); pairs apply in order
+against the running buffer; on any assert failure the file is
+untouched. The assembled result then runs the FULL edit() pipeline:
+the md auto-fixer (blank lines around tables, trailing newline), the
+md-lint no-new-violations gate (MD055/MD056/fences), and the
+delimiter balance check. A scripted replace can no longer smuggle a
+lint break into git, and there is no longer a reason to bypass the
+editor. Plus `code_edit.src_count(path, text)` as the exposed assert
+helper.
+
+Tests: 4 new (unique pairs apply + lint-clean, exact-count assert
+with the file untouched and count=2 -> replace_all, missing target
+untouched, the md pipeline actually runs - a table insert gets
+auto-blank-lined and a ragged MD056 is refused before the write).
+138 pass.
