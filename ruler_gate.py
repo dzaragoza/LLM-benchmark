@@ -58,6 +58,7 @@ FWE_CODED_WORDLEN = 6
 FWE_ALPHA = 2.0
 FWE_TOP_K = 3
 FWE_GEN_TOKENS = 128
+FWE_PASS_MIN = 1
 
 
 def zeta(alpha: float, k: int) -> float:
@@ -140,16 +141,19 @@ def strip_template_debris(answer: str) -> str:
     return TEMPLATE_DEBRIS.sub("", answer)
 
 
-def score_fwe(answer: str, top_k: list[str]) -> tuple[bool, int]:
+def score_fwe(
+    answer: str, top_k: list[str], min_words: int = FWE_PASS_MIN
+) -> tuple[bool, int]:
     """Upstream scores FWE as the hit-count of expected words in the
-    reply; the study's verdict form (registered 136b) was all-or-nothing
-    per task. Session 37, addendum 2 ruling (a): a task passes at
-    >= 1/3 words found (partial retrieval counts); the per-word count
-    remains the graded 0..k diagnostic. Template debris is stripped
-    first (ruling 1a, addendum 30)."""
+    reply. The verdict threshold is CONFIGURABLE (session 37,
+    addendum 9: measure once at k=3, grade at any threshold later):
+    a task passes when >= min_words of the expected words are found
+    (default 1, the addendum-2 relaxation; 3 is the original strict
+    form). The per-word count remains the graded 0..k diagnostic.
+    Template debris is stripped first (ruling 1a, addendum 30)."""
     clean = strip_template_debris(answer)
     found = [w for w in top_k if w in re.sub(r"\s+", "", clean)]
-    return len(found) >= 1, len(found)
+    return len(found) >= min_words, len(found)
 
 
 def report_server_ctx(log_path: str, wanted: int) -> int | None:
@@ -215,6 +219,7 @@ def run_fwe_depth(
     no_thinking: bool = True,
     show: bool = False,
     top_k: int = FWE_TOP_K,
+    min_words: int = FWE_PASS_MIN,
 ) -> dict[str, Any]:
     """FWE cells: same shape as run_depth (CSV cache, per-task rows,
     ERROR rows continue the sweep), verdict >= 1/3 words per task
@@ -224,7 +229,11 @@ def run_fwe_depth(
         with open(csv_path, encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         if len(rows) >= samples and all(r.get("correct") is not None for r in rows):
-            hits = sum(r["correct"] == "1" for r in rows[:samples])
+            hits = sum(
+                (int(r["partial"]) if r.get("partial") not in (None, "") else int(r["correct"]))
+                >= min_words
+                for r in rows[:samples]
+            )
             partials = [
                 int(r["partial"])
                 for r in rows[:samples]
@@ -254,7 +263,7 @@ def run_fwe_depth(
                 print(f"  task {i + 1}/{samples} @ {depth} tok: FAILED - {e}")
                 w.writerow([i, depth, ";".join(top_k), "", f"ERROR: {e}", ""])
                 continue
-            ok, partial = score_fwe(answer, top_k)
+            ok, partial = score_fwe(answer, top_k, min_words)
             hits += ok
             partial_list.append(partial)
             w.writerow([i, depth, ";".join(top_k), partial, answer, int(ok)])
@@ -330,6 +339,16 @@ def main() -> None:
         "set size (default 3; upstream RULER asks for the 10 most frequent "
         "words; the score is >= 1/3 words per task (session 37, addendum 2), "
         "the per-word partial is the graded 0..k diagnostic)",
+    )
+    p.add_argument(
+        "--fwe-pass-min",
+        type=int,
+        default=None,
+        help="session 37, addendum 9: the pass threshold - a task passes "
+        "at >= this many of the 3 expected words (default 1, the "
+        "addendum-2 relaxation; 3 is the original strict form). The "
+        "per-word partial is always recorded, so the same run grades "
+        "at any threshold later",
     )
     p.add_argument(
         "--kv-quant-v",
@@ -411,6 +430,7 @@ def main() -> None:
                     no_thinking=not args.thinking,
                     show=args.show,
                     top_k=args.fwe_top_k or FWE_TOP_K,
+                    min_words=args.fwe_pass_min or FWE_PASS_MIN,
                 )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "

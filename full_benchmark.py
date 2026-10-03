@@ -200,6 +200,7 @@ def fwe_pass(
     port: int,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
+    min_words: int = 1,
 ) -> tuple[bool, dict[str, Any]]:
     """One FWE cell at depth=rung-2x headroom, n=1, on its own server
     launch at exactly the rung's ctx (ruler_gate's launch shape: one
@@ -242,7 +243,8 @@ def fwe_pass(
                 pass
             return False, {"error": "fwe server did not come up", "depth": depth}
         row = ruler_gate.run_fwe_depth(
-            port, label, depth, 1, csv_path, seed0=seed, no_thinking=True
+            port, label, depth, 1, csv_path, seed0=seed, no_thinking=True,
+            min_words=min_words,
         )
         row["window_cap"] = _banner_window(log_path)
         smaps = llama_server.mapped_memory_gib(proc)
@@ -526,6 +528,62 @@ def tournament_family(
     }
 
 
+def diagnose_fwe(models_dir: str, state: dict[str, Any]) -> None:
+    """Session 37, addendum 9: the per-rank diagnostic - which of the
+    three expected words does a partial pass actually find? Reads the
+    climb cell CSVs (task rows carry the answer text and the rank-
+    ordered top_k list; the zeta law makes rank 1 the ~4x/9x more
+    frequent word, so a 1/3 pass that only ever finds rank 1 is a
+    WEAKER claim than the threshold suggests). Also reports the pass
+    rate at every threshold (>=1, >=2, 3 of 3) per family per rung:
+    measure once, grade later."""
+    import re as _re
+
+    print("=" * 60)
+    stamp("FWE DIAGNOSTIC (per-rank found; pass rates by threshold)")
+    for fam, fst in sorted((state.get("families") or {}).items()):
+        results_dir = os.path.join(models_dir, "tournament-results", fam)
+        if not os.path.isdir(results_dir):
+            continue
+        rank_found = [0, 0, 0]
+        partials = [0, 0, 0, 0]
+        cells = 0
+        for climb_dir in sorted(os.listdir(results_dir)):
+            cpath = os.path.join(results_dir, climb_dir)
+            if not os.path.isdir(cpath) or not climb_dir.startswith("climb"):
+                continue
+            for name in os.listdir(cpath):
+                if not name.endswith("-fwe.csv"):
+                    continue
+                with open(os.path.join(cpath, name), encoding="utf-8") as f:
+                    for r in csv.DictReader(f):
+                        ans = r.get("answer") or ""
+                        top_k = (r.get("top_k") or "").split(";")
+                        if not ans or not top_k or ans.startswith("ERROR"):
+                            continue
+                        clean = _re.sub(r"\s+", "", ans)
+                        found = [i for i, w in enumerate(top_k) if w and w in clean]
+                        cells += 1
+                        partials[min(len(found), 3)] += 1
+                        for i in found:
+                            rank_found[i] += 1
+        if not cells:
+            continue
+        print(f"  {fam}: {cells} cells (climb CSVs)")
+        for i, c in enumerate(rank_found):
+            print(f"    rank-{i + 1} word found in {c}/{cells} cells ({c / cells:.0%})")
+        p1 = partials[1] + partials[2] + partials[3]
+        p2 = partials[2] + partials[3]
+        p3 = partials[3]
+        print(
+            f"    pass >=1/3: {p1}/{cells} ({p1 / cells:.0%}) | "
+            f">=2/3: {p2}/{cells} ({p2 / cells:.0%}) | "
+            f"3/3: {p3}/{cells} ({p3 / cells:.0%})"
+        )
+        if p1 and rank_found[0] / max(1, rank_found[0] + rank_found[1] + rank_found[2]) > 0.7:
+            print("    NOTE: found-words are overwhelmingly rank-1 - the >=1/3 claim is mostly 'finds the most frequent word'")
+
+
 def certify_cells(fst: dict[str, Any], depth: int) -> dict[int, bool]:
     """Session 37, addendum 8: the CELL model - a cell is (model, run
     number, step) and is NEVER measured twice. The historical cells
@@ -653,7 +711,8 @@ def certify_rung(
             )
             ran += 1
             cells[next_run] = ok
-            direct[str(next_run)] = ok
+            words = fv.get("words_found") or []
+            direct[str(next_run)] = words[0] if words else int(ok)
             measured += 1
             k += 1 if ok else 0
             fst.setdefault("certify", {})[str(depth)] = direct
@@ -1523,6 +1582,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --rescore: write the re-scored falls to the state file",
     )
     ap.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="session 37, addendum 9: read the climb cell CSVs and report "
+        "the per-rank diagnostic (which of the 3 expected words a "
+        "partial pass found) and the pass rate at >=1/3, >=2/3, 3/3 "
+        "per family - measure once, grade at any threshold later",
+    )
+    ap.add_argument(
         "--certify",
         type=int,
         default=None,
@@ -1625,6 +1692,9 @@ def main() -> None:
         ap.error("no family specs given")
     if args.rescore:
         rescore_tournament(args.models_dir, state, args.state_file, not args.rescore_apply)
+        return
+    if args.diagnose:
+        diagnose_fwe(args.models_dir, state)
         return
     if args.certify:
         results = certify_rung(

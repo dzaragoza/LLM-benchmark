@@ -278,3 +278,51 @@ IMPLEMENTED (the addendum-50 --certify instrument, now specified):
 Tests: cell inheritance, accept+skip, early-reject-dead (the
 fall-at-rung vs fell-below distinction caught a fixture bug - the
 suite now pins it). 133 pass.
+
+
+### Addendum 9 - the configurable FWE threshold; measure once, grade later; the two quality metrics
+
+The author's ruling: the FWE cost is per-cell regardless of k, so
+INSTRUMENT: measure at k=3 with the per-word partial ALWAYS
+recorded, GRADE at any threshold later - no separate benchmarks.
+
+IMPLEMENTED:
+- ruler_gate: FWE_PASS_MIN (default 1); score_fwe and run_fwe_depth
+  take min_words; the CSV-cache re-grade reads the stored partials,
+  so a cached cell re-grades at any threshold without a rerun;
+  --fwe-pass-min CLI flag (3 = the original strict form).
+- full_benchmark: fwe_pass takes min_words; the certify controller's
+  DIRECT CELLS now persist the partial count (0..3) instead of a
+  boolean, so certify data also re-grades later.
+- --diagnose: reads every climb cell CSV and reports per family
+  (a) which RANK of the 3 expected words the found-words are
+  (the zeta law: rank-1 is ~4x/9x more frequent - a >=1/3 pass
+  that only ever finds rank 1 is a weaker claim than the threshold
+  suggests), (b) the pass rate at >=1/3, >=2/3, 3/3. Flag when
+  found-words are >70% rank-1.
+
+THE DIFFICULTY QUESTION (the author's k=3-at-1 vs k=1): NOT the
+same. The three words are unequally findable (rank^-2 counts), and
+>=1/3 is a union of three doors including the easiest one; k=1
+(the single most frequent word) is strictly harder than the union.
+The relaxation mostly rescues models that find the top word but
+cannot complete the aggregation - exactly the partial-fallers the
+re-score found.
+
+THE TWO QUALITY METRICS (the author's question: which is
+stronger?): (1) threshold quality - how many of the 3 words a cell
+finds (graded 1/3, 2/3, 3/3); (2) repetition quality - how many
+cells pass (the Wilson-certified count). ANSWER: they measure
+DIFFERENT failure modes and are not interchangeable. Threshold
+quality grades the MECHANISM (partial retrieval vs full
+aggregation) on one draw; repetition quality grades the RELIABILITY
+(the probability the mechanism fires at all). The stronger measure
+FOR THE PRACTITIONER is repetition at a FIXED honest threshold -
+p(pass) is what a user experiences, and it is what the Wilson
+certification already prices. Threshold quality is the DIAGNOSTIC:
+it explains WHY reliability collapses (rank-1-only retrieval) and
+it is the free upgrade path - if the certified map fills at 1/3
+but the practitioner wants the 3/3 claim, re-grade the same cells
+at 3/3 and re-certify with zero new compute. RULE: report both;
+certify on repetition at the stated threshold; state the threshold
+in every recommendation.
