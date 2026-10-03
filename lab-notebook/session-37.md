@@ -527,3 +527,36 @@ gate in safe_append has the same class for appends. NOTE: edit()
 does NOT compile .py targets after replace; PROPOSAL: extend the
 post-write verify to ast-parse .py results. Flagged for the author.
 140 tests pass.
+
+
+## Addendum 16: the ast gate - python edits are syntax-checked before the write (2026-10-03)
+
+BUILT (the addendum-15 proposal, the author: "build it! we always
+improve, no need to ask for permission"):
+
+`_check_python_syntax(src, out, path)`: for .py targets, if the
+source parsed and the edit's result does not, the edit is REFUSED
+with the SyntaxError's line and message - the file untouched.
+Philosophy identical to _check_markdown: only NEW problems fail; an
+edit to an already-broken file is a legal repair and goes through.
+Wired into edit(), edit_many(), and the check() preflight - the
+same gate a pre-flight caller sees.
+
+THE ADDENDUM-15 INCIDENT CLASS IS CLOSED: a replace that inserts a
+literal newline inside a string literal (the exact bug that broke
+full_benchmark.py's import last addendum) is now refused at edit
+time with the line number. The gate also catches the general class:
+truncated literals, orphaned brackets, mangled f-strings - any
+edit that leaves the module unparseable.
+
+INCIDENT (reported per wow.md section 4, with relish): while
+BUILDING the syntax gate, my first insertion broke code_edit.py's
+own syntax (a one-quote docstring terminator) - and the module
+could not load to fix itself. Fixed with a standalone
+verify-before-write script (the same atomic pattern). The irony is
+registered: the gate's first catch could not be the gate.
+
+Tests: 4 new (the addendum-15 reproduction refused with the line
+number and the file untouched; repair-of-broken-python allowed;
+clean python unaffected; the check() preflight runs the same gate).
+144 pass.
