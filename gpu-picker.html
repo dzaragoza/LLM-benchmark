@@ -142,11 +142,12 @@
     <div class="sub">
       Which model fits your GPU's VRAM? This study measured nine small
       language-model families (0.8B to 3B parameters) doing real long-context
-      work, then certified each one with a confidence level:
-      <strong>reliable</strong> = the model passed a repeated hidden-word
-      retrieval test at that context size with 1-sigma confidence;
-      <strong>conservative</strong> = the same claim at the stricter 2-sigma
-      level. The VRAM numbers are the measured whole-stack memory cost
+      work, then certified each one with a medal for quality, earned on
+      measured runs: <strong>bronze</strong> = it passed at least once at
+      that context size; <strong>silver</strong> = <em>reliable</em> &mdash;
+      passed often enough that we are confident it usually works;
+      <strong>gold</strong> = <em>confident</em> &mdash; passed often enough
+      to trust on a bad day. The VRAM numbers are the measured whole-stack memory cost
       (weights + KV cache + buffers + runtime), taken from the CPU-side
       instrument &mdash; a conservative upper bound for the GPU stack.
       Serving from system RAM instead?
@@ -211,10 +212,17 @@
     <div id="result"></div>
     <div id="tables"></div>
 
+    <h2>All measured models &mdash; the runs behind the medals</h2>
+    <p style="font-size: 0.9rem">
+      Every family the study measured, at every context size, with the raw
+      pass counts out of 21 runs and the medal each rung earned. This is the
+      data the recommendations come from &mdash; nothing hidden.
+    </p>
+    <div id="runsTable"></div>
+
     <div class="foot">
       <p>
-        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder (4k, 8k, 16k, &hellip; 256k tokens). At each context size the model had to find hidden words in a long coded text &mdash; pass means finding at least 1 of the 3 hidden words. A context size is <strong>reliable</strong> when the 1-sigma confidence lower bound on the pass probability is at least 50% (Wilson interval; about 13 of 21 passes at n=21); <strong>conservative</strong> doubles that (2 sigma, about 16 of 21). A candidate is eligible iff (a) its measured whole-stack memory cost (weights + KV cache + buffers + runtime &mdash; the CPU-side instrument, an upper bound for the GPU stack) fits the card's VRAM, and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader line, evaluated at each capacity's lowest-bandwidth card. The recommendation is the deepest reliable model that fits.
-      </p>
+        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder of context sizes (4k, 8k, 16k, &hellip; 256k tokens). At each context size the model had to find hidden words in a long coded text &mdash; a pass means finding them. The raw pass counts earn the medals: <strong>bronze</strong> = at least one pass out of 21 (it can work, but expect misses); <strong>silver</strong> = reliable, roughly 13 or more passes out of 21 (we are confident it usually works); <strong>gold</strong> = confident, roughly 16 or more out of 21 (trust it on a bad day). The recommended model is the deepest silver-or-better one that (a) fits your RAM (measured whole-stack cost: weights + KV cache + buffers + runtime, cold) and (b) is predicted to stay above the 5 w/s reader line at your bandwidth (speed scales linearly with memory bandwidth: measured@102.4&times;BW/102.4). The full runs table below shows every pass count behind every medal.
       <p>
         <strong>Two extrapolations, both flagged.</strong> The minimum-RAM
         criterion carries the CPU measurement onto the GPU unchanged
@@ -271,7 +279,7 @@
           cost: 4.42,
           costEst: false,
           wps: 6.84,
-          depth: 8192,
+          depth: 4096,
           conservative: 0,
           family: "AI21-Jamba2",
           quant: "Q8_0 + K/V f16",
@@ -421,12 +429,13 @@
             (best.m.depth === null
               ? "\u2014"
               : best.m.depth === 0
-                ? "counting floor"
+                ? "no medal"
                 : best.m.depth.toLocaleString()) +
-            " tokens reliable (1&sigma;)" +
-            (r.m.conservative
-              ? " &middot; " + r.m.conservative.toLocaleString() + " tokens conservative (2&sigma;)"
+            " tokens silver (reliable) &middot; " +
+            (best.m.conservative
+              ? best.m.conservative.toLocaleString() + " tokens gold (confident) &middot; "
               : "") +
+            "4,096+ tokens bronze" +
             "</div>" +
             "<div>file " +
             best.m.size.toFixed(2) +
@@ -454,7 +463,7 @@
           '<th class="num" data-k="cost">minimum RAM GiB</th><th class="num" data-k="fits">fits ' +
           vram +
           " GiB</th>" +
-          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">reliable tok (1&sigma;)</th><th class="num" data-k="conservative">conservative tok (2&sigma;)</th></tr></thead><tbody id="tbody">';
+          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">silver tok (reliable)</th><th class="num" data-k="conservative">gold tok (confident)</th></tr></thead><tbody id="tbody">';
         rows.forEach(function (r) {
           t +=
             "<tr><td>" +
@@ -476,13 +485,13 @@
             (r.m.depth === null
               ? "\u2014"
               : r.m.depth === 0
-                ? "none at 1&sigma;"
+                ? "no silver"
                 : r.m.depth.toLocaleString()) +
             '</td><td class="num">' +
             (r.m.conservative === null || r.m.conservative === undefined
               ? "\u2014"
               : r.m.conservative === 0
-                ? "none at 2&sigma;"
+                ? "no gold"
                 : r.m.conservative.toLocaleString()) +
             "</td></tr>";
         });
@@ -491,6 +500,57 @@
           t +
           '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
           '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV cache + buffers + runtime) at 262,144 context, cold; <strong>reliable/conservative</strong> = the deepest context certified at 1&sigma;/2&sigma; (n=21 repetitions, 1-of-3-words pass rule); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement. The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls.</div>';
+      }
+
+      // The runs-only table (n=21 seeded runs per family per rung, the raw
+      // study data before any recommendation). passes = how many of the 21
+      // runs found all 3 hidden words at that context size. medal per rung:
+      // bronze = at least one pass (it can work), silver = reliable (the
+      // 1-sigma Wilson lower bound on pass probability >= 50%: >= 13/21),
+      // gold = confident (the 2-sigma bar: >= 16/21).
+      var RUNS = [
+        { name: "Qwen3.5-0.8B",    passes: [17, 14, 12, 8, 8, 8, 2] },
+        { name: "Qwen3.5-2B",     passes: [16, 14, 11, 5, 3, 3, 1] },
+        { name: "AI21-Jamba2-3B", passes: [15, 12, 5, 5, 3, 3, 3] },
+        { name: "Llama-3.2-1B-Instruct", passes: [6, 5, 4, 2, 0, 0, 0] },
+        { name: "AI21-Jamba-Reasoning-3B", passes: [10, 1, 0, 0, 0, 0, 0] },
+        { name: "gemma-3-1b-it",  passes: [2, 1, 0, 0, 0, 0, 0] },
+        { name: "RWKV7-Goose-World3-2.9B", passes: [7, 0, 0, 0, 0, 0, 0] },
+        { name: "MiniCPM5-2B",    passes: [3, 0, 0, 0, 0, 0, 0] },
+        { name: "MiniCPM5-1B",    passes: [0, 0, 0, 0, 0, 0, 0] },
+      ];
+      var RUNGS = [4096, 8192, 16384, 32768, 65536, 131072, 262144];
+      // The certified medal depths per family (silver = reliable, gold =
+      // confident). Jamba2: silver at 4,096 only (n=21 table, session 37).
+      function medalFor(name, passes) {
+        if (passes >= 16) return "gold";
+        if (passes >= 13) return "silver";
+        if (passes >= 1) return "bronze";
+        return "none";
+      }
+      function medalIcon(m) {
+        return { gold: "\uD83E\uDD47", silver: "\uD83E\uDD48", bronze: "\uD83E\uDD49", none: "\u2014" }[m];
+      }
+      function renderRunsTable() {
+        var t =
+          "<table><thead><tr><th>model</th>" +
+          RUNGS.map(function (d) {
+            return '<th class="num">' + (d / 1024) + "k</th>";
+          }).join("") +
+          "</tr></thead><tbody>";
+        RUNS.forEach(function (r) {
+          t += "<tr><td>" + r.name + "</td>";
+          r.passes.forEach(function (p, i) {
+            var m = medalFor(r.name, p);
+            t +=
+              '<td class="num" title="' + p + '/21 passes">' +
+              (p === 0 ? "\u2014" : p + "/21 " + medalIcon(m)) +
+              "</td>";
+          });
+          t += "</tr>";
+        });
+        t += "</tbody></table>";
+        return t;
       }
 
       var SORT = { k: "depth", dir: -1 };
@@ -529,6 +589,7 @@
         }
         pick();
       });
+      $("runsTable").innerHTML = renderRunsTable();
       $("mincost").textContent = MIN_COST.toFixed(2);
       chooseVram(selKey);
     </script>
