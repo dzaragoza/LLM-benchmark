@@ -2185,10 +2185,11 @@ def git_tail(args: argparse.Namespace) -> None:
     )
     # wow.md section 9 lesson (2026-10-03): the tournament/certify cells
     # write their per-cell CSVs (with the `partial` word counts) to
-    # models/*/tournament-results/ - a path this glob missed, so the
-    # certify runs' raw evidence never committed and re-grading had to
-    # mine results.txt instead of reading the state
-    paths += glob.glob("models/*/tournament-results/**/*", recursive=True)
+    # models/tournament-results/ (one shared dir, per-family subdirs) -
+    # a path this glob missed, so the certify runs' raw evidence never
+    # committed and re-grading had to mine results.txt instead of the
+    # state
+    paths += glob.glob("models/tournament-results/**/*", recursive=True)
     # session 34 addendum 15: the ladder's raw data rides too - the
     # speed/fwe dumps and the window-probe logs (the addendum-6 cap's
     # evidence), plus the ruler CSVs.
