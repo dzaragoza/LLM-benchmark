@@ -659,6 +659,21 @@ var html = "";
         { name: "MiniCPM5-1B",    passes: [0, 0, 0, 0, 0, 0, 0] },
       ];
       var RUNGS = [4096, 8192, 16384, 32768, 65536, 131072, 262144];
+      // The HIGHEST certification each family holds per rung (the certify
+      // controller's verdicts, 2026-10-03) - it overrides the raw pass
+      // medal wherever a rung was certified. gold = 2 sigma at the stated
+      // pass bar. Jamba2-3B: gold at EVERY rung at the 2/3 bar (4,096:
+      // 10/11, 8,192-65,536: 11/11, 131,072/262,144: 10/11) and at 3/3
+      // from 32,768 up. Qwen3.5-0.8B: gold at the 3/3 (perfect-retrieval)
+      // bar at 4,096 (13/17), 8,192 (9/11) and 16,384 (10/11); deeper
+      // rungs alive but unmeasured at 3/3.
+      var CERTIFIED = {
+        "AI21-Jamba2-3B": {
+          4096: "gold", 8192: "gold", 16384: "gold", 32768: "gold",
+          65536: "gold", 131072: "gold", 262144: "gold",
+        },
+        "Qwen3.5-0.8B": { 4096: "gold", 8192: "gold", 16384: "gold" },
+      };
       // The certified medal depths per family (silver = reliable, gold =
       // confident). Jamba2: silver at 4,096 only (n=21 table, session 37).
       function medalFor(name, passes) {
@@ -680,10 +695,17 @@ var html = "";
         RUNS.forEach(function (r) {
           t += "<tr><td>" + r.name + "</td>";
           r.passes.forEach(function (p, i) {
-            var m = medalFor(r.name, p);
+            var rung = RUNGS[i];
+            var cert = (CERTIFIED[r.name] || {})[rung];
+            var m = cert || medalFor(r.name, p);
+            var tip =
+              p + "/21 tournament passes" +
+              (cert
+                ? "; certified " + cert.toUpperCase() + " (2 sigma, sequential controller)"
+                : "");
             t +=
-              '<td class="num" title="' + p + '/21 passes">' +
-              (p === 0 ? "\u2014" : p + "/21 " + medalIcon(m)) +
+              '<td class="num" title="' + tip + '">' +
+              (p === 0 && !cert ? "\u2014" : p + "/21 " + medalIcon(m)) +
               "</td>";
           });
           t += "</tr>";
