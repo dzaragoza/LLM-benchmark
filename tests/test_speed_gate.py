@@ -79,43 +79,32 @@ def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
     assert out == dump
 
 
-def test_tournament_rank_mode():
+def test_tournament_rank_sigma_only():
+    """Session 37, addendum 10: the mode is RETIRED - tournament_rank
+    returns the sigma statistics only; no rank_depth, no
+    rank_statistic, no central tendency of the fall depths."""
     import full_benchmark as fb
-
     depths = fb.TOURNAMENT_DEPTHS
-    # champion: all five top out - mode is 'top' -> rank 262144
+    # champion: all five top out -> every rung 5/5, reliable = top
     r = fb.tournament_rank([None] * 5, depths)
-    assert r["rank_depth"] == 262144 and r["full_holds"] == 5 and r["rank_mode"] is None
-    # a flicker: one climb falls at 131072, four top out - mode is 'top'
+    assert r["reliable_depth"] == 262144 and r["conservative_depth"] == 262144
+    assert r["full_holds"] == 5 and r["ceiling"] == 262144
+    assert "rank_depth" not in r and "rank_statistic" not in r and "rank_mode" not in r
+    # a flicker: one climb falls at 131072, four top out
     r = fb.tournament_rank([131072, None, None, None, None], depths)
-    assert r["rank_depth"] == 262144  # mode of 4 x top beats 1 x 131072
     assert r["passes"][262144] == 4 and r["passes"][65536] == 5
-    # a fall: three climbs fall at 65536, two top out - mode is 65536
+    assert r["reliable_depth"] == 262144 and r["ceiling"] == 262144  # lo(4,5)~0.58 >= 0.5
+    # a fall-heavy shape: three climbs fall at 65536, two top out
     r = fb.tournament_rank([65536, 65536, 65536, None, None], depths)
-    assert r["rank_depth"] == 65536  # mode of the climbs (3 x 65536)
     assert r["passes"][65536] == 2
-    # majority-vs-mode split: 3 top, 2 fall at 131072 - mode is 'top'
-    r = fb.tournament_rank([131072, 131072, None, None, None], depths)
-    assert r["rank_depth"] == 262144  # mode agrees with the old majority rule
-    # NO-MODE cases fall back to the MEDIAN (addendum 20), never the max:
-    # mode tie two top / two at 65536 / one at 32768 -> median 65536
-    r = fb.tournament_rank([None, None, 65536, 65536, 32768], depths)
-    assert r["rank_depth"] == 65536 and r["rank_statistic"] == "median-fallback"
-    # mode tie between two fall depths: two at 65536, two at 32768, one 131072
-    # -> sorted [32768, 32768, 65536, 65536, 131072], median 65536
-    r = fb.tournament_rank([65536, 65536, 32768, 32768, 131072], depths)
-    assert r["rank_depth"] == 65536 and r["rank_statistic"] == "median-fallback"
-    # all five distinct -> median (3rd of sorted), NOT the deepest climb
-    r = fb.tournament_rank([4096, 8192, 32768, 65536, 131072], depths)
-    assert r["rank_depth"] == 32768 and r["rank_statistic"] == "median-fallback"
-    # two tops is already a mode (top x2) - no fallback needed
-    r = fb.tournament_rank([4096, 65536, None, None, 131072], depths)
-    assert r["rank_depth"] == 262144 and r["rank_statistic"] == "mode"
-    # unanimous early fall: mode is the floor
+    assert r["reliable_depth"] == 32768 and r["ceiling"] == 262144
+    # unanimous early fall: nothing reliable, ceiling at the floor
     r = fb.tournament_rank([4096] * 5, depths)
-    assert r["rank_depth"] == 4096 and r["rank_statistic"] == "mode"
-
-
+    assert r["reliable_depth"] == 0 and r["ceiling"] == 4096
+    # all five distinct: sigma stats computed from the pass vector alone
+    r = fb.tournament_rank([4096, 8192, 32768, 65536, 131072], depths)
+    assert r["passes"][4096] == 4 and r["passes"][65536] == 1
+    assert r["reliable_depth"] == 4096 and r["ceiling"] == 131072  # lo(4,5)~0.58
 def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     """The addendum-14 bug: tournament_family passed per-climb subdirs
     to fwe_pass without creating them - fwe_pass (now hardened too)
@@ -148,7 +137,7 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     assert len(calls) == 141
     assert tour["fall_depths"] == [4096] + [None] * 20
     assert tour["full_holds"] == 20
-    assert tour["rank_depth"] == 262144  # mode of 14 x top (addendum 40)
+    assert tour["reliable_depth"] == 262144  # 20/21 at 1 sigma clears every rung
 
 
 def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
@@ -187,8 +176,8 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
     assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096] + [None] * 15
     saved = state["families"]["fam"]["tournament_falls"]
     assert len(saved) == 21 and saved["6"] == 4096 and saved["21"] is None
-    # mode of the twenty-one climbs: 16 x top beats 4 x 4096
-    assert tour["rank_statistic"] == "mode" and tour["rank_mode"] is None
+    # sigma rank: 15/21 top out -> reliable 262144 at 1 sigma (mode retired)
+    assert "rank_statistic" not in tour and tour["reliable_depth"] == 262144
 
 
 def test_wilson_and_reliable_depth():
@@ -277,7 +266,7 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
         8210,
         False,
     )
-    assert out["rank_depth"] == 262144 and out["full_holds"] == 21
+    assert out["reliable_depth"] == 262144 and out["full_holds"] == 21
     assert len(calls) == 21 * len(fb.TOURNAMENT_DEPTHS)
     assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
 

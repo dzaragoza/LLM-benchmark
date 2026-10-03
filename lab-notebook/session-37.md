@@ -326,3 +326,41 @@ but the practitioner wants the 3/3 claim, re-grade the same cells
 at 3/3 and re-certify with zero new compute. RULE: report both;
 certify on repetition at the stated threshold; state the threshold
 in every recommendation.
+
+## Addendum 10: the mode is RETIRED - sigma only (2026-10-03, during the 16k certify run)
+
+AUTHOR'S RULING (while `--certify 16384` runs): retire the mode
+measurement; n selection is based on sigma only.
+
+IMPLEMENTED: `tournament_rank` no longer computes any central tendency
+of the fall depths. The mode-with-median-fallback (session 36
+addenda 15/20) and its `rank_depth`/`rank_mode`/`rank_statistic`
+fields are deleted; the rank is the WILSON statistics alone - the
+per-rung pass vector, reliable depth (1 sigma), conservative depth
+(2 sigma), ceiling, and the per-rung 1-sigma Wilson bounds. The
+tournament table ranks by reliable -> conservative -> pass vector ->
+ceiling and reports no mode column. Rationale: the mode was a
+ranking convenience from the 5-climb era; the Wilson bounds already
+price reliability honestly, and a model is what it reliably holds,
+not what it most often fell at.
+
+A HONEST MATH NOTE from the rewritten tests: at 1 sigma, 4/5 holds
+(lo ~ 0.58) clears the reliable bar - a one-flicker family is still
+reliable at its top rung at small n. The mode would have called the
+same family "rank 262144" too; the difference appears at n=21 where
+the Wilson bar (11/21 early-accept, 13/21 reliable) is what the
+certify controller already enforces. The mode's retirement changes
+the TABLE, not the certification math - the controller was already
+sigma-only by design.
+
+State note: the historical `tournament` snapshot in
+state/benchmark-state-tournament.json still carries the old
+`rank_depth`/`rank_mode` fields from the 3/3-criterion run - they are
+a record of what was printed then, not live data; new runs write
+sigma-only entries.
+
+Tests: `test_tournament_rank_mode` -> `test_tournament_rank_sigma_only`
+(rewritten to the new semantics; two of my initial asserts were wrong
+- the flicker 4/5 and distinct-falls 4/5-at-4096 shapes are both
+reliable at 1 sigma, the suite taught the real bars), and the two
+family tests assert reliable_depth instead of rank_depth. 134 pass.
