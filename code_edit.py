@@ -74,6 +74,8 @@ __all__ = [
     "write",
     "apply_patch_blocks",
     "safe_append",
+    "replace_verified",
+    "src_count",
 ]
 
 
@@ -655,6 +657,11 @@ def safe_append(path: str, addition: str) -> str:
        fsync + os.replace) - a crash mid-append cannot leave a torn
        file. For .py targets the result is compiled (ast.parse)
        BEFORE the write - a syntactically broken addition is refused
+    4. MARKDOWN-CHECKED (session 37, addendum 13): for .md targets
+       the assembled result runs the md auto-fixer and the
+       no-new-violations lint gate BEFORE the write - an append can
+       no longer introduce a table/fence break that the editor
+       itself would have refused.
        with the file untouched.
     Returns a report string: 'appended N line(s) to <path>' or
     'idempotent skip: addition already present in <path>'.
@@ -669,6 +676,17 @@ def safe_append(path: str, addition: str) -> str:
     out += addition
     if _file_type(path) == "python":
         ast.parse(out)
+    # session 37, addendum 13: an append to a markdown file runs the
+    # SAME pipeline as edit() - the auto-fixer normalizes the
+    # mechanical whitespace (blank lines around any table the
+    # addition introduces, the single trailing newline) and the
+    # no-new-violations lint gate refuses a judgement-class break
+    # (ragged table, broken pipes, unclosed fence) BEFORE the write,
+    # file untouched. The notebook appends (the session's `cat >>
+    # heredoc` pattern) can no longer smuggle a lint break in.
+    if _file_type(path) == "prose" and path.endswith((".md", ".markdown")):
+        out = _fix_markdown(out, path)
+        _check_markdown(existing, out, path)
     _atomic_write_sync(path, out)
     n = addition.count("\n") + (1 if addition and not addition.endswith("\n") else 0)
     return f"appended {n} line(s) to {path}"
