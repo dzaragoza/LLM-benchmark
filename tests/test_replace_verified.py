@@ -61,7 +61,6 @@ def test_replace_verified_runs_the_md_pipeline(tmp_path):
     breaks a judgment rule (ragged MD056) is refused before the
     write."""
     import code_edit
-
     import md_check
 
     p = tmp_path / "n.md"
@@ -77,3 +76,29 @@ def test_replace_verified_runs_the_md_pipeline(tmp_path):
     except code_edit.CodeEditError as e:
         assert "MD056" in str(e)
     assert q.read_text() == "| a | b |\n|---|---|\n| 1 | 2 |\n"  # untouched
+
+
+def test_replace_verified_per_pair_counts(tmp_path):
+    """Addendum 82: a mixed transaction - one unique pair plus one
+    all-occurrences pair - in a single call, each with its own expected
+    count asserted against the file before anything is written."""
+    p = tmp_path / "cfg.txt"
+    p.write_text("a=1\nb=old\nc=old\n", encoding="utf-8")
+    import code_edit
+
+    code_edit.replace_verified(
+        str(p),
+        [("a=1", "a=2"), ("old", "new", 2)],
+    )
+    out = p.read_text(encoding="utf-8")
+    assert out == "a=2\nb=new\nc=new\n"
+    # the per-pair count is asserted: 1 occurrence claimed, 2 present
+    p.write_text("a=1\nb=old\n", encoding="utf-8")
+    try:
+        code_edit.replace_verified(str(p), [("a=1", "a=2"), ("old", "new", 2)])
+    except code_edit.CodeEditError as e:
+        assert "expected exactly 2" in str(e)
+        # transaction: the FIRST pair's change was not written either
+        assert p.read_text(encoding="utf-8") == "a=1\nb=old\n"
+    else:
+        raise AssertionError("expected CodeEditError")

@@ -276,7 +276,7 @@
       </p>
 
       <p class="footnote">
-        Caveats: w/s figures are the median of 5 conversations at each model's reliable depth (Jamba2's 6.84 w/s was measured at its former 4,096 reliable depth, before the deep rungs certified; treat its speed at 256k as unmeasured). Reliable/conservative depths are certified under the 1-of-3-words pass rule at n=21 runs (repetition gives the confidence; the threshold is stated). The 1-sigma certification ladder now reads: 0.8B and 2B at 8,192, Jamba2-3B at 262,144 (32,768 11/11, 65,536 11/11, 131,072 10/11, 262,144 11/11). The bandwidth law is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
+        Caveats: w/s figures are the median of 5 conversations at each model's reliable depth (Jamba2's 6.84 w/s was measured at its former 4,096 reliable depth, before the deep rungs certified; treat its speed at 256k as unmeasured). Reliable/conservative depths are certified under the 1-of-3-words pass rule at n=21 runs (repetition gives the confidence; the threshold is stated). The medals above are the highest 2-sigma (gold) certification each rung earned, at the pass bar named in the tooltip: Jamba2-3B holds gold at every rung (2-of-3-words bar at 4k&ndash;16k, the stricter perfect-retrieval 3-of-3 bar from 32k up); the 0.8B Qwen holds gold at 4k&ndash;16k at the 3-of-3 bar (deeper rungs alive but unmeasured at that bar). The bandwidth law is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
       </p>
     </div>
 
@@ -667,12 +667,15 @@ var html = "";
       // from 32,768 up. Qwen3.5-0.8B: gold at the 3/3 (perfect-retrieval)
       // bar at 4,096 (13/17), 8,192 (9/11) and 16,384 (10/11); deeper
       // rungs alive but unmeasured at 3/3.
-      var CERTIFIED = {
+      // medal -> the pass bar it was earned at (3/3 is the stricter,
+// perfect-retrieval bar; 2/3 finds 2 of the 3 hidden words).
+var CERTIFIED = {
         "AI21-Jamba2-3B": {
-          4096: "gold", 8192: "gold", 16384: "gold", 32768: "gold",
-          65536: "gold", 131072: "gold", 262144: "gold",
+          4096: "gold,2/3", 8192: "gold,2/3", 16384: "gold,2/3",
+          32768: "gold,3/3", 65536: "gold,3/3", 131072: "gold,3/3",
+          262144: "gold,3/3",
         },
-        "Qwen3.5-0.8B": { 4096: "gold", 8192: "gold", 16384: "gold" },
+        "Qwen3.5-0.8B": { 4096: "gold,3/3", 8192: "gold,3/3", 16384: "gold,3/3" },
       };
       // The certified medal depths per family (silver = reliable, gold =
       // confident). Jamba2: silver at 4,096 only (n=21 table, session 37).
@@ -696,7 +699,12 @@ var html = "";
           t += "<tr><td>" + r.name + "</td>";
           r.passes.forEach(function (p, i) {
             var m = (CERTIFIED[r.name] || {})[RUNGS[i]] || "none";
-            t += '<td class="num" title="highest 2-sigma certification at this rung">' + medalIcon(m) + "</td>";
+            var medal = m.split(",")[0];
+            var bar = m.split(",")[1];
+            var tip =
+              "certified " + medal.toUpperCase() +
+              " at 2 sigma" + (bar ? ", " + bar + " pass bar" : "");
+            t += '<td class="num" title="' + tip + '">' + medalIcon(medal) + "</td>";
           });
           t += "</tr>";
         });

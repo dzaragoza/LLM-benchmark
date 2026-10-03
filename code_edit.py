@@ -728,9 +728,12 @@ def replace_verified(path: str, replaces: Sequence[tuple[str, str]], count: int 
     escaped to git exactly that way. This function is that pattern
     done right, so there is never a reason to bypass the editor:
 
-    replaces: a list of (old, new) pairs. Each old must occur EXACTLY
-    `count` times in the file (count=1 default: unique; the assert is
-    the scripted-replace assert, enforced by the tool now). Pairs
+    replaces: a list of (old, new) pairs, or (old, new, count) triples
+    for a per-pair expected count (session 37, addendum 82: a mixed
+    transaction - one unique pair plus one all-occurrences pair - had
+    to be split into two calls, doubling the failure surface). Each old
+    must occur EXACTLY its count times (default 1: unique; the assert
+    is the scripted-replace assert, enforced by the tool now). Pairs
     apply in order against the running buffer, so a later pair may
     match text a earlier pair inserted. On ANY assert failure the file
     is untouched (nothing is written until every pair verifies).
@@ -741,14 +744,15 @@ def replace_verified(path: str, replaces: Sequence[tuple[str, str]], count: int 
     a scripted replace can no longer smuggle a lint break into git.
     """
     blocks: list[tuple] = []
-    for i, (old, new) in enumerate(replaces):
+    for i, item in enumerate(replaces):
+        old, new, pair_count = (item + (count,))[:3] if len(item) == 2 else item
         n = src_count(path, old)
-        if n != count:
+        if n != pair_count:
             raise CodeEditError(
                 f"{path}: replace pair {i} assert failed: old text occurs "
-                f"{n} time(s), expected exactly {count}"
+                f"{n} time(s), expected exactly {pair_count}"
             )
-        blocks.append(("replace_n", old, new, 1) if count == 1 else ("replace_all", old, new))
+        blocks.append(("replace_n", old, new, 1) if pair_count == 1 else ("replace_all", old, new))
     edit(path, blocks)
 
 

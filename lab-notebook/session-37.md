@@ -871,3 +871,47 @@ Session 37 closed 2026-10-04. Open threads for tomorrow: the VT gold
 results, the 0..5 partial curve, and the maybe pile (ARC distraction
 pilot, k=10 witness cell, inference-FWE, context-belief, format
 compliance, positional symmetry, conflict/update).
+
+## Addendum 82 - the afternoon code_edit incidents (wow.md section 4), and the hardening
+
+The morning addendum 6 recorded the conversational-tool failures; the
+afternoon added four more of the same class, all reported here:
+
+1. PARTIAL APPLY (the worst): a rename edit applied its first block,
+   failed on the second (the renamed name), and left the file
+   half-renamed - the page booted with "********ED is not defined".
+   Recovered via git stash + a structural re-edit.
+2. WRONG-TARGET REGEX: a regex edit meant for the runs-table loop
+   hit a DIFFERENT r.passes.forEach (medalDepth's) - regex edits on
+   repeated idioms need a scope anchor, not a pattern.
+3. SWALLOWED LINE: an insertion consumed the following def line
+   (fwe_flicker's def vanished into a docstring) - caught by ruff's
+   undefined-name, fixed the same session.
+4. NAME-MASKED DISPLAY: the tool output masks identifiers it renders
+   as ********, so old_str built from displayed text can never match;
+   worked around by reading the file in-script and extracting names.
+
+ROOT CAUSE, one sentence: every afternoon failure bypassed
+code_edit.edit()'s verify-all-blocks-before-apply transaction -
+hand-rolled open/write scripts with regex, none of them transactional.
+
+HARDENING (mechanism, not discipline):
+- replace_verified now takes (old, new, count) TRIPLES for a per-pair
+  expected count - a mixed unique+replace-all transaction is one call
+  again, one failure surface. Pinned by a new test (153 pass).
+- WORKING RULE for this repo (already the notebook pattern): any edit
+  beyond a single trivial pair goes through code_edit.replace_verified
+  with explicit counts, never raw open/write. The scripted-edit escape
+  hatch is closed except for genuinely novel transforms, and those must
+  be followed by md_check/js_check before commit.
+- The websites were re-fixed THROUGH replace_verified this time (the
+  map + cell-render edits as two verified pairs per file) - the pattern
+  demonstrated on the very files the incidents broke.
+
+WEBSITE RECONCILIATION (the reader-facing fix): the runs-table medals
+now carry their pass bar - Jamba2's shallow gold reads "gold at 2
+sigma, 2/3 pass bar" and its deep gold "gold at 2 sigma, 3/3 pass
+bar"; the 0.8B's medals name the 3/3 bar. The 3/3 split (Jamba2 owns
+the deep half, the 0.8B the shallow) is now readable directly from the
+table instead of contradicting it, and the stale 1-sigma footnote
+sentence is replaced by the current 2-sigma medal map.

@@ -3,9 +3,6 @@ RULER FWE through llama-server, the depth grid budgeted by
 /tokenize. Niah tests removed with the task (session 37, addendum 3).
 """
 
-
-
-
 import ruler_gate as rg
 
 
@@ -89,7 +86,7 @@ def test_vt_build_follows_upstream_shape(monkeypatch):
     assert positions == sorted(positions)
     # the first name is assigned the value directly; the rest chain
     assert f"VAR {expected[0]} = {value.group(1)}" in prompt
-    for a, b in zip(expected, expected[1:]):
+    for a, b in zip(expected, expected[1:], strict=False):
         assert f"VAR {b} = VAR {a}" in prompt
 
 
