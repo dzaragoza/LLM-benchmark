@@ -232,6 +232,31 @@ def _check_markdown(src: str, out: str, path: str) -> None:
         )
 
 
+def _check_python_syntax(src: str, out: str, path: str) -> None:
+    """The ast gate (session 37, addendum 16): for .py targets, if the
+    source parsed and the edit's result does not, the edit is refused
+    with the SyntaxError's line - the file untouched. Born from the
+    addendum-15 incident: a replace inserted a literal newline INSIDE
+    a python string literal; the string was legally edited (the md
+    and delimiter gates saw nothing wrong) but the module no longer
+    imported - caught by the test run, not by the editor. Philosophy
+    (same as _check_markdown): only NEW problems fail - if the source
+    was already broken, the edit is a legal repair and goes through."""
+    if _file_type(path) != "python":
+        return
+    try:
+        ast.parse(src)
+    except SyntaxError:
+        return  # already broken - a repair must be allowed through
+    try:
+        ast.parse(out)
+    except SyntaxError as e:
+        raise CodeEditError(
+            f"{path}: the edit breaks the python syntax "
+            f"(line {e.lineno}: {e.msg}) - refused, file untouched"
+        ) from e
+
+
 def _strip_apostrophes(text: str) -> str:
     """Drop single quotes so the balance check ignores prose
     apostrophes inside markup files, while DOUBLE quotes (HTML/JS
@@ -772,6 +797,7 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     _last_edit_regions.clear()
     _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
     _check_delimiters(src, out, path)
+    _check_python_syntax(src, out, path)
     # verify every post-condition against the IN-MEMORY result BEFORE
     # touching disk (session 35, addendum 4: these checks used to run
     # after the write, so a failed verify left the file MODIFIED and
@@ -883,6 +909,7 @@ def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
         _verify_blocks(src, blocks)
         out = _apply(src, blocks)
         _check_delimiters(src, out, path)
+        _check_python_syntax(src, out, path)
         _verify_result(out, blocks, path)
         specs.append((path, src, out))
     for path, _src, out in specs:
@@ -906,6 +933,7 @@ def check(path: str, blocks: Sequence[tuple]) -> str:
     _verify_blocks(src, blocks)
     out = _apply(src, blocks)
     _check_delimiters(src, out, path)
+    _check_python_syntax(src, out, path)
     _verify_result(out, blocks, path)
     return preview(path, blocks)
 
