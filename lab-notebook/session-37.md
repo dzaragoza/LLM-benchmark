@@ -451,3 +451,39 @@ DOGFOOD: this very addendum was appended through the upgraded
 safe_append - the first notebook entry to pass the gate. 2 new
 tests (the auto-fix on append, the MD056 refusal with the file
 untouched; python compile path re-pinned). 140 pass.
+
+
+## Addendum 14: medals replace sigma language; the runs-only table on the pages (2026-10-03)
+
+AUTHOR'S RULINGS: (1) add the runs-only data to the web pages;
+(2) sigma language is academic - quality is communicated in MEDALS:
+bronze = at least a pass, silver = reliable, gold = confident.
+
+IMPLEMENTED (both pages, JS-checked and boot-smoke-tested):
+- MEDALS replace sigma in all reader-facing prose: bronze = at least
+  one pass out of 21 (it can work, expect misses); silver = reliable
+  (>= 13/21, we are confident it usually works); gold = confident
+  (>= 16/21, trust it on a bad day). The verdict reads e.g. "8,192
+  tokens silver (reliable) - 4,096 tokens gold (confident) - 4,096+
+  tokens bronze". Table columns: silver tok (reliable), gold tok
+  (confident). Sigma survives only in code comments and the medal
+  definitions in the how-paragraph (the 13/21 and 16/21 bars).
+- THE RUNS-ONLY TABLE: a new section "All measured models - the runs
+  behind the medals" on both pages - all NINE families x SEVEN
+  rungs (4k..256k) with the raw passes/21 per cell and the medal the
+  rung earned (e.g. Qwen3.5-0.8B: 17/21 gold at 4k, 14/21 silver at
+  8k, 12/21 bronze at 16k, ... 2/21 bronze at 256k). "Nothing
+  hidden" - the recommendation derives from this data.
+- ERROR FIXED (mine, addendum 11): I had written Jamba2's reliable
+  depth as 8,192 on both pages; the n=21 table says 4,096 (15/21 at
+  the floor, 12/21 at 8k is short of 13). Corrected on both pages.
+- BUG FOUND BY THE NEW SMOKE TEST (live on the GPU page, predates
+  the medal edit): the no-eligible-model "closest fit" branch
+  referenced r.m while the variable in scope is best.m - a
+  ReferenceError that would have broken that branch in the browser.
+  Fixed; the smoke test now exercises the full boot path.
+
+A TOOL LESSON (addendum 12 upheld): all page edits went through
+code_edit.replace_verified; the exact-count assert caught a
+non-unique anchor mid-patch (the transaction rolled back cleanly,
+no partial state) - the tool working as designed.
