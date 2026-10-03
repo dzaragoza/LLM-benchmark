@@ -272,11 +272,11 @@
         <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder of context sizes (4k, 8k, 16k, &hellip; 256k context size). At each context size the model had to find hidden words in a long coded text &mdash; a pass means finding them. The raw pass counts earn the medals: <strong>bronze</strong> = at least one pass out of 21 (it can work, but expect misses); <strong>silver</strong> = reliable, roughly 13 or more passes out of 21 (we are confident it usually works); <strong>gold</strong> = confident, roughly 16 or more out of 21 (trust it on a bad day). The recommended model is the deepest silver-or-better one that (a) fits your RAM (measured whole-stack cost: weights + KV cache + buffers + runtime, cold) and (b) is predicted to stay above the 5 w/s reader line at your bandwidth (speed scales linearly with memory bandwidth: measured@102.4&times;BW/102.4). The full runs table below shows every pass count behind every medal.
 
       <p>
-        <strong>Why only three models?</strong> Nine families were measured (Qwen3.5 0.8B/2B, Jamba2-3B, Llama-3.2-1B, MiniCPM5 1B/2B, Jamba-Reasoning-3B, RWKV7-2.9B, gemma-3-1B). Six of them did not pass the retrieval test reliably at any context size &mdash; including some models with large advertised context windows. They are excluded rather than listed with misleading numbers; the full log is in the study's lab notebook. The three shown all certified at 4k/8k; deeper certifications are being measured now. Each family appears once, at its measured configuration.
+        <strong>Why only three models?</strong> Nine families were measured (Qwen3.5 0.8B/2B, Jamba2-3B, Llama-3.2-1B, MiniCPM5 1B/2B, Jamba-Reasoning-3B, RWKV7-2.9B, gemma-3-1B). Six of them did not pass the retrieval test reliably at any context size &mdash; including some models with large advertised context windows. They are excluded rather than listed with misleading numbers; the full log is in the study's lab notebook. The three shown all certified at 4k/8k; Jamba2-3B additionally certified 32k, 64k, 128k and 256k at 1 sigma (sequential controller, 2026-10-03). Each family appears once, at its measured configuration.
       </p>
 
       <p class="footnote">
-        Caveats: w/s figures are the median of 5 conversations at each model's reliable depth. Reliable/conservative depths are certified under the 1-of-3-words pass rule at n=21 runs (repetition gives the confidence; the threshold is stated). Certification at 32k and deeper is in progress &mdash; empty cells there mean "not yet certified", not "failed". Jamba2's 16,384 silver is certified (11/11 in the sequential controller). The bandwidth law is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
+        Caveats: w/s figures are the median of 5 conversations at each model's reliable depth (Jamba2's 6.84 w/s was measured at its former 4,096 reliable depth, before the deep rungs certified; treat its speed at 256k as unmeasured). Reliable/conservative depths are certified under the 1-of-3-words pass rule at n=21 runs (repetition gives the confidence; the threshold is stated). The 1-sigma certification ladder now reads: 0.8B and 2B at 8,192, Jamba2-3B at 262,144 (32,768 11/11, 65,536 11/11, 131,072 10/11, 262,144 11/11). The bandwidth law is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
       </p>
     </div>
 
@@ -316,8 +316,8 @@
           cost: 4.42,
           costEst: false,
           wps: 6.84,
-          depth: 16384,
-          depthSource: "certified 11/11 by the sequential controller (2026-10-03)",
+          depth: 262144,
+          depthSource: "certified by the sequential controller (2026-10-03): 32,768 11/11, 65,536 11/11, 131,072 10/11, 262,144 11/11, all at 1 sigma",
           conservative: 0,
           family: "AI21-Jamba2",
           quant: "Q8_0 + K/V f16",
@@ -331,8 +331,7 @@
       // survives skeptical review. wps = measured words/second at the reliable
       // depth (median of 5 conversations). cost = measured whole-stack machine
       // RAM (weights + KV cache + buffers + runtime) at 262,144 context, cold.
-      // Certification at 16k and above is in progress; the six remaining
-      // families did not certify at any rung and are not recommended.
+      // Jamba2-3B certified through 262,144 at 1 sigma (sequential      // controller, 2026-10-03); the six remaining families did not certify at      // any rung and are not recommended.
       var CLASSES = [25.6, 51.2, 102.4];
       var REF_BW = 102.4,
         READER = 5.0;
