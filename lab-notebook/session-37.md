@@ -848,3 +848,26 @@ PREDICTIONS (falsifiable, stated before measurement):
 - Qwen3.5-0.8B: unknown - its FWE 3/3 gold at 4k-16k does not predict VT;
   multi-hop tracing is a different capability than aggregation.
 - The 0..5 partials per rung are the study's first VT capability curve.
+
+## Addendum 81 (registered pre-measurement, 2026-10-04, session close): the VT grading ladder
+
+The VT gold run is launched (2 sigma, 5/5 bar, rungs 4,096-262,144, the
+full 9-family roster). The MORNING grading plan, stated now so it cannot
+be chosen after seeing the data:
+
+1. 5/5 at 2 sigma at every rung -> the model holds VT gold; done.
+2. Otherwise: find the LARGEST x/5 that still certifies at 2 sigma per
+   rung (re-graded from the stored partials - zero re-measurement; the
+   direct analogue of the FWE 2/3 tightening).
+3. If no x/5 holds at 2 sigma: the same ladder at 1 sigma (silver).
+
+The per-rung 0..5 partial distribution is the study's first VT
+capability curve and the headline result either way: FWE measures
+aggregation, VT measures multi-hop tracing, and the pilot already
+showed they fail independently (k=5 FWE 5/5 HIT, VT 4/5 MISS at the
+same depth on the same model).
+
+Session 37 closed 2026-10-04. Open threads for tomorrow: the VT gold
+results, the 0..5 partial curve, and the maybe pile (ARC distraction
+pilot, k=10 witness cell, inference-FWE, context-belief, format
+compliance, positional symmetry, conflict/update).
