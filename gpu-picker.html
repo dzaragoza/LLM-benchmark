@@ -209,15 +209,7 @@
       <div class="readout" id="bwout"></div>
     </div>
 
-    <div class="readout" id="qualout">
-      <label>Quality you need:</label>
-      <label><input type="radio" name="quality" value="bronze" onchange="pick()"> 🥉 bronze &mdash; it can work</label>
-      <label><input type="radio" name="quality" value="silver" checked onchange="pick()"> 🥈 silver &mdash; reliable (recommended)</label>
-      <label><input type="radio" name="quality" value="gold" onchange="pick()"> 🥇 gold &mdash; confident</label>
-    </div>
-
     <div id="result"></div>
-    <div id="tables"></div>
 
     <h2>All measured models &mdash; the runs behind the medals</h2>
     <p style="font-size: 0.9rem">
@@ -393,10 +385,6 @@
         renderList();
       }
 
-      function quality() {
-        var el = document.querySelector('input[name="quality"]:checked');
-        return el ? el.value : "silver";
-      }
       function medalDepth(m, q) {
         if (q === "silver") return m.depth || 0;
         if (q === "gold") return m.conservative || 0;
@@ -410,7 +398,6 @@
         var vram = parseFloat($("vram").value);
         if (!(vram > 0)) {
           $("result").innerHTML = "";
-          $("tables").innerHTML = "";
           return;
         }
         var bw = tierBw(vram) || null;
@@ -432,47 +419,42 @@
             fits: m.cost <= vram,
             passes: m.wps !== null && wpred >= READER,
           };
-        }).sort(cmpRows);
+        });
 
         var host = $("result");
         var eligible = rows.filter(function (r) {
           return r.fits;
         });
-        var q = quality();
-        var qlabel = { bronze: "bronze \u2014 it can work", silver: "silver \u2014 reliable", gold: "gold \u2014 confident" }[q];
-        var qicon = { bronze: "\uD83E\uDD49", silver: "\uD83E\uDD48", gold: "\uD83E\uDD47" }[q];
-        var medaled = eligible.filter(function (r) { return medalDepth(r.m, q) > 0; });
-        if (medaled.length) {
-          var best = medaled.reduce(function (a, r) {
-            return medalDepth(r.m, q) > medalDepth(a.m, q) ? r : a;
-          });
+                var medals = ["bronze", "silver", "gold"];
+        var winner = null;
+        medals.forEach(function (q) {
+          if (winner) return;
+          var med = eligible.filter(function (r) { return medalDepth(r.m, q) > 0; });
+          if (med.length) {
+            var b = med.reduce(function (a, r) {
+              return medalDepth(r.m, q) > medalDepth(a.m, q) ? r : a;
+            });
+            winner = { q: q, r: b };
+          }
+        });
+        if (winner) {
+          var r = winner.r;
+          var dGold = medalDepth(r.m, "gold");
+          var dSilver = medalDepth(r.m, "silver");
+          var dBronze = medalDepth(r.m, "bronze");
+          var medLine =
+            (dSilver ? "\uD83E\uDD48 " + dSilver.toLocaleString() + " tokens reliable" : "\uD83E\uDD48 none yet") +
+            " &middot; " +
+            (dGold ? "\uD83E\uDD47 " + dGold.toLocaleString() + " tokens confident" : "\uD83E\uDD47 none yet");
           host.innerHTML =
-            '<div class="verdict"><h3>Recommended: ' +
-            best.m.name +
-            " " +
-            best.m.quant +
-            "</h3>" +
-            '<div><span class="depth">' +
-            medalDepth(best.m, q).toLocaleString() +
-            " tokens " +
-            qicon +
-            " " +
-            qlabel +
-            "</div>" +
-            "<div>file " +
-            best.m.size.toFixed(2) +
-            " GiB \u00b7 minimum RAM " +
-            best.m.cost.toFixed(2) +
-            " GiB of your " +
-            vram +
-            " GiB VRAM (conservative: CPU-side measured minimum RAM)</div></div>";
+            '<div class="verdict"><h3>Recommended: ' + r.m.name + " " + r.m.quant + "</h3>" +
+            '<div><span class="depth">' + dBronze.toLocaleString() + " tokens \uD83E\uDD49</span> the largest context it can work at</div>" +
+            "<div>" + medLine + "</div>" +
+            "<div>file " + r.m.size.toFixed(2) + " GiB &middot; minimum RAM " + r.m.cost.toFixed(2) + " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + vram + " GiB</div>" +
+            '<div class="footnote">\uD83E\uDD49 bronze = it can work (at least 1 pass in 21) &middot; \uD83E\uDD48 silver = reliable (1-sigma) &middot; \uD83E\uDD47 gold = confident (2-sigma). Pick the context size that matches the quality you need.</div></div>';
         } else if (eligible.length) {
           host.innerHTML =
-            '<div class="verdict none"><h3>No model earns ' +
-            qicon +
-            " " +
-            qlabel +
-            " at any measured rung yet</h3><div>Try a lower quality bar: the runs table below shows what each model has earned at every rung.</div></div>";
+            '<div class="verdict none"><h3>No model earns a medal at any measured rung yet</h3><div>The runs table below shows what each model has earned at every rung.</div></div>';
         } else {
           var cheapest = CANDIDATES.reduce(function (a, c) {
             return c.cost < a.cost ? c : a;
@@ -486,51 +468,7 @@
             " GiB).</div></div>";
         }
 
-        var t =
-          "<table><thead><tr>" +
-          '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
-          '<th class="num" data-k="cost">minimum RAM GiB</th><th class="num" data-k="fits">fits ' +
-          vram +
-          " GiB</th>" +
-          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">silver tok (reliable)</th><th class="num" data-k="conservative">gold tok (confident)</th></tr></thead><tbody id="tbody">';
-        rows.forEach(function (r) {
-          t +=
-            "<tr><td>" +
-            r.m.name +
-            "</td><td>" +
-            r.m.quant +
-            "</td>" +
-            '<td class="num">' +
-            r.m.size.toFixed(2) +
-            '</td><td class="num">' +
-            r.m.cost.toFixed(2) +
-            '</td><td class="num">' +
-            (r.fits
-              ? '<span class="ok">yes</span>'
-              : '<span class="bad">no</span>') +
-            '</td><td class="num">' +
-            (r.w !== null && r.w !== undefined ? r.w.toFixed(1) : "\u2014") +
-            '</td><td class="num">' +
-            (r.m.depth === null
-              ? "\u2014"
-              : r.m.depth === 0
-                ? "no silver"
-                : r.m.depth.toLocaleString()) +
-            '</td><td class="num">' +
-            (r.m.conservative === null || r.m.conservative === undefined
-              ? "\u2014"
-              : r.m.conservative === 0
-                ? "no gold"
-                : r.m.conservative.toLocaleString()) +
-            "</td></tr>";
-        });
-        t += "</tbody></table>";
-        $("tables").innerHTML =
-          t +
-          '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
-          '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV cache + buffers + runtime) at 262,144 context, cold; <strong>reliable/conservative</strong> = the deepest context certified at 1&sigma;/2&sigma; (n=21 repetitions, 1-of-3-words pass rule); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement. The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls.</div>';
       }
-
       // The runs-only table (n=21 seeded runs per family per rung, the raw
       // study data before any recommendation). passes = how many of the 21
       // runs found all 3 hidden words at that context size. medal per rung:
@@ -582,42 +520,6 @@
         return t;
       }
 
-      var SORT = { k: "depth", dir: -1 };
-      function cmpRows(a, b) {
-        var k = SORT.k,
-          va,
-          vb;
-        if (k === "name" || k === "quant" || k === "fits") {
-          va = a[k] !== undefined ? a[k] : a.m[k];
-          vb = b[k] !== undefined ? b[k] : b.m[k];
-          if (typeof va === "boolean") {
-            va = va ? 1 : 0;
-            vb = vb ? 1 : 0;
-          }
-          return va < vb ? -1 * SORT.dir : va > vb ? 1 * SORT.dir : 0;
-        }
-        if (k === "w") {
-          va = a.w;
-          vb = b.w;
-        } else {
-          va = a.m[k];
-          vb = b.m[k];
-        }
-        if (va === null || va === undefined) return 1;
-        if (vb === null || vb === undefined) return -1;
-        return (va - vb) * SORT.dir;
-      }
-      $("tables").addEventListener("click", function (ev) {
-        var th = ev.target.closest("th");
-        if (!th || !th.dataset.k) return;
-        if (SORT.k === th.dataset.k) {
-          SORT.dir *= -1;
-        } else {
-          SORT.k = th.dataset.k;
-          SORT.dir = 1;
-        }
-        pick();
-      });
       $("runsTable").innerHTML = renderRunsTable();
       $("mincost").textContent = MIN_COST.toFixed(2);
       chooseVram(selKey);
