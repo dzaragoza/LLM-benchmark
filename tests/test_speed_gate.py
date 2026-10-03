@@ -84,6 +84,7 @@ def test_tournament_rank_sigma_only():
     returns the sigma statistics only; no rank_depth, no
     rank_statistic, no central tendency of the fall depths."""
     import full_benchmark as fb
+
     depths = fb.TOURNAMENT_DEPTHS
     # champion: all five top out -> every rung 5/5, reliable = top
     r = fb.tournament_rank([None] * 5, depths)
@@ -105,6 +106,8 @@ def test_tournament_rank_sigma_only():
     r = fb.tournament_rank([4096, 8192, 32768, 65536, 131072], depths)
     assert r["passes"][4096] == 4 and r["passes"][65536] == 1
     assert r["reliable_depth"] == 4096 and r["ceiling"] == 131072  # lo(4,5)~0.58
+
+
 def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     """The addendum-14 bug: tournament_family passed per-climb subdirs
     to fwe_pass without creating them - fwe_pass (now hardened too)
@@ -113,7 +116,9 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         calls.append(results_dir)
         assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
         hold = seed > 1
@@ -149,7 +154,9 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         calls.append(seed)
         assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
         return seed > 6, {"correct": 1 if seed > 6 else 0, "depth": rung}
@@ -236,7 +243,9 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
 
     calls = []
 
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         calls.append((model, kv_quant_k, kv_quant_v))
         return (True, {"correct": 1})
 
@@ -340,8 +349,8 @@ def test_rescore_tournament(tmp_path, capsys):
     HOLD (fall moves deeper or drops for re-run), a 0/3 cell still
     falls at the same rung."""
     import csv as csv_mod
+
     import full_benchmark as fb
-    import ruler_gate as rg
 
     def cell(models_dir, fam, climb, depth, partial):
         d = os.path.join(models_dir, "tournament-results", fam, f"climb{climb}")
@@ -363,11 +372,7 @@ def test_rescore_tournament(tmp_path, capsys):
     # climb 3: fell at 4096 with a 2/3 partial -> a pass chain now; the
     # saved fall is DROPPED so the next tournament re-runs the climb
     cell(str(tmp_path), "fam", 3, 4096, 2)
-    state = {
-        "families": {
-            "fam": {"tournament_falls": {"1": 8192, "2": 8192, "3": 4096}}
-        }
-    }
+    state = {"families": {"fam": {"tournament_falls": {"1": 8192, "2": 8192, "3": 4096}}}}
     state_path = str(tmp_path / "st.json")
     fb.rescore_tournament(str(tmp_path), state, state_path, False)
     saved = state["families"]["fam"]["tournament_falls"]
@@ -396,9 +401,9 @@ def test_certify_cells_inherit_from_falls():
 
     fst = {
         "tournament_falls": {
-            "1": 8192,   # fell at 8192: cell(1, 8192)=False, cell(1,4096)=True
-            "2": None,   # topped out: every cell True
-            "3": 4096,   # cell(3, 8192) unmeasured, cell(3,4096)=False
+            "1": 8192,  # fell at 8192: cell(1, 8192)=False, cell(1,4096)=True
+            "2": None,  # topped out: every cell True
+            "3": 4096,  # cell(3, 8192) unmeasured, cell(3,4096)=False
         },
         "certify": {"8192": {"3": True}},
     }
@@ -416,7 +421,9 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
 
     ran = []
 
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         ran.append(seed)
         return True, {"correct": 1, "depth": rung}
 
@@ -438,8 +445,14 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
                     "tournament_falls": {
-                        "1": None, "2": None, "3": None, "4": None,
-                        "5": 16384, "6": 16384, "7": 16384, "8": 16384,
+                        "1": None,
+                        "2": None,
+                        "3": None,
+                        "4": None,
+                        "5": 16384,
+                        "6": 16384,
+                        "7": 16384,
+                        "8": 16384,
                     },
                 },
                 "other": {
@@ -450,7 +463,14 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
             }
         }
         res = fb.certify_rung(
-            8192, "1_sigma", ["good", "other"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            8192,
+            "1_sigma",
+            ["good", "other"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
         )
         first = [r for r in res if r["family"] == "good"][0]
         assert first["verdict"] == "accept"
@@ -474,7 +494,9 @@ def test_certify_rung_dead(tmp_path, capsys):
 
     ran = []
 
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         ran.append(seed)
         return True, {"correct": 1, "depth": rung}
 
@@ -486,11 +508,15 @@ def test_certify_rung_dead(tmp_path, capsys):
         # 9 climbs FELL AT 8192 (9 measured fails, 12 remaining):
         # best case 12/21 passes, lo(12,21)=0.463 < 0.5 -> dead
         falls = {str(i): 8192 for i in range(1, 10)}
-        state = {"families": {"dead": {
-            "selected": "Q8_0",
-            "runs": {"Q8_0": {"file": str(model)}},
-            "tournament_falls": falls,
-        }}}
+        state = {
+            "families": {
+                "dead": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": falls,
+                }
+            }
+        }
         res = fb.certify_rung(
             8192, "1_sigma", ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
@@ -505,10 +531,15 @@ def test_certify_rung_at_least_one(tmp_path, capsys):
     """Addendum 18: at_least_one accepts a candidate with a single
     historical pass - no fresh cells needed - and skips the rest."""
     import full_benchmark as fb
+
     ran = []
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         ran.append(seed)
         return True, {"correct": 1, "depth": rung}
+
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
     try:
@@ -529,7 +560,14 @@ def test_certify_rung_at_least_one(tmp_path, capsys):
             }
         }
         res = fb.certify_rung(
-            16384, "at_least_one", ["one", "none"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            16384,
+            "at_least_one",
+            ["one", "none"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
         )
         first = [r for r in res if r["family"] == "one"][0]
         # climb 1 topped out, so its 16384 cell passed historically -> no fresh cells
@@ -541,27 +579,45 @@ def test_certify_rung_at_least_one(tmp_path, capsys):
         assert "at least one pass" in capsys.readouterr().out
     finally:
         monkeypatch.undo()
+
+
 def test_certify_rung_at_least_one_dead(tmp_path, capsys):
     """Addendum 18: at_least_one with all 21 cells measured and zero
     passes is DEAD - every remaining candidate gets its turn."""
     import full_benchmark as fb
+
     ran = []
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         ran.append(seed)
         return False, {"correct": 0, "depth": rung}
+
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "zero-Q8_0.gguf"
         model.write_bytes(b"x")
         falls = {str(i): 16384 for i in range(1, 22)}
-        state = {"families": {"zero": {
-            "selected": "Q8_0",
-            "runs": {"Q8_0": {"file": str(model)}},
-            "tournament_falls": falls,
-        }}}
+        state = {
+            "families": {
+                "zero": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": falls,
+                }
+            }
+        }
         res = fb.certify_rung(
-            16384, "at_least_one", ["zero"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            16384,
+            "at_least_one",
+            ["zero"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
         )
         assert res[0]["verdict"] == "dead"
         assert ran == []
@@ -569,27 +625,38 @@ def test_certify_rung_at_least_one_dead(tmp_path, capsys):
         assert "no pass" in out and "DEAD" in out
     finally:
         monkeypatch.undo()
+
+
 def test_certify_rung_2_sigma_dead(tmp_path, capsys):
     """Addendum 18: the 2-sigma bar is stricter - 8 passing cells at
     a rung are dead at 2 sigma (even 21/21 gives lo(21,21,2)=0.77 <
     0.5 is wrong - so use the real math: 9 fails, best 12/21,
     lo(12,21,2)=0.368 < 0.5) -> DEAD without running a cell."""
     import full_benchmark as fb
+
     ran = []
-    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+
+    def fake_fwe_pass(
+        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
+    ):
         ran.append(seed)
         return True, {"correct": 1, "depth": rung}
+
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "s2-Q8_0.gguf"
         model.write_bytes(b"x")
         falls = {str(i): 8192 for i in range(1, 10)}
-        state = {"families": {"s2": {
-            "selected": "Q8_0",
-            "runs": {"Q8_0": {"file": str(model)}},
-            "tournament_falls": falls,
-        }}}
+        state = {
+            "families": {
+                "s2": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": falls,
+                }
+            }
+        }
         res = fb.certify_rung(
             8192, "2_sigma", ["s2"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
@@ -599,11 +666,14 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
         assert "2s lower bound" in out
     finally:
         monkeypatch.undo()
+
+
 def test_diagnose_fwe(tmp_path, capsys):
     """Addendum 9: the per-rank diagnostic reads the climb CSVs -
     which of the 3 expected words the found-words actually are, and
     the pass rate at every threshold (>=1, >=2, 3 of 3)."""
     import csv as csv_mod
+
     import full_benchmark as fb
 
     d = tmp_path / "tournament-results" / "fam" / "climb1"
@@ -624,3 +694,36 @@ def test_diagnose_fwe(tmp_path, capsys):
     assert "3/3: 1/3" in out
     assert ">=2/3: 1/3" in out
     assert ">=1/3: 2/3" in out
+
+
+def test_certify_cells_regrades_inherited_from_csv(tmp_path):
+    """The 2/3 tightening: inherited tournament-fall cells are re-graded
+    from their committed climb CSV `partial` word counts instead of
+    being dropped - the fall only says pass/fail at 3/3, but the CSV
+    holds the actual words found."""
+    import csv as _csv
+
+    import full_benchmark as fb
+
+    fam = "fam"
+    cdir = tmp_path / "tournament-results" / fam / "climb7"
+    cdir.mkdir(parents=True)
+    with open(cdir / "fam-Q8_0-8192-fwe.csv", "w", newline="") as fh:
+        w = _csv.writer(fh)
+        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
+        w.writerow([0, 8192, "aaa;bbb;ccc", 1, "x", False])
+
+    fst = {"tournament_falls": {"7": None}}
+    cells = fb.certify_cells(fst, 8192, 2, str(tmp_path), fam)
+    assert cells == {7: False}
+
+    with open(cdir / "fam-Q8_0-8192-fwe.csv", "w", newline="") as fh:
+        w = _csv.writer(fh)
+        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
+        w.writerow([0, 8192, "aaa;bbb;ccc", 2, "x", True])
+    cells = fb.certify_cells(fst, 8192, 2, str(tmp_path), fam)
+    assert cells == {7: True}
+
+    # no models_dir: the inherited cell stays dropped (re-run, never guessed)
+    cells = fb.certify_cells(fst, 8192, 2)
+    assert cells == {}
