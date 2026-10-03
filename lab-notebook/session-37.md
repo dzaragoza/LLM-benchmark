@@ -672,3 +672,36 @@ rung with >= 1 pass in RUNS; eligible rows filtered to medalDepth >
 0, best = max medalDepth. Verified: node --check both pages, boot
 smoke test (node vm + stub DOM) across all three radio states on
 both pages - RUN-OK.
+
+
+## Addendum 22 (2026-10-03, web) - one recommendation, three medals stated
+
+The author: the recommendation itself is the recommendation - drop
+the per-model table under the verdict, drop the radios, and state
+the three quality choices IN the recommendation (the practitioner
+wants the largest context; the medals grade how confident it is).
+
+Both pages: the winner is now the model with the deepest BRONZE rung
+(the largest context it can work at), and the verdict states all
+three medals for that model:
+
+  Recommended: X (quant)
+  262,144 tokens [bronze] the largest context it can work at
+  [silver] 32,768 tokens reliable - [gold] none yet
+  ... RAM/VRAM, w/s ...
+  medals legend footnote: pick the context size that matches the
+  quality you need
+
+Removed: the quality radios (addendum 21), the sortable per-model
+table, the tables sort machinery (SORT/cmpRows/listener). The
+runs-only table stays (the evidence). The how-paragraph now points
+to it.
+
+INCIDENT (reported per wow.md 4): this edit was the messiest of the
+session - three patch scripts left duplicated blocks, spliced
+braces, and literal placeholders (%SPEED%) in the JS; each was
+caught by node --check + the stub-DOM boot test before commit, and
+the files were restored from HEAD once. Lesson reinforced: the
+pages minified-style long lines defeat my usual small-patch
+workflow; multi-anchor regex patches on them need the JS check
+after EVERY step, not at the end.
