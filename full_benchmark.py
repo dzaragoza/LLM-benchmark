@@ -44,8 +44,8 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
-import math
 import json
+import math
 import os
 import re
 import subprocess
@@ -243,7 +243,13 @@ def fwe_pass(
                 pass
             return False, {"error": "fwe server did not come up", "depth": depth}
         row = ruler_gate.run_fwe_depth(
-            port, label, depth, 1, csv_path, seed0=seed, no_thinking=True,
+            port,
+            label,
+            depth,
+            1,
+            csv_path,
+            seed0=seed,
+            no_thinking=True,
             min_words=min_words,
         )
         row["window_cap"] = _banner_window(log_path)
@@ -346,9 +352,7 @@ def _rank_extra(rank: dict[str, Any], depths: list[int]) -> dict[str, Any]:
     rank["reliable_depth"] = reliable
     rank["conservative_depth"] = conservative
     rank["wilson_bounds"] = bounds
-    climb_max = [
-        (top_d := depths[-1]) if f is None else f for f in rank["fall_depths"]
-    ]
+    climb_max = [depths[-1] if f is None else f for f in rank["fall_depths"]]
     rank["ceiling"] = max(climb_max) if climb_max else 0
     return rank
 
@@ -509,7 +513,7 @@ def diagnose_fwe(models_dir: str, state: dict[str, Any]) -> None:
 
     print("=" * 60)
     stamp("FWE DIAGNOSTIC (per-rank found; pass rates by threshold)")
-    for fam, fst in sorted((state.get("families") or {}).items()):
+    for fam, _fst in sorted((state.get("families") or {}).items()):
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         if not os.path.isdir(results_dir):
             continue
@@ -549,10 +553,46 @@ def diagnose_fwe(models_dir: str, state: dict[str, Any]) -> None:
             f"3/3: {p3}/{cells} ({p3 / cells:.0%})"
         )
         if p1 and rank_found[0] / max(1, rank_found[0] + rank_found[1] + rank_found[2]) > 0.7:
-            print("    NOTE: found-words are overwhelmingly rank-1 - the >=1/3 claim is mostly 'finds the most frequent word'")
+            print(
+                "    NOTE: found-words are overwhelmingly rank-1 - "
+                "the >=1/3 claim is mostly 'finds the most frequent word'"
+            )
 
 
-def certify_cells(fst: dict[str, Any], depth: int, min_words: int = 1) -> dict[int, bool]:
+def _climb_csv_partial(
+    models_dir: str | None, fam: str | None, climb: int, depth: int
+) -> int | None:
+    """The climb's committed FWE CSV holds the actual `partial` word
+    count for cell (climb, depth); None means no CSV (the cell is
+    unmeasured at this depth and stays dropped at a stricter bar)."""
+    if not models_dir or not fam:
+        return None
+    cdir = os.path.join(models_dir, "tournament-results", fam, f"climb{climb}")
+    if not os.path.isdir(cdir):
+        return None
+    matches = glob.glob(os.path.join(cdir, f"*-{depth}-fwe.csv"))
+    if len(matches) != 1:
+        return None
+    try:
+        with open(matches[0], newline="") as fh:
+            rows = list(csv.DictReader(fh))
+    except OSError:
+        return None
+    if len(rows) != 1:
+        return None
+    try:
+        return int(rows[0]["partial"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def certify_cells(
+    fst: dict[str, Any],
+    depth: int,
+    min_words: int = 1,
+    models_dir: str | None = None,
+    fam: str | None = None,
+) -> dict[int, bool]:
     """Session 37, addendum 8: the CELL model - a cell is (model, run
     number, step) and is NEVER measured twice. The historical cells
     come from the saved tournament_falls: climb s measured every
@@ -566,13 +606,19 @@ def certify_cells(fst: dict[str, Any], depth: int, min_words: int = 1) -> dict[i
 
     Re-grading (session 37, the 2/3 tightening): a direct cell that
     stored an INTEGER word count is graded at >= min_words exactly;
-    cells stored as booleans (or inherited from tournament falls)
-    were graded under the old 1/3 rule and are dropped from the
-    measured set at a stricter bar - they are re-run, never
-    silently trusted."""
+    cells stored as booleans were graded under the old 1/3 rule and
+    are dropped from the measured set at a stricter bar - they are
+    re-run, never silently trusted. Inherited tournament-fall cells
+    are re-graded from their committed climb CSV (the `partial`
+    word count) when models_dir/fam are given: the fall only says
+    pass/fail at 3/3, but the CSV holds the actual words found, so
+    the cell is MEASURED, not guessed."""
     cells: dict[int, bool] = {}
     for key, fall in (fst.get("tournament_falls") or {}).items():
         if min_words > 1:
+            csv_words = _climb_csv_partial(models_dir, fam, int(key), depth)
+            if csv_words is not None:
+                cells[int(key)] = csv_words >= min_words
             continue
         if fall is None or fall > depth:
             cells[int(key)] = True
@@ -633,18 +679,19 @@ def certify_rung(
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
-        cells = certify_cells(fst, depth, min_words)
-        rank_extra = {"reliable_depth": 0}
+        cells = certify_cells(fst, depth, min_words, models_dir, fam)
         order.append((fam, fst, cells))
+
     def promise(item):
         fam, fst, cells = item
         k = sum(1 for ok in cells.values() if ok)
-        saved_rank = (state.get("tournament") or [])
+        saved_rank = state.get("tournament") or []
         rd = 0
         for tr in saved_rank:
             if tr.get("family") == fam:
                 rd = tr.get("reliable_depth") or 0
         return (-k, -rd, fam)
+
     order.sort(key=promise)
     results: list[dict[str, Any]] = []
     answered = False
@@ -661,10 +708,7 @@ def certify_rung(
         }
         print()
         print("-" * 60)
-        print(
-            f"  {fam}: {k}/{measured} cells measured, "
-            f"{n_total - measured} unmeasured"
-        )
+        print(f"  {fam}: {k}/{measured} cells measured, {n_total - measured} unmeasured")
         if answered:
             entry["skipped"] = "rung already answered"
             print("  SKIPPED - the rung is already answered")
@@ -673,14 +717,26 @@ def certify_rung(
         famdir = os.path.join(models_dir, fam)
         rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
         run = (fst.get("runs") or {}).get(rung or "", {})
-        model = run.get("file") or (fst.get("tournament_entry") or {}).get("file") or local_rung(famdir, rung)
+        model = (
+            run.get("file")
+            or (fst.get("tournament_entry") or {}).get("file")
+            or local_rung(famdir, rung)
+        )
         if not model or not os.path.isfile(model):
             entry["error"] = f"model file not found ({model})"
             print(f"  ERROR: {entry['error']}")
             results.append(entry)
             continue
-        kv_k = run.get("kv_quant_k") or (fst.get("tournament_entry") or {}).get("kv_quant_k") or state.get("kv_quant_k")
-        kv_v = run.get("kv_quant_v") or (fst.get("tournament_entry") or {}).get("kv_quant_v") or state.get("kv_quant_v")
+        kv_k = (
+            run.get("kv_quant_k")
+            or (fst.get("tournament_entry") or {}).get("kv_quant_k")
+            or state.get("kv_quant_k")
+        )
+        kv_v = (
+            run.get("kv_quant_v")
+            or (fst.get("tournament_entry") or {}).get("kv_quant_v")
+            or state.get("kv_quant_v")
+        )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
         direct = dict((fst.get("certify") or {}).get(str(depth)) or {})
@@ -723,8 +779,7 @@ def certify_rung(
                         break
             if ran == 0:
                 plan = (
-                    f"  PLAN @ {depth:,}: {measured}/{n_total} cells measured, "
-                    f"{remaining} left - "
+                    f"  PLAN @ {depth:,}: {measured}/{n_total} cells measured, {remaining} left - "
                 )
                 plan += (
                     f"{to_accept if to_accept else remaining} consecutive pass(es) certify; "
@@ -784,10 +839,7 @@ def certify_rung(
         elif verdict == "dead":
             entry["verdict"] = "dead"
             if level == "at_least_one":
-                print(
-                    f"  DEAD - every cell measured, no pass at {depth:,}; "
-                    f"next candidate"
-                )
+                print(f"  DEAD - every cell measured, no pass at {depth:,}; next candidate")
             else:
                 print(
                     f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
@@ -795,7 +847,8 @@ def certify_rung(
                 )
         elif verdict == "would-run":
             entry["verdict"] = "would-run"
-            print(f"  dry run - would test {remaining} cell(s) from run {min(r for r in range(1, n_total + 1) if r not in cells)}")
+            nxt = min(r for r in range(1, n_total + 1) if r not in cells)
+            print(f"  dry run - would test {remaining} cell(s) from run {nxt}")
         results.append(entry)
     return results
 
@@ -837,7 +890,6 @@ def rescore_tournament(
             new_fall = None
             for d in depths:
                 csv_path = os.path.join(climb_dir, f"-{d}-fwe.csv")
-                label = None
                 if not os.path.isfile(csv_path):
                     matches = sorted(glob.glob(os.path.join(climb_dir, f"*-{d}-fwe.csv")))
                     csv_path = matches[0] if matches else csv_path
@@ -885,10 +937,9 @@ def rescore_tournament(
                 continue
             if new_fall != old_fall:
                 changed += 1
-                print(
-                    f"    climb {s}: fall {old_fall if old_fall is None else format(old_fall, ',')} -> "
-                    f"{new_fall if new_fall is None else format(new_fall, ',')} tok"
-                )
+                o = "None" if old_fall is None else format(old_fall, ",")
+                n = "None" if new_fall is None else format(new_fall, ",")
+                print(f"    climb {s}: fall {o} -> {n} tok")
                 saved[key] = new_fall
         if dry_run:
             print(f"  {fam}: dry run - {changed} climbs would change (state NOT written)")
@@ -2225,11 +2276,10 @@ def git_tail(args: argparse.Namespace) -> None:
     # my side for hours). Pull-rebase-autostash AFTER the commit and
     # BEFORE the push, so the artifact commit replays on top of
     # whatever landed meanwhile; the autostash covers tree dirt.
-    r = subprocess.run(
-        ["git", "pull", "--rebase", "--autostash"], capture_output=True, text=True
-    )
+    r = subprocess.run(["git", "pull", "--rebase", "--autostash"], capture_output=True, text=True)
     if r.returncode != 0:
-        stamp(f"pull before push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
+        hint = "run: git pull --rebase --autostash; and git push"
+        stamp(f"pull before push failed: {r.stderr.strip()} - {hint}")
     r = subprocess.run(["git", "push"], capture_output=True, text=True)
     if r.returncode != 0:
         stamp(f"push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
