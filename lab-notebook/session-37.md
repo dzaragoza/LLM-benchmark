@@ -637,3 +637,19 @@ comma-separated string (--rungs 32768,65536,131072,262144), split and
 int-parsed in main() with a clean ap.error on garbage. Per wow.md: a
 procedure error a human could make is a tooling defect - the comma form
 is impossible to get wrong, no -- separator to remember. 147 pass.
+
+
+## Addendum 20 (2026-10-03, tooling) - the certify PLAN line
+
+The author: tell which rung we are measuring and how many cells the
+current model needs to either pass or fail. Before each candidate
+first cell, certify now prints a PLAN line:
+
+  PLAN @ 32,768: 3/21 cells measured, 18 left - 8 consecutive
+  pass(es) certify; 9 consecutive fail(s) kill
+
+The math: to_accept scans j = 1..remaining for the first j whose
+Wilson lo(k+j, measured+j, z) clears the bar; to_dead scans for the
+first j fails whose best-case (remaining-j passes) cannot reach it.
+at_least_one plans 1 pass to certify. Only printed once per
+candidate (before the first fresh cell). 147 pass.
