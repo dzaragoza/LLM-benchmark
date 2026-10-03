@@ -552,7 +552,7 @@ def diagnose_fwe(models_dir: str, state: dict[str, Any]) -> None:
             print("    NOTE: found-words are overwhelmingly rank-1 - the >=1/3 claim is mostly 'finds the most frequent word'")
 
 
-def certify_cells(fst: dict[str, Any], depth: int) -> dict[int, bool]:
+def certify_cells(fst: dict[str, Any], depth: int, min_words: int = 1) -> dict[int, bool]:
     """Session 37, addendum 8: the CELL model - a cell is (model, run
     number, step) and is NEVER measured twice. The historical cells
     come from the saved tournament_falls: climb s measured every
@@ -560,17 +560,32 @@ def certify_cells(fst: dict[str, Any], depth: int) -> dict[int, bool]:
     so cell (s, depth) PASSED iff the fall is None (topped out) or
     deeper than the rung, FAILED iff the fall IS the rung, and is
     UNMEASURED iff the climb stopped below it. The direct cells
-    (certify runs) live in fst["certify"][str(depth)] as {run: pass}.
-    Returns {run: passed} for every MEASURED cell."""
+    (certify runs) live in fst["certify"][str(depth)] as {run: pass}
+    (or {run: words_found} once cells record word counts).
+    Returns {run: passed} for every MEASURED cell.
+
+    Re-grading (session 37, the 2/3 tightening): a direct cell that
+    stored an INTEGER word count is graded at >= min_words exactly;
+    cells stored as booleans (or inherited from tournament falls)
+    were graded under the old 1/3 rule and are dropped from the
+    measured set at a stricter bar - they are re-run, never
+    silently trusted."""
     cells: dict[int, bool] = {}
     for key, fall in (fst.get("tournament_falls") or {}).items():
+        if min_words > 1:
+            continue
         if fall is None or fall > depth:
             cells[int(key)] = True
         elif fall == depth:
             cells[int(key)] = False
     direct = (fst.get("certify") or {}).get(str(depth)) or {}
     for key, ok in direct.items():
-        cells[int(key)] = bool(ok)
+        if isinstance(ok, bool):
+            if min_words > 1:
+                continue
+            cells[int(key)] = ok
+        else:
+            cells[int(key)] = int(ok) >= min_words
     return cells
 
 
@@ -586,6 +601,7 @@ def certify_rung(
     state_path: str,
     port: int,
     dry_run: bool,
+    min_words: int = 1,
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
@@ -617,7 +633,7 @@ def certify_rung(
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
-        cells = certify_cells(fst, depth)
+        cells = certify_cells(fst, depth, min_words)
         rank_extra = {"reliable_depth": 0}
         order.append((fam, fst, cells))
     def promise(item):
@@ -733,6 +749,7 @@ def certify_rung(
                 port=port,
                 kv_quant_k=kv_k,
                 kv_quant_v=kv_v,
+                min_words=min_words,
             )
             ran += 1
             cells[next_run] = ok
@@ -1640,6 +1657,19 @@ def build_parser() -> argparse.ArgumentParser:
         "positional families list parseable (addendum 19: argparse's "
         "nargs='+' swallowed the families as depths)",
     )
+    ap.add_argument(
+        "--fwe-min-words",
+        type=int,
+        default=1,
+        metavar="N",
+        help="session 37 (the 2/3 tightening): the FWE pass bar - a cell "
+        "passes when >= N of the 3 hidden words are found (default 1, "
+        "the addendum-2 relaxation). N=2 tightens gold certification to "
+        "2-of-3. Cells that stored an integer word count are re-graded "
+        "exactly at the new bar; cells stored as booleans or inherited "
+        "from tournament falls were graded under the old 1/3 rule and are "
+        "re-run, never silently trusted",
+    )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant-k",
@@ -1754,6 +1784,7 @@ def main() -> None:
                 args.state_file,
                 state.get("ladder_port", 8210),
                 args.dry_run,
+                min_words=args.fwe_min_words,
             )
             state["certify"] = results
             save_state(args.state_file, state)
