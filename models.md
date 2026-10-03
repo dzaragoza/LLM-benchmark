@@ -165,6 +165,31 @@ n=21 GRADE (the addendum-45 questions, 3/3 criterion):
     4,096, 34.85 w/s); 8k -> 0.8B (reliable 8,192); 16k+ -> EMPTY -
     the certification phase (session 36 addendum 50) fills it.
 
+## THE PRACTITIONER TABLE (session 37 - the certify controller answers)
+
+The deliverable: per context rung, ONE model + config + quality level
+that solves it well. Quality levels: silver = reliable (1 sigma Wilson
+lower bound >= 0.5), gold = confident (2 sigma). w/s is NOT measured in
+the benchmark anymore (addendum 15 - the RAM-ceiling assumption: a
+config under the ceiling has the bandwidth for 5 w/s); historical w/s
+figures are old-protocol records.
+
+| rung (tokens) | model | config (model q, k, v) | quality | cells used | evidence |
+|---|---|---|---|---|---|
+| 4,096 | Qwen3.5-0.8B | (Q8_0, f16, f16) | gold (conservative 4,096, 17/21 at 1s) | n=21 tournament | session 36 addendum 42 |
+| 8,192 | Qwen3.5-0.8B | (Q8_0, f16, f16) | silver (reliable 8,192, 14/21 at 1s) | n=21 tournament | session 36 addendum 42 |
+| 16,384 | AI21-Jamba2-3B | (Q8_0, f16, f16) | silver (accept 11/11, 1s lo 0.917) | 3 inherited + 8 fresh cells (runs 9-21 never measured) | certify run 2026-10-03, addendum 17 |
+| 32,768+ | EMPTY | - | - | - | the next rungs to certify (cheapest-first) |
+
+NOTE on the 16k answer (addendum 17): Jamba2 - the hybrid whose n=21
+mode ROSE to 16,384 - certifies the rung at 11/11 with ZERO failures;
+the sequential controller spent 8 fresh cells total (runs 1-8) and
+skipped the other 8 families (the 21x9 worst case would have been 189
+cells; the sequential design saved ~95% of the compute). The one
+interrupted w/s trial (addendum 15's removal mid-flight) recorded
+7.2 w/s at 16,384 before the ruling - a PASS and a bonus record, not
+a certification input.
+
 The domination rule is retired (session 37, addendum 2); a replacement policy is pending from the author.
 
 NOBODY beat the bar (32,768, the first tournament's rank). The overall
