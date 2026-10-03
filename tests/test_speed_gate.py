@@ -450,7 +450,7 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
             }
         }
         res = fb.certify_rung(
-            8192, ["good", "other"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            8192, "1_sigma", ["good", "other"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
         first = [r for r in res if r["family"] == "good"][0]
         assert first["verdict"] == "accept"
@@ -492,7 +492,7 @@ def test_certify_rung_dead(tmp_path, capsys):
             "tournament_falls": falls,
         }}}
         res = fb.certify_rung(
-            8192, ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            8192, "1_sigma", ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
         assert res[0]["verdict"] == "dead"
         assert ran == []
@@ -501,6 +501,104 @@ def test_certify_rung_dead(tmp_path, capsys):
         monkeypatch.undo()
 
 
+def test_certify_rung_at_least_one(tmp_path, capsys):
+    """Addendum 18: at_least_one accepts a candidate with a single
+    historical pass - no fresh cells needed - and skips the rest."""
+    import full_benchmark as fb
+    ran = []
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return True, {"correct": 1, "depth": rung}
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    try:
+        model = tmp_path / "one-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state = {
+            "families": {
+                "one": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": {"1": None},
+                },
+                "none": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    "tournament_falls": {},
+                },
+            }
+        }
+        res = fb.certify_rung(
+            16384, "at_least_one", ["one", "none"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+        )
+        first = [r for r in res if r["family"] == "one"][0]
+        # climb 1 topped out, so its 16384 cell passed historically -> no fresh cells
+        assert first["verdict"] == "accept"
+        assert first["passes"] == 1 and first["ran_now"] == 0
+        assert ran == []
+        other = [r for r in res if r["family"] == "none"][0]
+        assert other.get("skipped") == "rung already answered"
+        assert "at least one pass" in capsys.readouterr().out
+    finally:
+        monkeypatch.undo()
+def test_certify_rung_at_least_one_dead(tmp_path, capsys):
+    """Addendum 18: at_least_one with all 21 cells measured and zero
+    passes is DEAD - every remaining candidate gets its turn."""
+    import full_benchmark as fb
+    ran = []
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return False, {"correct": 0, "depth": rung}
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    try:
+        model = tmp_path / "zero-Q8_0.gguf"
+        model.write_bytes(b"x")
+        falls = {str(i): 16384 for i in range(1, 22)}
+        state = {"families": {"zero": {
+            "selected": "Q8_0",
+            "runs": {"Q8_0": {"file": str(model)}},
+            "tournament_falls": falls,
+        }}}
+        res = fb.certify_rung(
+            16384, "at_least_one", ["zero"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+        )
+        assert res[0]["verdict"] == "dead"
+        assert ran == []
+        out = capsys.readouterr().out
+        assert "no pass" in out and "DEAD" in out
+    finally:
+        monkeypatch.undo()
+def test_certify_rung_2_sigma_dead(tmp_path, capsys):
+    """Addendum 18: the 2-sigma bar is stricter - 8 passing cells at
+    a rung are dead at 2 sigma (even 21/21 gives lo(21,21,2)=0.77 <
+    0.5 is wrong - so use the real math: 9 fails, best 12/21,
+    lo(12,21,2)=0.368 < 0.5) -> DEAD without running a cell."""
+    import full_benchmark as fb
+    ran = []
+    def fake_fwe_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return True, {"correct": 1, "depth": rung}
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    try:
+        model = tmp_path / "s2-Q8_0.gguf"
+        model.write_bytes(b"x")
+        falls = {str(i): 8192 for i in range(1, 10)}
+        state = {"families": {"s2": {
+            "selected": "Q8_0",
+            "runs": {"Q8_0": {"file": str(model)}},
+            "tournament_falls": falls,
+        }}}
+        res = fb.certify_rung(
+            8192, "2_sigma", ["s2"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+        )
+        assert res[0]["verdict"] == "dead"
+        assert ran == []
+        out = capsys.readouterr().out
+        assert "2s lower bound" in out
+    finally:
+        monkeypatch.undo()
 def test_diagnose_fwe(tmp_path, capsys):
     """Addendum 9: the per-rank diagnostic reads the climb CSVs -
     which of the 3 expected words the found-words actually are, and
