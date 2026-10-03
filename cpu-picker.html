@@ -257,6 +257,13 @@
       <div class="readout" id="classout"></div>
     </div>
 
+    <div class="readout" id="qualout">
+      <label>Quality you need:</label>
+      <label><input type="radio" name="quality" value="bronze" onchange="pick()"> 🥉 bronze &mdash; it can work</label>
+      <label><input type="radio" name="quality" value="silver" checked onchange="pick()"> 🥈 silver &mdash; reliable (recommended)</label>
+      <label><input type="radio" name="quality" value="gold" onchange="pick()"> 🥇 gold &mdash; confident</label>
+    </div>
+
     <div id="result"></div>
     <div id="tables"></div>
 
@@ -486,6 +493,23 @@
         pick();
       }
 
+      // The reader-chosen quality bar (addendum 21): bronze = any
+      // pass at the rung (at_least_one), silver = reliable (1 sigma),
+      // gold = confident (2 sigma) - the same three claims the
+      // certify controller makes.
+      function quality() {
+        var el = document.querySelector('input[name="quality"]:checked');
+        return el ? el.value : "silver";
+      }
+      function medalDepth(m, q) {
+        if (q === "silver") return m.depth || 0;
+        if (q === "gold") return m.conservative || 0;
+        var r = RUNS.filter(function (x) { return x.name === m.name; })[0];
+        if (!r) return m.depth || 0;
+        var d = 0;
+        r.passes.forEach(function (p, i) { if (p >= 1) d = RUNGS[i]; });
+        return d;
+      }
       function pick() {
         var perch, ch, chLabel;
         var m = MACHINES.filter(function (x) {
@@ -560,12 +584,18 @@
           };
         }).sort(cmpRows);
 
+        var q = quality();
+        var qlabel = { bronze: "bronze \u2014 it can work", silver: "silver \u2014 reliable", gold: "gold \u2014 confident" }[q];
+        var qicon = { bronze: "\uD83E\uDD49", silver: "\uD83E\uDD48", gold: "\uD83E\uDD47" }[q];
         var eligible = rows.filter(function (r) {
           return r.fits && r.passes;
         });
         var html = "";
-        if (eligible.length) {
-          var r = eligible[0];
+        var medaled = eligible.filter(function (r) { return medalDepth(r.m, q) > 0; });
+        if (medaled.length) {
+          var r = medaled.reduce(function (a, b) {
+            return medalDepth(b.m, q) > medalDepth(a.m, q) ? b : a;
+          });
           html +=
             '<div class="verdict"><h3>Recommended: ' +
             r.m.name +
@@ -573,16 +603,11 @@
             r.m.quant +
             ")</h3>" +
             '<div><span class="depth">' +
-            (r.m.depth === null
-              ? "\u2014"
-              : r.m.depth === 0
-                ? "no medal"
-                : r.m.depth.toLocaleString()) +
-            " tokens silver (reliable) &middot; " +
-            (r.m.conservative
-              ? r.m.conservative.toLocaleString() + " tokens gold (confident) &middot; "
-              : "") +
-            "4,096+ tokens bronze" +
+            medalDepth(r.m, q).toLocaleString() +
+            " tokens " +
+            qicon +
+            " " +
+            qlabel +
             "</div>" +
             "<div>predicted " +
             r.w.toFixed(1) +
@@ -598,6 +623,16 @@
             " of your " +
             ram +
             " GiB</div></div>";
+        } else if (eligible.length) {
+          var near = medaled.length ? null : eligible.reduce(function (a, b) {
+            return medalDepth(b.m, q === "bronze" ? "silver" : "bronze") > 0 ? b : a;
+          }, null);
+          html +=
+            '<div class="verdict none"><h3>No model earns ' +
+            qicon +
+            " " +
+            qlabel +
+            " at any measured rung yet</h3><div>Try a lower quality bar: the runs table below shows what each model has earned at every rung.</div></div>";
         } else {
           var fitting = rows.filter(function (r) {
             return r.fits;

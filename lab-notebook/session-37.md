@@ -653,3 +653,22 @@ Wilson lo(k+j, measured+j, z) clears the bar; to_dead scans for the
 first j fails whose best-case (remaining-j passes) cannot reach it.
 at_least_one plans 1 pass to certify. Only printed once per
 candidate (before the first fresh cell). 147 pass.
+
+
+## Addendum 21 (2026-10-03, web) - the quality radio on both pages
+
+The author approved the recommendation design. Both pickers now ask
+QUALITY YOU NEED before recommending: three radios - bronze = it can
+work (at_least_one), silver = reliable (1 sigma, checked by default),
+gold = confident (2 sigma). The verdict then recommends the model
+with the deepest rung at that quality; if no model earns the chosen
+quality at any measured rung, the page says so honestly and points
+to the runs table. Same three claims as the certify levels - one
+language from benchmark to page.
+
+Implementation: quality() reads the checked radio; medalDepth(m, q)
+maps silver -> m.depth, gold -> m.conservative, bronze -> deepest
+rung with >= 1 pass in RUNS; eligible rows filtered to medalDepth >
+0, best = max medalDepth. Verified: node --check both pages, boot
+smoke test (node vm + stub DOM) across all three radio states on
+both pages - RUN-OK.

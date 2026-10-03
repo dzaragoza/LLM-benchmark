@@ -209,6 +209,13 @@
       <div class="readout" id="bwout"></div>
     </div>
 
+    <div class="readout" id="qualout">
+      <label>Quality you need:</label>
+      <label><input type="radio" name="quality" value="bronze" onchange="pick()"> 🥉 bronze &mdash; it can work</label>
+      <label><input type="radio" name="quality" value="silver" checked onchange="pick()"> 🥈 silver &mdash; reliable (recommended)</label>
+      <label><input type="radio" name="quality" value="gold" onchange="pick()"> 🥇 gold &mdash; confident</label>
+    </div>
+
     <div id="result"></div>
     <div id="tables"></div>
 
@@ -386,6 +393,19 @@
         renderList();
       }
 
+      function quality() {
+        var el = document.querySelector('input[name="quality"]:checked');
+        return el ? el.value : "silver";
+      }
+      function medalDepth(m, q) {
+        if (q === "silver") return m.depth || 0;
+        if (q === "gold") return m.conservative || 0;
+        var r = RUNS.filter(function (x) { return x.name === m.name; })[0];
+        if (!r) return m.depth || 0;
+        var d = 0;
+        r.passes.forEach(function (p, i) { if (p >= 1) d = RUNGS[i]; });
+        return d;
+      }
       function pick() {
         var vram = parseFloat($("vram").value);
         if (!(vram > 0)) {
@@ -418,9 +438,13 @@
         var eligible = rows.filter(function (r) {
           return r.fits;
         });
-        if (eligible.length) {
-          var best = eligible.reduce(function (a, r) {
-            return (r.m.depth || 0) > (a.m.depth || 0) ? r : a;
+        var q = quality();
+        var qlabel = { bronze: "bronze \u2014 it can work", silver: "silver \u2014 reliable", gold: "gold \u2014 confident" }[q];
+        var qicon = { bronze: "\uD83E\uDD49", silver: "\uD83E\uDD48", gold: "\uD83E\uDD47" }[q];
+        var medaled = eligible.filter(function (r) { return medalDepth(r.m, q) > 0; });
+        if (medaled.length) {
+          var best = medaled.reduce(function (a, r) {
+            return medalDepth(r.m, q) > medalDepth(a.m, q) ? r : a;
           });
           host.innerHTML =
             '<div class="verdict"><h3>Recommended: ' +
@@ -429,16 +453,11 @@
             best.m.quant +
             "</h3>" +
             '<div><span class="depth">' +
-            (best.m.depth === null
-              ? "\u2014"
-              : best.m.depth === 0
-                ? "no medal"
-                : best.m.depth.toLocaleString()) +
-            " tokens silver (reliable) &middot; " +
-            (best.m.conservative
-              ? best.m.conservative.toLocaleString() + " tokens gold (confident) &middot; "
-              : "") +
-            "4,096+ tokens bronze" +
+            medalDepth(best.m, q).toLocaleString() +
+            " tokens " +
+            qicon +
+            " " +
+            qlabel +
             "</div>" +
             "<div>file " +
             best.m.size.toFixed(2) +
@@ -447,6 +466,13 @@
             " GiB of your " +
             vram +
             " GiB VRAM (conservative: CPU-side measured minimum RAM)</div></div>";
+        } else if (eligible.length) {
+          host.innerHTML =
+            '<div class="verdict none"><h3>No model earns ' +
+            qicon +
+            " " +
+            qlabel +
+            " at any measured rung yet</h3><div>Try a lower quality bar: the runs table below shows what each model has earned at every rung.</div></div>";
         } else {
           var cheapest = CANDIDATES.reduce(function (a, c) {
             return c.cost < a.cost ? c : a;
