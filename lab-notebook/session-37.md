@@ -428,3 +428,26 @@ with the file untouched and count=2 -> replace_all, missing target
 untouched, the md pipeline actually runs - a table insert gets
 auto-blank-lined and a ragged MD056 is refused before the write).
 138 pass.
+
+
+## Addendum 13: safe_append upgraded - the notebook-append pattern is markdown-checked too (2026-10-03)
+
+THE AUDIT (wow.md section 3: a class of bug becomes a tool
+guarantee): every notebook addendum this session went in via a
+shell heredoc append, bypassing the editor - the same bypass class
+as addendum 12. And the tool built to own that pattern,
+safe_append, only checked PYTHON syntax; a markdown append ran no
+auto-fixer and no lint gate.
+
+THE FIX: safe_append to a .md/.markdown target now runs the SAME
+pipeline as edit() before the write - the md auto-fixer (blank
+lines around any table the addition introduces, the single
+trailing newline) and the no-new-violations lint gate (a ragged
+MD056 row or an unclosed fence in the addition is refused with the
+file untouched). The addendum-21 guarantees (idempotent,
+non-corrupting, atomic, python-compiles-first) are unchanged.
+
+DOGFOOD: this very addendum was appended through the upgraded
+safe_append - the first notebook entry to pass the gate. 2 new
+tests (the auto-fix on append, the MD056 refusal with the file
+untouched; python compile path re-pinned). 140 pass.
