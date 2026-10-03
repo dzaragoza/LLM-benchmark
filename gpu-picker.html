@@ -221,7 +221,7 @@
 
     <div class="foot">
       <p>
-        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder of context sizes (4k, 8k, 16k, &hellip; 256k tokens). At each context size the model had to find hidden words in a long coded text &mdash; a pass means finding them. The raw pass counts earn the medals: <strong>bronze</strong> = at least one pass out of 21 (it can work, but expect misses); <strong>silver</strong> = reliable, roughly 13 or more passes out of 21 (we are confident it usually works); <strong>gold</strong> = confident, roughly 16 or more out of 21 (trust it on a bad day). The recommended model is the deepest silver-or-better one that (a) fits your RAM (measured whole-stack cost: weights + KV cache + buffers + runtime, cold) and (b) is predicted to stay above the 5 w/s reader line at your bandwidth (speed scales linearly with memory bandwidth: measured@102.4&times;BW/102.4). The full runs table below shows every pass count behind every medal.
+        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder of context sizes (4k, 8k, 16k, &hellip; 256k context size). At each context size the model had to find hidden words in a long coded text &mdash; a pass means finding them. The raw pass counts earn the medals: <strong>bronze</strong> = at least one pass out of 21 (it can work, but expect misses); <strong>silver</strong> = reliable, roughly 13 or more passes out of 21 (we are confident it usually works); <strong>gold</strong> = confident, roughly 16 or more out of 21 (trust it on a bad day). The recommended model is the deepest silver-or-better one that (a) fits your RAM (measured whole-stack cost: weights + KV cache + buffers + runtime, cold) and (b) is predicted to stay above the 5 w/s reader line at your bandwidth (speed scales linearly with memory bandwidth: measured@102.4&times;BW/102.4). The full runs table below shows every pass count behind every medal.
       <p>
         <strong>Two extrapolations, both flagged.</strong> The minimum-RAM
         criterion carries the CPU measurement onto the GPU unchanged
@@ -442,14 +442,16 @@
           var dGold = medalDepth(r.m, "gold");
           var dSilver = medalDepth(r.m, "silver");
           var dBronze = medalDepth(r.m, "bronze");
-          var medLine =
-            (dSilver ? "\uD83E\uDD48 " + dSilver.toLocaleString() + " tokens reliable" : "\uD83E\uDD48 none yet") +
-            " &middot; " +
-            (dGold ? "\uD83E\uDD47 " + dGold.toLocaleString() + " tokens confident" : "\uD83E\uDD47 none yet");
+                    var medalList =
+            "<ul class=\"medals\">" +
+            "<li>\uD83E\uDD47 gold &mdash; confident: " + (dGold ? dGold.toLocaleString() + " context size" : "none yet") + "</li>" +
+            "<li>\uD83E\uDD48 silver &mdash; reliable: " + (dSilver ? dSilver.toLocaleString() + " context size" : "none yet") + "</li>" +
+            "<li>\uD83E\uDD49 bronze &mdash; it can work: " + dBronze.toLocaleString() + " context size</li>" +
+            "</ul>";
           host.innerHTML =
             '<div class="verdict"><h3>Recommended: ' + r.m.name + " " + r.m.quant + "</h3>" +
-            '<div><span class="depth">' + dBronze.toLocaleString() + " tokens \uD83E\uDD49</span> the largest context it can work at</div>" +
-            "<div>" + medLine + "</div>" +
+            
+            "<div>" + medalList + "</div>" +
             "<div>file " + r.m.size.toFixed(2) + " GiB &middot; minimum RAM " + r.m.cost.toFixed(2) + " GiB" + (r.m.costEst ? " (est)" : "") + " of your " + vram + " GiB</div>" +
             '<div class="footnote">\uD83E\uDD49 bronze = it can work (at least 1 pass in 21) &middot; \uD83E\uDD48 silver = reliable (1-sigma) &middot; \uD83E\uDD47 gold = confident (2-sigma). Pick the context size that matches the quality you need.</div></div>';
         } else if (eligible.length) {
