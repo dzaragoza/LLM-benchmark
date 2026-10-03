@@ -1596,15 +1596,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--rungs",
-        type=int,
-        nargs="+",
+        type=str,
         default=None,
-        metavar="DEPTH",
-        help="session 37, addendum 18: the rung(s) to certify, processed "
+        metavar="D1,D2,...",
+        help="session 37, addendum 18: comma-separated rung(s) to "
+        "certify (e.g. --rungs 32768,65536), processed "
         "cheapest-first (sorted ascending); required with --certify. "
         "State is saved after each rung, so each rung's answers feed "
         "the next rung's predictions - a range is just multiple "
-        "commands concatenated, no JSON needed",
+        "commands concatenated, no JSON needed. Comma form keeps the "
+        "positional families list parseable (addendum 19: argparse's "
+        "nargs='+' swallowed the families as depths)",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
@@ -1702,9 +1704,15 @@ def main() -> None:
         return
     if args.certify:
         if not args.rungs:
-            ap.error("--certify needs --rungs DEPTH [DEPTH ...]")
+            ap.error("--certify needs --rungs D1,D2,...")
+        try:
+            rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
+        except ValueError:
+            ap.error(f"--rungs must be comma-separated integers, got {args.rungs!r}")
+        if not rung_list:
+            ap.error("--rungs needs at least one depth")
         all_results: list[dict[str, Any]] = []
-        for depth in sorted(args.rungs):
+        for depth in sorted(rung_list):
             results = certify_rung(
                 depth,
                 args.certify,
