@@ -526,6 +526,181 @@ def tournament_family(
     }
 
 
+def certify_cells(fst: dict[str, Any], depth: int) -> dict[int, bool]:
+    """Session 37, addendum 8: the CELL model - a cell is (model, run
+    number, step) and is NEVER measured twice. The historical cells
+    come from the saved tournament_falls: climb s measured every
+    rung up to and including its fall (fall == first FAILING rung),
+    so cell (s, depth) PASSED iff the fall is None (topped out) or
+    deeper than the rung, FAILED iff the fall IS the rung, and is
+    UNMEASURED iff the climb stopped below it. The direct cells
+    (certify runs) live in fst["certify"][str(depth)] as {run: pass}.
+    Returns {run: passed} for every MEASURED cell."""
+    cells: dict[int, bool] = {}
+    for key, fall in (fst.get("tournament_falls") or {}).items():
+        if fall is None or fall > depth:
+            cells[int(key)] = True
+        elif fall == depth:
+            cells[int(key)] = False
+    direct = (fst.get("certify") or {}).get(str(depth)) or {}
+    for key, ok in direct.items():
+        cells[int(key)] = bool(ok)
+    return cells
+
+
+def certify_rung(
+    depth: int,
+    specs: list[str],
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    port: int,
+    dry_run: bool,
+) -> list[dict[str, Any]]:
+    """Session 37, addendum 8 (the practitioner-certified map): fill
+    ONE rung - the sequential controller of session-36 addendum 50.
+    Candidates are the given families, ordered by promise (existing
+    passes at the rung, then reliable depth). Each candidate is
+    tested cell by cell (direct single-rung FWE at the rung, seed =
+    the run number, cells already measured are NEVER re-run) until
+    EARLY ACCEPT (1-sigma Wilson lower bound >= 0.5 over the measured
+    cells, count >= half of n=21) or EARLY REJECT (mathematically
+    dead: even passing every remaining cell cannot reach the bar).
+    On accept the rung's w/s is measured (n=5 median, addendum 42).
+    The first accepted candidate ANSWERS the rung; the rest are
+    skipped (the practitioner wants ONE model per rung)."""
+    n_total = TOURNAMENT_CLIMBS
+    floor = math.ceil(0.5 * n_total)
+    order: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    for spec in specs:
+        fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
+        fst = state["families"].get(fam, {})
+        cells = certify_cells(fst, depth)
+        rank_extra = {"reliable_depth": 0}
+        order.append((fam, fst, cells))
+    def promise(item):
+        fam, fst, cells = item
+        k = sum(1 for ok in cells.values() if ok)
+        saved_rank = (state.get("tournament") or [])
+        rd = 0
+        for tr in saved_rank:
+            if tr.get("family") == fam:
+                rd = tr.get("reliable_depth") or 0
+        return (-k, -rd, fam)
+    order.sort(key=promise)
+    results: list[dict[str, Any]] = []
+    answered = False
+    for fam, fst, cells0 in order:
+        cells = dict(cells0)
+        measured = len(cells)
+        k = sum(1 for ok in cells.values() if ok)
+        entry = {
+            "family": fam,
+            "depth": depth,
+            "historical_passes": k,
+            "historical_cells": measured,
+        }
+        print()
+        print("-" * 60)
+        print(
+            f"  {fam}: {k}/{measured} cells measured, "
+            f"{n_total - measured} unmeasured"
+        )
+        if answered:
+            entry["skipped"] = "rung already answered"
+            print("  SKIPPED - the rung is already answered")
+            results.append(entry)
+            continue
+        famdir = os.path.join(models_dir, fam)
+        rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
+        run = (fst.get("runs") or {}).get(rung or "", {})
+        model = run.get("file") or (fst.get("tournament_entry") or {}).get("file") or local_rung(famdir, rung)
+        if not model or not os.path.isfile(model):
+            entry["error"] = f"model file not found ({model})"
+            print(f"  ERROR: {entry['error']}")
+            results.append(entry)
+            continue
+        kv_k = run.get("kv_quant_k") or (fst.get("tournament_entry") or {}).get("kv_quant_k") or state.get("kv_quant_k")
+        kv_v = run.get("kv_quant_v") or (fst.get("tournament_entry") or {}).get("kv_quant_v") or state.get("kv_quant_v")
+        results_dir = os.path.join(models_dir, "tournament-results", fam)
+        os.makedirs(results_dir, exist_ok=True)
+        direct = dict((fst.get("certify") or {}).get(str(depth)) or {})
+        ran = 0
+        verdict = None
+        while True:
+            lo, _ = wilson_interval(k, measured) if measured else (0.0, 0.0)
+            remaining = n_total - measured
+            if measured >= floor and lo >= 0.5:
+                verdict = "accept"
+                break
+            best_k = k + remaining
+            best_lo, _ = wilson_interval(best_k, n_total)
+            if best_lo < 0.5 or best_k < floor:
+                verdict = "dead"
+                break
+            if dry_run:
+                verdict = "would-run"
+                break
+            next_run = min(r for r in range(1, n_total + 1) if r not in cells)
+            ok, fv = fwe_pass(
+                model,
+                depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                results_dir,
+                seed=next_run,
+                port=port,
+                kv_quant_k=kv_k,
+                kv_quant_v=kv_v,
+            )
+            ran += 1
+            cells[next_run] = ok
+            direct[str(next_run)] = ok
+            measured += 1
+            k += 1 if ok else 0
+            fst.setdefault("certify", {})[str(depth)] = direct
+            save_state(state_path, state)
+            print(
+                f"  cell (run {next_run}, {depth:,} tok): "
+                f"{'PASS' if ok else 'FAIL'} -> {k}/{measured} "
+                f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
+            )
+        entry["cells_measured"] = measured
+        entry["passes"] = k
+        entry["ran_now"] = ran
+        if verdict == "accept":
+            entry["verdict"] = "accept"
+            lo = wilson_interval(k, measured)[0]
+            print(
+                f"  ACCEPT at {k}/{measured} - 1-sigma lower bound "
+                f"{lo:.3f} >= 0.5 - {fam} answers the {depth:,} rung"
+            )
+            if not dry_run:
+                stamp(f"certified-rung w/s: {fam} @ {depth:,} tok (n=5)")
+                wps = []
+                for i in range(5):
+                    ok_s, sv = speed_pass(
+                        model, depth, CORPUS_DEFAULT, port, results_dir, kv_k, kv_v
+                    )
+                    w = sv.get("worst")
+                    wps.append(w)
+                    print(f"  {fam} @ {depth:,} tok w/s trial {i+1}/5: {w} w/s -> {'PASS' if ok_s else 'FAIL'}")
+                kept = [w for w in wps if w is not None]
+                med = sorted(kept)[len(kept) // 2] if kept else None
+                entry["wps_median"] = med
+                print(f"  {fam}: certified-rung w/s median {med} w/s over {len(kept)} trials")
+            answered = True
+        elif verdict == "dead":
+            entry["verdict"] = "dead"
+            print(
+                f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
+                f"(best 1s lower bound {best_lo:.3f} < 0.5); next candidate"
+            )
+        elif verdict == "would-run":
+            entry["verdict"] = "would-run"
+            print(f"  dry run - would test {remaining} cell(s) from run {min(r for r in range(1, n_total + 1) if r not in cells)}")
+        results.append(entry)
+    return results
+
+
 def rescore_tournament(
     models_dir: str,
     state: dict[str, Any],
@@ -1347,6 +1522,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --rescore: write the re-scored falls to the state file",
     )
+    ap.add_argument(
+        "--certify",
+        type=int,
+        default=None,
+        metavar="DEPTH",
+        help="session 37, addendum 8 (the practitioner map): fill ONE "
+        "rung sequentially - the most promising candidate is tested "
+        "cell by cell (a cell is model x run x step, NEVER re-measured; "
+        "historical climb cells are inherited) until it certifies "
+        "(1-sigma Wilson lower bound >= 0.5, n=21) or is mathematically "
+        "dead; the first accepted model answers the rung (w/s measured, "
+        "n=5 median), the rest are skipped",
+    )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant-k",
@@ -1437,6 +1625,29 @@ def main() -> None:
         ap.error("no family specs given")
     if args.rescore:
         rescore_tournament(args.models_dir, state, args.state_file, not args.rescore_apply)
+        return
+    if args.certify:
+        results = certify_rung(
+            args.certify,
+            args.families,
+            args.models_dir,
+            state,
+            args.state_file,
+            state.get("ladder_port", 8210),
+            args.dry_run,
+        )
+        state["certify"] = results
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp(f"CERTIFY {args.certify:,} SUMMARY")
+        for r in results:
+            v = r.get("verdict", r.get("error", r.get("skipped", "?")))
+            extra = f" w/s median {r['wps_median']}" if r.get("wps_median") else ""
+            print(
+                f"  {r['family']}: {v} ({r.get('passes', 0)}/"
+                f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
+            )
         return
     if args.tournament:
         tours = []
