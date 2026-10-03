@@ -1799,6 +1799,12 @@ def main() -> None:
                     f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
                 )
             all_results.extend(results)
+        # the gold-run lesson (2026-10-03): the certify branch returned
+        # bare and skipped the git tail - the artifacts (results.txt,
+        # state) never committed and had to be pushed by hand
+        if not args.no_git:
+            tee_output.uninstall()
+            git_tail(args)
         return
     if args.tournament:
         tours = []
