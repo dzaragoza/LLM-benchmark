@@ -55,3 +55,53 @@ def test_build_fwe_task_top_k_override():
     assert ruler_gate.build_fwe_task.__defaults__ == (ruler_gate.FWE_TOP_K,)
     sig = ruler_gate.build_fwe_task.__code__
     assert "top_k" in sig.co_varnames
+
+
+def test_vt_build_follows_upstream_shape(monkeypatch):
+    """VT: 1 chain x 4 hops = 5 five-letter uppercase names, the first
+    'VAR X = <value>' and each hop 'VAR Y = VAR X', the chain sentences
+    scattered through the noise haystack in chain ORDER (the heap
+    shuffle interleaves chains but preserves each chain's order), and
+    the query asks for every variable assigned the base value."""
+    monkeypatch.setattr(
+        rg.llama_server,
+        "tokenize",
+        lambda port, content, timeout=300: [0] * max(1, len(content) // 4),
+    )
+    monkeypatch.setattr(
+        rg.llama_server,
+        "trim_to_tokens",
+        lambda port, text, target, tolerance=8, max_iter=24: (text[: target * 4], target),
+    )
+    prompt, expected = rg.build_vt_task(port=0, depth_tokens=8192, seed=11)
+    assert len(expected) == 5
+    for name in expected:
+        assert len(name) == rg.VT_NAME_LEN and name.isupper() and name.isalpha()
+        assert name in prompt
+    # the query carries the chain's base value
+    import re as _re
+
+    value = _re.search(r"assigned the value (\d{5})", prompt)
+    assert value is not None
+    # chain order preserved in the context: each link appears after the
+    # previous one (a heap shuffle interleaves only ACROSS chains)
+    positions = [prompt.index(f"VAR {n}") for n in expected]
+    assert positions == sorted(positions)
+    # the first name is assigned the value directly; the rest chain
+    assert f"VAR {expected[0]} = {value.group(1)}" in prompt
+    for a, b in zip(expected, expected[1:]):
+        assert f"VAR {b} = VAR {a}" in prompt
+
+
+def test_vt_scoring_all_names_required():
+    # a full trace passes; a partial trace is a broken trace (fails)
+    names = ["ABCDE", "FGHIJ", "KLMNO"]
+    ok, partial = rg.score_vt("they are: ABCDE, FGHIJ, KLMNO", names)
+    assert ok is True and partial == 3
+    ok, partial = rg.score_vt("ABCDE and FGHIJ", names)
+    assert ok is False and partial == 2
+    ok, partial = rg.score_vt("I can't fulfill this request.", names)
+    assert ok is False and partial == 0
+    # case-insensitive: models love lowercase
+    ok, partial = rg.score_vt("abcde fghij klmno", names)
+    assert ok is True and partial == 3
