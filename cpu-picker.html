@@ -579,7 +579,15 @@
           var med = eligible.filter(function (r) { return medalDepth(r.m, q) > 0; });
           if (med.length) {
             var b = med.reduce(function (a, r) {
-              return medalDepth(r.m, q) > medalDepth(a.m, q) ? r : a;
+              var ra = medalDepth(a.m, q), rr = medalDepth(r.m, q);
+              if (rr > ra) return r;
+              if (rr < ra) return a;
+              // tie at this quality: prefer the stronger claim at the
+              // same depth (silver certified beats a bare bronze pass)
+              var sa = medalDepth(a.m, "silver"), sr = medalDepth(r.m, "silver");
+              if (sr > sa) return r;
+              if (sr < sa) return a;
+              return medalDepth(r.m, "gold") > medalDepth(a.m, "gold") ? r : a;
             });
             winner = { q: q, r: b };
           }
