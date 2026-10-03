@@ -282,56 +282,23 @@ def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
 
 
 def tournament_rank(fall_depths: list[int | None], depths: list[int]) -> dict[str, Any]:
-    """The mode-with-median-fallback rank (session 36, addendum 20,
-    supersedes the addendum-15 pure mode): fall_depths is one entry per
-    climb - the depth where that climb ended (the first non-perfect
-    cell), or None for a climb that topped out at the highest step
-    (full hold). THE RANK IS THE MODE OF THE CLIMBS - the most common
-    fall depth (None/top counts as a value; ties break to the DEEPER
-    outcome). WHEN THERE IS NO MODE (all values distinct, incl. the
-    4-vs-1 and 3-vs-2 tie cases) the rank is the MEDIAN of the climbs
-    (the middle of the sorted values, top encoded as top+1 so it sorts
-    above every fall); the tie-break-to-deeper rule is NOT applied in
-    the no-mode case - the median is the honest summary, never the
-    maximum in disguise. The statistic used is reported in
-    rank_statistic ('mode' or 'median-fallback'). The pass vector is
-    still computed for grading (who held what, and where)."""
+    """The sigma-only rank (session 37, addendum 10: the mode is
+    RETIRED - the author's ruling, n selection is based on sigma
+    only): fall_depths is one entry per climb - the depth where that
+    climb ended (the first non-perfect cell), or None for a climb
+    that topped out at the highest step (full hold). The rank is the
+    WILSON-basis statistics alone: the per-rung pass vector, the
+    reliable depth (1 sigma), the conservative depth (2 sigma), the
+    ceiling, and the per-rung 1-sigma Wilson bounds. No central
+    tendency of the fall depths is computed; a model is what it
+    reliably holds, not what it most often fell at."""
     passes: dict[int, int] = {}
     for d in depths:
         passes[d] = sum(
             1 for fall in fall_depths if fall is None or (fall is not None and fall > d)
         )
-    counts: dict[int | None, int] = {}
-    for fall in fall_depths:
-        counts[fall] = counts.get(fall, 0) + 1
-    top_depth = depths[-1] if depths else 0
-
-    def mode_key(fall: int | None) -> tuple[int, int]:
-        depth = top_depth + 1 if fall is None else fall
-        return (counts[fall], depth)
-
-    highest_count = max(counts.values())
-    modes = [fall for fall, c in counts.items() if c == highest_count]
-    if len(modes) == 1 and highest_count > 1:
-        mode = modes[0]
-        return _rank_extra(
-            {
-                "rank_depth": top_depth if mode is None else mode,
-                "rank_mode": mode,
-                "rank_statistic": "mode",
-                "passes": passes,
-                "fall_depths": fall_depths,
-                "full_holds": sum(1 for fall in fall_depths if fall is None),
-            },
-            depths,
-        )
-    encoded = sorted((top_depth + 1) if fall is None else fall for fall in fall_depths)
-    median = encoded[len(encoded) // 2]
     return _rank_extra(
         {
-            "rank_depth": top_depth if median == top_depth + 1 else median,
-            "rank_mode": None,
-            "rank_statistic": "median-fallback",
             "passes": passes,
             "fall_depths": fall_depths,
             "full_holds": sum(1 for fall in fall_depths if fall is None),
@@ -508,8 +475,9 @@ def tournament_family(
         save_state(state_path, state)
     rank = tournament_rank(fall_depths, depths)
     print(
-        f"  {fam}: rank depth {rank['rank_depth']:,} tokens "
-        f"[{rank['rank_statistic']}] "
+        f"  {fam}: sigma rank - reliable {rank['reliable_depth']:,} "
+        f"(1 sigma) | conservative {rank['conservative_depth']:,} "
+        f"(2 sigma) | ceiling {rank['ceiling']:,} tokens "
         f"(falls: {[f if f else 'top' for f in fall_depths]})"
     )
     print(
@@ -859,22 +827,22 @@ def rescore_tournament(
 
 
 def print_tournament_table(tours: list[dict[str, Any]]) -> None:
-    """The tournament ranking (session 36, addendum 15, revised addendum
-    37): ranked by the mode of the climbs, ties on the pass vector at
-    the steps above, then on full holds (kept as an internal
-    tie-break, no longer reported - the author: overly optimistic)."""
+    """The tournament ranking (session 37, addendum 10: the mode is
+    retired - sigma only): ranked by reliable depth (1 sigma), ties on
+    conservative depth (2 sigma), then the pass vector at the steps
+    above, then the ceiling."""
     print()
     print("=" * 60)
-    stamp("TOURNAMENT TABLE (mode rank, median fallback - session 36 addendum 20)")
-    done = [t for t in tours if "rank_depth" in t]
+    stamp("TOURNAMENT TABLE (sigma rank - session 37 addendum 10)")
+    done = [t for t in tours if "passes" in t]
     errs = [t for t in tours if "error" in t]
     for t in errs:
         print(f"  {t['family']}: SKIPPED - {t['error']}")
     order = sorted(
         done,
         key=lambda t: (
-            -t["rank_depth"],
             -t.get("reliable_depth", 0),
+            -t.get("conservative_depth", 0),
             [-t["passes"][d] for d in sorted(t["passes"], reverse=True)],
             -t.get("ceiling", 0),
         ),
@@ -882,8 +850,7 @@ def print_tournament_table(tours: list[dict[str, Any]]) -> None:
     for i, t in enumerate(order, 1):
         pv = " ".join(f"{t['passes'][d]}" for d in TOURNAMENT_DEPTHS)
         print(
-            f"  {i}. {t['family']:24s} rank {t['rank_depth']:>7,} tok "
-            f"[{t.get('rank_statistic', 'mode')}] | reliable "
+            f"  {i}. {t['family']:24s} reliable "
             f"{t.get('reliable_depth', 0):>7,} tok | conservative "
             f"{t.get('conservative_depth', 0):>7,} tok | ceiling "
             f"{t.get('ceiling', 0):>7,} tok | passes/rung [{pv}]"
@@ -1564,7 +1531,7 @@ def build_parser() -> argparse.ArgumentParser:
         "ladder sweep - every family at its SELECTED rung (the PASS "
         "config, its stored KV quants), five climbs of the dyadic FWE "
         "ladder 4096..262144, SEED = CLIMB NUMBER, early stop at the "
-        "first non-perfect cell; the majority rank is the ranking",
+        "first non-perfect cell; the sigma rank (reliable/conservative depths) is the ranking",
     )
     ap.add_argument(
         "--rescore",
