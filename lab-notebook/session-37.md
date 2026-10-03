@@ -734,3 +734,81 @@ No depth-highlight span; each line states medal - meaning: context
 size, or none yet. Prose updated (256k tokens -> 256k context size
 in the how-paragraph). Verified by the new js gate: both pages pass
 syntax + boot.
+
+### Session 37, addendum 79 - REGISTERED (pre-measurement, wow.md 1): the candidate-gate backlog
+
+The gate stack generalizes: each gate certifies ONE contract between the
+model and the practitioner, anchored externally, context-bound (the
+answer exists only in the context), binary-or-count scored, and reuses
+the cell model + Wilson certification. REGISTERED candidates, priority
+order, ALL pre-measurement - no code before the pilot:
+
+1. VT (variable tracking, IMPLEMENTED - commit c278b6d, --task vt in
+   ruler_gate.py): RULER's multi-hop tracing. 1 chain x 4 hops = 5
+   five-letter uppercase names; 'VAR X = <5-digit value>' then each hop
+   'VAR Y = VAR X'; scattered through the noise haystack in chain
+   order (the heap shuffle); the query asks for every variable
+   assigned the base value. Scoring: ALL 5 names (a partial trace is a
+   broken trace); found-count is the diagnostic. PILOT (registered):
+   Jamba2-3B, depths 4096/16384/65536/262144, 5 samples each, ruler
+   results to ruler-results/. HYPOTHESIS (registered before the run):
+   the field splits into tracers and non-tracers; Jamba2's 3/3 FWE
+   gold does NOT predict VT pass - tracing is inference over bindings,
+   not frequency spotting. If VT also saturates at k=3-equivalent
+   difficulty, that is the k=3 lesson repeated and the witness protocol
+   (k=10, addendum 6) goes next.
+
+2. INFERENCE-FWE (registered spec, no code): same zeta-law corpus
+   generator as FWE, but the query asks a DERIVED comparison of two
+   mid-rank words (target ranks ~5 and ~8, the thin-margin tail where
+   count(5)/count(8) is small): "Does word A appear more often than
+   word B? Answer yes or no." Binary, no partial credit. WHY: FWE at
+   k=3 conflates counting with spotting - the zeta law makes ranks 1-3
+   ~4x/9x louder than the tail, so a spotter passes; inference-FWE
+   forces counting (a rank-5-vs-8 comparison cannot be spotted).
+   HYPOTHESIS: the field splits into counters and spotters; a 3/3 FWE
+   model can be a spotters-only model. RANK-PAIR CHOICE (registered):
+   ranks 5 and 8 at alpha 2.07 - margin thin enough to force counting,
+   thick enough to survive tokenizer noise; if the pilot is a coin
+   flip at 8k, step the pair to ranks 4 and 9 and re-register.
+
+3. CONTEXT-BELIEF (registered spec, no code): the context states
+   something FALSE-about-the-world (planted, unanswerable from
+   parametric memory - the shape: "the Eiffel Tower is in Berlin"
+   inside corpus-like filler); the query asks about it. Pass = the
+   model answers from the CONTEXT (Berlin), fail = it answers from
+   parametric memory (Paris). Measures: does the model treat the
+   context as authority - the RAG silent-failure detector (RULER's
+   parametric-pollution finding, weaponized as a gate). Binary.
+   HYPOTHESIS: small models split; instruction-tuned models believe
+   the document more than base-tuned ones, but the fragile tail
+   (gemma-3-1b-class) ignores the context entirely.
+
+4. FORMAT-COMPLIANCE (registered spec, no code): the query demands an
+   exact output shape ("the three words, comma-separated, nothing
+   else"); pass = machine-parseable output. Measures: can the app
+   rely on the output - anchored to the app's parser, not our taste.
+   Cheapest gate in the stack; the 136h truncations and template
+   debris were all failures of this axis. May be scored as a
+   byproduct column on every existing task rather than its own run.
+
+5. POSITIONAL SYMMETRY (registered spec, no code): the same fact
+   planted at head vs middle vs tail of the context; pass = all three
+   retrieved. Measures primacy/recency bias at 0.8B-4B scale - a known
+   frontier-model defect, unmapped here. Could fold into VT (chain at
+   head vs tail) rather than its own generator.
+
+6. CONFLICT/UPDATE (registered spec, no code): statement X planted,
+   then contradicted 100k later ("the server room is on floor 3" ...
+   "the server room moved to floor 5"); query. Measures update
+   handling - does the latest win, or the first? Both answers exist
+   in the context; only ordering resolves it. The retrieval task NIAH
+   cannot be.
+
+PARKED (registered as not-gates): TTFT/prefill (llama-bench pp t/s is
+structurally >= tg, and the generation measurement bounds it - the
+author's ruling 2026-10-04); summarization quality (no external
+anchor); multi-turn dialog memory (no corpus, app-shape question).
+The ARC distraction-robustness pilot stays in the maybe pile (the
+author's ruling 2026-10-04) - pilot-first, only becomes a gate if
+model-dependent capture shows.
