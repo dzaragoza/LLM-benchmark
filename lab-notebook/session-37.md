@@ -812,3 +812,39 @@ anchor); multi-turn dialog memory (no corpus, app-shape question).
 The ARC distraction-robustness pilot stays in the maybe pile (the
 author's ruling 2026-10-04) - pilot-first, only becomes a gate if
 model-dependent capture shows.
+
+## Addendum 80 (registered pre-measurement, 2026-10-04): the VT gold certification
+
+The pilots are in (ruler-results-pilots, n=1, Jamba2-3B @ 32,768): FWE k=5
+5/5 words HIT (the model COUNTS at depth - rank-4/5 words are ~4-9x quieter
+under the zeta law), VT 4/5 names MISS (a partial trace - one chain link
+lost, clean prose answer, a retrieval miss inside the chain). Both tasks
+are alive: the author green-lights the VT certification run.
+
+PROTOCOL (registered before any cell is measured):
+- Same stack as the FWE ladder: the selected rung config per family (Q8_0,
+  the family's stored KV quants), own server per cell at exactly the rung's
+  ctx, banner guard, memory census, n=21 cells, seeds = run numbers.
+- Rungs 4,096-262,144 (the full ladder), gold = 2 sigma (Wilson lo >= 0.5).
+- Pass bar: ALL 5 chain names (a partial trace is a broken trace).
+- The 0..5 partial is stored per cell (certify_vt namespace - the VT
+  analogue of the FWE x/3 word count), so any stricter/looser bar can be
+  re-graded later WITHOUT re-measuring, exactly like FWE's 2/3 and 3/3.
+- CELL ISOLATION: VT cells live in certify_vt; the FWE certify namespace
+  and the tournament evidence are NEVER read, written, or inherited. VT
+  inherits nothing from the FWE climbs - every cell is fresh.
+- Candidate order: same promise rule (existing VT passes at the rung,
+  then FWE reliable depth as tiebreak); first accepted candidate answers
+  the rung, the rest are skipped.
+- Early reject: mathematically dead candidates (even perfect remaining
+  cells cannot reach 2s lo >= 0.5) stop without running the leftover cells.
+
+PREDICTIONS (falsifiable, stated before measurement):
+- Jamba2-3B: the pilot's 4/5 at 32k suggests VT is HARDER than FWE k=3 at
+  the same depth; gold may fail at the perfect-trace bar on some rungs.
+  If 4/5 partials dominate the failures, the model traces 4 hops and loses
+  one - a depth-stable partial would mean the loss is structural (the
+  chain-length cap), not depth-driven.
+- Qwen3.5-0.8B: unknown - its FWE 3/3 gold at 4k-16k does not predict VT;
+  multi-hop tracing is a different capability than aggregation.
+- The 0..5 partials per rung are the study's first VT capability curve.

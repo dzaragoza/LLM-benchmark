@@ -727,3 +727,106 @@ def test_certify_cells_regrades_inherited_from_csv(tmp_path):
     # no models_dir: the inherited cell stays dropped (re-run, never guessed)
     cells = fb.certify_cells(fst, 8192, 2)
     assert cells == {}
+
+
+def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
+    """The VT certification: same sequential controller, but cells live in
+    certify_vt (the FWE evidence is untouched), NOTHING is inherited from the
+    FWE tournament, pass = 5/5 names, and the 0..5 partial is stored per cell
+    (re-gradable at any bar later without re-measuring)."""
+    import full_benchmark as fb
+
+    ran = []
+
+    def fake_vt_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        # the pilot shape: 4/5 names - a near-miss that still FAILs the 5/5 bar
+        return False, {"correct": 0, "words_found": [4], "depth": rung}
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "vt_pass", fake_vt_pass)
+    try:
+        model = tmp_path / "good-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state = {
+            "families": {
+                "good": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                    # an FWE certification exists at this rung - VT must not
+                    # read it, write it, or inherit its cells
+                    "certify": {"8192": {"1": True, "2": True, "3": True}},
+                    "tournament_falls": {"1": None, "2": None},
+                }
+            }
+        }
+        res = fb.certify_rung(
+            8192,
+            "1_sigma",
+            ["good"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            task="vt",
+        )
+        first = res[0]
+        # 0 passes, dead by EARLY REJECT at 9 consecutive fails
+        # (best 12/21, lo 0.463 < 0.5 - the remaining 12 cells are not run)
+        assert first["verdict"] == "dead"
+        assert len(ran) == 9
+        # the partials landed in certify_vt - 4/5 per cell, FAIL at the 5/5 bar
+        vt = state["families"]["good"]["certify_vt"]["8192"]
+        assert all(p == 4 for p in vt.values()) and len(vt) == 9
+        # the FWE namespace is untouched
+        assert state["families"]["good"]["certify"] == {"8192": {"1": True, "2": True, "3": True}}
+        # re-grade the SAME cells at the 4/5 bar from the stored partials
+        cells = fb.vt_cells(state["families"]["good"], 8192)
+        assert all(p == 4 for p in cells.values())
+    finally:
+        monkeypatch.undo()
+
+
+def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
+    """A model that traces all 5 names every cell: VT gold certifies with the
+    same early-accept math as FWE (11/11 at 1 sigma)."""
+    import full_benchmark as fb
+
+    ran = []
+
+    def fake_vt_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
+        ran.append(seed)
+        return True, {"correct": 1, "words_found": [5], "depth": rung}
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "vt_pass", fake_vt_pass)
+    try:
+        model = tmp_path / "vt-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state = {
+            "families": {
+                "vt": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": str(model)}},
+                }
+            }
+        }
+        res = fb.certify_rung(
+            8192,
+            "1_sigma",
+            ["vt"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            task="vt",
+        )
+        assert res[0]["verdict"] == "accept"
+        assert sorted(ran) == list(range(1, 12))
+        assert res[0]["cells_measured"] == 11
+        vt = state["families"]["vt"]["certify_vt"]["8192"]
+        assert all(p == 5 for p in vt.values())
+    finally:
+        monkeypatch.undo()

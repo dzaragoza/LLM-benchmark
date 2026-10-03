@@ -268,6 +268,78 @@ def fwe_pass(
     return row["acc"] == 1.0, row
 
 
+def vt_pass(
+    model: str,
+    rung: int,
+    results_dir: str,
+    seed: int,
+    port: int,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
+) -> tuple[bool, dict[str, Any]]:
+    """One VT cell - the same launch shape as fwe_pass (own server at
+    exactly the rung's ctx, banner guard, memory census), the task
+    swapped: one variable-tracking chain (RULER's 1 chain x 4 hops,
+    5 five-letter names), pass = ALL 5 names, the 0..5 partial is
+    the graded diagnostic stored per cell (the VT analogue of the
+    FWE x/3 word count)."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
+    os.makedirs(results_dir, exist_ok=True)
+    csv_path = os.path.join(results_dir, f"{label}-{depth}-vt.csv")
+    if os.path.exists(csv_path):
+        os.remove(csv_path)
+    log_path = os.path.join(results_dir, f"{label}-rung{rung}-vt-server.log")
+    llama_server.drop_file_cache(model)
+    mem_before = llama_server.system_memavailable_gib()
+    extra_args = ["-c", str(rung), "--parallel", "1"]
+    if kv_quant_k or kv_quant_v:
+        extra_args += ["-fa", "on"]
+        if kv_quant_k:
+            extra_args += ["--cache-type-k", kv_quant_k]
+        if kv_quant_v:
+            extra_args += ["--cache-type-v", kv_quant_v]
+    proc, healthy = llama_server.start_server(
+        model,
+        port=port,
+        extra_args=extra_args,
+        log_path=log_path,
+    )
+    try:
+        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            print("    ERROR: vt server did not come up; log tail:")
+            try:
+                with open(log_path, encoding="utf-8", errors="replace") as f:
+                    for ln in f.read().splitlines()[-15:]:
+                        print(f"    [server] {ln}")
+            except OSError:
+                pass
+            return False, {"error": "vt server did not come up", "depth": depth}
+        row = ruler_gate.run_vt_depth(
+            port,
+            label,
+            depth,
+            1,
+            csv_path,
+            seed0=seed,
+            no_thinking=True,
+        )
+        row["window_cap"] = _banner_window(log_path)
+        smaps = llama_server.mapped_memory_gib(proc)
+        if smaps is not None:
+            row["mem_census"] = smaps
+            print(
+                f"    vt census: {smaps['resident_gib']:.2f} GiB resident "
+                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)"
+            )
+        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
+        if cost is not None:
+            row["mem_cost_gib"] = cost
+    finally:
+        llama_server.stop_server(proc, port)
+    return row["acc"] == 1.0, row
+
+
 def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
     """The flicker rule (session 34, addendum 31, ruling b): FWE
     verdicts must be MONOTONE - depth only gets harder. Returns the
@@ -635,6 +707,17 @@ def certify_cells(
     return cells
 
 
+def vt_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
+    """The VT cell model: a cell is (model, run, task) and is NEVER
+    measured twice. VT inherits NOTHING from the tournament (the
+    climbs were FWE) - every cell is fresh, stored in the separate
+    certify_vt namespace as {run: partial 0..5} (the graded score,
+    like the FWE x/3 word count; pass = 5, re-gradable at any bar
+    later without re-measuring)."""
+    direct = (fst.get("certify_vt") or {}).get(str(depth)) or {}
+    return {int(r): int(p) for r, p in direct.items()}
+
+
 CERTIFY_LEVELS = ["at_least_one", "1_sigma", "2_sigma"]
 
 
@@ -648,6 +731,7 @@ def certify_rung(
     port: int,
     dry_run: bool,
     min_words: int = 1,
+    task: str = "fwe",
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
@@ -675,11 +759,14 @@ def certify_rung(
     n_total = TOURNAMENT_CLIMBS
     floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
     z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
-    order: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    order: list[tuple[str, dict[str, Any], dict[int, bool]]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
-        cells = certify_cells(fst, depth, min_words, models_dir, fam)
+        if task == "vt":
+            cells = {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
+        else:
+            cells = certify_cells(fst, depth, min_words, models_dir, fam)
         order.append((fam, fst, cells))
 
     def promise(item):
@@ -739,7 +826,10 @@ def certify_rung(
         )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        direct = dict((fst.get("certify") or {}).get(str(depth)) or {})
+        direct = dict(
+            ((fst.get("certify_vt") if task == "vt" else fst.get("certify")) or {}).get(str(depth))
+            or {}
+        )
         ran = 0
         verdict = None
         while True:
@@ -796,6 +886,31 @@ def certify_rung(
                 verdict = "would-run"
                 break
             next_run = min(r for r in range(1, n_total + 1) if r not in cells)
+            if task == "vt":
+                ok, fv = vt_pass(
+                    model,
+                    depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                    results_dir,
+                    seed=next_run,
+                    port=port,
+                    kv_quant_k=kv_k,
+                    kv_quant_v=kv_v,
+                )
+                ran += 1
+                cells[next_run] = ok
+                partial = int((fv.get("words_found") or [0])[0] or 0)
+                direct[str(next_run)] = partial
+                measured += 1
+                k += 1 if ok else 0
+                fst.setdefault("certify_vt", {})[str(depth)] = direct
+                save_state(state_path, state)
+                print(
+                    f"  vt cell (run {next_run}, {depth:,} tok): "
+                    f"{partial}/5 names -> {'PASS' if ok else 'FAIL'} -> "
+                    f"{k}/{measured} "
+                    f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
+                )
+                continue
             ok, fv = fwe_pass(
                 model,
                 depth + 2 * ruler_gate.ANSWER_HEADROOM,
@@ -1721,6 +1836,17 @@ def build_parser() -> argparse.ArgumentParser:
         "from tournament falls were graded under the old 1/3 rule and are "
         "re-run, never silently trusted",
     )
+    ap.add_argument(
+        "--task",
+        default="fwe",
+        choices=["fwe", "vt"],
+        help="session 37 (the VT certification): with --certify, run the "
+        "variable-tracking task instead of FWE - same stack, n=21, "
+        "seeds and sequential controller, but a separate cell namespace "
+        "(certify_vt - the FWE evidence is never touched), pass = ALL "
+        "5 chain names, the 0..5 partial stored per cell as the graded "
+        "diagnostic (the VT analogue of the FWE x/3 word count)",
+    )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
         "--kv-quant-k",
@@ -1836,6 +1962,7 @@ def main() -> None:
                 state.get("ladder_port", 8210),
                 args.dry_run,
                 min_words=args.fwe_min_words,
+                task=args.task,
             )
             state["certify"] = results
             save_state(args.state_file, state)
