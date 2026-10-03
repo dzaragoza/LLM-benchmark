@@ -22,7 +22,6 @@ Usage (repo root):
       --depths 4096 --samples 5 --results-dir ruler-results
 """
 
-
 from __future__ import annotations
 
 import argparse
@@ -59,6 +58,123 @@ FWE_ALPHA = 2.0
 FWE_TOP_K = 3
 FWE_GEN_TOKENS = 128
 FWE_PASS_MIN = 1
+
+# --- VT (variable tracking, RULER's multi-hop tracing task) ---
+# upstream: NVIDIA/RULER scripts/data/synthetic/variable_tracking.py
+# @ main: type_haystack 'noise', num_chains 1, num_hops 4 (so 5 variable
+# names per chain), names are 5 uppercase letters, the first link is
+# 'VAR X = <5-digit value>' and each hop 'VAR Y = VAR X', the chain is
+# shuffled into the noise with a heap so sub-list order (the chain's
+# own order) is preserved, the query asks for every variable assigned
+# the chain's base value, scored as the hit-count of expected names.
+VT_HAYSTACK = (
+    "The grass is green. The sky is blue. \nThe sun is yellow. Here we go. There and back again."
+)
+VT_TEMPLATE = (
+    "[INST] Memorize and track the chain(s) of variable assignment "
+    "hidden in the following text.\n\n{context}\nQuestion: Find all "
+    "variables that are assigned the value {query} in the text above. "
+    "[/INST] Answer: According to the chain(s) of variable assignment "
+    "in the text above, {num_v} variables are assgined the value "
+    '{query}, they are: "\n'
+)
+VT_NAME_LEN = 5
+VT_NUM_CHAINS = 1
+VT_NUM_HOPS = 4
+VT_GEN_TOKENS = 128
+
+
+def _vt_shuffle_sublists_heap(lst: list[list[str]], rng: random.Random) -> list[str]:
+    """Upstream's shuffle_sublists_heap verbatim in shape: interleave the
+    chains with random priorities while PRESERVING each chain's internal
+    order (a heap of (priority, list, index)); a chain read backwards is
+    a different task, so the order guarantee is the point."""
+    import heapq
+
+    heap: list[tuple[float, int, int]] = []
+    for i in range(len(lst)):
+        heapq.heappush(heap, (rng.random(), i, 0))
+    out: list[str] = []
+    while heap:
+        _, list_idx, elem_idx = heapq.heappop(heap)
+        out.append(lst[list_idx][elem_idx])
+        if elem_idx + 1 < len(lst[list_idx]):
+            heapq.heappush(heap, (rng.random(), list_idx, elem_idx + 1))
+    return out
+
+
+def build_vt_task(
+    port: int,
+    depth_tokens: int,
+    seed: int,
+    num_chains: int = VT_NUM_CHAINS,
+    num_hops: int = VT_NUM_HOPS,
+) -> tuple[str, list[str]]:
+    """One VT task at ~depth_tokens: returns (prompt, expected_names).
+    Faithful to upstream's generate_input_output: a chain of num_hops+1
+    five-letter uppercase names, the first assigned a random 5-digit
+    value and each next 'VAR Y = VAR X'; the chain's sentences are
+    shuffled into the noise haystack (heap shuffle, chain order
+    preserved); the query asks for every variable assigned the chain's
+    base value - multi-hop tracing, the reasoning-flavored gate.
+    Token-budget by probe-and-trim like build_fwe_task: measure the
+    noise sentence's tokens once, fill the budget, trim-verify."""
+    import string
+
+    rng = random.Random(seed)
+    names: list[str] = []
+    seen: set[str] = set()
+    need = (num_hops + 1) * num_chains
+    while len(names) < need:
+        n = "".join(rng.choices(string.ascii_uppercase, k=VT_NAME_LEN))
+        if n not in seen:
+            seen.add(n)
+            names.append(n)
+    chains: list[list[str]] = []
+    values: list[str] = []
+    for c in range(num_chains):
+        this = names[c * (num_hops + 1) : (c + 1) * (num_hops + 1)]
+        value = str(rng.randint(10000, 99999))
+        values.append(value)
+        chain = [f"VAR {this[0]} = {value}"]
+        for j in range(num_hops):
+            chain.append(f"VAR {this[j + 1]} = VAR {this[j]} ")
+        chains.append(chain)
+    budget = depth_tokens - ANSWER_HEADROOM
+    probe = VT_HAYSTACK * 20
+    probe_n = len(llama_server.tokenize(port, probe))
+    tokens_per_sent = max(1.0, probe_n / 20.0)
+    num_noises = max(num_chains * (num_hops + 1), int(budget / tokens_per_sent))
+    # the query (the chain's base value) lives in the prompt TAIL - a
+    # trim from the end would cut the question itself; upstream sizes
+    # the haystack so the FULL prompt fits and never trims. Same here:
+    # shrink the noise until tokenize(prompt) <= budget, keep the tail.
+    while True:
+        sentences = [VT_HAYSTACK] * num_noises
+        for chain in chains:
+            positions = sorted(rng.sample(range(len(sentences)), len(chain)))
+            for insert_pi, j in zip(positions, range(len(chain)), strict=True):
+                sentences.insert(insert_pi + j, chain[j])
+        context = "\n".join(sentences).replace(". \n", ".\n")
+        prompt = VT_TEMPLATE.format(context=context, query=values[0], num_v=num_hops + 1)
+        n_tok = len(llama_server.tokenize(port, prompt))
+        if n_tok <= budget or num_noises <= num_chains * (num_hops + 1):
+            break
+        num_noises = max(
+            num_chains * (num_hops + 1),
+            int(num_noises * budget / max(1, n_tok)),
+        )
+    return prompt, names[: (num_hops + 1) * num_chains]
+
+
+def score_vt(answer: str, expected: list[str]) -> tuple[bool, int]:
+    """Upstream scores VT as the hit-count of expected variable names in
+    the reply; the pass is ALL of them (the chain is the answer - a
+    partial trace is a broken trace, unlike FWE's graded partial).
+    Template debris stripped first (ruling 1a, addendum 30)."""
+    clean = re.sub(r"\s+", "", strip_template_debris(answer)).upper()
+    found = [v for v in expected if v in clean]
+    return len(found) == len(expected), len(found)
 
 
 def zeta(alpha: float, k: int) -> float:
@@ -141,9 +257,7 @@ def strip_template_debris(answer: str) -> str:
     return TEMPLATE_DEBRIS.sub("", answer)
 
 
-def score_fwe(
-    answer: str, top_k: list[str], min_words: int = FWE_PASS_MIN
-) -> tuple[bool, int]:
+def score_fwe(answer: str, top_k: list[str], min_words: int = FWE_PASS_MIN) -> tuple[bool, int]:
     """Upstream scores FWE as the hit-count of expected words in the
     reply. The verdict threshold is CONFIGURABLE (session 37,
     addendum 9: measure once at k=3, grade at any threshold later):
@@ -235,9 +349,7 @@ def run_fwe_depth(
                 for r in rows[:samples]
             )
             partials = [
-                int(r["partial"])
-                for r in rows[:samples]
-                if r.get("partial") not in (None, "")
+                int(r["partial"]) for r in rows[:samples] if r.get("partial") not in (None, "")
             ]
             return {
                 "label": label,
@@ -281,6 +393,69 @@ def run_fwe_depth(
     }
 
 
+def run_vt_depth(
+    port: int,
+    label: str,
+    depth: int,
+    samples: int,
+    csv_path: str,
+    seed0: int = 1024,
+    no_thinking: bool = True,
+    show: bool = False,
+) -> dict[str, Any]:
+    """VT cells: the same shape as run_fwe_depth (CSV cache, ERROR rows
+    continue, per-task partial as the diagnostic) - the pass is ALL
+    5 chain names (a partial trace is a broken trace)."""
+    if os.path.exists(csv_path):
+        with open(csv_path, encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        if len(rows) >= samples and all(r.get("correct") is not None for r in rows):
+            hits = sum(int(r["correct"]) for r in rows[:samples])
+            partials = [
+                int(r["partial"]) for r in rows[:samples] if r.get("partial") not in (None, "")
+            ]
+            return {
+                "label": label,
+                "depth": depth,
+                "n": len(rows[:samples]),
+                "correct": hits,
+                "acc": hits / samples,
+                "words_found": partials,
+            }
+    hits = 0
+    partial_list: list[int] = []
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
+        for i in range(samples):
+            prompt, expected = build_vt_task(port, depth, seed=seed0 + i)
+            if show:
+                print(f"    --- task prompt head: {prompt[:160]!r}")
+                print(f"    expected chain names: {expected}")
+            try:
+                answer = ask(port, prompt, max_tokens=VT_GEN_TOKENS, no_thinking=no_thinking)
+            except ValueError as e:
+                print(f"  task {i + 1}/{samples} @ {depth} tok: FAILED - {e}")
+                w.writerow([i, depth, ";".join(expected), "", f"ERROR: {e}", ""])
+                continue
+            ok, partial = score_vt(answer, expected)
+            hits += ok
+            partial_list.append(partial)
+            w.writerow([i, depth, ";".join(expected), partial, answer, int(ok)])
+            print(
+                f"  task {i + 1}/{samples} @ {depth} tok: {partial}/{len(expected)} "
+                f"names -> {'HIT' if ok else 'MISS'} ({answer.strip()[:48]!r})"
+            )
+    return {
+        "label": label,
+        "depth": depth,
+        "n": samples,
+        "correct": hits,
+        "acc": hits / samples,
+        "words_found": partial_list,
+    }
+
+
 def main() -> None:
     tee_output.install()
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -293,6 +468,14 @@ def main() -> None:
         help="token depths to grade (default: the protocol depth 4096)",
     )
     p.add_argument("--samples", type=int, default=5, help="tasks per depth")
+    p.add_argument(
+        "--task",
+        default="fwe",
+        choices=["fwe", "vt"],
+        help="the quality task: fwe (aggregation, the default - the whole "
+        "ladder runs it) or vt (variable tracking, RULER's multi-hop "
+        "tracing - the reasoning-flavored gate)",
+    )
     p.add_argument("--port", type=int, default=8200)
     p.add_argument("--results-dir", default="ruler-results")
     p.add_argument("--seed", type=int, default=1024)
@@ -413,25 +596,22 @@ def main() -> None:
             "for the reason (silent context reduction: KV/memory budget, "
             "build flags) and re-run with a grid that fits."
         )
-    print(
-        f"ruler gate: {label} (fwe, depths {args.depths}, "
-        f"samples {args.samples})"
-    )
+    print(f"ruler gate: {label} (fwe, depths {args.depths}, samples {args.samples})")
     try:
         for depth in args.depths:
             csv_path = os.path.join(args.results_dir, f"{label}-{depth}-fwe.csv")
             row = run_fwe_depth(
-                    args.port,
-                    label,
-                    depth,
-                    args.samples,
-                    csv_path,
-                    seed0=args.seed,
-                    no_thinking=not args.thinking,
-                    show=args.show,
-                    top_k=args.fwe_top_k or FWE_TOP_K,
-                    min_words=args.fwe_pass_min or FWE_PASS_MIN,
-                )
+                args.port,
+                label,
+                depth,
+                args.samples,
+                csv_path,
+                seed0=args.seed,
+                no_thinking=not args.thinking,
+                show=args.show,
+                top_k=args.fwe_top_k or FWE_TOP_K,
+                min_words=args.fwe_pass_min or FWE_PASS_MIN,
+            )
             print(
                 f"  {label} @ {depth} tok: {row['correct']}/{row['n']} "
                 f"correct (acc {row['acc']:.0%})"
