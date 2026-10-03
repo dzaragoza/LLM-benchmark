@@ -140,14 +140,16 @@
   <body>
     <h1>Local LLM picker &mdash; GPU</h1>
     <div class="sub">
-      The recommended model (best quant per family: Q4_K_M where it scored
-      deeper, Q8_0 otherwise) for your GPU, among the models the study scored
-      under protocol v4.3 (a depth-scored ladder: per rung, a speed gate at &ge;
-      5 w/s for a 300-wpm reader, then a frequent-word-extraction count; the
-      score is the deepest context passing both; n=1 everywhere, floor 4,096
-      &mdash; the corpus structural floor, addendum 32). Lab notebook study
-      &mdash; measured on a T14s (102.4 GB/s class), live-corpus cal-50. Serving
-      from system RAM instead?
+      Which model fits your GPU's VRAM? This study measured nine small
+      language-model families (0.8B to 3B parameters) doing real long-context
+      work, then certified each one with a confidence level:
+      <strong>reliable</strong> = the model passed a repeated hidden-word
+      retrieval test at that context size with 1-sigma confidence;
+      <strong>conservative</strong> = the same claim at the stricter 2-sigma
+      level. The VRAM numbers are the measured whole-stack memory cost
+      (weights + KV cache + buffers + runtime), taken from the CPU-side
+      instrument &mdash; a conservative upper bound for the GPU stack.
+      Serving from system RAM instead?
       <a href="cpu-picker.html">System RAM picker</a>.
     </div>
 
@@ -211,22 +213,7 @@
 
     <div class="foot">
       <p>
-        <strong>How the recommendation is computed.</strong> Candidates are the
-        measured members of the studied lineages (qwen, granite, MiniCPM, Phi),
-        each scored under protocol v4.3 (session 34, addendum 33): a
-        depth-scored ladder from the 4,096-token floor, doubling rungs, score =
-        the deepest rung passing BOTH the speed gate (n=1, worst-turn &ge; 5
-        w/s, &le; 5% stall) AND FWE (n=1, 3/3 coded words), refined to
-        1,024-token resolution &mdash; the same pool as the
-        <a href="cpu-picker.html">system-RAM picker</a>. A candidate is eligible
-        iff (a) its <em>minimum RAM</em> (whole-stack machine cost: weights + KV
-        + buffers + runtime, MemAvailable-delta instrument, cold-cache at the
-        scored rung) fits the card's VRAM &mdash; conservative, since the
-        CPU-side cost is an upper bound on the GPU-side one &mdash; and (b) its
-        predicted w/s at the card's bandwidth clears the 5.0 reader line,
-        evaluated at each capacity's lowest-bandwidth card (conservative for
-        anything faster). Eligibility is the VRAM fit; the w/s column shows the
-        reader-line margin.
+        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder (4k, 8k, 16k, &hellip; 256k tokens). At each context size the model had to find hidden words in a long coded text &mdash; pass means finding at least 1 of the 3 hidden words. A context size is <strong>reliable</strong> when the 1-sigma confidence lower bound on the pass probability is at least 50% (Wilson interval; about 13 of 21 passes at n=21); <strong>conservative</strong> doubles that (2 sigma, about 16 of 21). A candidate is eligible iff (a) its measured whole-stack memory cost (weights + KV cache + buffers + runtime &mdash; the CPU-side instrument, an upper bound for the GPU stack) fits the card's VRAM, and (b) its predicted w/s at the card's bandwidth clears the 5.0 reader line, evaluated at each capacity's lowest-bandwidth card. The recommendation is the deepest reliable model that fits.
       </p>
       <p>
         <strong>Two extrapolations, both flagged.</strong> The minimum-RAM
@@ -243,46 +230,61 @@
         VRAM figures are nominal card capacity; a small fraction is consumed by
         the display/OS. Bandwidth figures are the card's theoretical peak
         (memory type &times; bus). Quant: each family appears once, at its
-        best-scoring quant (Q4_K_M where the Q4 run scored deeper, Q8_0
-        otherwise; session 35, addendum 2).
+        measured certification configuration. Certification at 16k and deeper
+        is in progress; the six families that certified nothing are excluded.
       </p>
     </div>
 
     <script>
       "use strict";
-      // Measured records (v4.3-scored, session 35 addenda 10-12) - the 256k survivors only;
-      // identical to cpu-picker.html. wps = the WORST TURN at the scored rung. cost =
-      // minimum RAM (whole-stack machine cost, MemAvailable delta, cold-cache at the
-      // scored rung), measured - used here as a conservative VRAM requirement.
+      // Measured records (session 37: the certified families under the 1/3 pass
+      // rule at n=21) - identical to cpu-picker.html. depth = reliable (1 sigma),
+      // conservative = 2 sigma. wps = median words/second at the reliable depth
+      // (n=5). cost = measured whole-stack machine RAM at 262,144 context, cold -
+      // used here as a
       var CANDIDATES = [
+        {
+          name: "Qwen3.5-0.8B",
+          size: 0.86,
+          cost: 4.96,
+          costEst: false,
+          wps: 34.85,
+          depth: 8192,
+          conservative: 4096,
+          family: "Qwen3.5",
+          quant: "Q8_0 + K/V f16",
+        },
         {
           name: "Qwen3.5-2B",
           size: 1.22,
           cost: 3.48,
           costEst: false,
-          wps: 9.5,
-          depth: 262144,
+          wps: 27.79,
+          depth: 8192,
+          conservative: 4096,
           family: "Qwen3.5",
-          quant: "Q4_K_M",
+          quant: "Q4_K_M + K/V q5_0",
         },
         {
-          name: "Qwen3.5-0.8B",
-          size: 0.78,
-          cost: 4.96,
-          wps: 9.3,
-          depth: 262144,
-          family: "Qwen3.5",
-          quant: "Q8_0",
+          name: "AI21-Jamba2-3B",
+          size: 3.17,
+          cost: 4.42,
+          costEst: false,
+          wps: 6.84,
+          depth: 8192,
+          conservative: 0,
+          family: "AI21-Jamba2",
+          quant: "Q8_0 + K/V f16",
         },
       ];
-      // depth = the v4.3 ladder score (tokens): the deepest rung at which the model BOTH
-      // serves the reader (speed gate) AND counts (FWE) - n=1 everywhere. The rows are
-      // the survivors: the 2B at Q4_K_M + K/V q5_0 (3.48 GiB, 9.5 w/s - pending its
-      // quant-raise re-probe, addendum 12) and the 0.8B champion at Q8_0 weights (the
-      // quant CAP is Q8), f16 KV, 262,144 deep, 4.96 GiB cold, 9.3 w/s worst. THE RETIRED FAMILIES (session 35, addendum 10): every
-      // other pool family failed the 256k screen - training window below 262,144, KV
-      // geometry too fat under the RAM ceiling, or FWE quality broken far shallower; the
-      // full rejection log lives in the lab notebook (session 35, addendum 10).
+      // depth = the RELIABLE depth (tokens): the deepest context size at which the
+      // model passed the FWE hidden-word retrieval task across repeated seeded
+      // runs with 1-sigma confidence (Wilson lower bound >= 0.5; n=21 runs per
+      // family, session 37). Pass = finding >= 1 of 3 hidden words (1/3 rule).
+      // conservative = the same at 2 sigma. wps = the measured words/second at the
+      // reliable depth (median of 5 conversations). cost = measured whole-stack
+      // machine RAM at 262,144 context, cold - used here as a conservative VRAM
+      // requirement. The six remaining families did not certify at any rung.
       var REF_BW = 102.4;
       var READER = 5.0;
 
@@ -293,7 +295,7 @@
       // Distinct VRAM capacities of real consumer/prosumer GPUs across the last ~30 years,
       // each paired with the lowest memory bandwidth among cards found at that capacity
       // (the conservative w/s estimate for the tier). Only tiers that fit at least one
-      // measured model are listed; the smallest minimum RAM is 3.48 GiB (Qwen3.5-2B, cold at its scored rung).
+      // measured model are listed; the smallest minimum RAM is 3.48 GiB (Qwen3.5-2B, cold at 262,144 context).
       var VRAM_TIERS = [
         { v: 1.5, bw: 177.4 }, // GTX 480 (2010)
         { v: 2, bw: 176.0 }, // Radeon HD 6970 (2010)
@@ -324,7 +326,7 @@
         return t.v >= MIN_COST;
       });
 
-      // default: the smallest capacity that runs every measured model (session 35, addendum 2)
+      // default: the smallest capacity that runs every certified model
       var DEFAULT_TIER =
         TIERS.filter(function (t) {
           return t.v >= MAX_COST;
@@ -421,7 +423,11 @@
               : best.m.depth === 0
                 ? "counting floor"
                 : best.m.depth.toLocaleString()) +
-            " depth score (v4.3 ladder, n=1 screen)</div>" +
+            " tokens reliable (1&sigma;)" +
+            (r.m.conservative
+              ? " &middot; " + r.m.conservative.toLocaleString() + " tokens conservative (2&sigma;)"
+              : "") +
+            "</div>" +
             "<div>file " +
             best.m.size.toFixed(2) +
             " GiB \u00b7 minimum RAM " +
@@ -448,7 +454,7 @@
           '<th class="num" data-k="cost">minimum RAM GiB</th><th class="num" data-k="fits">fits ' +
           vram +
           " GiB</th>" +
-          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">depth (tok)</th></tr></thead><tbody id="tbody">';
+          '<th class="num" data-k="w">est. w/s</th><th class="num" data-k="depth">reliable tok (1&sigma;)</th><th class="num" data-k="conservative">conservative tok (2&sigma;)</th></tr></thead><tbody id="tbody">';
         rows.forEach(function (r) {
           t +=
             "<tr><td>" +
@@ -470,15 +476,21 @@
             (r.m.depth === null
               ? "\u2014"
               : r.m.depth === 0
-                ? "0 (counting floor)"
+                ? "none at 1&sigma;"
                 : r.m.depth.toLocaleString()) +
+            '</td><td class="num">' +
+            (r.m.conservative === null || r.m.conservative === undefined
+              ? "\u2014"
+              : r.m.conservative === 0
+                ? "none at 2&sigma;"
+                : r.m.conservative.toLocaleString()) +
             "</td></tr>";
         });
         t += "</tbody></table>";
         $("tables").innerHTML =
           t +
           '<div class="footnote" style="margin-top:0.3rem">Click a column header to sort by it (click again to reverse).</div>' +
-          '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV + buffers + runtime) at the scored rung; <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement (measured@102.4 \u00d7 BW/102.4). The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls (n=1 screen, protocol v4.3).</div>';
+          '<div class="footnote">Legend: <strong>file GiB</strong> = GGUF size; <strong>quant</strong> = GGUF quantization; <strong>minimum RAM</strong> = measured whole-stack memory (weights + KV cache + buffers + runtime) at 262,144 context, cold; <strong>reliable/conservative</strong> = the deepest context certified at 1&sigma;/2&sigma; (n=21 repetitions, 1-of-3-words pass rule); <strong>est. w/s</strong> = words/second at the tier\u2019s lowest-bandwidth card, linear scaling from the 102.4 GB/s measurement. The minimum acceptable is <strong>5 w/s</strong>: below the reader line, a 300-wpm reader stalls.</div>';
       }
 
       var SORT = { k: "depth", dir: -1 };

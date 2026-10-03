@@ -165,16 +165,15 @@
   <body>
     <h1>Local LLM picker &mdash; CPU/iGPU</h1>
     <div class="sub">
-      The recommended model (best quant per family: Q4_K_M where it scored
-      deeper, Q8_0 otherwise) for your machine, among the models the study
-      scored under protocol v4.3 (a depth-scored ladder: per rung, a speed gate
-      at &ge; 5 w/s for a 300-wpm reader, then a frequent-word-extraction count;
-      the score is the deepest context passing both). Lab notebook study &mdash;
-      measured on a T14s (102.4 GB/s class), live-corpus cal-50. The
-      recommendation ranks by measured DEPTH (the v4.3 ladder score, session 34
-      addendum 33: the deepest context at which the model both serves the reader
-      and counts; n=1 everywhere, floor 4,096 &mdash; the corpus structural
-      floor, addendum 32). Serving from a GPU instead?
+      Which model should you run on your machine? This study measured nine
+      small language-model families (0.8B to 3B parameters) doing real
+      long-context work on a laptop-class CPU, then certified each one with a
+      confidence level. <strong>Reliable</strong> means the model passed a
+      repeated hidden-word retrieval test at that context size with 1-sigma
+      confidence; <strong>conservative</strong> means the same claim at the
+      stricter 2-sigma level. Every recommendation below is a model that was
+      actually measured doing the task &mdash; not a vendor's claimed context
+      window. Serving from a GPU instead?
       <a href="gpu-picker.html">GPU picker</a>.
     </div>
 
@@ -239,9 +238,9 @@
       />
       <label for="ram">System memory (GiB)</label>
       <div class="footnote" style="margin-top: 0.2rem">
-        Prefilled with the minimum RAM needed to run a measured model (4.96 GiB,
-        the champion's cold whole-stack cost); any machine with more memory runs
-        the same models.
+        Prefilled with the minimum RAM needed to run a certified model (3.48
+        GiB, the cheapest configuration); any machine with more memory runs the
+        same models.
       </div>
       <input
         type="number"
@@ -261,87 +260,70 @@
 
     <div class="foot">
       <p>
-        <strong>How the recommendation is computed.</strong> Candidates are the
-        measured members of the studied lineages (qwen, granite, MiniCPM, Phi),
-        each scored under protocol v4.3 (session 34, addendum 33): a
-        depth-scored ladder that starts at the 4,096-token floor (addendum 32)
-        and doubles the context rung until the model fails &mdash; the deepest
-        rung at which it BOTH serves the reader (speed gate: n=1 conversation,
-        worst-turn &ge; 5 w/s, &le; 5% stall rate) AND counts (FWE: n=1, 3/3
-        coded words) is the score, refined to 1,024-token resolution by binary
-        search. A candidate is eligible iff (a) its
-        <em>minimum RAM</em> (whole-stack machine cost: weights + KV + buffers +
-        runtime, MemAvailable-delta instrument, cold-cache at the scored rung)
-        fits your RAM, and (b) its predicted w/s at your bandwidth clears the
-        5.0 reader line. The w/s anchor is the worst turn at the model's deepest
-        speed-measured rung. Bandwidth scaling is the pre-registered halving
-        form: w/s(BW) = w/s<sub>measured@102.4</sub>
-        &times; BW/102.4 &mdash; linear because at these sizes decode is
-        bandwidth-dominated; for the smallest members it is conservative. The
-        recommendation is the highest-depth eligible candidate.
+        <strong>How the recommendation is computed.</strong> The study ran each model family 21 times per context size up a doubling ladder of context sizes (4k, 8k, 16k, &hellip; 256k tokens). At each context size the model had to find hidden words in a long coded text (a frequent-word-extraction task) &mdash; pass means it found at least 1 of the 3 hidden words. A context size counts as <strong>reliable</strong> when the pass rate is high enough that the 1-sigma confidence lower bound on the pass probability is at least 50% (a Wilson score interval; at n=21 that means about 13 of 21 passes). <strong>Conservative</strong> doubles the confidence requirement (2 sigma, about 16 of 21). The recommended model is the deepest reliable one that (a) fits your RAM (measured whole-stack cost: weights + KV cache + buffers + runtime, cold) and (b) is predicted to stay above the 5 w/s reader line at your bandwidth (speed scales linearly with memory bandwidth: measured@102.4&times;BW/102.4).
       </p>
 
       <p>
-        <strong>Out of the pool.</strong> Qwen2.5-0.5B-Instruct is out (counting
-        floor &mdash; it cannot do FWE at any measured depth);
-        Qwen2.5-3B-Instruct is out (task refusal; the benchmark is not changed
-        to fit a model). Models scoring zero under v4.3 rank last and cannot be
-        recommended. Quant: each family appears once, at its best-scoring quant
-        (Q4_K_M where the Q4 run scored deeper, Q8_0 otherwise; session 35,
-        addendum 2).
+        <strong>Why only three models?</strong> Nine families were measured (Qwen3.5 0.8B/2B, Jamba2-3B, Llama-3.2-1B, MiniCPM5 1B/2B, Jamba-Reasoning-3B, RWKV7-2.9B, gemma-3-1B). Six of them did not pass the retrieval test reliably at any context size &mdash; including some models with large advertised context windows. They are excluded rather than listed with misleading numbers; the full log is in the study's lab notebook. The three shown all certified at 4k/8k; deeper certifications are being measured now. Each family appears once, at its measured configuration.
       </p>
 
       <p class="footnote">
-        Caveats: w/s figures are the worst turn at each model's deepest
-        speed-measured rung (the v4.3 ladder's n=1 screen &mdash; one
-        conversation at the ranked depth). Depth scores are n=1 screening ranks
-        (session 34, addendum 33). The bandwidth law is validated only at the
-        102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit
-        boundary as soft within ~1 GiB.
+        Caveats: w/s figures are the median of 5 conversations at each model's reliable depth. Reliable/conservative depths are certified under the 1-of-3-words pass rule at n=21 runs (repetition gives the confidence; the threshold is stated). Certification at 16k and deeper is in progress &mdash; empty cells there mean "not yet certified", not "failed". The bandwidth law is validated only at the 102.4 GB/s class. Minimum-RAM values are run-shaped: treat the fit boundary as soft within ~1 GiB.
       </p>
     </div>
 
     <script>
       "use strict";
-      // Measured records (v4.3-scored, session 35 addenda 10-12: the roster is the 256k
-      // survivors - every family that cannot reach 262,144 under the RAM ceiling is
-      // retired. The 2B row is the addendum-11 probe PASS (Q4_K_M + K/V q5_0, cold
-      // 3.48 GiB); a higher-quant re-probe toward the 4.96 GiB ceiling is pending
-      // (addendum 12). wps = the WORST TURN at the scored rung. cost = minimum RAM
-      // (whole-stack machine cost, MemAvailable delta, cold-cache at the scored rung),
-      // measured.
+      // Measured records (session 37: the certified families - each family that
+      // certified a rung at 1 sigma under the 1/3 pass rule at n=21). depth =
+      // reliable (1 sigma), conservative = 2 sigma. wps = the median words/second
+      // at the reliable depth (n=5). cost = measured whole-stack machine RAM
+      // (MemAvailable delta, cold) at 262,144 context.
       var CANDIDATES = [
+        {
+          name: "Qwen3.5-0.8B",
+          size: 0.86,
+          cost: 4.96,
+          costEst: false,
+          wps: 34.85,
+          depth: 8192,
+          conservative: 4096,
+          family: "Qwen3.5",
+          quant: "Q8_0 + K/V f16",
+        },
         {
           name: "Qwen3.5-2B",
           size: 1.22,
           cost: 3.48,
-          wps: 9.5,
-          depth: 262144,
+          costEst: false,
+          wps: 27.79,
+          depth: 8192,
+          conservative: 4096,
           family: "Qwen3.5",
-          quant: "Q4_K_M",
+          quant: "Q4_K_M + K/V q5_0",
         },
         {
-          name: "Qwen3.5-0.8B",
-          size: 0.78,
-          cost: 4.96,
+          name: "AI21-Jamba2-3B",
+          size: 3.17,
+          cost: 4.42,
           costEst: false,
-          wps: 9.3,
-          depth: 262144,
-          family: "Qwen3.5",
-          quant: "Q8_0",
+          wps: 6.84,
+          depth: 8192,
+          conservative: 0,
+          family: "AI21-Jamba2",
+          quant: "Q8_0 + K/V f16",
         },
       ];
-      // depth = the v4.3 ladder score (tokens, session 34, addendum 33): the deepest rung at
-      // which the model BOTH serves the reader (speed gate) AND counts (FWE) - n=1
-      // everywhere. The rows are the survivors: the 2B at Q4_K_M + K/V q5_0
-      // (3.48 GiB - pending its quant-raise re-probe, addendum 12) and the 0.8B
-      // champion at Q8_0 weights (the quant CAP is Q8 - session 35, addendum 10),
-      // f16 KV, 262,144 deep, 4.96 GiB
-      // cold, 9.3 w/s worst at the scored rung. THE RETIRED FAMILIES (session 35,
-      // addendum 10): every other pool family failed the 256k screen - training
-      // window below 262,144, KV geometry too fat under the RAM ceiling, or FWE
-      // quality already broken far shallower; the full rejection log is in the
-      // lab notebook (session 35, addendum 10).
+      // depth = the RELIABLE depth (tokens): the deepest context size at which the
+      // model passed the FWE hidden-word retrieval task across repeated seeded
+      // runs with 1-sigma confidence (Wilson lower bound >= 0.5; n=21 runs per
+      // family, session 37). Pass = finding >= 1 of 3 hidden words (1/3 rule).
+      // conservative = the same claim at 2 sigma - the stricter level that
+      // survives skeptical review. wps = measured words/second at the reliable
+      // depth (median of 5 conversations). cost = measured whole-stack machine
+      // RAM (weights + KV cache + buffers + runtime) at 262,144 context, cold.
+      // Certification at 16k and above is in progress; the six remaining
+      // families did not certify at any rung and are not recommended.
       var CLASSES = [25.6, 51.2, 102.4];
       var REF_BW = 102.4,
         READER = 5.0;
@@ -401,7 +383,7 @@
       var MIN_RUN_BW = CANDIDATES.reduce(function (a, c) {
         return Math.max(a, c.wps);
       }, 0);
-      MIN_RUN_BW = (READER * REF_BW) / MIN_RUN_BW; // ~54 GB/s with the current pool (worst w/s 9.5)
+      MIN_RUN_BW = (READER * REF_BW) / MIN_RUN_BW; // ~14.7 GB/s with the current pool (slowest certified model 6.84 w/s at its reliable depth)
 
       function buildMachineMenu() {
         [1, 2, 4, 8].forEach(function (ch) {
@@ -586,7 +568,11 @@
               : r.m.depth === 0
                 ? "counting floor"
                 : r.m.depth.toLocaleString()) +
-            " depth score (FWE ladder, n=1 screen)</div>" +
+            " tokens reliable (1&sigma;)" +
+            (r.m.conservative
+              ? " &middot; " + r.m.conservative.toLocaleString() + " tokens conservative (2&sigma;)"
+              : "") +
+            "</div>" +
             "<div>predicted " +
             r.w.toFixed(1) +
             " w/s at " +
@@ -622,7 +608,7 @@
             html +=
               '<div class="verdict none"><h3>No measured model fits ' +
               ram +
-              " GiB of RAM</h3><div>The smallest measured member (Qwen3.5-2B) needs 3.48 GiB of minimum RAM (cold, scored rung).</div></div>";
+              " GiB of RAM</h3><div>The smallest certified configuration (Qwen3.5-2B) needs 3.48 GiB of measured whole-stack RAM (cold).</div></div>";
           }
         }
         $("result").innerHTML = html;
@@ -631,7 +617,7 @@
           "<table><thead><tr>" +
           '<th data-k="name">model</th><th data-k="quant">quant</th><th class="num" data-k="size">file GiB</th>' +
           '<th class="num" data-k="cost">minimum RAM GiB</th>' +
-          '<th class="num" data-k="depth">depth score (tok)</th><th class="num" data-k="w">w/s @ you</th><th data-k="fits">fits RAM</th><th data-k="passes">clears reader</th></tr></thead><tbody id="tbody">';
+          '<th class="num" data-k="depth">reliable tok (1&sigma;)</th><th class="num" data-k="conservative">conservative tok (2&sigma;)</th><th class="num" data-k="w">w/s @ you</th><th data-k="fits">fits RAM</th><th data-k="passes">clears reader</th></tr></thead><tbody id="tbody">';
         rows.forEach(function (r) {
           t +=
             "<tr><td>" +
@@ -647,8 +633,14 @@
             (r.m.depth === null
               ? "\u2014 (ladder climbing)"
               : r.m.depth === 0
-                ? "0 (counting floor)"
+                ? "none at 1&sigma;"
                 : r.m.depth.toLocaleString()) +
+            '</td><td class="num">' +
+            (r.m.conservative === null || r.m.conservative === undefined
+              ? "\u2014"
+              : r.m.conservative === 0
+                ? "none at 2&sigma;"
+                : r.m.conservative.toLocaleString()) +
             '</td><td class="num">' +
             (r.w === null ? "\u2014 (ladder climbing)" : r.w.toFixed(2)) +
             '</td><td class="' +
