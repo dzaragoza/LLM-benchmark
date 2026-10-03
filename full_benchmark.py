@@ -574,8 +574,12 @@ def certify_cells(fst: dict[str, Any], depth: int) -> dict[int, bool]:
     return cells
 
 
+CERTIFY_LEVELS = ["at_least_one", "1_sigma", "2_sigma"]
+
+
 def certify_rung(
     depth: int,
+    level: str,
     specs: list[str],
     models_dir: str,
     state: dict[str, Any],
@@ -585,13 +589,17 @@ def certify_rung(
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
-    Candidates are the given families, ordered by promise (existing
-    passes at the rung, then reliable depth). Each candidate is
-    tested cell by cell (direct single-rung FWE at the rung, seed =
-    the run number, cells already measured are NEVER re-run) until
-    EARLY ACCEPT (1-sigma Wilson lower bound >= 0.5 over the measured
-    cells, count >= half of n=21) or EARLY REJECT (mathematically
-    dead: even passing every remaining cell cannot reach the bar).
+    Session 37, addendum 18: the certification TYPE is chosen per
+    rung - at_least_one (the practitioner's question 1: any model
+    with a pass at the step), 1_sigma (reliable: 1-sigma Wilson
+    lower bound >= 0.5, count >= half of n=21) or 2_sigma
+    (conservative: the same bar at 2 sigma). Candidates are the
+    given families, ordered by promise (existing passes at the
+    rung, then reliable depth). Each candidate is tested cell by
+    cell (direct single-rung FWE at the rung, seed = the run
+    number, cells already measured are NEVER re-run) until EARLY
+    ACCEPT or EARLY REJECT (mathematically dead: even passing
+    every remaining cell cannot reach the bar).
     The RAM-ceiling assumption replaces the w/s measurement
     (session 37, addendum 15): a config selected under the ceiling
     has enough bandwidth to clear the 5 w/s reader line - w/s is
@@ -600,8 +608,11 @@ def certify_rung(
     if a recommendation is ever doubted. The first accepted
     candidate ANSWERS the rung; the rest are skipped (the
     practitioner wants ONE model per rung)."""
+    if level not in CERTIFY_LEVELS:
+        raise ValueError(f"unknown certify level {level!r}")
     n_total = TOURNAMENT_CLIMBS
-    floor = math.ceil(0.5 * n_total)
+    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
+    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
     order: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
@@ -628,6 +639,7 @@ def certify_rung(
         entry = {
             "family": fam,
             "depth": depth,
+            "level": level,
             "historical_passes": k,
             "historical_cells": measured,
         }
@@ -659,16 +671,24 @@ def certify_rung(
         ran = 0
         verdict = None
         while True:
-            lo, _ = wilson_interval(k, measured) if measured else (0.0, 0.0)
+            lo, _ = wilson_interval(k, measured, z) if measured else (0.0, 0.0)
             remaining = n_total - measured
-            if measured >= floor and lo >= 0.5:
-                verdict = "accept"
-                break
-            best_k = k + remaining
-            best_lo, _ = wilson_interval(best_k, n_total)
-            if best_lo < 0.5 or best_k < floor:
-                verdict = "dead"
-                break
+            if level == "at_least_one":
+                if k >= 1:
+                    verdict = "accept"
+                    break
+                if remaining == 0:
+                    verdict = "dead"
+                    break
+            else:
+                if measured >= floor and lo >= 0.5:
+                    verdict = "accept"
+                    break
+                best_k = k + remaining
+                best_lo, _ = wilson_interval(best_k, n_total, z)
+                if best_lo < 0.5 or best_k < floor:
+                    verdict = "dead"
+                    break
             if dry_run:
                 verdict = "would-run"
                 break
@@ -700,18 +720,30 @@ def certify_rung(
         entry["ran_now"] = ran
         if verdict == "accept":
             entry["verdict"] = "accept"
-            lo = wilson_interval(k, measured)[0]
-            print(
-                f"  ACCEPT at {k}/{measured} - 1-sigma lower bound "
-                f"{lo:.3f} >= 0.5 - {fam} answers the {depth:,} rung"
-            )
+            if level == "at_least_one":
+                print(
+                    f"  ACCEPT at {k}/{measured} - at least one pass at "
+                    f"{depth:,} - {fam} answers the {depth:,} rung"
+                )
+            else:
+                lo = wilson_interval(k, measured, z)[0]
+                print(
+                    f"  ACCEPT at {k}/{measured} - {level.replace('_', ' ')} "
+                    f"lower bound {lo:.3f} >= 0.5 - {fam} answers the {depth:,} rung"
+                )
             answered = True
         elif verdict == "dead":
             entry["verdict"] = "dead"
-            print(
-                f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
-                f"(best 1s lower bound {best_lo:.3f} < 0.5); next candidate"
-            )
+            if level == "at_least_one":
+                print(
+                    f"  DEAD - every cell measured, no pass at {depth:,}; "
+                    f"next candidate"
+                )
+            else:
+                print(
+                    f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
+                    f"(best {int(z)}s lower bound {best_lo:.3f} < 0.5); next candidate"
+                )
         elif verdict == "would-run":
             entry["verdict"] = "would-run"
             print(f"  dry run - would test {remaining} cell(s) from run {min(r for r in range(1, n_total + 1) if r not in cells)}")
@@ -1549,15 +1581,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--certify",
+        choices=CERTIFY_LEVELS,
+        default=None,
+        metavar="LEVEL",
+        help="session 37, addendum 18: certify the rungs given by "
+        "--rungs sequentially - the most promising candidate is tested "
+        "cell by cell (a cell is model x run x step, NEVER re-measured; "
+        "historical climb cells are inherited) until it certifies or is "
+        "mathematically dead; the first accepted model answers the rung; "
+        "the rest are skipped. LEVEL is the certification type: "
+        "at_least_one (any model with a pass at the step), 1_sigma "
+        "(reliable: 1-sigma Wilson lower bound >= 0.5, n=21), 2_sigma "
+        "(conservative: the same bar at 2 sigma)",
+    )
+    ap.add_argument(
+        "--rungs",
         type=int,
+        nargs="+",
         default=None,
         metavar="DEPTH",
-        help="session 37, addendum 8 (the practitioner map): fill ONE "
-        "rung sequentially - the most promising candidate is tested "
-        "cell by cell (a cell is model x run x step, NEVER re-measured; "
-        "historical climb cells are inherited) until it certifies "
-        "(1-sigma Wilson lower bound >= 0.5, n=21) or is mathematically "
-        "dead; the first accepted model answers the rung; the rest are skipped",
+        help="session 37, addendum 18: the rung(s) to certify, processed "
+        "cheapest-first (sorted ascending); required with --certify. "
+        "State is saved after each rung, so each rung's answers feed "
+        "the next rung's predictions - a range is just multiple "
+        "commands concatenated, no JSON needed",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
@@ -1654,27 +1701,33 @@ def main() -> None:
         diagnose_fwe(args.models_dir, state)
         return
     if args.certify:
-        results = certify_rung(
-            args.certify,
-            args.families,
-            args.models_dir,
-            state,
-            args.state_file,
-            state.get("ladder_port", 8210),
-            args.dry_run,
-        )
-        state["certify"] = results
-        save_state(args.state_file, state)
-        print()
-        print("=" * 60)
-        stamp(f"CERTIFY {args.certify:,} SUMMARY")
-        for r in results:
-            v = r.get("verdict", r.get("error", r.get("skipped", "?")))
-            extra = f" w/s median {r['wps_median']}" if r.get("wps_median") else ""
-            print(
-                f"  {r['family']}: {v} ({r.get('passes', 0)}/"
-                f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
+        if not args.rungs:
+            ap.error("--certify needs --rungs DEPTH [DEPTH ...]")
+        all_results: list[dict[str, Any]] = []
+        for depth in sorted(args.rungs):
+            results = certify_rung(
+                depth,
+                args.certify,
+                args.families,
+                args.models_dir,
+                state,
+                args.state_file,
+                state.get("ladder_port", 8210),
+                args.dry_run,
             )
+            state["certify"] = results
+            save_state(args.state_file, state)
+            print()
+            print("=" * 60)
+            stamp(f"CERTIFY {args.certify} {depth:,} SUMMARY")
+            for r in results:
+                v = r.get("verdict", r.get("error", r.get("skipped", "?")))
+                extra = f" w/s median {r['wps_median']}" if r.get("wps_median") else ""
+                print(
+                    f"  {r['family']}: {v} ({r.get('passes', 0)}/"
+                    f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
+                )
+            all_results.extend(results)
         return
     if args.tournament:
         tours = []

@@ -593,3 +593,37 @@ GRADED INTO THE ARTIFACTS:
 NEXT RUNG (cheapest-first): --certify 32768 on the same 9 families,
 state/benchmark-state-tournament.json. All 9 stay candidates - early
 stop never measured most deep cells.
+
+
+## Addendum 18 (2026-10-03, tooling) - certify becomes a TYPE + a RANGE
+
+The author's two rulings, and the design that fell out:
+
+1. "certify should be a range." A JSON spec file was considered and
+   REJECTED by the author's own observation: the output of the previous
+   rung can change the predictions, so a static spec is stale the
+   moment rung k is answered. The simpler design: --rungs DEPTH
+   [DEPTH ...], processed cheapest-first (sorted ascending), state
+   saved after EACH rung - so a range is just multiple commands
+   concatenated, and each rung's answers feed the next rung's
+   candidate ordering live. No JSON needed.
+
+2. Three certification TYPES, chosen per invocation:
+   --certify at_least_one - the practitioner's question 1: the first
+   candidate with >= 1 pass at the rung answers it (bronze).
+   --certify 1_sigma - reliable: 1-sigma Wilson lower bound >= 0.5,
+   count >= half of n=21 (silver; the previous fixed bar).
+   --certify 2_sigma - conservative: the same bar at 2 sigma (gold).
+
+   The accept/dead math is parameterized by (floor, z) derived from
+   the level; at_least_one uses floor=1, z=0 and declares DEAD only
+   when every cell is measured with zero passes. Early reject still
+   applies at the sigma levels (best-case Wilson lo < 0.5 = dead).
+
+   CLI: --certify LEVEL + --rungs DEPTH [...]; the old single-depth
+   --certify DEPTH form is retired.
+
+Tests: 3 new (at_least_one accepts from a historical top-out cell
+with zero fresh cells and skips the rest; at_least_one with 21
+measured fails is DEAD; 2_sigma early-reject with the 2s bound in
+the message). 147 pass.
