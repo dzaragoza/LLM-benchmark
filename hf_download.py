@@ -466,6 +466,9 @@ def _http_get_json(
     raise RuntimeError(f"http get failed after {retries} attempts: {url}") from last_err
 
 
+ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
+
+
 def load_questions(config: str, n: int) -> list[dict[str, Any]]:
     """ARC questions from the HF datasets-server; cached in the repo root
     (same questions across runs and models - McNemar pairing depends
