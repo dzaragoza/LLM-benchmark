@@ -25,3 +25,4 @@
 - [Session 27 — 2026-09-26 (protocol v2: the depth-prefill gate; the reader guarantee replaces the floor)](session-27.md)
 - [Session 34](session-34.md)
 - [Session 35 — 2026-10-01 (the Q4_K_M sweep: context-over-parameters confirmed; the merged best-of pages)](session-35.md)
+- [Session 38 — 2026-10-03 (the VT gold certification mid-flight; the 3/3 medal ruling live)](session-38.md)
