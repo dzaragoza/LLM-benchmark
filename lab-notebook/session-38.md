@@ -129,3 +129,23 @@ LIMITATION, on record: the delta is machine-wide, not per-process -
 if another GPU client ran DURING a cell, its usage contaminates the
 delta. The overnight runs are solo on the box, so this is acceptable;
 the carveout_hidden flag (delta > 0.05 GiB) marks every affected cell.
+
+## Addendum 5 (registered 2026-10-04): the third witness - llama's own accounting in the log
+
+The author's ruling: capture llama.cpp's own memory accounting from the
+start (we should have done this from the beginning). All three launch
+sites (fwe_pass, vt_pass, speed bench_model) now pass -lv 5 so the
+load-time tensor/KV/buffer banner lines land in the server log, where
+addendum-36's parse_memory_log already extracts kv_cache_gib,
+cpu_buffers_gib, graph_overhead_gib + raw banner_lines.
+
+Per cell we now have THREE independent memory witnesses:
+1. smaps census (resident, file/anon split; addendum 23)
+2. amdgpu sysfs delta (the carveout, GTT; addendum 4)
+3. llama's own load accounting (per-device buffer sizes; addendum 5)
+
+VERIFICATION REQUIRED (first cell of the next run): check the server
+log for the load_tensors/buffer-size lines. Verbosity mappings vary
+across builds - if the lines are absent at -lv 5, try -lv 1 or 0
+(some builds invert the scale; the banner guard reads n_ctx from the
+log, so any regression there is caught by the gate itself).
