@@ -1204,3 +1204,57 @@ def test_code_edit_md_gate_not_applied_to_python(tmp_path):
     code_edit.edit(str(p), [("replace", "x = 1", "y = 'a|b'")])
     with open(str(p)) as f:
         assert f.read() == "y = 'a|b'\n"
+
+
+def test_amdgpu_census_math(tmp_path, monkeypatch):
+    """Addendum 4 (the UMA carveout census): the amdgpu sysfs reader,
+    the machine-wide delta, and the smaps+carveout union. The smaps
+    resident number must stay comparable to pre-addendum-4 records -
+    the carveout lands in its OWN keys and footprint_gib."""
+    import llama_server as ls
+
+    # a fake sysfs tree: 2 GiB carveout, weights spilled into it
+    base = tmp_path / "card0"
+    base.mkdir()
+    (base / "mem_info_vram_used").write_text(str(int(1.25 * 1024**3)))
+    (base / "mem_info_gtt_used").write_text(str(int(0.5 * 1024**3)))
+    (base / "mem_info_vram_total").write_text(str(int(2.0 * 1024**3)))
+    (base / "mem_info_gtt_total").write_text(str(int(8.0 * 1024**3)))
+    monkeypatch.setattr(ls, "glob", lambda p: [str(base)] if "card*" in p else [])
+    monkeypatch.setattr(
+        ls, "_amdgpu_devices", lambda: [str(base)] if (base / "mem_info_vram_used").exists() else []
+    )
+
+    snap = ls.amdgpu_memory_gib()
+    assert snap is not None
+    assert abs(snap["vram_used_gib"] - 1.25) < 0.01
+    assert abs(snap["gtt_used_gib"] - 0.5) < 0.01
+    assert abs(snap["vram_total_gib"] - 2.0) < 0.01
+
+    # the delta: model took 1.25 GiB of carveout over the launch window
+    before = {"vram_used_gib": 0.1, "gtt_used_gib": 0.5, "vram_total_gib": 2.0}
+    after = snap
+    d = ls.amdgpu_delta_gib(before, after)
+    assert abs(d["vram_used_gib"] - 1.15) < 0.01
+    # negative deltas clamp to zero (a bystander freed memory)
+    d2 = ls.amdgpu_delta_gib(after, before)
+    assert d2["vram_used_gib"] == 0.0
+
+    # the union census: smaps resident + carveout, keys never merged
+    class FakeProc:
+        pid = None
+
+    monkeypatch.setattr(
+        ls,
+        "mapped_memory_gib",
+        lambda proc: {"mapped_gib": 4.0, "resident_gib": 3.0, "file_gib": 1.5, "anon_gib": 1.5},
+    )
+    census = ls.mapped_plus_gpu_gib(FakeProc(), d)
+    assert census["resident_gib"] == 3.0  # untouched, comparable to old records
+    assert abs(census["gpu_vram_delta_gib"] - 1.15) < 0.01
+    assert abs(census["footprint_gib"] - 4.15) < 0.01
+    assert census.get("carveout_hidden") is True
+    # no amdgpu interface (non-AMD box): footprint == resident, no GPU keys
+    census2 = ls.mapped_plus_gpu_gib(FakeProc(), None)
+    assert census2["footprint_gib"] == 3.0
+    assert "gpu_vram_delta_gib" not in census2

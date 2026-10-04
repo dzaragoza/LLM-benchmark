@@ -217,6 +217,7 @@ def fwe_pass(
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
+    gpu_baseline = llama_server.amdgpu_memory_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     # session 35, addendum 8: separate K/V (the combined flag is gone);
     # -fa takes a value on this build: "-fa on"
@@ -253,12 +254,19 @@ def fwe_pass(
             min_words=min_words,
         )
         row["window_cap"] = _banner_window(log_path)
-        smaps = llama_server.mapped_memory_gib(proc)
+        gpu_delta = llama_server.amdgpu_delta_gib(gpu_baseline, llama_server.amdgpu_memory_gib())
+        smaps = llama_server.mapped_plus_gpu_gib(proc, gpu_delta)
         if smaps is not None:
             row["mem_census"] = smaps
+            gpu_line = ""
+            if smaps.get("gpu_vram_delta_gib") is not None:
+                gpu_line = (
+                    f", +GPU carveout {smaps['gpu_vram_delta_gib']:.2f} GiB"
+                    f" -> footprint {smaps['footprint_gib']:.2f} GiB (amdgpu; addendum 4)"
+                )
             print(
                 f"    fwe census: {smaps['resident_gib']:.2f} GiB resident "
-                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)"
+                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)" + gpu_line
             )
         cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         if cost is not None:
@@ -353,6 +361,7 @@ def vt_pass(
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-vt-server.log")
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
+    gpu_baseline = llama_server.amdgpu_memory_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     if kv_quant_k or kv_quant_v:
         extra_args += ["-fa", "on"]
@@ -386,12 +395,19 @@ def vt_pass(
             no_thinking=True,
         )
         row["window_cap"] = _banner_window(log_path)
-        smaps = llama_server.mapped_memory_gib(proc)
+        gpu_delta = llama_server.amdgpu_delta_gib(gpu_baseline, llama_server.amdgpu_memory_gib())
+        smaps = llama_server.mapped_plus_gpu_gib(proc, gpu_delta)
         if smaps is not None:
             row["mem_census"] = smaps
+            gpu_line = ""
+            if smaps.get("gpu_vram_delta_gib") is not None:
+                gpu_line = (
+                    f", +GPU carveout {smaps['gpu_vram_delta_gib']:.2f} GiB"
+                    f" -> footprint {smaps['footprint_gib']:.2f} GiB (amdgpu; addendum 4)"
+                )
             print(
                 f"    vt census: {smaps['resident_gib']:.2f} GiB resident "
-                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)"
+                f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; smaps)" + gpu_line
             )
         cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         if cost is not None:

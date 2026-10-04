@@ -698,6 +698,7 @@ def bench_model(
     if not llama_server.drop_file_cache(model):
         print("    note: cache drop unavailable - cost may read warm (137k)")
     mem_before = llama_server.system_memavailable_gib()
+    gpu_baseline = llama_server.amdgpu_memory_gib()
     proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
     try:
         if not healthy:
@@ -843,7 +844,8 @@ def bench_model(
 
     finally:
         peak = llama_server.peak_rss_gib(proc)
-        smaps = llama_server.mapped_memory_gib(proc)
+        gpu_delta = llama_server.amdgpu_delta_gib(gpu_baseline, llama_server.amdgpu_memory_gib())
+        smaps = llama_server.mapped_plus_gpu_gib(proc, gpu_delta)
         cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         llama_server.stop_server(proc, port)
         if peak is not None or smaps is not None:
@@ -857,11 +859,18 @@ def bench_model(
                 }
             )
             if smaps is not None and smaps.get("resident_gib") is not None:
+                gpu_line = ""
+                if smaps.get("gpu_vram_delta_gib") is not None:
+                    gpu_line = (
+                        f", +GPU carveout {smaps['gpu_vram_delta_gib']:.2f} GiB "
+                        f"-> footprint {smaps['footprint_gib']:.2f} GiB (amdgpu; addendum 4)"
+                    )
                 print(
                     f"    memory: mapped census {smaps['mapped_gib']:.2f} GiB mapped, "
                     f"{smaps['resident_gib']:.2f} GiB resident "
                     f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; "
                     "smaps, addendum 23)"
+                    + gpu_line
                     + (
                         f", machine cost {cost:.2f} GiB (MemAvailable delta)"
                         if cost is not None
