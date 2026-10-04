@@ -149,3 +149,10 @@ log for the load_tensors/buffer-size lines. Verbosity mappings vary
 across builds - if the lines are absent at -lv 5, try -lv 1 or 0
 (some builds invert the scale; the banner guard reads n_ctx from the
 log, so any regression there is caught by the gate itself).
+
+Addendum 5, refinement 1: the -lv flag is single-sourced in
+llama_server.py (LOG_VERBOSITY_ARGS) and applied inside start_server -
+the author's ruling over the assistant's triplicated flags (every
+launch site invents its own extras; the shared ones live in the
+launcher). All three call sites build their own extra_args without
+verbosity; start_server injects it before them.
