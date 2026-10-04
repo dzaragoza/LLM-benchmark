@@ -11097,3 +11097,38 @@ Traceback (most recent call last):
     time.sleep(delay)
     ~~~~~~~~~~^^^^^^^
 KeyboardInterrupt
+
+===== 2026-10-04T21:44:36 | full_benchmark.py --certify 2_sigma --task all --rungs 4096,8192,16384,32768,65536,131072,262144 --fwe-min-words 3 Qwen/Qwen3.5-0.8B Qwen/Qwen3.5-2B openbmb/MiniCPM5-1B openbmb/MiniCPM5-2B ai21labs/AI21-Jamba-Reasoning-3B AI21/AI21-Jamba2-3B meta-llama/Llama-3.2-1B-Instruct google/gemma-3-1b-it RWKV/RWKV7-Goose-World3-2.9B-HF --state-file state/benchmark-state-tournament.json =====
+  [0] no stale llama-server found
+
+------------------------------------------------------------
+  Qwen3.5-0.8B speed: 11/11 cells measured, 10 unmeasured
+  Qwen3.5-0.8B fwe: 13/17 cells measured, 4 unmeasured
+  Qwen3.5-0.8B vt: 9/11 cells measured, 10 unmeasured
+  Qwen3.5-0.8B arc: 0/0 cells measured, 21 unmeasured
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 2979, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 2504, in main
+    results = certify_rung_combined(
+        depth,
+    ...<7 lines>...
+        min_words=args.fwe_min_words,
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1419, in certify_rung_combined
+    ok, graded, line = _task_measure(
+                       ~~~~~~~~~~~~~^
+        t, model, depth, results_dir, next_run, port, kv_k, kv_v, min_words
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1236, in _task_measure
+    ok, fv = arc_pass(model, run, port)
+             ~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1144, in arc_pass
+    questions = arc_cell_questions(run)
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1118, in arc_cell_questions
+    questions = hf_download.load_questions("ARC-Challenge", hf_download.ARC_NUM_DEFAULT)
+                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'hf_download' has no attribute 'ARC_NUM_DEFAULT'
