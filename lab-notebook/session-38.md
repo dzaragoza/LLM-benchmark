@@ -94,3 +94,38 @@ MEDALS (re-graded from the stored records, never re-measured):
 CLI: --task all with --certify dispatches to certify_rung_combined; the
 per-task namespaces (certify, certify_vt, certify_speed) are untouched -
 the single-task controllers remain available.
+
+## Addendum 4 (registered 2026-10-04): the UMA carveout census - what smaps cannot see
+
+The author's correction: the rig runs the VULKAN build with -ngl 99 on
+the T14s APU (an iGPU, UMA design), NOT CPU-only as the assistant had
+asserted. Two consequences:
+
+1. The T14s BIOS reserves 2048 MiB as a dedicated UMA frame buffer.
+   Pages allocated inside that carveout belong to the GPU and NEVER
+   appear in the host process's /proc/<pid>/smaps - the addendum-23
+   census undercounts exactly the offloaded fraction when the driver
+   spills into the carveout.
+2. The GPU table wants an accurate GPU-side number, not a proxy.
+
+INSTRUMENT (amdgpu sysfs, /sys/class/drm/card*/device/):
+- mem_info_vram_used: the carveout usage (hidden from smaps; sampled
+  as a machine-wide DELTA across the launch window, so the compositor
+  and other processes are excluded; negative deltas clamp to 0)
+- mem_info_gtt_used: shared GTT usage (already resident in system RAM
+  and visible to smaps - recorded for the GPU table, NOT added again)
+- mem_info_vram_total: the BIOS reservation itself (2 GiB on the T14s)
+
+CENSUS UNION (mapped_plus_gpu_gib): the smaps resident number stays
+untouched and comparable to all pre-addendum-4 records; the carveout
+delta lands in its own keys (gpu_vram_delta_gib, gpu_gtt_delta_gib,
+carveout_hidden) and footprint_gib = resident + carveout is the new
+honest grand total. Wired into all three census sites: fwe_pass,
+vt_pass and the speed gate's bench_model. On non-AMD boxes the
+interface returns None and the census degrades gracefully to the
+addendum-23 behavior.
+
+LIMITATION, on record: the delta is machine-wide, not per-process -
+if another GPU client ran DURING a cell, its usage contaminates the
+delta. The overnight runs are solo on the box, so this is acceptable;
+the carveout_hidden flag (delta > 0.05 GiB) marks every affected cell.

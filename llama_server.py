@@ -21,6 +21,7 @@ when live-bench was absorbed into speed_gate.py.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -267,6 +268,119 @@ def parse_memory_log(log_path: str) -> dict[str, Any] | None:
             elif "graph" in key and "graph_overhead_gib" not in out:
                 out["graph_overhead_gib"] = round(gib, 3)
     out["banner_lines"] = out["banner_lines"][-40:]
+    return out
+
+
+def _amdgpu_devices() -> list[str]:
+    devs = []
+    for d in glob.glob("/sys/class/drm/card*/device"):
+        if os.path.exists(os.path.join(d, "mem_info_vram_used")):
+            devs.append(d)
+    return devs
+
+
+def amdgpu_memory_gib() -> dict[str, float | None] | None:
+    """The iGPU's own accounting from the amdgpu sysfs interface
+    (session 38, addendum 4 - the UMA carveout census). The T14s
+    reserves 2 GiB as a dedicated UMA frame buffer: pages inside it
+    belong to the GPU and NEVER appear in the host process's smaps,
+    so the addendum-23 census undercounts exactly the offloaded
+    fraction when the carveout is used. This reads:
+      vram_used_gib  mem_info_vram_used  (the carveout - hidden
+                    from smaps; the number the GPU table wants)
+      gtt_used_gib   mem_info_gtt_used   (shared GTT - already
+                    resident in system RAM and visible to smaps)
+      vram_total_gib mem_info_vram_total (the BIOS reservation,
+                    e.g. 2 GiB on the T14s)
+    Returns None when the amdgpu interface is absent (no iGPU driver
+    or non-AMD hardware)."""
+    devs = _amdgpu_devices()
+    if not devs:
+        return None
+    out: dict[str, float | None] = {
+        "vram_used_gib": 0.0,
+        "gtt_used_gib": 0.0,
+        "vram_total_gib": None,
+        "gtt_total_gib": None,
+    }
+    seen_vram = False
+    seen_gtt = False
+    gib = 1 / (1024 * 1024 * 1024)
+    for dev in devs:
+        try:
+            with open(os.path.join(dev, "mem_info_vram_used")) as f:
+                out["vram_used_gib"] = (out["vram_used_gib"] or 0.0) + int(f.read().strip()) * gib
+                seen_vram = True
+            with open(os.path.join(dev, "mem_info_gtt_used")) as f:
+                out["gtt_used_gib"] = (out["gtt_used_gib"] or 0.0) + int(f.read().strip()) * gib
+                seen_gtt = True
+            if out["vram_total_gib"] is None:
+                with open(os.path.join(dev, "mem_info_vram_total")) as f:
+                    out["vram_total_gib"] = int(f.read().strip()) * gib
+            if out["gtt_total_gib"] is None:
+                with open(os.path.join(dev, "mem_info_gtt_total")) as f:
+                    out["gtt_total_gib"] = int(f.read().strip()) * gib
+        except Exception:
+            continue
+    if not seen_vram and not seen_gtt:
+        return None
+    return out
+
+
+def amdgpu_delta_gib(
+    before: dict[str, float | None] | None, after: dict[str, float | None] | None
+) -> dict[str, float | None] | None:
+    """The model's OWN GPU memory: the amdgpu counters are machine-wide
+    (the desktop compositor and the game you left open count too), so
+    the honest number for a benchmark cell is the DELTA across the
+    launch window. Baseline before the launch, sample after the deep
+    turns; negative deltas clamp to 0.0 (another process freeing
+    memory mid-run)."""
+    if not before or not after:
+        return None
+    out: dict[str, float | None] = {}
+    for key in ("vram_used_gib", "gtt_used_gib"):
+        b = before.get(key)
+        a = after.get(key)
+        if a is None:
+            out[key] = None
+        elif b is None:
+            out[key] = a
+        else:
+            out[key] = max(0.0, a - b)
+    out["vram_total_gib"] = after.get("vram_total_gib")
+    return out
+
+
+def mapped_plus_gpu_gib(
+    proc: Any, gpu_delta: dict[str, float | None] | None = None
+) -> dict[str, float | None] | None:
+    """The full footprint census (session 38, addendum 4): the
+    addendum-23 smaps census UNION the amdgpu carveout delta. The
+    smaps resident number stays honest for the pages the host must
+    hold; the carveout delta is added on top for the true footprint -
+    on the T14s up to 2 GiB that smaps never sees. GPU-side totals
+    are stored under their own keys (never merged into resident_gib -
+    the smaps number must stay comparable to the pre-addendum-4
+    records); 'footprint_gib' is the new honest grand total."""
+    smaps = mapped_memory_gib(proc)
+    if smaps is None:
+        return None
+    out: dict[str, float | None] = dict(smaps)
+    if gpu_delta:
+        vram = gpu_delta.get("vram_used_gib")
+        gtt = gpu_delta.get("gtt_used_gib")
+        out["gpu_vram_delta_gib"] = vram
+        out["gpu_gtt_delta_gib"] = gtt
+        resident = smaps.get("resident_gib")
+        if vram is not None and resident is not None:
+            out["footprint_gib"] = round(resident + vram, 3)
+        else:
+            out["footprint_gib"] = resident
+        if vram is not None and vram > 0.05:
+            out["carveout_hidden"] = True
+    else:
+        out["footprint_gib"] = smaps.get("resident_gib")
     return out
 
 
