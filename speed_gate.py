@@ -650,6 +650,7 @@ def bench_model(
     label: str | None = None,
     reader_wps: float | None = None,
     n_conversations: int | None = None,
+    conversation_start: int = 0,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
 ) -> tuple[list[dict[str, Any]], tuple[str, float, float] | None, list[dict[str, Any]]]:
@@ -665,8 +666,9 @@ def bench_model(
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
-    if n_conversations is not None:
-        conversations = conversations[:n_conversations]
+    if n_conversations is not None or conversation_start:
+        end = conversation_start + (n_conversations or len(conversations))
+        conversations = conversations[conversation_start:end]
     cap_tokens = corpus["answer_cap_tokens"]
     label = label or model.split("/")[-1]
 
@@ -721,7 +723,7 @@ def bench_model(
             return all_turns, None, mem_reports
         pool = "\n\n".join(t for c in conversations for t in c["user_turns"])
         conv_worsts = []
-        for ci, conv in enumerate(conversations, 1):
+        for ci, conv in enumerate(conversations, 1 + conversation_start):
             budget = depth_budget(conv["user_turns"], cap_tokens, ctx, thinking)
             blob, blob_tokens = build_blob(port, pool, budget)
             if blob is None:
