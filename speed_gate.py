@@ -678,7 +678,7 @@ def bench_model(
     mem_reports = []
     log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
     print("  starting server...", flush=True)
-    extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
+    extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1", "-lv", "5"]
     # session 35, addendum 8: K and V quantize SEPARATELY (the
     # combined option is GONE - author ruling); a None leaves that
     # cache at the default f16. Quantized caches need the FA kernels,
