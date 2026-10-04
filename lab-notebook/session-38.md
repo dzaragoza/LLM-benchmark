@@ -68,3 +68,29 @@ PREDICTIONS (falsifiable, stated before measurement):
   [5, 7.5)) where the old instrument showed near-misses; the
   per-cell stall counts localize exactly which conversation/turn
   stalls - deterministic, reproducible.
+
+## Addendum 3 (registered 2026-10-04): the COMBINED cell - speed, FWE and VT in one controller
+
+The author's ruling: the three instruments now certify TOGETHER. A cell is
+(model, rung, run) carrying THREE independent measurements - speed, FWE,
+VT. A cell's task is measured only if missing (never twice); the three
+tasks keep their own pass/fail tallies and their own accept/dead verdicts.
+
+CONTROLLER:
+- Candidate certifies the rung when ALL THREE tasks accept (each at the
+  level's bar, the same sequential math as before).
+- Candidate dies when ANY ONE task is dead - the next candidate is picked
+  up. The other tasks' perfect runs do not rescue it.
+- The cell run is shared: the lowest unmeasured run is picked across the
+  three tasks, and only that cell's missing tasks are measured.
+
+MEDALS (re-graded from the stored records, never re-measured):
+- gold = all three tasks at their gold bars
+  (speed 0 stalls, FWE 3/3, VT 5/5)
+- silver = at least silver in all three
+  (speed <=1 stall, FWE 2/3, VT 4/5)
+- bronze = any pass at all (any task at its silver bar or better)
+
+CLI: --task all with --certify dispatches to certify_rung_combined; the
+per-task namespaces (certify, certify_vt, certify_speed) are untouched -
+the single-task controllers remain available.
