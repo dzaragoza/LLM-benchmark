@@ -830,3 +830,128 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
         assert all(p == 5 for p in vt.values())
     finally:
         monkeypatch.undo()
+
+
+def test_combined_rung_accept_and_medal(tmp_path, capsys):
+    """The combined controller (addendum 3): one cell run shared by the
+    three tasks, measured only if missing; accept needs ALL THREE at
+    the bar; the medal is re-graded from the stored records."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        calls.append((task, run))
+        return True, {"speed": 0, "fwe": 3, "vt": 5}[task], f"{task} ok"
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "_task_measure", fake_measure)
+    try:
+        model = tmp_path / "fam-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state = {"families": {"fam": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}}}}
+        res = fb.certify_rung_combined(
+            8192,
+            "1_sigma",
+            ["fam"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            min_words=3,
+        )
+        r = res[0]
+        assert r["verdict"] == "accept"
+        assert all(r[f"{t}_verdict"] == "accept" for t in fb.COMBINED_TASKS)
+        assert r["medal"] == "gold"
+        ns = state["families"]["fam"]
+        assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
+        # resume: every cell-task stored, nothing re-measured
+        calls.clear()
+        res = fb.certify_rung_combined(
+            8192,
+            "1_sigma",
+            ["fam"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            min_words=3,
+        )
+        assert calls == []
+        assert res[0]["verdict"] == "accept"
+    finally:
+        monkeypatch.undo()
+
+
+def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
+    """Any single task dead kills the candidate - the others' perfect
+    runs do not rescue it; the next candidate is picked up."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        calls.append((task, run))
+        if task == "vt":
+            return False, 0, "vt 0/5"
+        return True, 0, f"{task} ok"
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(fb, "_task_measure", fake_measure)
+    try:
+        model = tmp_path / "a-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state = {
+            "families": {
+                "a": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}},
+            }
+        }
+        res = fb.certify_rung_combined(
+            4096,
+            "2_sigma",
+            ["a"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        r = res[0]
+        assert r["verdict"] == "dead"
+        assert r["vt_verdict"] == "dead"
+        assert r["vt_passes"] == 0
+        # gold bars: fwe (>=3) and speed (0 stalls) held everywhere measured
+        assert r["fwe_verdict"] is None or r["fwe_verdict"] == "accept"
+        assert r["medal"] is None
+    finally:
+        monkeypatch.undo()
+
+
+def test_combined_medal_grading_from_records():
+    """Gold/silver/bronze re-graded from stored records alone - no
+    re-measurement, any bar, forever."""
+    import full_benchmark as fb
+
+    base = {
+        "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 12)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
+    }
+    assert fb.combined_medal(base, 8192, "1_sigma") == "gold"
+    silver = {
+        "certify": {"8192": {str(r): 2 for r in range(1, 12)}},
+        "certify_vt": {"8192": {str(r): 4 for r in range(1, 12)}},
+        "certify_speed": {"8192": {str(r): 1 for r in range(1, 12)}},
+    }
+    assert fb.combined_medal(silver, 8192, "1_sigma") == "silver"
+    bronze = {
+        "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
+        "certify_vt": {"8192": {str(r): 4 for r in range(1, 12)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
+    }
+    assert fb.combined_medal(bronze, 8192, "1_sigma") == "bronze"
+    empty = {}
+    assert fb.combined_medal(empty, 8192, "1_sigma") is None

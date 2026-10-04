@@ -1065,6 +1065,339 @@ def certify_rung(
     return results
 
 
+COMBINED_TASKS = ("speed", "fwe", "vt")
+
+
+def _task_load(
+    fst: dict[str, Any],
+    depth: int,
+    task: str,
+    min_words: int,
+    models_dir: str,
+    fam: str,
+) -> dict[int, bool]:
+    """The pass/fail cell map for one task at one rung, from whatever
+    evidence already exists (combined mode: a cell's task measurement
+    is loaded if present, measured later only if missing)."""
+    if task == "vt":
+        return {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
+    if task == "speed":
+        return {r: p == 0 for r, p in speed_cells(fst, depth).items()}
+    return certify_cells(fst, depth, min_words, models_dir, fam)
+
+
+def _task_store(fst: dict[str, Any], depth: int, task: str, run: int, value: int) -> None:
+    """Persist one cell's graded record in its own namespace (the
+    combined controller never re-measures a stored cell-task)."""
+    ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(task, "certify")
+    fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = value
+
+
+def _task_measure(
+    task: str,
+    model: str,
+    depth: int,
+    results_dir: str,
+    run: int,
+    port: int,
+    kv_k: str | None,
+    kv_v: str | None,
+    min_words: int,
+) -> tuple[bool, int, str]:
+    """Measure one cell's one task. Returns (passed_at_gold, graded
+    record, human line). The graded record is the speed stall count,
+    the FWE word count, the VT 5-name count - all re-gradable at any
+    bar later without re-measuring."""
+    if task == "speed":
+        ok, fv = speed_cell(
+            model,
+            depth + 2 * ruler_gate.ANSWER_HEADROOM,
+            CORPUS_DEFAULT,
+            results_dir,
+            run,
+            port,
+            kv_quant_k=kv_k,
+            kv_quant_v=kv_v,
+        )
+        stalls = int(fv.get("stalls") or 0)
+        n_turns = int(fv.get("turns") or 0)
+        return (
+            ok,
+            stalls,
+            (f"speed: {stalls} stall(s) in {n_turns} turns -> {'PASS' if ok else 'FAIL'}"),
+        )
+    if task == "vt":
+        ok, fv = vt_pass(
+            model,
+            depth + 2 * ruler_gate.ANSWER_HEADROOM,
+            results_dir,
+            seed=run,
+            port=port,
+            kv_quant_k=kv_k,
+            kv_quant_v=kv_v,
+        )
+        partial = int((fv.get("words_found") or [0])[0] or 0)
+        return ok, partial, f"vt: {partial}/5 names -> {'PASS' if ok else 'FAIL'}"
+    ok, fv = fwe_pass(
+        model,
+        depth + 2 * ruler_gate.ANSWER_HEADROOM,
+        results_dir,
+        seed=run,
+        port=port,
+        kv_quant_k=kv_k,
+        kv_quant_v=kv_v,
+        min_words=min_words,
+    )
+    words = fv.get("words_found") or []
+    count = words[0] if words else int(ok)
+    return ok, count, f"fwe: {count}/{max(1, min_words)} word(s) -> {'PASS' if ok else 'FAIL'}"
+
+
+def certify_rung_combined(
+    depth: int,
+    level: str,
+    specs: list[str],
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    port: int,
+    dry_run: bool,
+    min_words: int = 1,
+) -> list[dict[str, Any]]:
+    """The combined controller (session 38, addendum 3 - the author's
+    ruling): a cell is (model, rung, run) carrying THREE independent
+    measurements - speed, FWE and VT. A cell's task is measured only
+    if missing (never twice); the three tasks carry their own pass/fail
+    tallies and their own accept/dead verdicts. The candidate certifies
+    the rung when ALL THREE accept; it dies when ANY ONE is dead (the
+    next candidate is picked up). Gold = all three at gold; silver =
+    all three at least silver; bronze = any pass at all."""
+    if level not in CERTIFY_LEVELS:
+        raise ValueError(f"unknown certify level {level!r}")
+    n_total = TOURNAMENT_CLIMBS
+    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
+    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
+    order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]]]] = []
+    for spec in specs:
+        fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
+        fst = state["families"].get(fam, {})
+        cells = {t: _task_load(fst, depth, t, min_words, models_dir, fam) for t in COMBINED_TASKS}
+        order.append((fam, fst, cells))
+
+    def promise(item):
+        fam, fst, cells = item
+        k = sum(sum(1 for ok in t.values() if ok) for t in cells.values())
+        saved_rank = state.get("tournament") or []
+        rd = 0
+        for tr in saved_rank:
+            if tr.get("family") == fam:
+                rd = tr.get("reliable_depth") or 0
+        return (-k, -rd, fam)
+
+    order.sort(key=promise)
+    results: list[dict[str, Any]] = []
+    answered = False
+    for fam, fst, cells0 in order:
+        cells = {t: dict(v) for t, v in cells0.items()}
+        entry = {
+            "family": fam,
+            "depth": depth,
+            "level": level,
+            "task": "all",
+        }
+        for t in COMBINED_TASKS:
+            m = len(cells[t])
+            kp = sum(1 for ok in cells[t].values() if ok)
+            entry[f"{t}_historical_passes"] = kp
+            entry[f"{t}_historical_cells"] = m
+        print()
+        print("-" * 60)
+        for t in COMBINED_TASKS:
+            print(
+                f"  {fam} {t}: {entry[f'{t}_historical_passes']}/"
+                f"{entry[f'{t}_historical_cells']} cells measured, "
+                f"{n_total - entry[f'{t}_historical_cells']} unmeasured"
+            )
+        if answered:
+            entry["skipped"] = "rung already answered"
+            print("  SKIPPED - the rung is already answered")
+            results.append(entry)
+            continue
+        famdir = os.path.join(models_dir, fam)
+        rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
+        run = (fst.get("runs") or {}).get(rung or "", {})
+        model = (
+            run.get("file")
+            or (fst.get("tournament_entry") or {}).get("file")
+            or local_rung(famdir, rung)
+        )
+        if not model or not os.path.isfile(model):
+            entry["error"] = f"model file not found ({model})"
+            print(f"  ERROR: {entry['error']}")
+            results.append(entry)
+            continue
+        kv_k = (
+            run.get("kv_quant_k")
+            or (fst.get("tournament_entry") or {}).get("kv_quant_k")
+            or state.get("kv_quant_k")
+        )
+        kv_v = (
+            run.get("kv_quant_v")
+            or (fst.get("tournament_entry") or {}).get("kv_quant_v")
+            or state.get("kv_quant_v")
+        )
+        results_dir = os.path.join(models_dir, "tournament-results", fam)
+        os.makedirs(results_dir, exist_ok=True)
+        ran = 0
+        verdict = None
+        verdicts = {t: None for t in COMBINED_TASKS}
+        tallies = {
+            t: {
+                "measured": len(cells[t]),
+                "k": sum(1 for ok in cells[t].values() if ok),
+            }
+            for t in COMBINED_TASKS
+        }
+
+        def task_lo(t, _tallies=tallies):
+            ta = _tallies[t]
+            return wilson_interval(ta["k"], ta["measured"], z)[0] if ta["measured"] else 0.0
+
+        while True:
+            # verdicts: per task, independent accept / dead
+            for t in COMBINED_TASKS:
+                if verdicts[t] is not None:
+                    continue
+                ta = tallies[t]
+                k, measured = ta["k"], ta["measured"]
+                remaining = n_total - measured
+                lo = task_lo(t)
+                if level == "at_least_one":
+                    if k >= 1:
+                        verdicts[t] = "accept"
+                    elif remaining == 0:
+                        verdicts[t] = "dead"
+                else:
+                    if measured >= floor and lo >= 0.5:
+                        verdicts[t] = "accept"
+                        continue
+                    best_k = k + remaining
+                    best_lo, _ = wilson_interval(best_k, n_total, z)
+                    if best_lo < 0.5 or best_k < floor:
+                        verdicts[t] = "dead"
+            if all(v == "accept" for v in verdicts.values()):
+                verdict = "accept"
+                break
+            if any(v == "dead" for v in verdicts.values()):
+                verdict = "dead"
+                dead_task = next(t for t in COMBINED_TASKS if verdicts[t] == "dead")
+                break
+            if dry_run:
+                verdict = "would-run"
+                break
+            # pick the lowest unmeasured cell across the three tasks:
+            # a cell run is shared, so measure the tasks the cell misses
+            next_run = min(
+                min(r for r in range(1, n_total + 1) if r not in cells[t])
+                for t in COMBINED_TASKS
+                if any(r not in cells[t] for r in range(1, n_total + 1))
+            )
+            for t in COMBINED_TASKS:
+                if next_run in cells[t]:
+                    continue
+                ok, graded, line = _task_measure(
+                    t, model, depth, results_dir, next_run, port, kv_k, kv_v, min_words
+                )
+                ran += 1
+                cells[t][next_run] = ok
+                tallies[t]["measured"] += 1
+                tallies[t]["k"] += 1 if ok else 0
+                _task_store(fst, depth, t, next_run, graded)
+                save_state(state_path, state)
+                print(
+                    f"  cell {next_run} (rung {depth:,}) {line} -> {t} "
+                    f"{tallies[t]['k']}/{tallies[t]['measured']} "
+                    f"(1s lower bound {task_lo(t):.3f})"
+                )
+        entry["cells_measured"] = sum(tallies[t]["measured"] for t in COMBINED_TASKS)
+        entry["ran_now"] = ran
+        entry["medal"] = combined_medal(fst, depth, level)
+        for t in COMBINED_TASKS:
+            entry[f"{t}_passes"] = tallies[t]["k"]
+            entry[f"{t}_cells"] = tallies[t]["measured"]
+            entry[f"{t}_verdict"] = verdicts[t]
+        tally_line = ", ".join(
+            f"{t} {tallies[t]['k']}/{tallies[t]['measured']}" for t in COMBINED_TASKS
+        )
+        if verdict == "accept":
+            entry["verdict"] = "accept"
+            print(
+                f"  ACCEPT at {depth:,} - all three tasks clear "
+                f"({tally_line}) "
+                f"- {fam} answers the {depth:,} rung"
+            )
+            answered = True
+        elif verdict == "dead":
+            entry["verdict"] = "dead"
+            ta = tallies[dead_task]
+            print(
+                f"  DEAD - {dead_task} cannot reach the bar at {depth:,} "
+                f"({ta['k']}/{ta['measured']}, best lower bound "
+                f"{wilson_interval(ta['k'] + (n_total - ta['measured']), n_total, z)[0]:.3f} < 0.5)"
+                "; next candidate"
+            )
+        elif verdict == "would-run":
+            entry["verdict"] = "would-run"
+            print("  dry run - would measure the missing cell-tasks above")
+        results.append(entry)
+    return results
+
+
+TASK_GOLD_BARS = {"speed": 0, "fwe": 3, "vt": 5}
+TASK_SILVER_BARS = {"speed": 1, "fwe": 2, "vt": 4}
+
+
+def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
+    """The combined medal (session 38, addendum 3): re-grade the stored
+    per-cell records at each task's gold and silver bars. Gold = all
+    three tasks at gold; silver = at least silver in all three; bronze
+    = any pass at all. A task with no measured cells has no medal
+    contribution (None overall until every task has evidence)."""
+    n_total = TOURNAMENT_CLIMBS
+    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
+    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
+    bars = {"gold": TASK_GOLD_BARS, "silver": TASK_SILVER_BARS}
+    grades = {}
+    for t in COMBINED_TASKS:
+        if t == "fwe":
+            raw = (fst.get("certify") or {}).get(str(depth)) or {}
+            records = {}
+            for r, p in raw.items():
+                if isinstance(p, bool):
+                    records[int(r)] = 3 if p else 0
+                else:
+                    records[int(r)] = int(p)
+        elif t == "vt":
+            records = vt_cells(fst, depth)
+        else:
+            records = speed_cells(fst, depth)
+        if not records:
+            return None
+        grades[t] = {}
+        for label in bars:
+            bar = bars[label][t]
+            k = sum(1 for p in records.values() if p >= bar)
+            lo, _ = wilson_interval(k, len(records), z)
+            grades[t][label] = k >= floor and lo >= 0.5
+    if all(grades[t]["gold"] for t in COMBINED_TASKS):
+        return "gold"
+    if all(grades[t]["silver"] for t in COMBINED_TASKS):
+        return "silver"
+    if any(grades[t]["gold"] or grades[t]["silver"] for t in COMBINED_TASKS):
+        return "bronze"
+    return None
+
+
 def rescore_tournament(
     models_dir: str,
     state: dict[str, Any],
@@ -1936,13 +2269,17 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="fwe",
-        choices=["fwe", "vt", "speed"],
+        choices=["fwe", "vt", "speed", "all"],
         help="session 37 (the VT certification): with --certify, run the "
         "variable-tracking task instead of FWE - same stack, n=21, "
         "seeds and sequential controller, but a separate cell namespace "
         "(certify_vt - the FWE evidence is never touched), pass = ALL "
         "5 chain names, the 0..5 partial stored per cell as the graded "
-        "diagnostic (the VT analogue of the FWE x/3 word count)",
+        "diagnostic (the VT analogue of the FWE x/3 word count). "
+        "session 38 (addendum 3): 'all' is the combined controller - "
+        "each cell carries speed, fwe and vt, measured only if missing, "
+        "three independent tallies, accept when all three clear, dead "
+        "when any one dies",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument(
@@ -2049,18 +2386,31 @@ def main() -> None:
             ap.error("--rungs needs at least one depth")
         all_results: list[dict[str, Any]] = []
         for depth in sorted(rung_list):
-            results = certify_rung(
-                depth,
-                args.certify,
-                args.families,
-                args.models_dir,
-                state,
-                args.state_file,
-                state.get("ladder_port", 8210),
-                args.dry_run,
-                min_words=args.fwe_min_words,
-                task=args.task,
-            )
+            if args.task == "all":
+                results = certify_rung_combined(
+                    depth,
+                    args.certify,
+                    args.families,
+                    args.models_dir,
+                    state,
+                    args.state_file,
+                    state.get("ladder_port", 8210),
+                    args.dry_run,
+                    min_words=args.fwe_min_words,
+                )
+            else:
+                results = certify_rung(
+                    depth,
+                    args.certify,
+                    args.families,
+                    args.models_dir,
+                    state,
+                    args.state_file,
+                    state.get("ladder_port", 8210),
+                    args.dry_run,
+                    min_words=args.fwe_min_words,
+                    task=args.task,
+                )
             state["certify"] = results
             save_state(args.state_file, state)
             print()
