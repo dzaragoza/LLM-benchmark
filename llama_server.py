@@ -31,6 +31,12 @@ import time
 import urllib.request
 from typing import Any
 
+# session 38, addendum 5: llama's own memory accounting must land in the
+# server log (the third memory witness, next to the smaps census and the
+# amdgpu sysfs delta). Single-sourced HERE - every launch site gets it,
+# no triplicated flags to drift apart.
+LOG_VERBOSITY_ARGS = ["-lv", "5"]
+
 
 def find_server() -> str | None:
     """llama-server binary: repo-relative first, pre-reorg HOME fallback.
@@ -81,7 +87,7 @@ def start_server(
     last launch's banner is the reported one)."""
     server = server_bin or find_server()
     assert server is not None  # the caller (check_tooling) verified the binary exists
-    cmd = [server, "-m", model_path, "--port", str(port)]
+    cmd = [server, "-m", model_path, "--port", str(port)] + list(LOG_VERBOSITY_ARGS)
     if extra_args:
         cmd += list(extra_args)
     if log_path:

@@ -218,7 +218,7 @@ def fwe_pass(
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
     gpu_baseline = llama_server.amdgpu_memory_gib()
-    extra_args = ["-c", str(rung), "--parallel", "1", "-lv", "5"]
+    extra_args = ["-c", str(rung), "--parallel", "1"]
     # session 35, addendum 8: separate K/V (the combined flag is gone);
     # -fa takes a value on this build: "-fa on"
     if kv_quant_k or kv_quant_v:
@@ -362,7 +362,7 @@ def vt_pass(
     llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
     gpu_baseline = llama_server.amdgpu_memory_gib()
-    extra_args = ["-c", str(rung), "--parallel", "1", "-lv", "5"]
+    extra_args = ["-c", str(rung), "--parallel", "1"]
     if kv_quant_k or kv_quant_v:
         extra_args += ["-fa", "on"]
         if kv_quant_k:
