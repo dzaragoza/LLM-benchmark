@@ -195,3 +195,20 @@ medals now depend on 4 models").Design:- ARC_CELL_K = 5; cell = (family, run) wi
   certify (the FWE namespace) under a rung key - arc_cells saw
   nothing and the medal returned None. Fixed with a regression test
   (test_arc_rung_independence_and_namespace).
+
+Addendum 7: the medals are pure confidence tiers (the author's
+refinement, 2026-10-05): "we will continue with the three medal
+system, it is very clear to explain results. We can change the
+criteria of what a pass or fail means tuning the test difficulty,
+but the medals stay the same."- GOLD: 2 sigma confidence in EVERY test.
+- SILVER: at least 1 sigma in EVERY test.
+- BRONZE: at least one pass in EVERY test (it can work, but expect
+  misses).
+- Otherwise: no medal.The pass bars (the difficulty knob) now live in TASK_PASS_BARS
+(speed 0 stalls, fwe 3 words, vt 5 names, arc 5 correct) and are
+DECORATED from the medal logic: tuning a test's difficulty changes
+what a pass means, never what a medal means. The old
+TASK_GOLD_BARS/TASK_SILVER_BARS (bar-based medals, where silver FWE
+was 2/3) are retired - a stored graded record is re-gradable at any
+bar anyway, so difficulty changes cost nothing (no re-measurement,
+ever).

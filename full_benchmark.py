@@ -1465,21 +1465,21 @@ def certify_rung_combined(
     return results
 
 
-TASK_GOLD_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}
-TASK_SILVER_BARS = {"speed": 1, "fwe": 2, "vt": 4, "arc": 4}
+TASK_PASS_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}
 
 
 def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
-    """The combined medal (session 38, addendum 3): re-grade the stored
-    per-cell records at each task's gold and silver bars. Gold = all
-    three tasks at gold; silver = at least silver in all three; bronze
-    = any pass at all. A task with no measured cells has no medal
-    contribution (None overall until every task has evidence)."""
+    """The combined medal (session 38, addendum 7 - the author's
+    refinement): the medals are PURE CONFIDENCE TIERS over each task's
+    pass bar - gold = 2 sigma in EVERY test, silver = at least 1 sigma
+    in EVERY test, bronze = at least one pass in EVERY test. The pass
+    bars (the difficulty knob) live in TASK_PASS_BARS and never move
+    the medals; tuning a test's difficulty changes what a pass means,
+    not what the medals mean. A task with no measured cells has no
+    medal contribution (None overall until every task has evidence)."""
     n_total = TOURNAMENT_CLIMBS
-    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
-    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
-    bars = {"gold": TASK_GOLD_BARS, "silver": TASK_SILVER_BARS}
-    grades = {}
+    floor = math.ceil(0.5 * n_total)
+    grades: dict[str, dict[str, bool]] = {}
     for t in COMBINED_TASKS:
         if t == "fwe":
             raw = (fst.get("certify") or {}).get(str(depth)) or {}
@@ -1497,17 +1497,20 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
             records = speed_cells(fst, depth)
         if not records:
             return None
-        grades[t] = {}
-        for label in bars:
-            bar = bars[label][t]
-            k = sum(1 for p in records.values() if p >= bar)
-            lo, _ = wilson_interval(k, len(records), z)
-            grades[t][label] = k >= floor and lo >= 0.5
+        bar = TASK_PASS_BARS[t]
+        k = sum(1 for p in records.values() if p >= bar)
+        lo_1s, _ = wilson_interval(k, len(records), 1.0)
+        lo_2s, _ = wilson_interval(k, len(records), 2.0)
+        grades[t] = {
+            "gold": k >= floor and lo_2s >= 0.5,
+            "silver": k >= floor and lo_1s >= 0.5,
+            "bronze": k >= 1,
+        }
     if all(grades[t]["gold"] for t in COMBINED_TASKS):
         return "gold"
     if all(grades[t]["silver"] for t in COMBINED_TASKS):
         return "silver"
-    if any(grades[t]["gold"] or grades[t]["silver"] for t in COMBINED_TASKS):
+    if all(grades[t]["bronze"] for t in COMBINED_TASKS):
         return "bronze"
     return None
 
