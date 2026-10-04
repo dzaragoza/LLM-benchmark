@@ -268,6 +268,67 @@ def fwe_pass(
     return row["acc"] == 1.0, row
 
 
+def speed_cell(
+    model: str,
+    rung: int,
+    corpus: str,
+    results_dir: str,
+    run: int,
+    port: int,
+    kv_quant_k: str | None = None,
+    kv_quant_v: str | None = None,
+) -> tuple[bool, dict[str, Any]]:
+    """One speed-gate cell (session 38, addendum 2 - the redesigned
+    gate): conversation `run` of the 21-conversation corpus, played on
+    its own server at exactly the rung's ctx. The record is the stall
+    count: how many of the conversation's turns stalled the reader
+    (the binary per-turn event, the addendum-55/73 collision test).
+    Gold bar = 0 stalls (the perfect record); the count is stored per
+    cell (the speed analogue of FWE's x/3 and VT's x/5) so any bar can
+    be re-graded later without re-measuring. Returns (passed_at_gold,
+    record)."""
+    label = os.path.splitext(os.path.basename(model))[0]
+    os.makedirs(results_dir, exist_ok=True)
+    turns, _, mem_reports = speed_gate.bench_model(
+        model,
+        corpus,
+        port,
+        rung,
+        False,
+        True,
+        n_conversations=1,
+        conversation_start=run - 1,
+        kv_quant_k=kv_quant_k,
+        kv_quant_v=kv_quant_v,
+    )
+    dump = os.path.join(results_dir, f"{label}-rung{rung}-speed-cell{run}.json")
+    with open(dump, "w") as f:
+        json.dump(turns, f)
+    server_log = os.path.join(
+        os.path.dirname(model) or ".", os.path.basename(model) + ".server.log"
+    )
+    window_cap = _banner_window(server_log)
+    floor_hit = next((t for t in turns if t.get("error") == "rung below conversation floor"), None)
+    if floor_hit is not None:
+        return False, {"error": "rung below conversation floor", "window_cap": window_cap}
+    if not turns or all(not t.get("server_wps") for t in turns):
+        if window_cap is not None and window_cap < rung:
+            return False, {"error": "capped to the window", "window_cap": window_cap}
+        return False, {"error": "no turns measured", "launch_failed": True}
+    bench_turns = [t for t in turns if t.get("deltas") is not None]
+    stalls = sum(1 for t in bench_turns if t.get("reader_wall_fail"))
+    record = {
+        "stalls": stalls,
+        "turns": len(bench_turns),
+        "conv": run,
+        "worst_wps": min(
+            (t["server_wps"] for t in bench_turns if t.get("server_wps")), default=None
+        ),
+        "window_cap": window_cap,
+    }
+    return stalls == 0, record
+
+
 def vt_pass(
     model: str,
     rung: int,
@@ -707,6 +768,15 @@ def certify_cells(
     return cells
 
 
+def speed_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
+    """The redesigned speed gate's cell model (session 38, addendum 2):
+    cell = (model, rung, conversation r), stored in certify_speed as
+    {run: stall count}. Gold bar = 0 stalls; the counts re-grade at
+    any 'at most x stalls' bar later without re-measuring."""
+    direct = (fst.get("certify_speed") or {}).get(str(depth)) or {}
+    return {int(r): int(p) for r, p in direct.items()}
+
+
 def vt_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
     """The VT cell model: a cell is (model, run, task) and is NEVER
     measured twice. VT inherits NOTHING from the tournament (the
@@ -765,6 +835,8 @@ def certify_rung(
         fst = state["families"].get(fam, {})
         if task == "vt":
             cells = {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
+        elif task == "speed":
+            cells = {r: p == 0 for r, p in speed_cells(fst, depth).items()}
         else:
             cells = certify_cells(fst, depth, min_words, models_dir, fam)
         order.append((fam, fst, cells))
@@ -826,10 +898,8 @@ def certify_rung(
         )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        direct = dict(
-            ((fst.get("certify_vt") if task == "vt" else fst.get("certify")) or {}).get(str(depth))
-            or {}
-        )
+        ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(task, "certify")
+        direct = dict((fst.get(ns) or {}).get(str(depth)) or {})
         ran = 0
         verdict = None
         while True:
@@ -886,6 +956,33 @@ def certify_rung(
                 verdict = "would-run"
                 break
             next_run = min(r for r in range(1, n_total + 1) if r not in cells)
+            if task == "speed":
+                ok, fv = speed_cell(
+                    model,
+                    depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                    CORPUS_DEFAULT,
+                    results_dir,
+                    next_run,
+                    port,
+                    kv_quant_k=kv_k,
+                    kv_quant_v=kv_v,
+                )
+                ran += 1
+                cells[next_run] = ok
+                stalls = int(fv.get("stalls") or 0)
+                n_turns = int(fv.get("turns") or 0)
+                direct[str(next_run)] = stalls
+                measured += 1
+                k += 1 if ok else 0
+                fst.setdefault("certify_speed", {})[str(depth)] = direct
+                save_state(state_path, state)
+                print(
+                    f"  speed cell (conv {next_run}, {depth:,} tok): "
+                    f"{stalls} stall(s) in {n_turns} turns -> "
+                    f"{'PASS' if ok else 'FAIL'} -> {k}/{measured} "
+                    f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
+                )
+                continue
             if task == "vt":
                 ok, fv = vt_pass(
                     model,
@@ -1839,7 +1936,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="fwe",
-        choices=["fwe", "vt"],
+        choices=["fwe", "vt", "speed"],
         help="session 37 (the VT certification): with --certify, run the "
         "variable-tracking task instead of FWE - same stack, n=21, "
         "seeds and sequential controller, but a separate cell namespace "

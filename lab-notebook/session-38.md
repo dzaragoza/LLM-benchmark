@@ -27,3 +27,44 @@ goes, one save per cell, so an interruption loses nothing measured.
 No analysis of the partial results happens until the run completes -
 the grading ladder (session 37 addendum 81) is applied to the COMPLETE
 cell map, in order, with no peeking-driven bar shopping.
+
+## Addendum 2 (registered pre-measurement, 2026-10-04): the speed gate REDESIGNED - stalls per conversation, the FWE/VT shape
+
+The author's clean-slate ruling: the old speed gate does not behave like
+the other instruments and is REDESIGNED from scratch. Everything
+protocol-v3.x (stall RATE <= 5%, n=50 corpus conversations, the
+threshold = reader_wps - 2*sigma budget) is RETIRED from the
+certification path. The corpus is now DEFINED as its first 21
+conversations (the 50 was itself an arbitrary cut from a much larger
+pool; the author's ruling 2026-10-04).
+
+DESIGN (property-derived, no arbitrary thresholds):
+- Measurement unit: the TURN. A turn stalls iff the 5 w/s reader
+  (Brysbaert 2019, the external anchor) ever hits the wall on that
+  turn's arrival stream - the binary event, unchanged.
+- Run unit / cell: (model, rung, conversation r), r = 1..21,
+  deterministic corpus order, seed = r. Same cell model as FWE/VT:
+  never re-measured, resumable.
+- k = 5: the MEDIAN number of turns in the 21-conversation corpus
+  ([4,4,5,4,5,8,5,5,7,5,5,5,4,5,6,5,4,4,6,6,5], 107 turns). k is a
+  property of the corpus, like FWE's 3 words and VT's 5 names.
+- Per-cell record: stalls/k - the count of stalled turns in that
+  conversation (0..len). Stored per cell, re-gradable at any bar
+  forever (the exact analogue of x/3 and x/5).
+- Bars, the same ladder as FWE/VT: gold candidate = 0 stalls per
+  conversation (the perfect record); fallback = at most x stalls,
+  chosen AFTER measurement from the stored records.
+- n = 21 cells, gold = 2 sigma (Wilson lower bound >= 0.5), the same
+  sequential controller: early accept (11/11 at 2s), early reject
+  (mathematically dead), first accepted candidate answers the rung.
+- Cells live in a separate certify_speed namespace. The FWE and VT
+  evidence is never touched.
+
+PREDICTIONS (falsifiable, stated before measurement):
+- The certified region stalls rarely (the ladder's v3.1 runs showed 0
+  wall-fail turns at every passing rung) -> gold candidates accept
+  fast, at or near 11/11.
+- The interesting cells are the CEILING rungs (worst w/s in
+  [5, 7.5)) where the old instrument showed near-misses; the
+  per-cell stall counts localize exactly which conversation/turn
+  stalls - deterministic, reproducible.
