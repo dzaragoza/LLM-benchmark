@@ -1258,3 +1258,25 @@ def test_amdgpu_census_math(tmp_path, monkeypatch):
     census2 = ls.mapped_plus_gpu_gib(FakeProc(), None)
     assert census2["footprint_gib"] == 3.0
     assert "gpu_vram_delta_gib" not in census2
+
+
+def test_parse_memory_log_vulkan_buffers(tmp_path):
+    """Addendum 5: the b10964 build's -lv 5 accounting lines (from the
+    author's real log, 2026-10-04) - Vulkan0/Vulkan_Host model buffer
+    sizes are extracted as structured keys for the GPU table."""
+    import llama_server as ls
+
+    log = tmp_path / "lv5.log"
+    log.write_text(
+        "0.00.030.805 I cmn  common_param:   - Vulkan0 : AMD Radeon 780M "
+        "Graphics (RADV PHOENIX) (16383 MiB, 14757 MiB free)\n"
+        "0.01.067.920 I load_tensors: offloaded 26/26 layers to GPU\n"
+        "0.01.067.928 I load_tensors:      Vulkan0 model buffer size =   763.78 MiB\n"
+        "0.01.067.929 I load_tensors:  Vulkan_Host model buffer size =   257.66 MiB\n"
+        "0.01.068.100 I llama_kv_cache: KV self size  =  2048.00 MiB\n",
+        encoding="utf-8",
+    )
+    out = ls.parse_memory_log(str(log))
+    assert abs(out["vulkan_buffers_gib"] - 763.78 / 1024) < 0.001
+    assert abs(out["host_buffers_gib"] - 257.66 / 1024) < 0.001
+    assert abs(out["kv_cache_gib"] - 2.0) < 0.001

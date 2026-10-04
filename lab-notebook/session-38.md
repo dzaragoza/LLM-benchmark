@@ -156,3 +156,18 @@ the author's ruling over the assistant's triplicated flags (every
 launch site invents its own extras; the shared ones live in the
 launcher). All three call sites build their own extra_args without
 verbosity; start_server injects it before them.
+
+Addendum 5, verification complete (2026-10-04, the author's manual
+launch): -lv 5 prints the full accounting on the b10964-gpu build.
+Confirmed lines (Qwen3.5-0.8B Q8_0, -ngl 99):
+- the device enumeration: Vulkan0 = RADV PHOENIX 780M reporting a
+  16383 MiB heap (the shared GTT view, NOT the 2 GiB carveout - the
+  sysfs delta remains the carveout authority)
+- load_tensors: offloaded 26/26 layers to GPU (full offload, from the
+  log itself)
+- Vulkan0 model buffer size = 763.78 MiB (llama's own GPU-side claim)
+- Vulkan_Host model buffer size = 257.66 MiB (~25% of the model
+  stays host-side even at -ngl 99 - a finding for the GPU table)
+parse_memory_log (addendum 36) extended: vulkan_buffers_gib and
+host_buffers_gib extracted as structured keys alongside kv_cache_gib;
+regression test added against the author's real log lines.

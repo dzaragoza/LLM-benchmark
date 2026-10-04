@@ -273,6 +273,10 @@ def parse_memory_log(log_path: str) -> dict[str, Any] | None:
                 out["cpu_buffers_gib"] = round(gib, 3)
             elif "graph" in key and "graph_overhead_gib" not in out:
                 out["graph_overhead_gib"] = round(gib, 3)
+            elif "vulkan" in key and "buffer" in key and "vulkan_buffers_gib" not in out:
+                out["vulkan_buffers_gib"] = round(gib, 3)
+            elif "host" in key and "buffer" in key and "host_buffers_gib" not in out:
+                out["host_buffers_gib"] = round(gib, 3)
     out["banner_lines"] = out["banner_lines"][-40:]
     return out
 
