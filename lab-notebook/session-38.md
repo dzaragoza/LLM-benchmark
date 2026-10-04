@@ -171,3 +171,27 @@ Confirmed lines (Qwen3.5-0.8B Q8_0, -ngl 99):
 parse_memory_log (addendum 36) extended: vulkan_buffers_gib and
 host_buffers_gib extracted as structured keys alongside kv_cache_gib;
 regression test added against the author's real log lines.
+
+Addendum 6: ARC joins the combined controller as the 4th task (the
+author's ruling 2026-10-04: "deterministic questions, k=5 questions,
+n=21, 2sigma confidence on answering 5/5; the only difference is
+that arc doesn't care about context, so a single run at ctx 4k; the
+medals now depend on 4 models").Design:- ARC_CELL_K = 5; cell = (family, run) with a 0..5 graded record
+  (correct of 5), pass at gold = 5/5, bar at silver = 4/5.- arc_cell_questions(run): the full ARC-Challenge test split
+  (ARC_NUM_DEFAULT = 1172) shuffled once with the study seed
+  20260923; cell r takes questions 5*(r-1)..5*r. Deterministic - the
+  same question never repeats across the n=21 cells and any cell is
+  re-derivable from the seed alone.- Rung-independent: unlike speed/FWE/VT (per-rung namespaces), ARC
+  is measured ONCE per family at ctx 4096 (a single llama-server
+  launch per cell, -t 8 -c 4096 -ngl 99, raw /v1/completions,
+  max_tokens=1, temperature=0, top-20 logprobs, letter scoring - the
+  retired arc_eval.py protocol recovered from git history). Stored
+  flat in certify_arc {run: correct}; inherited at every rung - a
+  rung never re-measures it.- Bars: TASK_GOLD_BARS["arc"] = 5, TASK_SILVER_BARS["arc"] = 4. Gold
+  = all four tasks at gold; silver = at least silver in all four;
+  bronze = any pass at all. combined_medal re-grades from records
+  (arc_cells is depth-free).- Bug found and fixed while integrating: _task_store mapped vt/speed
+  to their namespaces but NOT arc, so ARC records silently landed in
+  certify (the FWE namespace) under a rung key - arc_cells saw
+  nothing and the medal returned None. Fixed with a regression test
+  (test_arc_rung_independence_and_namespace).

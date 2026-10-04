@@ -47,6 +47,7 @@ import glob
 import json
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -914,7 +915,9 @@ def certify_rung(
         )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(task, "certify")
+        ns = {"vt": "certify_vt", "speed": "certify_speed", "arc": "certify_arc"}.get(
+            task, "certify"
+        )
         direct = dict((fst.get(ns) or {}).get(str(depth)) or {})
         ran = 0
         verdict = None
@@ -1081,7 +1084,9 @@ def certify_rung(
     return results
 
 
-COMBINED_TASKS = ("speed", "fwe", "vt")
+COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
+ARC_CELL_K = 5  # questions per cell (the author's ruling: k=5, like VT's 5 names)
+ARC_RUN_CTX = 4096  # ARC ignores context depth - one measurement, verdict applies to every rung
 
 
 def _task_load(
@@ -1099,13 +1104,98 @@ def _task_load(
         return {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
     if task == "speed":
         return {r: p == 0 for r, p in speed_cells(fst, depth).items()}
+    if task == "arc":
+        return {r: p >= ARC_CELL_K for r, p in arc_cells(fst).items()}
     return certify_cells(fst, depth, min_words, models_dir, fam)
+
+
+def arc_cell_questions(run: int) -> list[dict[str, Any]]:
+    """Cell `run`'s k=5 ARC questions, deterministic: the full ARC-
+    Challenge test split is shuffled with the fixed study seed, then
+    cell r takes questions 5*(r-1)..5*r - the rung-independent
+    analogue of FWE/VT's seed=run (ARC questions are a fixed pool;
+    there is nothing to seed per rung)."""
+    questions = hf_download.load_questions("ARC-Challenge", hf_download.ARC_NUM_DEFAULT)
+    rng = random.Random(20260923)  # the study seed (author ruling 2026-09-23)
+    rng.shuffle(questions)
+    start = (run - 1) * ARC_CELL_K
+    return questions[start : start + ARC_CELL_K]
+
+
+def arc_cells(fst: dict[str, Any]) -> dict[int, int]:
+    """The ARC cell model: a cell is (family, run) with a 0..k graded
+    record (correct answers of 5), stored in certify_arc ONCE per
+    family - rung-independent (ARC ignores context depth). Pass at
+    gold = 5/5."""
+    direct = fst.get("certify_arc") or {}
+    return {int(r): int(p) for r, p in direct.items()}
+
+
+def arc_pass(
+    model: str,
+    run: int,
+    port: int,
+) -> tuple[bool, dict[str, Any]]:
+    """One ARC cell (session 38, addendum 6): k=5 deterministic
+    questions, one server launch at ARC_RUN_CTX (rung-independent),
+    strict-ARC protocol (logprob letter scoring, raw completions,
+    max_tokens=1, temperature=0 - the retired arc_eval.py protocol,
+    recovered). Returns (passed_at_gold, record)."""
+    questions = arc_cell_questions(run)
+    ctx = ARC_RUN_CTX
+    log_path = os.path.join(
+        os.path.dirname(model) or ".", os.path.basename(model) + f".arc-cell{run}.log"
+    )
+    proc, healthy = llama_server.start_server(
+        model, port, ["-t", "8", "-c", str(ctx), "-ngl", "99"], log_path=log_path
+    )
+    try:
+        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            return False, {"error": "arc server did not come up"}
+        correct = 0
+        for q in questions:
+            prompt = f"Question: {q['q']}\n"
+            for lbl, text in q["choices"]:
+                prompt += f"{lbl}) {text}\n"
+            prompt += "\nThe answer is"
+            r = llama_server.post_json(
+                port,
+                "/v1/completions",
+                {"prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20},
+                timeout=120,
+            )
+            labels = {lb for lb, _ in q["choices"]}
+            logps = {}
+            try:
+                top = r["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+                for entry in top:
+                    tok = entry["token"].strip().rstrip(").,")
+                    if tok in labels:
+                        logps[tok] = max(logps.get(tok, -999), entry["logprob"])
+            except (KeyError, IndexError, TypeError):
+                pass
+            if logps:
+                ok = max(logps, key=lambda k: logps[k]) == q["ans"]
+            else:
+                gen = r["choices"][0]["text"].strip()
+                ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
+            correct += 1 if ok else 0
+        return correct == len(questions), {"correct": correct, "k": len(questions)}
+    finally:
+        llama_server.stop_server(proc, port)
 
 
 def _task_store(fst: dict[str, Any], depth: int, task: str, run: int, value: int) -> None:
     """Persist one cell's graded record in its own namespace (the
     combined controller never re-measures a stored cell-task)."""
-    ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(task, "certify")
+    ns = {
+        "vt": "certify_vt",
+        "speed": "certify_speed",
+        "arc": "certify_arc",
+    }.get(task, "certify")
+    if task == "arc":
+        fst.setdefault(ns, {})[str(run)] = value
+        return
     fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = value
 
 
@@ -1142,6 +1232,11 @@ def _task_measure(
             stalls,
             (f"speed: {stalls} stall(s) in {n_turns} turns -> {'PASS' if ok else 'FAIL'}"),
         )
+    if task == "arc":
+        ok, fv = arc_pass(model, run, port)
+        correct = int(fv.get("correct") or 0)
+        k_q = int(fv.get("k") or ARC_CELL_K)
+        return ok, correct, f"arc: {correct}/{k_q} answers -> {'PASS' if ok else 'FAIL'}"
     if task == "vt":
         ok, fv = vt_pass(
             model,
@@ -1370,8 +1465,8 @@ def certify_rung_combined(
     return results
 
 
-TASK_GOLD_BARS = {"speed": 0, "fwe": 3, "vt": 5}
-TASK_SILVER_BARS = {"speed": 1, "fwe": 2, "vt": 4}
+TASK_GOLD_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}
+TASK_SILVER_BARS = {"speed": 1, "fwe": 2, "vt": 4, "arc": 4}
 
 
 def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
@@ -1396,6 +1491,8 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
                     records[int(r)] = int(p)
         elif t == "vt":
             records = vt_cells(fst, depth)
+        elif t == "arc":
+            records = arc_cells(fst)
         else:
             records = speed_cells(fst, depth)
         if not records:

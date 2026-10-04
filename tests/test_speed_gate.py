@@ -842,7 +842,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
 
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         calls.append((task, run))
-        return True, {"speed": 0, "fwe": 3, "vt": 5}[task], f"{task} ok"
+        return True, {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok"
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(fb, "_task_measure", fake_measure)
@@ -867,6 +867,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         assert r["medal"] == "gold"
         ns = state["families"]["fam"]
         assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
+        assert ns["certify_arc"]  # rung-independent, stored once
         # resume: every cell-task stored, nothing re-measured
         calls.clear()
         res = fb.certify_rung_combined(
@@ -897,7 +898,7 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
         calls.append((task, run))
         if task == "vt":
             return False, 0, "vt 0/5"
-        return True, 0, f"{task} ok"
+        return True, {"speed": 0, "fwe": 3, "arc": 5}[task], f"{task} ok"
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(fb, "_task_measure", fake_measure)
@@ -939,19 +940,50 @@ def test_combined_medal_grading_from_records():
         "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
         "certify_vt": {"8192": {str(r): 5 for r in range(1, 12)}},
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
+        "certify_arc": {str(r): 5 for r in range(1, 12)},
     }
     assert fb.combined_medal(base, 8192, "1_sigma") == "gold"
     silver = {
         "certify": {"8192": {str(r): 2 for r in range(1, 12)}},
         "certify_vt": {"8192": {str(r): 4 for r in range(1, 12)}},
         "certify_speed": {"8192": {str(r): 1 for r in range(1, 12)}},
+        "certify_arc": {str(r): 4 for r in range(1, 12)},
     }
     assert fb.combined_medal(silver, 8192, "1_sigma") == "silver"
     bronze = {
         "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
         "certify_vt": {"8192": {str(r): 4 for r in range(1, 12)}},
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
+        "certify_arc": {str(r): 3 for r in range(1, 12)},
     }
     assert fb.combined_medal(bronze, 8192, "1_sigma") == "bronze"
     empty = {}
     assert fb.combined_medal(empty, 8192, "1_sigma") is None
+
+
+def test_arc_rung_independence_and_namespace():
+    """ARC (addendum 6): one measurement per family, rung-independent -
+    the same certify_arc records answer every rung, and the medal is
+    identical at any depth (nothing to re-measure)."""
+    import full_benchmark as fb
+
+    assert fb._task_load(
+        {"certify_arc": {str(r): 5 for r in range(1, 12)}}, 8192, "arc", 3, "", "f"
+    ) == {r: True for r in range(1, 12)}
+    assert fb._task_load({"certify_arc": {"1": 5}}, 262144, "arc", 3, "", "f") == {1: True}
+
+    fst = {}
+    fb._task_store(fst, 8192, "arc", 3, 5)
+    fb._task_store(fst, 262144, "fwe", 3, 3)
+    assert fst["certify_arc"] == {"3": 5}
+    assert fst["certify"] == {"262144": {"3": 3}}
+
+    arc_gold = {
+        "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 12)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
+        "certify_arc": {str(r): 5 for r in range(1, 12)},
+    }
+    assert fb.combined_medal(arc_gold, 8192, "1_sigma") == "gold"
+    no_arc = {k: v for k, v in arc_gold.items() if k != "certify_arc"}
+    assert fb.combined_medal(no_arc, 8192, "1_sigma") is None
