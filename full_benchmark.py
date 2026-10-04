@@ -1337,6 +1337,7 @@ def certify_rung_combined(
                 )
         entry["cells_measured"] = sum(tallies[t]["measured"] for t in COMBINED_TASKS)
         entry["ran_now"] = ran
+        entry["passes"] = sum(tallies[t]["k"] for t in COMBINED_TASKS)
         entry["medal"] = combined_medal(fst, depth, level)
         for t in COMBINED_TASKS:
             entry[f"{t}_passes"] = tallies[t]["k"]
