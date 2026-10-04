@@ -12,7 +12,7 @@ def test_edit_refuses_python_syntax_break(tmp_path):
             str(p),
             [
                 (
-                    "help = \"session 37, addendum 8\"",
+                    'help = "session 37, addendum 8"',
                     'help = "line one\nline two"',  # real newline in a string = SyntaxError
                 )
             ],
