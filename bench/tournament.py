@@ -9,7 +9,8 @@ import csv
 import math
 import os
 import sys
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -49,7 +50,7 @@ def fwe_flicker(rungs: list[dict[str, Any]]) -> tuple[int, int] | None:
     return None
 
 
-def tournament_rank(fall_depths: list[int | None], depths: list[int]) -> dict[str, Any]:
+def tournament_rank(fall_depths: Sequence[int | None], depths: list[int]) -> dict[str, Any]:
     """The sigma-only rank (session 37, addendum 10: the mode is
     RETIRED - the author's ruling, n selection is based on sigma
     only): fall_depths is one entry per climb - the depth where that
@@ -135,13 +136,13 @@ def tournament_family(
         # addendum 29: the tournament acquires its own entry files -
         # the same phase-1 path the main run uses (wow.md: the author
         # runs one command, not a download step per model)
+        hf_download.require_hub()
+        list_repo_files = cast("Any", hf_download.list_repo_files)
         try:
-            model_files = hf_download.list_repo_files(model_repo)
+            model_files = list_repo_files(model_repo)
             source_repo_eff = source_repo or model_repo
             source_files = (
-                model_files
-                if source_repo_eff == model_repo
-                else hf_download.list_repo_files(source_repo_eff)
+                model_files if source_repo_eff == model_repo else list_repo_files(source_repo_eff)
             )
             path, plan = hf_download.acquire(
                 fam, famdir, rung, model_repo, model_files, source_repo_eff, source_files, dry_run

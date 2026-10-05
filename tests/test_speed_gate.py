@@ -9,6 +9,7 @@ import json
 import os
 import signal
 import time
+from typing import Any
 
 import pytest
 
@@ -442,7 +443,7 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         # candidate A: 8 passing cells at 8192 historically; the
         # accept bar fires EARLY - at 11/11 measured cells
         # (lo(11,11)=0.917 >= 0.5, count 11 >= floor 11)
-        state = {
+        state: dict[str, Any] = {
             "families": {
                 "good": {
                     "selected": "Q8_0",
@@ -484,7 +485,8 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         other = [r for r in res if r["family"] == "other"][0]
         assert other.get("skipped") == "rung already answered"
         # direct cells persisted
-        direct = state["families"]["good"]["certify"]["8192"]
+        good: dict[str, Any] = state["families"]["good"]
+        direct = good["certify"]["8192"]
         assert direct == {str(r): True for r in (9, 10, 11)}
     finally:
         monkeypatch.undo()
@@ -751,7 +753,7 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
     try:
         model = tmp_path / "good-Q8_0.gguf"
         model.write_bytes(b"x")
-        state = {
+        state: dict[str, Any] = {
             "families": {
                 "good": {
                     "selected": "Q8_0",
@@ -780,12 +782,13 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
         assert first["verdict"] == "dead"
         assert len(ran) == 9
         # the partials landed in certify_vt - 4/5 per cell, FAIL at the 5/5 bar
-        vt = state["families"]["good"]["certify_vt"]["8192"]
+        good_ns: dict[str, Any] = state["families"]["good"]
+        vt = good_ns["certify_vt"]["8192"]
         assert all(p == 4 for p in vt.values()) and len(vt) == 9
         # the FWE namespace is untouched
-        assert state["families"]["good"]["certify"] == {"8192": {"1": True, "2": True, "3": True}}
+        assert good_ns["certify"] == {"8192": {"1": True, "2": True, "3": True}}
         # re-grade the SAME cells at the 4/5 bar from the stored partials
-        cells = fb.vt_cells(state["families"]["good"], 8192)
+        cells = fb.vt_cells(good_ns, 8192)
         assert all(p == 4 for p in cells.values())
     finally:
         monkeypatch.undo()
@@ -807,7 +810,7 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
     try:
         model = tmp_path / "vt-Q8_0.gguf"
         model.write_bytes(b"x")
-        state = {
+        state: dict[str, Any] = {
             "families": {
                 "vt": {
                     "selected": "Q8_0",
@@ -829,7 +832,8 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
         assert res[0]["verdict"] == "accept"
         assert sorted(ran) == list(range(1, 12))
         assert res[0]["cells_measured"] == 11
-        vt = state["families"]["vt"]["certify_vt"]["8192"]
+        vt_ns: dict[str, Any] = state["families"]["vt"]
+        vt = vt_ns["certify_vt"]["8192"]
         assert all(p == 5 for p in vt.values())
     finally:
         monkeypatch.undo()
@@ -852,7 +856,9 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
     try:
         model = tmp_path / "fam-Q8_0.gguf"
         model.write_bytes(b"x")
-        state = {"families": {"fam": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}}}}
+        state: dict[str, Any] = {
+            "families": {"fam": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}}}
+        }
         res = fb.certify_rung_combined(
             8192,
             "1_sigma",
@@ -868,7 +874,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         assert r["verdict"] == "accept"
         assert all(r[f"{t}_verdict"] == "accept" for t in fb.COMBINED_TASKS)
         assert r["medal"] == "gold"
-        ns = state["families"]["fam"]
+        ns: dict[str, Any] = state["families"]["fam"]
         assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
         assert ns["certify_arc"]  # rung-independent, stored once
         # resume: every cell-task stored, nothing re-measured

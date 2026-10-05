@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 import os
 import sys
-from typing import Any
+from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -62,13 +62,13 @@ def _acquire_missing_model(
     if not rung:
         return None
     model_repo, _, source_repo = spec.partition("=")
+    hf_download.require_hub()
+    list_repo_files = cast("Any", hf_download.list_repo_files)
     try:
-        model_files = hf_download.list_repo_files(model_repo)
+        model_files = list_repo_files(model_repo)
         source_repo_eff = source_repo or model_repo
         source_files = (
-            model_files
-            if source_repo_eff == model_repo
-            else hf_download.list_repo_files(source_repo_eff)
+            model_files if source_repo_eff == model_repo else list_repo_files(source_repo_eff)
         )
         path, plan = hf_download.acquire(
             fam,
@@ -416,7 +416,7 @@ def certify_rung_combined(
     answered = False
     for fam, fst, cells0 in order:
         cells = {t: dict(v) for t, v in cells0.items()}
-        entry = {
+        entry: dict[str, Any] = {
             "family": fam,
             "depth": depth,
             "level": level,
