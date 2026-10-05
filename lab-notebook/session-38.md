@@ -308,3 +308,17 @@ trackers - while Jamba-Reasoning (1/28), MiniCPM5-1B (0/26) and RWKV7
 (2/19) stay dead, so 4/5 keeps separation at both ends. Who's blocking
 next: FWE 3/3, killing Jamba-Reasoning (0/9), RWKV7 (0/13), MiniCPM5-1B
 (0/8) and gemma (3/16) outright.
+
+Addendum 13: FWE bar calibrated to 2/3 (TASK_PASS_BARS["fwe"]). The
+author's floor rule: keep the aggregate pass rate >= 50%, "if k needs to
+become zero to do so, we have a problem". Re-grade ladder of the stored
+records: k=3 -> 47%, k=2 -> 68%, k=1 -> 78%, k=0 -> 100% - 2/3 clears
+the floor with margin, and the 3->2 move is where the big jump lives
+(41 new passing cells: a 2/3 cell is a "found the list, missed one
+word" recall, not a fluke). At the new bars the blocking ranking is:
+arc 60% < vt 61% < fwe 68% < speed 100% - ARC and VT are now the
+co-blocking gates. Separation survives: Jamba-Reasoning, MiniCPM5-1B
+and RWKV7 still sit at 0 fwe passes; MiniCPM5-2B moves 1/16 -> 3/16
+and gemma 3/16 -> 7/16 (still failing); the alive set is unchanged
+(Qwen3.5-2B, Qwen3.5-0.8B, Jamba2), now with perfect fwe records
+(13/13, 33/33, 67/69).
