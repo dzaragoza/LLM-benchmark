@@ -1,4 +1,9 @@
-## Session 34
+## Session 34 - 2026-09-30
+
+(Historically undated; dated from git commit history by the
+session-39 addendum-19 audit. Addenda 1-40 registered 2026-09-30;
+the tail addenda 41-43 were committed 2026-10-01 - recorded, not
+split.)
 
 Session 34 opens with a change in the way of working (author ruling, the tee WoW): every command the study hands the author writes its full stdout/stderr BOTH to the terminal and appended to ./results.txt, prefixed with a timestamped command header; the author no longer copy-pastes output - the run ends with a commit+push and the agent reads results.txt from the repo. Other data files (like full_benchmark's) remain allowed for structured data.
 

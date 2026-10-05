@@ -1,4 +1,4 @@
-"""bench.ladder -- the protocol-v4 ladder (session 38, addendum 15:
+"""bench.ladder -- the protocol-v4 ladder (session 39, addendum 15:
 the full_benchmark.py refactor). The gallop + binary search to
 1024-token resolution, the ceiling matrix and the scored rung.
 Extracted verbatim."""

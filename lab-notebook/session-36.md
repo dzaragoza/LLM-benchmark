@@ -1,4 +1,7 @@
-## Session 36
+## Session 36 - 2026-10-02
+
+(Historically undated; dated from its own day-close marker and git
+commit history by the session-39 addendum-19 audit.)
 
 Session 36 opens with the overnight run's results in (the four-probe ceiling chase, session 35 addendum 27's blocks, dry-run-verified addendum 28). The machine ran 21:43-01:25; every probe completed its ladder. The grading below is against the pre-registered predictions (session 35, day close).
 

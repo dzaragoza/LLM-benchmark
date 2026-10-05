@@ -70,7 +70,7 @@ MIN_RUNG_FAIL = 16384  # session 34 (addendum 19): a floor below the start
 # rung means a base failure - the model is out, pending investigation
 
 
-# session 38, addendum 15: the bench/ package holds the extracted
+# session 39, addendum 15: the bench/ package holds the extracted
 # concerns; this file remains the CLI + orchestration only.
 from bench import cells as _cells  # noqa: E402
 from bench import certify as _certify  # noqa: E402
@@ -592,7 +592,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--size-table",
         action="store_true",
-        help="session 38, addendum 16: print the per-context recommendation "
+        help="session 39, addendum 16: print the per-context recommendation "
         "table (family x rung) from the committed -lv 5 memory censuses "
         "and speed dumps - the flat 5 GiB ceiling becomes a curve; the "
         "speed gate is the size authority. Read-only",
@@ -1200,7 +1200,7 @@ def git_tail(args: argparse.Namespace) -> None:
         glob.glob("models/*/*.live-dump*.json")
         + glob.glob("models/*/*.sentinel*.json")
         + glob.glob("models/*/*.mem.json")
-        # session 38, addendum 9: the per-model server logs (the -lv 5
+        # session 39, addendum 9: the per-model server logs (the -lv 5
         # accounting - arc cells, window probes, model-dir launches) -
         # the interrupted-run lesson: both Ctrl-Cs landed before the
         # tail, so the ONLY copies of llama's own memory accounting
