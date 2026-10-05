@@ -212,3 +212,25 @@ TASK_GOLD_BARS/TASK_SILVER_BARS (bar-based medals, where silver FWE
 was 2/3) are retired - a stored graded record is re-gradable at any
 bar anyway, so difficulty changes cost nothing (no re-measurement,
 ever).
+
+Addendum 8: two rulings from the interrupted-run review (2026-10-05).1. ARC bar calibrated to 4/5 (TASK_PASS_BARS). The first combined
+   run's records showed 5/5 was the hardest bar in the study - the
+   best family (Jamba2) passed 3/7 cells, most pass at 4/5 - while
+   4/5 keeps the separation (gemma, Llama-3.2-1B and MiniCPM5-1B
+   stay dead). The author's design principle confirmed: k is the
+   difficulty knob, the medals (2s/1s/one-pass in every test,
+   addendum 7) never move. Every stored record re-grades free.
+   The speed-gate prediction registered: 0 stalls passes until
+   256k, where the author predicts NO model clears it (the one
+   historical stall datum was n=1).
+2. SIGINT handler (session 38, addendum 8): Ctrl-C now stops
+   cleanly - pkill llama-server, tee uninstall, git commit+push
+   (the addendum-78 tail) unless --no-git, then exit 130. The
+   handler installs right after arg parsing, before any launch.
+
+Memory-prediction pairs registered (to check against the next
+run's three witnesses): (a) llama-server's own accounting should
+report HIGHER totals than our smaps census (the UMA carveout is
+invisible to smaps); (b) the ~80% bandwidth achievement may rise
+to 90%+ once the hidden UMA part is counted - the working
+hypothesis is the discrepancy was the hidden carveout traffic.
