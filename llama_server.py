@@ -281,6 +281,67 @@ def parse_memory_log(log_path: str) -> dict[str, Any] | None:
     return out
 
 
+MEMORY_BREAKDOWN_ROW = re.compile(
+    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*\d+\s*\+\s*"
+    r"\(\s*\d+\s*=\s*(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\)"
+)
+MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
+    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*"
+    r"(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\|"
+)
+
+
+def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
+    """llama.cpp's own memory accounting from the -lv 5 server log
+    (session 38, addendum 11 - the smaps census retired: it can't see
+    the UMA carveout, so it undercounted offload by 3-8x). Parses the
+    `memory breakdown [MiB]` table rows:
+      | - Vulkan0 (780M ...) | 16383 = 15181 + (1140 = 1013 + 71 + 55) + 61 |
+      | - Host               |   317 =   306 +   0 + 11                  |
+    into per-device model/context/compute and the totals the GPU table
+    wants. Sums ALL model-buffer-size lines (the first occurrence in
+    hybrid builds is a 0.00 placeholder before the real split)."""
+    devices: dict[str, dict[str, float]] = {}
+    weights_mib = 0.0
+    try:
+        with open(log_path, errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return None
+    for ln in lines:
+        m = re.search(r"model buffer size\s*=\s*([0-9.]+)\s*MiB", ln)
+        if m:
+            weights_mib += float(m.group(1))
+    for ln in lines:
+        m = MEMORY_BREAKDOWN_ROW.search(ln) or MEMORY_BREAKDOWN_ROW_FLAT.search(ln)
+        if not m:
+            continue
+        dev = m.group(1).split("(")[0].strip()
+        model, context, compute = (int(m.group(i)) for i in (3, 4, 5))
+        row = {
+            "self_gib": round(int(m.group(2)) / 1024, 3),
+            "model_gib": round(model / 1024, 3),
+            "context_gib": round(context / 1024, 3),
+            "compute_gib": round(compute / 1024, 3),
+        }
+        if dev not in devices:
+            devices[dev] = row
+    if not devices and weights_mib == 0.0:
+        return None
+    model_gib = round(sum(d["model_gib"] for d in devices.values()), 3)
+    context_gib = round(sum(d["context_gib"] for d in devices.values()), 3)
+    compute_gib = round(sum(d["compute_gib"] for d in devices.values()), 3)
+    return {
+        "source": "llama-server (memory breakdown)",
+        "weights_gib": round(max(weights_mib, model_gib * 1024) / 1024, 3),
+        "model_gib": model_gib,
+        "context_gib": context_gib,
+        "compute_gib": compute_gib,
+        "total_gib": round(model_gib + context_gib + compute_gib, 3),
+        "devices": devices,
+    }
+
+
 def _amdgpu_devices() -> list[str]:
     devs = []
     for d in glob.glob("/sys/class/drm/card*/device"):
