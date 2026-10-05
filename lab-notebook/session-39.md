@@ -365,3 +365,34 @@ made it visible).
 
 VERIFIED: ty 0 diagnostics (full env), ruff check + format clean,
 162/162 tests pass, markdownlint and js_check pass.
+
+## Addendum 21 - ty runs ALWAYS: the environment exception retired (2026-10-05, the author's request)
+
+The author asked to retire the environment exceptions to ty and run
+it always. THE ROOT CAUSE: ty resolves third-party imports against
+the sys.prefix site-packages ONLY; the sandbox's requirements
+(huggingface_hub, pyarrow, transformers, pytest) live in the USER
+site (/home/appuser/.local/...), which the interpreter itself
+searches (imports work) but ty did not. Every commit this session
+carried a --no-verify exception for that phantom.
+
+THE FIX: ty_check.py - a pre-commit wrapper in the md_check.py /
+js_check.py house style. It derives every site-packages directory
+the RUNNING interpreter actually searches (site.getsitepackages()
+plus the user site) and passes each as --extra-search-path to
+`python -m ty check`, then exits with ty's own verdict. Nothing is
+hardcoded - on the author's machine (deps in the repo venv at
+sys.prefix) the extra paths simply repeat what ty already searches
+and the behavior is unchanged; on a user-site machine the phantom
+unresolved-imports disappear. The hook entry in
+.pre-commit-config.yaml now calls the wrapper.
+
+CONFIG NOTE: [tool.ty.environment] extra-paths in pyproject.toml
+(the section addendum 91 carried, removed as empty) IS supported by
+ty 0.0.84 and would also work - but a pyproject path is STATIC
+(hardcoded per machine) while the wrapper derives the paths at run
+time, which is the honest version of the same fix.
+
+VERIFIED (hooks on, no --no-verify): ty via the wrapper 0
+diagnostics, ruff check + format clean, 162/162 pytest, md_check,
+js_check all pass; commit and push ran the full hook set.
