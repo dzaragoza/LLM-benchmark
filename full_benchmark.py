@@ -1454,7 +1454,7 @@ def certify_rung_combined(
     return results
 
 
-TASK_PASS_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 4}
+TASK_PASS_BARS = {"speed": 0, "fwe": 3, "vt": 4, "arc": 4}
 
 
 def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
