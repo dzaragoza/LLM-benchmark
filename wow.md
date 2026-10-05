@@ -110,3 +110,8 @@ Due to the restricted nature of the sandbox, Daniela usually has
 access to more tools and external websites. If Vibe cannot figure
 out something - a gated model repo, a measurement on the real
 machine, an upstream source - it asks for help rather than guessing.
+
+## 10. Review is on demand
+
+Vibe will integrate directly to main. Vibe will only wait for a
+review if Daniela asked for it.
