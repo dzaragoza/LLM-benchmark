@@ -9,6 +9,9 @@ import code_edit
 import full_benchmark as fb
 import hf_download
 import ruler_gate
+from bench import cells as bench_cells
+from bench import state_store as bench_state_store
+from bench import tournament as bench_tournament
 
 
 def make_args(**kw):
@@ -153,8 +156,8 @@ def _ladder_stub(monkeypatch, speed_results, fwe_results, caps=None):
         v["window_cap"] = caps.get(r)
         return ok, v
 
-    monkeypatch.setattr(fb, "speed_pass", speed_pass)
-    monkeypatch.setattr(fb, "fwe_pass", fwe_pass)
+    monkeypatch.setattr(bench_cells, "speed_pass", speed_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fwe_pass)
 
 
 def test_run_ladder_fails_when_the_ceiling_is_below_the_start(tmp_path, monkeypatch):
@@ -808,7 +811,7 @@ def test_resume_skip_prints_na_for_none_worst(capsys, tmp_path, monkeypatch):
             }
         }
     }
-    monkeypatch.setattr(fb, "save_state", lambda *a, **k: None)
+    monkeypatch.setattr(bench_state_store, "save_state", lambda *a, **k: None)
     fb.process_family(
         "r/Fam",
         "corpus.json",
@@ -883,9 +886,9 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
     # and marks a non-monotone run invalid (score 0, loud print).
     # Within one ladder the gallop keeps verdicts monotone, so this
     # simulates the read-time/cross-grid shape by injecting the pair.
-    monkeypatch.setattr(fb, "fwe_flicker", lambda rungs: (16384, 2048))
+    monkeypatch.setattr(bench_tournament, "fwe_flicker", lambda rungs: (16384, 2048))
     monkeypatch.setattr(
-        fb,
+        bench_cells,
         "speed_pass",
         lambda model, rung, corpus, port, results_dir, kv_quant=None, k=None, v=None: (
             True,
@@ -893,7 +896,7 @@ def test_run_ladder_invalidates_a_flickering_run(monkeypatch, capsys):
         ),
     )
     monkeypatch.setattr(
-        fb,
+        bench_cells,
         "fwe_pass",
         lambda model, rung, results_dir, seed, port, kv_quant=None, k=None, v=None: (
             True,

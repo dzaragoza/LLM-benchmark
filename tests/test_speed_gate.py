@@ -13,6 +13,8 @@ import time
 import pytest
 
 import speed_gate as sg
+from bench import cells as bench_cells
+from bench import state_store as bench_state_store
 
 
 def _fixture(tmp_path, turns):
@@ -125,7 +127,7 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
         hold = seed > 1
         return hold, {"correct": 1 if hold else 0, "depth": rung}
 
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     model = tmp_path / "fam-Q8_0.gguf"
     model.write_bytes(b"x")
     state = {
@@ -162,7 +164,7 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
         assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
         return seed > 6, {"correct": 1 if seed > 6 else 0, "depth": rung}
 
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     model = tmp_path / "fam-Q8_0.gguf"
     model.write_bytes(b"x")
     state = {
@@ -250,7 +252,7 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
         calls.append((model, kv_quant_k, kv_quant_v))
         return (True, {"correct": 1})
 
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     m = tmp_path / "Llama-3.2-1B-Instruct"
     m.mkdir()
     f = m / "Llama-3.2-1B-Instruct-F16.gguf"
@@ -432,8 +434,8 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         return True, {"worst": 30.0}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
-    monkeypatch.setattr(fb, "speed_pass", fake_speed_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "speed_pass", fake_speed_pass)
     try:
         model = tmp_path / "good-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -502,7 +504,7 @@ def test_certify_rung_dead(tmp_path, capsys):
         return True, {"correct": 1, "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "dead-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -542,7 +544,7 @@ def test_certify_rung_at_least_one(tmp_path, capsys):
         return True, {"correct": 1, "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "one-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -596,7 +598,7 @@ def test_certify_rung_at_least_one_dead(tmp_path, capsys):
         return False, {"correct": 0, "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "zero-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -644,7 +646,7 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
         return True, {"correct": 1, "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
     try:
         model = tmp_path / "s2-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -745,7 +747,7 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
         return False, {"correct": 0, "words_found": [4], "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "vt_pass", fake_vt_pass)
+    monkeypatch.setattr(bench_cells, "vt_pass", fake_vt_pass)
     try:
         model = tmp_path / "good-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -801,7 +803,7 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
         return True, {"correct": 1, "words_found": [5], "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "vt_pass", fake_vt_pass)
+    monkeypatch.setattr(bench_cells, "vt_pass", fake_vt_pass)
     try:
         model = tmp_path / "vt-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -846,7 +848,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         return True, {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok"
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "_task_measure", fake_measure)
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
     try:
         model = tmp_path / "fam-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -902,7 +904,7 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
         return True, {"speed": 0, "fwe": 3, "arc": 5}[task], f"{task} ok"
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(fb, "_task_measure", fake_measure)
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
     try:
         model = tmp_path / "a-Q8_0.gguf"
         model.write_bytes(b"x")
