@@ -365,22 +365,22 @@ def run_fwe_depth(
         w = csv.writer(f)
         w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
         for i in range(samples):
-            prompt, top_k = build_fwe_task(port, depth, seed=seed0 + i, top_k=top_k)
+            prompt, top_words = build_fwe_task(port, depth, seed=seed0 + i, top_k=top_k)
             if show:
                 print(f"    --- task prompt head: {prompt[:160]!r}")
-                print(f"    expected top-{FWE_TOP_K}: {top_k}")
+                print(f"    expected top-{FWE_TOP_K}: {top_words}")
             try:
                 answer = ask(port, prompt, max_tokens=FWE_GEN_TOKENS, no_thinking=no_thinking)
             except ValueError as e:
                 print(f"  task {i + 1}/{samples} @ {depth} tok: FAILED - {e}")
-                w.writerow([i, depth, ";".join(top_k), "", f"ERROR: {e}", ""])
+                w.writerow([i, depth, ";".join(top_words), "", f"ERROR: {e}", ""])
                 continue
-            ok, partial = score_fwe(answer, top_k, min_words)
+            ok, partial = score_fwe(answer, top_words, min_words)
             hits += ok
             partial_list.append(partial)
-            w.writerow([i, depth, ";".join(top_k), partial, answer, int(ok)])
+            w.writerow([i, depth, ";".join(top_words), partial, answer, int(ok)])
             print(
-                f"  task {i + 1}/{samples} @ {depth} tok: {partial}/{len(top_k)} words "
+                f"  task {i + 1}/{samples} @ {depth} tok: {partial}/{len(top_words)} words "
                 f"-> {'HIT' if ok else 'MISS'} ({answer.strip()[:48]!r})"
             )
     return {

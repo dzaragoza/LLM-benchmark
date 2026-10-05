@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+from typing import Any
 
 import pytest
 
@@ -13,6 +14,14 @@ import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
 from bench import tournament as bench_tournament
+
+
+def _f(census: dict[str, Any], key: str) -> float:
+    """Narrow a census value for arithmetic: the None-in-annotation
+    cases are exactly the ones the surrounding asserts reject."""
+    val = census[key]
+    assert val is not None
+    return val
 
 
 def make_args(**kw):
@@ -1232,17 +1241,19 @@ def test_amdgpu_census_math(tmp_path, monkeypatch):
 
     snap = ls.amdgpu_memory_gib()
     assert snap is not None
-    assert abs(snap["vram_used_gib"] - 1.25) < 0.01
-    assert abs(snap["gtt_used_gib"] - 0.5) < 0.01
-    assert abs(snap["vram_total_gib"] - 2.0) < 0.01
+    assert abs(_f(snap, "vram_used_gib") - 1.25) < 0.01
+    assert abs(_f(snap, "gtt_used_gib") - 0.5) < 0.01
+    assert abs(_f(snap, "vram_total_gib") - 2.0) < 0.01
 
     # the delta: model took 1.25 GiB of carveout over the launch window
     before = {"vram_used_gib": 0.1, "gtt_used_gib": 0.5, "vram_total_gib": 2.0}
     after = snap
     d = ls.amdgpu_delta_gib(before, after)
-    assert abs(d["vram_used_gib"] - 1.15) < 0.01
+    assert d is not None
+    assert abs(_f(d, "vram_used_gib") - 1.15) < 0.01
     # negative deltas clamp to zero (a bystander freed memory)
     d2 = ls.amdgpu_delta_gib(after, before)
+    assert d2 is not None
     assert d2["vram_used_gib"] == 0.0
 
     # the union census: smaps resident + carveout, keys never merged
@@ -1255,12 +1266,14 @@ def test_amdgpu_census_math(tmp_path, monkeypatch):
         lambda proc: {"mapped_gib": 4.0, "resident_gib": 3.0, "file_gib": 1.5, "anon_gib": 1.5},
     )
     census = ls.mapped_plus_gpu_gib(FakeProc(), d)
+    assert census is not None
     assert census["resident_gib"] == 3.0  # untouched, comparable to old records
     assert abs(census["gpu_vram_delta_gib"] - 1.15) < 0.01
     assert abs(census["footprint_gib"] - 4.15) < 0.01
     assert census.get("carveout_hidden") is True
     # no amdgpu interface (non-AMD box): footprint == resident, no GPU keys
     census2 = ls.mapped_plus_gpu_gib(FakeProc(), None)
+    assert census2 is not None
     assert census2["footprint_gib"] == 3.0
     assert "gpu_vram_delta_gib" not in census2
 
@@ -1283,6 +1296,7 @@ def test_parse_memory_log_vulkan_buffers(tmp_path):
         encoding="utf-8",
     )
     out = ls.parse_memory_log(str(log))
+    assert out is not None
     assert abs(out["vulkan_buffers_gib"] - 763.78 / 1024) < 0.001
     assert abs(out["host_buffers_gib"] - 257.66 / 1024) < 0.001
     assert abs(out["kv_cache_gib"] - 2.0) < 0.001
@@ -1314,6 +1328,7 @@ def test_memory_breakdown_gib(tmp_path):
         encoding="utf-8",
     )
     out = ls.memory_breakdown_gib(str(log))
+    assert out is not None
     assert out["source"] == "llama-server (memory breakdown)"
     assert abs(out["weights_gib"] - 1021.44 / 1024) < 0.001
     assert abs(out["model_gib"] - (763 + 257) / 1024) < 0.001

@@ -310,3 +310,58 @@ precedent); work registered on a NEW calendar day after the session
 closed moves to that day's session (the addendum-7-16 move). The
 notebook never rewrites measurement history - dates and addenda move
 only by registered addendum.
+
+## Addendum 20 - the ty clean-down to zero: environment ruled out, four honest fixes (2026-10-05, the author's request)
+
+The author asked for a look at `ty check`: 65 diagnostics, but with
+the optional deps (huggingface_hub, pyarrow, pytest, transformers)
+absent from the checker's environment EVERY unresolved import fans
+out into follow-on errors - the true count with the environment
+resolved was 43, all in tests and annotations, none a behavior bug.
+
+THE RULING (environment): ty is pinned in the pre-commit hook to the
+active environment's site-packages (addendum 91). In THIS sandbox the
+hook's environment lacks the optional deps; the honest comparison is
+`ty check --python <full env>`: 43 diagnostics before, ZERO after
+this addendum. The 11 `unresolved-import`s that remain under the
+sandbox's bare hook are environment-only and identical with/without
+this change.
+
+THE REAL FIXES (43 -> 0, each verified against the code, not the
+checker):
+
+1. `mapped_memory_gib` (llama_server.py): annotated
+   `dict[str, float | None]` but every return path fills all four
+   floats - narrowed to `dict[str, float] | None`. Four downstream
+   arithmetic errors in test_seams were the annotation's fault, not
+   the test's.
+
+2. `amdgpu_delta_gib` (llama_server.py): parameters narrowed to
+   `Mapping[str, float | None] | None` - `dict` is invariant in its
+   value type, so the honest `dict[str, float]` literal the test
+   passes was REJECTED at the `float | None` parameter (ty's own FAQ
+   suggestion). `tournament_rank` (bench/tournament.py): same
+   invariance on the read-only fall-depths list - `Sequence`.
+
+3. `mapped_plus_gpu_gib` (llama_server.py): return annotation said
+   `dict[str, float | None]` but it stores `carveout_hidden: bool` -
+   WRONG annotation; `dict[str, Any] | None` (the value union is
+   float | bool | None by construction).
+
+4. test_speed_gate state literals: ty binds a local to the full
+   literal shape even when annotated `dict[str, Any]` - the certify
+   code under test EXTENDS the state with new nested keys, so the
+   literal shape is a lie by the time the asserts read it back. Fixed
+   with annotated intermediate locals (`ns: dict[str, Any] =
+   state["families"]["fam"]`), the same narrowing style the seams
+   tests already use.
+
+Also in the pass: bench/certify.py `_acquire_missing_model` (a
+shadowed-import workaround cast + the `require_hub` call the addendum
+refactor dropped), and ruler_gate.py `run_fwe_depth` (the local
+`top_k` shadowed the parameter of the same name - renamed to
+`top_words`, the shadowing was the addendum-91 annotation fix that
+made it visible).
+
+VERIFIED: ty 0 diagnostics (full env), ruff check + format clean,
+162/162 tests pass, markdownlint and js_check pass.

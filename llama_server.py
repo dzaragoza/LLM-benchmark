@@ -29,6 +29,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections.abc import Mapping
 from typing import Any
 
 # session 38, addendum 5: llama's own memory accounting must land in the
@@ -122,7 +123,7 @@ def peak_rss_gib(proc: Any) -> float | None:
     return None
 
 
-def mapped_memory_gib(proc: Any) -> dict[str, float | None] | None:
+def mapped_memory_gib(proc: Any) -> dict[str, float] | None:
     """The server's mapped-memory census from /proc/<pid>/smaps
     (session 34, addendum 23 - the VmHWM undercount fix).
 
@@ -399,7 +400,7 @@ def amdgpu_memory_gib() -> dict[str, float | None] | None:
 
 
 def amdgpu_delta_gib(
-    before: dict[str, float | None] | None, after: dict[str, float | None] | None
+    before: Mapping[str, float | None] | None, after: Mapping[str, float | None] | None
 ) -> dict[str, float | None] | None:
     """The model's OWN GPU memory: the amdgpu counters are machine-wide
     (the desktop compositor and the game you left open count too), so
@@ -425,7 +426,7 @@ def amdgpu_delta_gib(
 
 def mapped_plus_gpu_gib(
     proc: Any, gpu_delta: dict[str, float | None] | None = None
-) -> dict[str, float | None] | None:
+) -> dict[str, Any] | None:
     """The full footprint census (session 38, addendum 4): the
     addendum-23 smaps census UNION the amdgpu carveout delta. The
     smaps resident number stays honest for the pages the host must
@@ -437,7 +438,7 @@ def mapped_plus_gpu_gib(
     smaps = mapped_memory_gib(proc)
     if smaps is None:
         return None
-    out: dict[str, float | None] = dict(smaps)
+    out: dict[str, Any] = dict(smaps)
     if gpu_delta:
         vram = gpu_delta.get("vram_used_gib")
         gtt = gpu_delta.get("gtt_used_gib")

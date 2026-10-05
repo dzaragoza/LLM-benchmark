@@ -717,7 +717,11 @@ def safe_append(path: str, addition: str) -> str:
     return f"appended {n} line(s) to {path}"
 
 
-def replace_verified(path: str, replaces: Sequence[tuple[str, str]], count: int = 1) -> None:
+def replace_verified(
+    path: str,
+    replaces: Sequence[tuple[str, str] | tuple[str, str, int]],
+    count: int = 1,
+) -> None:
     """Scripted replaces with asserts, as a first-class transaction
     (session 37, addendum 12). Born from the session-37 incident class
     (notebook addendum 6): when the conversational edit tool fails on
