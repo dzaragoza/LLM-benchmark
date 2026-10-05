@@ -2926,6 +2926,16 @@ def git_tail(args: argparse.Namespace) -> None:
         glob.glob("models/*/*.live-dump*.json")
         + glob.glob("models/*/*.sentinel*.json")
         + glob.glob("models/*/*.mem.json")
+        # session 38, addendum 9: the per-model server logs (the -lv 5
+        # accounting - arc cells, window probes, model-dir launches) -
+        # the interrupted-run lesson: both Ctrl-Cs landed before the
+        # tail, so the ONLY copies of llama's own memory accounting
+        # sat uncommitted on the author's disk (prediction B needs
+        # them; the SIGINT handler now runs the tail, but the glob
+        # has to reach the logs first)
+        + glob.glob("models/*/*.arc-cell*.log")
+        + glob.glob("models/*/*-server.log")
+        + glob.glob("models/*/*window-probe.log")
     )
     # wow.md section 9 lesson (2026-10-03): the tournament/certify cells
     # write their per-cell CSVs (with the `partial` word counts) to
