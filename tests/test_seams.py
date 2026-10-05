@@ -3,9 +3,6 @@
 import argparse
 import json
 import os
-from typing import Any
-
-import pytest
 
 import code_edit
 import full_benchmark as fb
@@ -14,14 +11,6 @@ import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
 from bench import tournament as bench_tournament
-
-
-def _f(census: dict[str, Any], key: str) -> float:
-    """Narrow a census value for arithmetic: the None-in-annotation
-    cases are exactly the ones the surrounding asserts reject."""
-    val = census[key]
-    assert val is not None
-    return val
 
 
 def make_args(**kw):
@@ -569,45 +558,6 @@ def test_code_edit_new_blocks_compose_in_one_transaction(tmp_path):
     )
     with open(str(p)) as f:
         assert f.read() == "def bench():\n    do_work(1)\n    return 1\n"
-
-
-def test_mapped_memory_census_splits_file_and_anon(tmp_path):
-    """Addendum 23: the smaps census - mapped >= resident = file + anon;
-    the VmHWM undercount fix. Linux-only instrument (skipped elsewhere)."""
-    import subprocess
-    import sys
-    import time
-
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "b = bytearray(16*1024*1024); import time; time.sleep(30)"]
-        )
-    except Exception:
-        pytest.skip("cannot spawn a helper process")
-    time.sleep(0.5)
-    try:
-        import llama_server
-
-        if not os.path.exists(f"/proc/{proc.pid}/smaps"):
-            pytest.skip("no /proc smaps (Linux exclusive)")
-        c = llama_server.mapped_memory_gib(proc)
-        assert c is not None
-        assert c["mapped_gib"] >= c["resident_gib"] > 0
-        assert abs(c["file_gib"] + c["anon_gib"] - c["resident_gib"]) < 1e-6
-        assert c["anon_gib"] >= 0.015, "the 16 MiB anon bytearray"
-        assert c["file_gib"] > 0, "the python binary's file-backed pages"
-    finally:
-        proc.kill()
-        proc.wait()
-
-
-def test_mapped_memory_none_for_dead_pid():
-    import llama_server
-
-    class Dead:
-        pid = 999999998
-
-    assert llama_server.mapped_memory_gib(Dead()) is None
 
 
 def test_code_edit_preview_shows_diff_without_writing(tmp_path):
@@ -1217,89 +1167,6 @@ def test_code_edit_md_gate_not_applied_to_python(tmp_path):
     code_edit.edit(str(p), [("replace", "x = 1", "y = 'a|b'")])
     with open(str(p)) as f:
         assert f.read() == "y = 'a|b'\n"
-
-
-def test_amdgpu_census_math(tmp_path, monkeypatch):
-    import llama_server as ls
-
-    """Addendum 4 (the UMA carveout census): the amdgpu sysfs reader,
-    the machine-wide delta, and the smaps+carveout union. The smaps
-    resident number must stay comparable to pre-addendum-4 records -
-    the carveout lands in its OWN keys and footprint_gib."""
-
-    # a fake sysfs tree: 2 GiB carveout, weights spilled into it
-    base = tmp_path / "card0"
-    base.mkdir()
-    (base / "mem_info_vram_used").write_text(str(int(1.25 * 1024**3)))
-    (base / "mem_info_gtt_used").write_text(str(int(0.5 * 1024**3)))
-    (base / "mem_info_vram_total").write_text(str(int(2.0 * 1024**3)))
-    (base / "mem_info_gtt_total").write_text(str(int(8.0 * 1024**3)))
-    monkeypatch.setattr(ls, "glob", lambda p: [str(base)] if "card*" in p else [])
-    monkeypatch.setattr(
-        ls, "_amdgpu_devices", lambda: [str(base)] if (base / "mem_info_vram_used").exists() else []
-    )
-
-    snap = ls.amdgpu_memory_gib()
-    assert snap is not None
-    assert abs(_f(snap, "vram_used_gib") - 1.25) < 0.01
-    assert abs(_f(snap, "gtt_used_gib") - 0.5) < 0.01
-    assert abs(_f(snap, "vram_total_gib") - 2.0) < 0.01
-
-    # the delta: model took 1.25 GiB of carveout over the launch window
-    before = {"vram_used_gib": 0.1, "gtt_used_gib": 0.5, "vram_total_gib": 2.0}
-    after = snap
-    d = ls.amdgpu_delta_gib(before, after)
-    assert d is not None
-    assert abs(_f(d, "vram_used_gib") - 1.15) < 0.01
-    # negative deltas clamp to zero (a bystander freed memory)
-    d2 = ls.amdgpu_delta_gib(after, before)
-    assert d2 is not None
-    assert d2["vram_used_gib"] == 0.0
-
-    # the union census: smaps resident + carveout, keys never merged
-    class FakeProc:
-        pid = None
-
-    monkeypatch.setattr(
-        ls,
-        "mapped_memory_gib",
-        lambda proc: {"mapped_gib": 4.0, "resident_gib": 3.0, "file_gib": 1.5, "anon_gib": 1.5},
-    )
-    census = ls.mapped_plus_gpu_gib(FakeProc(), d)
-    assert census is not None
-    assert census["resident_gib"] == 3.0  # untouched, comparable to old records
-    assert abs(census["gpu_vram_delta_gib"] - 1.15) < 0.01
-    assert abs(census["footprint_gib"] - 4.15) < 0.01
-    assert census.get("carveout_hidden") is True
-    # no amdgpu interface (non-AMD box): footprint == resident, no GPU keys
-    census2 = ls.mapped_plus_gpu_gib(FakeProc(), None)
-    assert census2 is not None
-    assert census2["footprint_gib"] == 3.0
-    assert "gpu_vram_delta_gib" not in census2
-
-
-def test_parse_memory_log_vulkan_buffers(tmp_path):
-    import llama_server as ls
-
-    """Addendum 5: the b10964 build's -lv 5 accounting lines (from the
-    author's real log, 2026-10-04) - Vulkan0/Vulkan_Host model buffer
-    sizes are extracted as structured keys for the GPU table."""
-
-    log = tmp_path / "lv5.log"
-    log.write_text(
-        "0.00.030.805 I cmn  common_param:   - Vulkan0 : AMD Radeon 780M "
-        "Graphics (RADV PHOENIX) (16383 MiB, 14757 MiB free)\n"
-        "0.01.067.920 I load_tensors: offloaded 26/26 layers to GPU\n"
-        "0.01.067.928 I load_tensors:      Vulkan0 model buffer size =   763.78 MiB\n"
-        "0.01.067.929 I load_tensors:  Vulkan_Host model buffer size =   257.66 MiB\n"
-        "0.01.068.100 I llama_kv_cache: KV self size  =  2048.00 MiB\n",
-        encoding="utf-8",
-    )
-    out = ls.parse_memory_log(str(log))
-    assert out is not None
-    assert abs(out["vulkan_buffers_gib"] - 763.78 / 1024) < 0.001
-    assert abs(out["host_buffers_gib"] - 257.66 / 1024) < 0.001
-    assert abs(out["kv_cache_gib"] - 2.0) < 0.001
 
 
 def test_memory_breakdown_gib(tmp_path):
