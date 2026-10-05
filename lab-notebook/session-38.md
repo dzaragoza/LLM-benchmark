@@ -322,3 +322,19 @@ and RWKV7 still sit at 0 fwe passes; MiniCPM5-2B moves 1/16 -> 3/16
 and gemma 3/16 -> 7/16 (still failing); the alive set is unchanged
 (Qwen3.5-2B, Qwen3.5-0.8B, Jamba2), now with perfect fwe records
 (13/13, 33/33, 67/69).
+
+Addendum 14: roster widened to 12 and everyone's config standardized to
+(q8 weights, f16 K, f16 V). Who changed: Qwen3.5-2B - its 90 cells were
+all Q4_K_M (the session-34 context-over-parameters config; its arc logs
+are Qwen3.5-2B-Q4_K_M.gguf.*), so the config move makes it a different
+model instance. Ruling (author, via question): wipe the records, fresh
+start - cells are never re-measured and the Q4_K_M cells belong to a
+different config; the family re-enters with 0 cells at Q8_0. Three new
+competitors join at (Q8_0, f16, f16): qwen2.5-1.5b-instruct (ladder: 32k
+at 18 w/s worst span, vanilla attention), Qwen3.5-4B (ladder: 131k
+window, 4.3 GiB Q8 near the 5 GiB BW ceiling) and Qwen3-1.7B (ladder:
+32k at 7.6 w/s). Preflight caveat from models.md: the 4B and 3-1.7B were
+closed at their FLOOR configs (q2/q4 KV); at f16 KV their deep rungs
+may hit the RAM ceiling - the dry run's feasibility check reports it
+per family, and a ceiling simply stops the climb (a config ceiling, not
+a model failure).
