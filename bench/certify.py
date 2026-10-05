@@ -47,6 +47,49 @@ def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
 CERTIFY_LEVELS = ["at_least_one", "1_sigma", "2_sigma"]
 
 
+def _acquire_missing_model(
+    spec: str,
+    fam: str,
+    famdir: str,
+    rung: str | None,
+    state: dict[str, Any],
+    dry_run: bool,
+) -> str | None:
+    """The certify controllers acquire their own entry files (addendum 16,
+    refinement: the same phase-1 path the tournament uses - the author runs
+    one command, not a download step per model). Returns the local path or
+    None (in dry-run the plan is only reported)."""
+    if not rung:
+        return None
+    model_repo, _, source_repo = spec.partition("=")
+    try:
+        model_files = hf_download.list_repo_files(model_repo)
+        source_repo_eff = source_repo or model_repo
+        source_files = (
+            model_files
+            if source_repo_eff == model_repo
+            else hf_download.list_repo_files(source_repo_eff)
+        )
+        path, plan = hf_download.acquire(
+            fam,
+            famdir,
+            rung,
+            model_repo,
+            model_files,
+            source_repo_eff,
+            source_files,
+            dry_run,
+        )
+    except SystemExit:
+        return None
+    if path:
+        state["families"].setdefault(fam, {})["tournament_entry"] = {
+            "rung": rung,
+            "file": path,
+        }
+    return path
+
+
 def certify_rung(
     depth: int,
     level: str,
@@ -135,8 +178,12 @@ def certify_rung(
         model = (
             run.get("file")
             or (fst.get("tournament_entry") or {}).get("file")
-            or local_rung(famdir, rung)
+            or (local_rung(famdir, rung) if rung else None)
         )
+        if (not model or not os.path.isfile(model)) and spec:
+            acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
+            if acquired:
+                model = acquired
         if not model or not os.path.isfile(model):
             entry["error"] = f"model file not found ({model})"
             print(f"  ERROR: {entry['error']}")
@@ -399,8 +446,12 @@ def certify_rung_combined(
         model = (
             run.get("file")
             or (fst.get("tournament_entry") or {}).get("file")
-            or local_rung(famdir, rung)
+            or (local_rung(famdir, rung) if rung else None)
         )
+        if (not model or not os.path.isfile(model)) and spec:
+            acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
+            if acquired:
+                model = acquired
         if not model or not os.path.isfile(model):
             entry["error"] = f"model file not found ({model})"
             print(f"  ERROR: {entry['error']}")
