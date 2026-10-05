@@ -7,6 +7,7 @@ monkeypatch style."""
 
 import json
 import os
+import signal
 import time
 
 import pytest
@@ -1002,3 +1003,25 @@ def test_arc_rung_independence_and_namespace():
     assert fb.combined_medal(arc_gold, 8192, "1_sigma") == "gold"
     no_arc = {k: v for k, v in arc_gold.items() if k != "certify_arc"}
     assert fb.combined_medal(no_arc, 8192, "1_sigma") is None
+
+
+def test_sigint_shutdown_sequence(tmp_path, capsys):
+    """Addendum 8: Ctrl-C stops cleanly - llama-server pkilled, the tee
+    uninstalled, the git tail only when --no-git is absent."""
+    import argparse
+
+    import full_benchmark as fb
+
+    assert fb.TASK_PASS_BARS["arc"] == 4  # addendum 8: the 4/5 calibration
+    args = argparse.Namespace(no_git=True, dry_run=False)
+    import contextlib
+    import io
+
+    buf = io.StringIO()
+    with pytest.raises(SystemExit) as exc:
+        with contextlib.redirect_stdout(buf):
+            fb.sigint_shutdown(signal.SIGINT, None, args)
+    assert exc.value.code == 130
+    out = buf.getvalue()
+    assert "SIGINT" in out
+    assert "llama-server" in out

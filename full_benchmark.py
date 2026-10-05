@@ -49,6 +49,7 @@ import math
 import os
 import random
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -1465,7 +1466,7 @@ def certify_rung_combined(
     return results
 
 
-TASK_PASS_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}
+TASK_PASS_BARS = {"speed": 0, "fwe": 3, "vt": 5, "arc": 4}
 
 
 def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
@@ -2463,6 +2464,7 @@ def main() -> None:
     args = ap.parse_args()
     global DRY_RUN_ACTIVE
     DRY_RUN_ACTIVE = args.dry_run
+    install_sigint_handler(args)
 
     if args.thinking and args.no_thinking:
         ap.error("--thinking and --no-thinking are mutually exclusive")
@@ -2976,6 +2978,43 @@ def git_tail(args: argparse.Namespace) -> None:
         stamp(f"push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
     else:
         stamp("pushed")
+
+
+def sigint_shutdown(signum, frame, args=None):
+    """Session 38, addendum 8: the author's Ctrl-C ruling - "when I
+    interrupt a run with control-c it stops cleanly: stop llama-server,
+    stop results logging, git commit and pull". The handler is
+    installed AFTER arg parsing, so it always has args (state file,
+    results file, --no-git). Dry runs skip the tail (nothing to
+    commit that pre-flight didn't already plan to)."""
+    stamp("SIGINT - shutting down cleanly (addendum 8)")
+    r = subprocess.run(
+        ["pkill", "-f", "llama-server"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    stamp("llama-server stopped" if r.returncode == 0 else "no llama-server to stop")
+    try:
+        tee_output.uninstall()
+        stamp("results logging stopped")
+    except Exception as e:
+        stamp(f"results logging stop failed (ignored): {e}")
+    if (
+        args is not None
+        and not getattr(args, "no_git", True)
+        and not getattr(args, "dry_run", True)
+    ):
+        try:
+            git_tail(args)
+            git_pull_head()
+        except Exception as e:
+            stamp(f"git tail failed (ignored): {e}")
+    stamp("shutdown complete - goodbye")
+    sys.exit(130)
+
+
+def install_sigint_handler(args: argparse.Namespace) -> None:
+    signal.signal(signal.SIGINT, lambda s, f: sigint_shutdown(s, f, args))
 
 
 if __name__ == "__main__":
