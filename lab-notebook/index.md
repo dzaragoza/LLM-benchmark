@@ -26,3 +26,4 @@
 - [Session 34](session-34.md)
 - [Session 35 — 2026-10-01 (the Q4_K_M sweep: context-over-parameters confirmed; the merged best-of pages)](session-35.md)
 - [Session 38 — 2026-10-03 (the VT gold certification mid-flight; the 3/3 medal ruling live)](session-38.md)
+- [Session 39 — 2026-10-05 (registry hygiene: wow.md section 10 review-on-demand; protocol.md catch-up addendum 107)](session-39.md)
