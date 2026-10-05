@@ -75,6 +75,7 @@ MIN_RUNG_FAIL = 16384  # session 34 (addendum 19): a floor below the start
 from bench import cells as _cells  # noqa: E402
 from bench import certify as _certify  # noqa: E402
 from bench import ladder as _ladder  # noqa: E402
+from bench import size_table as _size_table  # noqa: E402
 from bench import state_store as _state_store  # noqa: E402
 from bench import tournament as _tournament  # noqa: E402
 
@@ -112,6 +113,8 @@ rescore_tournament = _tournament.rescore_tournament
 print_tournament_table = _tournament.print_tournament_table
 run_ladder = _ladder.run_ladder
 scored_row = _ladder.scored_row
+build_size_table = _size_table.build_size_table
+print_size_table = _size_table.print_size_table
 
 
 def diagnose_fwe(models_dir: str, state: dict[str, Any]) -> None:
@@ -587,6 +590,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --rescore: write the re-scored falls to the state file",
     )
     ap.add_argument(
+        "--size-table",
+        action="store_true",
+        help="session 38, addendum 16: print the per-context recommendation "
+        "table (family x rung) from the committed -lv 5 memory censuses "
+        "and speed dumps - the flat 5 GiB ceiling becomes a curve; the "
+        "speed gate is the size authority. Read-only",
+    )
+    ap.add_argument(
         "--diagnose",
         action="store_true",
         help="session 37, addendum 9: read the climb cell CSVs and report "
@@ -720,6 +731,17 @@ def main() -> None:
 
     if args.thinking and args.no_thinking:
         ap.error("--thinking and --no-thinking are mutually exclusive")
+
+    if args.size_table:
+        print_size_table(
+            build_size_table(
+                [
+                    os.path.join(args.models_dir, "ladder-results"),
+                    os.path.join(args.models_dir, "tournament-results"),
+                ]
+            )
+        )
+        return
 
     check_requirements()
     git_pull_head()
