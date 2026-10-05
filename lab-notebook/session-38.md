@@ -234,3 +234,12 @@ report HIGHER totals than our smaps census (the UMA carveout is
 invisible to smaps); (b) the ~80% bandwidth achievement may rise
 to 90%+ once the hidden UMA part is counted - the working
 hypothesis is the discrepancy was the hidden carveout traffic.
+
+Addendum 9: git_tail now globs the per-model server logs (models/*/
+*.arc-cell*.log, *-server.log, *window-probe.log). The lesson from
+both interrupted runs: the Ctrl-C landed before the tail, so the
+only copies of llama's own -lv 5 memory accounting sat uncommitted
+on the author's disk - prediction B (bandwidth rising to 90%+ once
+the UMA-hidden size is counted) needs those logs to compute. The
+SIGINT handler (addendum 8) now runs the tail on interruption; this
+glob makes the tail actually reach them.
