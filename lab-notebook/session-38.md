@@ -243,3 +243,39 @@ on the author's disk - prediction B (bandwidth rising to 90%+ once
 the UMA-hidden size is counted) needs those logs to compute. The
 SIGINT handler (addendum 8) now runs the tail on interruption; this
 glob makes the tail actually reach them.
+
+Addendum 10: both memory predictions computed from the committed -lv 5
+logs (254 files). Prediction A CONFIRMED: llama's own weight accounting
+(1.0-3.2 GiB per family) is 3-8x our smaps census (0.14-0.42 GiB
+resident) - the UMA/GTT-hidden fraction was exactly the missing witness,
+and the machine-cost (MemAvailable) figures match llama weights plus
+overhead. Prediction B CONFIRMED FOR ATTENTION MODELS ONLY, with a
+correction: the true hybrid set is larger than the Jamba pair. The
+arc-cell logs reveal llama_memory_recurrent layers in Qwen3.5-0.8B,
+Qwen3.5-2B (qwen35 arch, full_attention_interval 4) and RWKV7 alongside
+the Jambas - five of nine families are SSM/recurrent hybrids. Full BW
+table (weights from model-buffer-size sums incl. the 0.00 placeholder
+blocks, KV linear-scaled from the ctx-4096 memory breakdown, t/s =
+worst turn of the earliest-rung speed cells):
+
+  family                  rung  t/s  w GiB  denom  BW GiB/s  %102.4
+  Llama-3.2-1B             8448  43.3  1.48   1.74     75.3    74%
+  Qwen3.5-2B               4352  45.8  1.57   1.69     77.6    76%
+  MiniCPM5-2B              8448  26.0  2.49   2.83     73.5    72%
+  MiniCPM5-1B              8448  56.1  1.07   1.26     70.8    69%
+  gemma-3-1b-it            4352  52.8  1.29   1.36     71.9    70%
+  Qwen3.5-0.8B             4352  62.7  1.00   1.00     62.6    61%
+  RWKV7-Goose-World3       8448  16.0  3.03   3.20     51.2    50%
+  Jamba2-3B               131k    9.8  3.17   4.49     44.0    43%
+  Jamba-Reasoning-3B       8448  10.8  3.17   3.26     35.3    34%
+
+The attention models cluster at 70-76% of theoretical, NOT the 90%+
+predicted - the remaining gap is likely the ~25% Vulkan_Host fraction
+(cross-heap traffic) plus the KV-linear-scaling approximation. The
+hybrids sit at 34-61% because the size x t/s law does not apply: SSM
+layers read a bounded recurrent state per token, not the full weight
+matrix, so their per-token traffic is a fraction of the denominator.
+Correction to the earlier Jamba-only claim: the law exception is a
+property of the architecture, not of one vendor. The Qwen3.5 parse bug
+(first model-buffer-size lines are 0.00 placeholders before the real
+Vulkan0/Vulkan_Host sizes) is resolved by summing all occurrences.
