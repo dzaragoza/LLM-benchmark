@@ -338,3 +338,19 @@ closed at their FLOOR configs (q2/q4 KV); at f16 KV their deep rungs
 may hit the RAM ceiling - the dry run's feasibility check reports it
 per family, and a ceiling simply stops the climb (a config ceiling, not
 a model failure).
+
+Addendum 15: the refactor - full_benchmark.py (3,020 lines) split into the
+bench/ package; the orchestrator keeps the CLI + process_family + main and is
+now ~1,290 lines. Module map: bench/cells.py (cell primitives: kill_stale_server,
+speed_pass, fwe_pass, speed_cell, vt_pass, rung constants), bench/state_store.py
+(the never-re-measure store: task namespaces, loaders, stamp/load_state/
+save_state), bench/certify.py (the sequential + combined controllers, Wilson,
+TASK_PASS_BARS, combined_medal), bench/tournament.py (climbs, ranking, rescore,
+table), bench/ladder.py (run_ladder, scored_row), bench/constants.py (single
+source for every shared constant), bench/tournament_helpers.py (shared CSV
+reader). Seam policy: tests monkeypatch the DEFINING bench module
+(bench_cells.fwe_pass, bench_state_store._task_measure, bench_tournament.
+fwe_flicker), and bench modules call those seams via module attribute access
+(bench_cells.<name>) so patches land where the call resolves; the orchestrator
+re-exports the seam names for the old test seams. All 161 tests pass; ruff
+clean; --help smoke-checked.
