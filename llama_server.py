@@ -21,7 +21,6 @@ when live-bench was absorbed into speed_gate.py.
 
 from __future__ import annotations
 
-import glob
 import json
 import os
 import re
@@ -29,12 +28,12 @@ import subprocess
 import sys
 import time
 import urllib.request
-from collections.abc import Mapping
 from typing import Any
 
 # session 38, addendum 5: llama's own memory accounting must land in the
-# server log (the third memory witness, next to the smaps census and the
-# amdgpu sysfs delta). Single-sourced HERE - every launch site gets it,
+# server log (the sole per-process memory witness - session 38, addendum
+# 11 retired the smaps census; addendum 23 deletes the machinery).
+# Single-sourced HERE - every launch site gets it,
 # no triplicated flags to drift apart.
 LOG_VERBOSITY_ARGS = ["-lv", "5"]
 
@@ -110,9 +109,9 @@ def peak_rss_gib(proc: Any) -> float | None:
     cache - the kernel may evict and re-fault them during the run, so
     the per-process peak UNDERCOUNTS the whole stack at deep ctx
     (registered pattern: peak RSS 0.27 GiB < a 0.63 GiB file). The
-    authoritative number is mapped_memory_gib(). Linux only
-    (/proc); returns None elsewhere or after the process is gone.
-    MUST be called before stop_server terminates the process."""
+    authoritative number is memory_breakdown_gib() on the server log.
+    Linux only (/proc); returns None elsewhere or after the process
+    is gone. MUST be called before stop_server terminates the process."""
     try:
         with open(f"/proc/{proc.pid}/status") as f:
             for line in f:
@@ -121,72 +120,6 @@ def peak_rss_gib(proc: Any) -> float | None:
     except Exception:
         return None
     return None
-
-
-def mapped_memory_gib(proc: Any) -> dict[str, float] | None:
-    """The server's mapped-memory census from /proc/<pid>/smaps
-    (session 34, addendum 23 - the VmHWM undercount fix).
-
-    Sums the VMA size of every mapping and the RSS (pages actually
-    resident) split by backing:
-      mapped_gib    total address-space mapped (the launch's claim)
-      resident_gib  pages resident RIGHT NOW (sum of VMA Rss)
-      file_gib      resident pages of file-backed VMAs (the weights,
-                    via mmap - immune to the VmHWM peak-eviction quirk:
-                    a resident page counts, whether or not the peak
-                    caught it)
-      anon_gib      resident pages of anonymous VMAs (KV cache,
-                    compute buffers, runtime heap)
-    resident_gib is the honest "can it run here" number: the pages
-    the machine must actually hold with the model in use, counted
-    from the memory map rather than a single high-water mark. Best
-    read LATE in the run (deep turns faulted the whole blob in);
-    MUST be called before stop_server terminates the process.
-    Linux-exclusive (/proc/<pid>/smaps with per-VMA Rss, kernel 2.6.32+):
-    returns None elsewhere or after the process is gone."""
-    pid = getattr(proc, "pid", None)
-    if pid is None:
-        return None
-    mapped = 0.0
-    file_rss = 0.0
-    anon_rss = 0.0
-    cur_file = False
-    try:
-        with open(f"/proc/{pid}/smaps", errors="replace") as f:
-            for line in f:
-                first = line.split()[0] if line.strip() else ""
-                if (
-                    len(first) >= 3
-                    and first[0] in "0123456789abcdef"
-                    and "-" in first
-                    and ":" not in first
-                ):
-                    # VMA header: "addr-addr perms offset dev inode [path]" -
-                    # exactly 5 fields before the optional path; a path
-                    # (6+ fields) means file-backed, "[vso]"-style or none
-                    # means anonymous
-                    cur_file = len(line.split()) >= 6
-                    continue
-                key, _, val = line.partition(":")
-                val = val.strip()
-                if key == "Size":
-                    mapped += int(val.split()[0])
-                elif key == "Rss":
-                    kb = int(val.split()[0])
-                    if cur_file:
-                        file_rss += kb
-                    else:
-                        anon_rss += kb
-    except Exception:
-        return None
-    gib = 1 / (1024 * 1024)
-    resident = file_rss + anon_rss
-    return {
-        "mapped_gib": mapped * gib,
-        "resident_gib": resident * gib,
-        "file_gib": file_rss * gib,
-        "anon_gib": anon_rss * gib,
-    }
 
 
 def system_memavailable_gib() -> float | None:
@@ -242,46 +175,6 @@ def drop_file_cache(path: str) -> bool:
             os.close(fd)
 
 
-def parse_memory_log(log_path: str) -> dict[str, Any] | None:
-    """Best-effort parse of llama.cpp's own memory accounting from the
-    captured server log (addendum 36). The banner format moves between
-    builds, so this extracts structured keys where the wording is
-    recognizable AND keeps the raw memory-bearing lines verbatim;
-    the peak RSS (VmHWM) remains the authoritative total. Returns a
-    dict: {keys...: GiB, 'banner_lines': [raw lines with sizes]}."""
-    out = {"banner_lines": []}
-    pat = re.compile(
-        r"([A-Za-z_0-9 .]*?)[:=]\s*([0-9]+(?:\.[0-9]+)?)"
-        r"\s*(KiB|MiB|GiB)"
-    )
-    to_gib = {"KiB": 1 / (1024 * 1024), "MiB": 1 / 1024, "GiB": 1.0}
-    try:
-        with open(log_path, errors="replace") as f:
-            lines = f.readlines()
-    except Exception:
-        return out
-    for ln in lines:
-        low = ln.lower()
-        if "mib" not in low and "gib" not in low and "kib" not in low:
-            continue
-        out["banner_lines"].append(ln.rstrip())
-        for label, val, unit in pat.findall(ln):
-            key = label.strip().lower().rstrip(" :=")
-            gib = float(val) * to_gib[unit]
-            if "kv" in key and "kv_cache_gib" not in out:
-                out["kv_cache_gib"] = round(gib, 3)
-            elif "cpu" in key and "cpu_buffers_gib" not in out:
-                out["cpu_buffers_gib"] = round(gib, 3)
-            elif "graph" in key and "graph_overhead_gib" not in out:
-                out["graph_overhead_gib"] = round(gib, 3)
-            elif "vulkan" in key and "buffer" in key and "vulkan_buffers_gib" not in out:
-                out["vulkan_buffers_gib"] = round(gib, 3)
-            elif "host" in key and "buffer" in key and "host_buffers_gib" not in out:
-                out["host_buffers_gib"] = round(gib, 3)
-    out["banner_lines"] = out["banner_lines"][-40:]
-    return out
-
-
 MEMORY_BREAKDOWN_ROW = re.compile(
     r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*\d+\s*\+\s*"
     r"\(\s*\d+\s*=\s*(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\)"
@@ -295,7 +188,8 @@ MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
 def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
     """llama.cpp's own memory accounting from the -lv 5 server log
     (session 39, addendum 11 - the smaps census retired: it can't see
-    the UMA carveout, so it undercounted offload by 3-8x). Parses the
+    the UMA carveout, so it undercounted offload by 3-8x - addendum 23
+    deletes the machinery outright). Parses the
     `memory breakdown [MiB]` table rows:
       | - Vulkan0 (780M ...) | 16383 = 15181 + (1140 = 1013 + 71 + 55) + 61 |
       | - Host               |   317 =   306 +   0 + 11                  |
@@ -341,119 +235,6 @@ def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
         "total_gib": round(model_gib + context_gib + compute_gib, 3),
         "devices": devices,
     }
-
-
-def _amdgpu_devices() -> list[str]:
-    devs = []
-    for d in glob.glob("/sys/class/drm/card*/device"):
-        if os.path.exists(os.path.join(d, "mem_info_vram_used")):
-            devs.append(d)
-    return devs
-
-
-def amdgpu_memory_gib() -> dict[str, float | None] | None:
-    """The iGPU's own accounting from the amdgpu sysfs interface
-    (session 38, addendum 4 - the UMA carveout census). The T14s
-    reserves 2 GiB as a dedicated UMA frame buffer: pages inside it
-    belong to the GPU and NEVER appear in the host process's smaps,
-    so the addendum-23 census undercounts exactly the offloaded
-    fraction when the carveout is used. This reads:
-      vram_used_gib  mem_info_vram_used  (the carveout - hidden
-                    from smaps; the number the GPU table wants)
-      gtt_used_gib   mem_info_gtt_used   (shared GTT - already
-                    resident in system RAM and visible to smaps)
-      vram_total_gib mem_info_vram_total (the BIOS reservation,
-                    e.g. 2 GiB on the T14s)
-    Returns None when the amdgpu interface is absent (no iGPU driver
-    or non-AMD hardware)."""
-    devs = _amdgpu_devices()
-    if not devs:
-        return None
-    out: dict[str, float | None] = {
-        "vram_used_gib": 0.0,
-        "gtt_used_gib": 0.0,
-        "vram_total_gib": None,
-        "gtt_total_gib": None,
-    }
-    seen_vram = False
-    seen_gtt = False
-    gib = 1 / (1024 * 1024 * 1024)
-    for dev in devs:
-        try:
-            with open(os.path.join(dev, "mem_info_vram_used")) as f:
-                out["vram_used_gib"] = (out["vram_used_gib"] or 0.0) + int(f.read().strip()) * gib
-                seen_vram = True
-            with open(os.path.join(dev, "mem_info_gtt_used")) as f:
-                out["gtt_used_gib"] = (out["gtt_used_gib"] or 0.0) + int(f.read().strip()) * gib
-                seen_gtt = True
-            if out["vram_total_gib"] is None:
-                with open(os.path.join(dev, "mem_info_vram_total")) as f:
-                    out["vram_total_gib"] = int(f.read().strip()) * gib
-            if out["gtt_total_gib"] is None:
-                with open(os.path.join(dev, "mem_info_gtt_total")) as f:
-                    out["gtt_total_gib"] = int(f.read().strip()) * gib
-        except Exception:
-            continue
-    if not seen_vram and not seen_gtt:
-        return None
-    return out
-
-
-def amdgpu_delta_gib(
-    before: Mapping[str, float | None] | None, after: Mapping[str, float | None] | None
-) -> dict[str, float | None] | None:
-    """The model's OWN GPU memory: the amdgpu counters are machine-wide
-    (the desktop compositor and the game you left open count too), so
-    the honest number for a benchmark cell is the DELTA across the
-    launch window. Baseline before the launch, sample after the deep
-    turns; negative deltas clamp to 0.0 (another process freeing
-    memory mid-run)."""
-    if not before or not after:
-        return None
-    out: dict[str, float | None] = {}
-    for key in ("vram_used_gib", "gtt_used_gib"):
-        b = before.get(key)
-        a = after.get(key)
-        if a is None:
-            out[key] = None
-        elif b is None:
-            out[key] = a
-        else:
-            out[key] = max(0.0, a - b)
-    out["vram_total_gib"] = after.get("vram_total_gib")
-    return out
-
-
-def mapped_plus_gpu_gib(
-    proc: Any, gpu_delta: dict[str, float | None] | None = None
-) -> dict[str, Any] | None:
-    """The full footprint census (session 38, addendum 4): the
-    addendum-23 smaps census UNION the amdgpu carveout delta. The
-    smaps resident number stays honest for the pages the host must
-    hold; the carveout delta is added on top for the true footprint -
-    on the T14s up to 2 GiB that smaps never sees. GPU-side totals
-    are stored under their own keys (never merged into resident_gib -
-    the smaps number must stay comparable to the pre-addendum-4
-    records); 'footprint_gib' is the new honest grand total."""
-    smaps = mapped_memory_gib(proc)
-    if smaps is None:
-        return None
-    out: dict[str, Any] = dict(smaps)
-    if gpu_delta:
-        vram = gpu_delta.get("vram_used_gib")
-        gtt = gpu_delta.get("gtt_used_gib")
-        out["gpu_vram_delta_gib"] = vram
-        out["gpu_gtt_delta_gib"] = gtt
-        resident = smaps.get("resident_gib")
-        if vram is not None and resident is not None:
-            out["footprint_gib"] = round(resident + vram, 3)
-        else:
-            out["footprint_gib"] = resident
-        if vram is not None and vram > 0.05:
-            out["carveout_hidden"] = True
-    else:
-        out["footprint_gib"] = smaps.get("resident_gib")
-    return out
 
 
 def stop_server(proc: Any, port: int, warn_after: float = 60) -> bool:

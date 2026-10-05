@@ -449,3 +449,45 @@ OPEN RULINGS (not touched - they belong to the author):
 
 VERIFIED: ruff check + format clean, ty 0 via the addendum-21
 wrapper, 162/162 pytest, md_check, js_check pass.
+
+## Addendum 23 - the smaps/amdgpu machinery deleted: llama-server report only (2026-10-05, the author's ruling)
+
+The author challenged addendum 22's "stays" call on the smaps/amdgpu
+census family: "Didn't we decide to go llama-server report only?" YES -
+session 38, addendum 11 retired the smaps census with memory_breakdown_gib
+(the -lv 5 table) as the sole per-process memory witness; addendum 22's
+"machinery stays for the old records" kept dead code that no production
+path had called since. The author's ruling supersedes: the machinery is
+DELETED, not parked.
+
+DELETED from llama_server.py: mapped_memory_gib (the addendum-23 smaps
+census), parse_memory_log (the addendum-36 banner parser), amdgpu_memory_gib,
+amdgpu_delta_gib, mapped_plus_gpu_gib, _amdgpu_devices (the addendum-4
+carveout family) - and the four tests that pinned them
+(test_mapped_memory_census_splits_file_and_anon, test_mapped_memory_none_for_dead_pid,
+test_amdgpu_census_math, test_parse_memory_log_vulkan_buffers) plus the
+_f narrowing helper the amdgpu test used.
+
+KEPT (each verified against live call sites): memory_breakdown_gib
+(all three census sites + size_table), mem_cost_gib + system_memavailable_gib
+(the machine-level witness, bench/cells.py + speed_gate.py),
+peak_rss_gib (depth_probe.py), drop_file_cache. peak_rss_gib's docstring
+now cites memory_breakdown_gib (not mapped_memory_gib) as the
+authoritative number; LOG_VERBOSITY_ARGS's comment cites the sole-witness
+ruling. protocol.md's memory-witness history row updated (the "stays for
+the old records" note is now false and would have misled).
+
+INCIDENT DURING THE CUT (registered): the block deletion twice caught
+real damage before it landed - first the module-level
+MEMORY_BREAKDOWN_ROW(_FLAT) regexes (they lived between the dead
+functions and serve the SURVIVING memory_breakdown_gib), then a one-
+character drift in the restored FLAT pattern (missing trailing \s*)
+that broke Host-row parsing and failed test_size_table_build_and_recommend.
+Both caught by the 158-test suite before commit; the regexes restored
+verbatim.
+
+The open rulings from addendum 22 stand: _vt_shuffle_sublists_heap and
+recommended_max_rung await the author.
+
+VERIFIED: ty 0 via the wrapper, ruff check + format clean, 158/158
+pytest (162 prior - 4 dead tests), md_check, js_check pass.
