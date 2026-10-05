@@ -81,14 +81,6 @@ def remote_head() -> str:
     return ref["object"]["sha"]
 
 
-def head_is_ancestor_of_remote(local_sha: str) -> bool:
-    try:
-        remote = api_request("GET", f"commits/{local_sha}")
-        return remote.get("sha") == local_sha
-    except PushError:
-        return False
-
-
 def push_files(
     files: list[tuple[str, str | None]], message: str, parent_sha: str | None = None
 ) -> str:
