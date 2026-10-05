@@ -396,3 +396,56 @@ time, which is the honest version of the same fix.
 VERIFIED (hooks on, no --no-verify): ty via the wrapper 0
 diagnostics, ruff check + format clean, 162/162 pytest, md_check,
 js_check all pass; commit and push ran the full hook set.
+
+## Addendum 22 - the dead-code sweep: two retirements, one open ruling (2026-10-05, the author's request)
+
+The author asked for a dead-code check. METHOD: vulture (an AST-based
+dead-code detector: parses the source, reports names defined but
+never referenced; confidence-scored, blind to dynamic dispatch - a
+candidate generator, every hit verified by grep against real call
+sites and the notebook/protocol registrations before judgment).
+
+RETIRED (the author approved 1 and 2):
+
+1. print_wt_table (full_benchmark.py): its call site was dropped at
+   the session-34 merger - registered there as "the w/t calibration
+   table print is dropped from the default path (a corpus-wall
+   artifact)" - but the function survived the cut. Deleted; the
+   retirement was already on record.
+
+2. head_is_ancestor_of_remote (git_push.py): zero callers in code,
+   tests, notebook, or protocol - a leftover from the session-34
+   infra commit. Deleted.
+
+LEFT IN PLACE (judged not dead, rulings cited):
+
+- The llama_server smaps/amdgpu census family
+  (mapped_memory_gib, amdgpu_memory_gib, amdgpu_delta_gib,
+  mapped_plus_gpu_gib, parse_memory_log): no production callers,
+  but session 39 addendum 11 rules they stay ("the old records cite
+  it"); test-covered.
+- tee_output.isatty (file-object protocol), hf_download.dwLength
+  (ctypes struct field), sigint_shutdown's signum/frame (signal
+  handler signature): false positives.
+
+OPEN RULINGS (not touched - they belong to the author):
+
+1. _vt_shuffle_sublists_heap (ruler_gate.py): NEVER called since
+   its birth commit - build_vt_task inserts chain sentences at
+   random positions via rng.sample instead. But the protocol (the
+   VT instrument row) and session 37 both register "the chain's
+   sentences shuffle into the noise with a heap (chain order
+   preserved)" as the instrument, and upstream fidelity is the
+   stated point. Either the call was never wired (wiring it now
+   changes prompt generation and breaks comparability with the
+   stored VT cells) or the insertion scheme is the real instrument
+   and the registrations are wrong. Needs the author's ruling.
+
+2. recommended_max_rung (bench/size_table.py): test-only callers;
+   the session-39 registration calls it "the per-family headline"
+   but --size-table prints only the full grid, never the headline.
+   Either a dropped wire (one call in the CLI path) or the
+   registration overstates it.
+
+VERIFIED: ruff check + format clean, ty 0 via the addendum-21
+wrapper, 162/162 pytest, md_check, js_check pass.

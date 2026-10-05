@@ -1134,28 +1134,6 @@ def write_results(args: argparse.Namespace, state: dict[str, Any]) -> None:
     print(f"all data     -> {args.results_file}")
 
 
-def print_wt_table(state: dict[str, Any]) -> None:
-    """The per-model w/t calibration table (addendum 78, item 4)."""
-    # ---- addendum 78, item 4: the per-model w/t calibration inline
-    # (the addendum-74 lesson: grading waited on a manual extraction).
-    # Single-sourced from speed_gate.analyze's own fields, already in
-    # the state - no dump re-parsing, no second extraction pass.
-    print()
-    print("=" * 60)
-    stamp("per-model w/t calibration (the gate's own p05 rule)")
-    for fam, fst in state["families"].items():
-        for rung, run in fst.get("runs", {}).items():
-            if run.get("words_per_token_p05") is None:
-                continue
-            print(
-                f"  {fam:36s} {rung:6s} "
-                f"n={run.get('n_turns', 0):4d} "
-                f"min={run.get('words_per_token_min') or 0:.3f} "
-                f"p05={run['words_per_token_p05']:.3f} "
-                f"mean={run.get('words_per_token') or 0:.3f}"
-            )
-
-
 # =========================================================== git tail
 
 
