@@ -297,3 +297,14 @@ witness. Blocking-gate ranking from the stored records at the current
 bars (speed 0, fwe 3/3, vt 5/5, arc 4/5): VT is the most blocking gate
 at 31% pass (103/335 cells), then fwe 47% (88/189), arc 60% (33/55),
 speed 100% (111/111 - free until deep rungs).
+
+Addendum 12: VT bar calibrated to 4/5 (TASK_PASS_BARS["vt"]). At 5/5 VT
+was the most blocking gate at 31% (addendum 11); at 4/5 the stored
+records re-grade to 61% and the blocking ranking flips: fwe 3/3 is now
+the hardest bar at 47%, then vt 4/5 61%, arc 4/5 60%, speed 100%. The
+per-family picture at 4/5: Qwen3.5-2B (57/57) and Qwen3.5-0.8B (54/55)
+own VT - the hybrids with full_attention_interval 4 are the variable
+trackers - while Jamba-Reasoning (1/28), MiniCPM5-1B (0/26) and RWKV7
+(2/19) stay dead, so 4/5 keeps separation at both ends. Who's blocking
+next: FWE 3/3, killing Jamba-Reasoning (0/9), RWKV7 (0/13), MiniCPM5-1B
+(0/8) and gemma (3/16) outright.
