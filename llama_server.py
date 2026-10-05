@@ -293,7 +293,7 @@ MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
 
 def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
     """llama.cpp's own memory accounting from the -lv 5 server log
-    (session 38, addendum 11 - the smaps census retired: it can't see
+    (session 39, addendum 11 - the smaps census retired: it can't see
     the UMA carveout, so it undercounted offload by 3-8x). Parses the
     `memory breakdown [MiB]` table rows:
       | - Vulkan0 (780M ...) | 16383 = 15181 + (1140 = 1013 + 71 + 55) + 61 |

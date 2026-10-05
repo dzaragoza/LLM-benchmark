@@ -1,5 +1,5 @@
 """bench.tournament_helpers -- the shared CSV readers between the
-store and the tournament (session 38, addendum 15 refactor).
+store and the tournament (session 39, addendum 15 refactor).
 Extracted verbatim; addendum citations stay."""
 
 from __future__ import annotations

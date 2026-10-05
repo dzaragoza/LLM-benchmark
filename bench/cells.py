@@ -1,4 +1,4 @@
-"""bench.cells -- the cell primitives (session 38, addendum 15: the
+"""bench.cells -- the cell primitives (session 39, addendum 15: the
 full_benchmark.py refactor). Every function here measures ONE cell
 (model, rung, run) and returns its record; nothing here touches the
 state file. Extracted verbatim from full_benchmark.py -- the addendum
