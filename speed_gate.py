@@ -698,7 +698,6 @@ def bench_model(
     if not llama_server.drop_file_cache(model):
         print("    note: cache drop unavailable - cost may read warm (137k)")
     mem_before = llama_server.system_memavailable_gib()
-    gpu_baseline = llama_server.amdgpu_memory_gib()
     proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
     try:
         if not healthy:
@@ -843,54 +842,29 @@ def bench_model(
                 print("      noise at depth: " + ", ".join(f"{x:.1f}" for x in ntps))
 
     finally:
-        peak = llama_server.peak_rss_gib(proc)
-        gpu_delta = llama_server.amdgpu_delta_gib(gpu_baseline, llama_server.amdgpu_memory_gib())
-        smaps = llama_server.mapped_plus_gpu_gib(proc, gpu_delta)
+        breakdown = llama_server.memory_breakdown_gib(log_path)
         cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         llama_server.stop_server(proc, port)
-        if peak is not None or smaps is not None:
+        if breakdown is not None:
             mem_reports.append(
                 {
                     "rep": 1,
-                    "peak_rss_gib": peak,
                     "mem_cost_gib": cost,
-                    **(smaps or {}),
-                    **(llama_server.parse_memory_log(log_path) or {}),
+                    **breakdown,
                 }
             )
-            if smaps is not None and smaps.get("resident_gib") is not None:
-                gpu_line = ""
-                if smaps.get("gpu_vram_delta_gib") is not None:
-                    gpu_line = (
-                        f", +GPU carveout {smaps['gpu_vram_delta_gib']:.2f} GiB "
-                        f"-> footprint {smaps['footprint_gib']:.2f} GiB (amdgpu; addendum 4)"
-                    )
-                print(
-                    f"    memory: mapped census {smaps['mapped_gib']:.2f} GiB mapped, "
-                    f"{smaps['resident_gib']:.2f} GiB resident "
-                    f"(file {smaps['file_gib']:.2f} + anon {smaps['anon_gib']:.2f}; "
-                    "smaps, addendum 23)"
-                    + gpu_line
-                    + (
-                        f", machine cost {cost:.2f} GiB (MemAvailable delta)"
-                        if cost is not None
-                        else ""
-                    ),
-                    flush=True,
-                )
-                resident = smaps.get("resident_gib")
-                if peak is not None and resident is not None and peak < resident - 0.05:
-                    print(
-                        f"    note: peak RSS {peak:.2f} GiB read below the smaps "
-                        f"census {resident:.2f} GiB - the VmHWM "
-                        "undercount (mmap eviction; addendum 23)"
-                    )
-            elif peak is not None:
-                print(
-                    f"    memory: peak RSS {peak:.2f} GiB (VmHWM; smaps unavailable)"
-                    + (f", machine cost {cost:.2f} GiB" if cost is not None else ""),
-                    flush=True,
-                )
+            print(
+                f"    memory (llama): weights {breakdown['weights_gib']:.2f} GiB, "
+                f"context {breakdown['context_gib']:.2f} GiB, "
+                f"compute {breakdown['compute_gib']:.2f} GiB"
+                f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)"
+                + (
+                    f", machine cost {cost:.2f} GiB (MemAvailable delta)"
+                    if cost is not None
+                    else ""
+                ),
+                flush=True,
+            )
     wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
     if wall_hits:
         print(
@@ -919,16 +893,14 @@ def bench_model(
                 f"  worst/mean {nw / nm:.3f}  (n={len(ntps)})"
             )
     if mem_reports:
-        peaks = [
-            float(v) for m in mem_reports if isinstance(v := m.get("peak_rss_gib"), (int, float))
+        totals = [
+            float(v) for m in mem_reports if isinstance(v := m.get("weights_gib"), (int, float))
         ]
-        print(
-            f"  {label}: MEMORY: peak RSS {max(peaks):.2f} GiB "
-            f"- file "
-            f"{os.path.getsize(model) / (1024**3):.2f} GiB, i.e. "
-            f"{max(peaks) - os.path.getsize(model) / (1024**3):.2f} "
-            "GiB beyond the file (KV + buffers + runtime)"
-        )
+        if totals:
+            print(
+                f"  {label}: MEMORY (llama): weights {max(totals):.2f} GiB "
+                f"- file {os.path.getsize(model) / (1024**3):.2f} GiB (addendum 11)"
+            )
     return all_turns, summary, mem_reports
 
 
@@ -1010,11 +982,11 @@ def bench(
             try:
                 with open(mem_sidecar) as f:
                     mem = json.load(f)
-                peaks = [m["peak_rss_gib"] for m in mem if m.get("peak_rss_gib")]
-                if peaks:
+                totals = [m["weights_gib"] for m in mem if m.get("weights_gib")]
+                if totals:
                     print(
-                        f"    memory: peak RSS {max(peaks):.2f} GiB "
-                        "(from this dump's run; VmHWM, addendum 36)"
+                        f"    memory (llama): weights {max(totals):.2f} GiB "
+                        "(from this dump's run; addendum 11)"
                     )
             except Exception:
                 pass

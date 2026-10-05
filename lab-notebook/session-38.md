@@ -279,3 +279,21 @@ Correction to the earlier Jamba-only claim: the law exception is a
 property of the architecture, not of one vendor. The Qwen3.5 parse bug
 (first model-buffer-size lines are 0.00 placeholders before the real
 Vulkan0/Vulkan_Host sizes) is resolved by summing all occurrences.
+
+Addendum 11: the smaps census is RETIRED - llama-server's own accounting
+is the memory witness. Ruling from the author after addendum 10: "at
+least we know the llama-server measurements are reliable." The new
+llama_server.memory_breakdown_gib() parses the -lv 5 memory-breakdown
+table (both row shapes: the paren'd device line and the flat Host line)
+into per-device model/context/compute plus weights_gib (summed over ALL
+model-buffer-size lines - hybrid builds print a 0.00 placeholder before
+the real split). All three census sites switched: fwe_cell, vt_cell and
+the speed-gate mem report now record mem_census = {source, weights_gib,
+model_gib, context_gib, compute_gib, total_gib, devices}. The smaps
+mapped_plus_gpu_gib / amdgpu delta / peak-RSS machinery stays in
+llama_server.py (the old records cite it) but is no longer called by
+the benchmark; mem_cost_gib (MemAvailable) remains as the machine-level
+witness. Blocking-gate ranking from the stored records at the current
+bars (speed 0, fwe 3/3, vt 5/5, arc 4/5): VT is the most blocking gate
+at 31% pass (103/335 cells), then fwe 47% (88/189), arc 60% (33/55),
+speed 100% (111/111 - free until deep rungs).
