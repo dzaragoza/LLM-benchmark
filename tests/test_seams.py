@@ -1,6 +1,7 @@
 """Pin the addendum-90 refactor seams (addendum 87's contract style)."""
 
 import argparse
+import json
 import os
 
 import pytest
@@ -1210,11 +1211,12 @@ def test_code_edit_md_gate_not_applied_to_python(tmp_path):
 
 
 def test_amdgpu_census_math(tmp_path, monkeypatch):
+    import llama_server as ls
+
     """Addendum 4 (the UMA carveout census): the amdgpu sysfs reader,
     the machine-wide delta, and the smaps+carveout union. The smaps
     resident number must stay comparable to pre-addendum-4 records -
     the carveout lands in its OWN keys and footprint_gib."""
-    import llama_server as ls
 
     # a fake sysfs tree: 2 GiB carveout, weights spilled into it
     base = tmp_path / "card0"
@@ -1264,10 +1266,11 @@ def test_amdgpu_census_math(tmp_path, monkeypatch):
 
 
 def test_parse_memory_log_vulkan_buffers(tmp_path):
+    import llama_server as ls
+
     """Addendum 5: the b10964 build's -lv 5 accounting lines (from the
     author's real log, 2026-10-04) - Vulkan0/Vulkan_Host model buffer
     sizes are extracted as structured keys for the GPU table."""
-    import llama_server as ls
 
     log = tmp_path / "lv5.log"
     log.write_text(
@@ -1286,11 +1289,12 @@ def test_parse_memory_log_vulkan_buffers(tmp_path):
 
 
 def test_memory_breakdown_gib(tmp_path):
+    import llama_server as ls
+
     """Addendum 11: llama's own memory-breakdown table replaces the smaps
     census. Both row shapes (paren'd GPU line, flat Host line), the
     hybrid placeholder quirk (0.00 first, summed over all occurrences),
     and per-device model/context/compute extraction."""
-    import llama_server as ls
 
     log = tmp_path / "lv5.log"
     log.write_text(
@@ -1321,3 +1325,62 @@ def test_memory_breakdown_gib(tmp_path):
     empty = tmp_path / "empty.log"
     empty.write_text("nothing here\n", encoding="utf-8")
     assert ls.memory_breakdown_gib(str(empty)) is None
+
+
+def test_size_table_build_and_recommend(tmp_path, capsys):
+    """Addendum 16: the per-context recommendation table - the flat 5 GiB
+    ceiling becomes a curve. Evidence from the committed -lv 5 censuses
+    (fits) and speed dumps (holds the reader line); the recommendation
+    is the deepest rung that fits AND holds the guarantee with 0 stalls."""
+    from bench.size_table import (
+        build_size_table,
+        print_size_table,
+        recommended_max_rung,
+    )
+
+    log = tmp_path / "famA-Q8_0-rung8192-fwe-server.log"
+    log.write_text(
+        "0.00.501.944 I common_memory_breakdown_print: | memory breakdown [MiB]\n"
+        "0.00.501.945 I common_memory_breakdown_print: |   - Vulkan0 (780M Graphics"
+        " (RADV PHOENIX)) | 16383 = 14998 + ( 935 =   763 +     125 +      46)"
+        " +         450 |\n"
+        "0.00.501.945 I common_memory_breakdown_print: |   - Host"
+        "                                   |"
+        "                   265 =   257 +       0 +       8                |\n",
+        encoding="utf-8",
+    )
+    log2 = tmp_path / "famA-Q8_0-rung16384-fwe-server.log"
+    log2.write_text(log.read_text(), encoding="utf-8")
+
+    def turn(conv, wps, deltas, gen_words=10):
+        return {
+            "model": "famA-Q8_0.gguf",
+            "conv": conv,
+            "server_wps": wps,
+            "gen_words": gen_words,
+            "deltas": deltas,
+        }
+
+    fast = [{"t": i * 0.1, "w": i + 1} for i in range(10)]
+    slow = [{"t": i * 2.0, "w": i + 1} for i in range(10)]
+    (tmp_path / "famA-Q8_0-rung8192-speed.json").write_text(
+        json.dumps([turn(1, 20.0, fast), turn(2, 20.0, fast)])
+    )
+    # the deeper rung stalls (a reader catch-up in the arrival stream)
+    (tmp_path / "famA-Q8_0-rung16384-speed.json").write_text(
+        json.dumps([turn(1, 20.0, fast), turn(2, 2.0, slow)])
+    )
+    rows = build_size_table([str(tmp_path)])
+    by_rung = {r["rung"]: r for r in rows}
+    assert set(by_rung) == {8192, 16384}
+    r8 = by_rung[8192]
+    assert abs(r8["weights_gib"] - 1021.44 / 1024) < 0.01
+    assert r8["recommend"] is True and r8["clean_pass"] is True
+    r16 = by_rung[16384]
+    assert r16["recommend"] is False
+    best = recommended_max_rung(rows)
+    assert best == {"famA": 8192}
+    out = capsys.readouterr().out
+    print_size_table(rows)
+    out = capsys.readouterr().out
+    assert "famA" in out and "8192" in out and "recommend" in out

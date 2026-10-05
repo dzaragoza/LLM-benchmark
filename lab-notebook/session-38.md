@@ -354,3 +354,20 @@ fwe_flicker), and bench modules call those seams via module attribute access
 (bench_cells.<name>) so patches land where the call resolves; the orchestrator
 re-exports the seam names for the old test seams. All 161 tests pass; ruff
 clean; --help smoke-checked.
+
+Addendum 16: bench/size_table.py - the per-context recommendation table.
+The flat 5 GiB ceiling becomes a curve: for every (family, rung) the module
+reads the committed -lv 5 server logs (llama's own memory breakdown,
+addendum 11: weights/context/compute GiB) and the committed speed dumps
+(recomputed stall rate + worst-span w/s via the same reader-wall test
+analyze runs, addendum 73), then rules per cell: recommend = fits AND holds
+the reader line with 0 stalls. The speed gate is the size authority (the
+author's ruling). recommended_max_rung() gives the per-family headline
+(the deepest recommendable rung); print_size_table() prints the family x
+rung grid. CLI: --size-table (read-only, dispatched before
+check_requirements - it needs no ML packages and touches nothing).
+Census coverage today: 87 -lv 5 logs across ladder-results/ and
+models/tournament-results/; rungs without census evidence print "." and
+fill in as the 12-family run commits logs. Evidence observed so far:
+Qwen3.5-4B holds the line to 16k (4.3 GiB Q8) and recommends at
+4k-16k; Qwen3.5-0.8B recommends through 128k.
