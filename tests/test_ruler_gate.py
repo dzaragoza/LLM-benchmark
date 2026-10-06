@@ -57,8 +57,8 @@ def test_build_fwe_task_top_k_override():
 def test_vt_build_follows_upstream_shape(monkeypatch):
     """VT: 1 chain x 4 hops = 5 five-letter uppercase names, the first
     'VAR X = <value>' and each hop 'VAR Y = VAR X', the chain sentences
-    scattered through the noise haystack in chain ORDER (the heap
-    shuffle interleaves chains but preserves each chain's order), and
+    scattered through the noise haystack in chain ORDER (random
+    insertion positions; order within a chain is preserved), and
     the query asks for every variable assigned the base value."""
     monkeypatch.setattr(
         rg.llama_server,
@@ -81,7 +81,7 @@ def test_vt_build_follows_upstream_shape(monkeypatch):
     value = _re.search(r"assigned the value (\d{5})", prompt)
     assert value is not None
     # chain order preserved in the context: each link appears after the
-    # previous one (a heap shuffle interleaves only ACROSS chains)
+    # previous one (the insertion positions are drawn per link, ascending)
     positions = [prompt.index(f"VAR {n}") for n in expected]
     assert positions == sorted(positions)
     # the first name is assigned the value directly; the rest chain
