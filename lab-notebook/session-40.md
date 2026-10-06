@@ -917,3 +917,19 @@ THE RUN (one flag fewer):
   pkill -f llama-server; git pull
   python3 full_benchmark.py --task all --force-rung f16 --dry-run
   python3 full_benchmark.py --task all --force-rung f16
+
+### Addendum 37 - the five rulings: the v4.x conformance pass (2026-10-06, the author's rulings)
+
+THE SURVEY asked "what else can be simplified or removed? Where are our weak spots in testing and formal validation?" - and the author ruled on five points. This addendum executes the five rulings.
+
+RULING 1 (the stall-rate gate): "obsolete in v4.x, make it conform." The speed verdict is STRICTLY worst wps >= the reader line (5.0), k=1, one conversation per cell, n=21. The stall-rate tolerance is gone as a gate: bench/cells.py's speed check accepts on worst wps alone (the ceiling-rung diagnostic stays); speed_gate.analyze()'s verdict is strictly worst_wps >= reader_wps; the reader-wall collision simulation (addendum 55) is recorded per turn as DATA (stall_rate, catchup_s, first_catchup_word_frac) - never a gate. STALL_RATE_MAX stays only as the recorded config of the diagnostic.
+
+RULING 2 (corpus building): "may be needed still... make it conform to 4.x protocol." bench() and the bench-CLI sweep are DELETED from speed_gate.py (the bench path is bench/cells.py's library, called inside the certify controllers); the CLI keeps only the corpus builders (--make-sample, --make-corpus).
+
+RULING 3 (single-task certify): "not for a run - the orchestrator decides what needs to be run based on the cell content." Unchanged: the single-task certify controllers stay exactly as they are.
+
+RULING 4 (the artifacts): "the html are live, they are the main artifact of the study. files.txt is obsolete. the log files, no idea." files.txt deleted; lineage2-ladder.log and overnight-lineage.log deleted (both recoverable from git history if ever wanted); cpu-picker.html and gpu-picker.html stay - the study's main artifacts.
+
+RULING 5 (dead code): "fix." TOURNAMENT_MODEL_QUANTS / TOURNAMENT_KV_QUANTS (bench/constants.py), QUERY_TEMPLATE (ruler_gate.py), drop_file_cache (infra/llama_server.py) deleted. Three obsolete dump-reuse tests cut (they exercised the deleted bench()).
+
+Tests: 163 total (the three dump-reuse tests cut with the bench path). All gates: pytest 163/163, ty 0 (only the sandbox's missing huggingface_hub/pyarrow imports), ruff clean, md_check, vulture clean (the sigint handler's required signum/frame signature aside). Sanity: analyze() verdicted on correct-shape dumps - worst 2.50 wps -> FAIL, worst 20.00 wps -> PASS (confident), stall_rate present as data both times.
