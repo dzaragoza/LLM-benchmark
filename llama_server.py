@@ -27,6 +27,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from typing import Any
 
@@ -36,6 +37,38 @@ from typing import Any
 # Single-sourced HERE - every launch site gets it,
 # no triplicated flags to drift apart.
 LOG_VERBOSITY_ARGS = ["-lv", "5"]
+
+
+def kill_stale_server() -> bool:
+    """Session 34 (addendum 19, refinement 1): pkill any llama-server
+    holding a port or RAM - the sweep's own launches replace whatever
+    was there. Session 40 (addendum 5): moved here from bench/cells.py
+    - process control of llama-server is bottom-layer contact, and the
+    middle layer does not shell out directly. Returns True when
+    something was killed."""
+    r = subprocess.run(
+        ["pkill", "-f", "llama-server"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return r.returncode == 0
+
+
+def port_serves_health(port: int, timeout: float = 2) -> str | None:
+    """Probe whether a port answers /health - the stale-server refusal
+    check. Returns None when nothing answers (the port is free),
+    "ok" when /health answers 200, "error" when something is there
+    but answers with an HTTP error. Session 40 (addendum 5): moved
+    here from ruler_gate.py - llama-server HTTP is bottom-layer
+    contact."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout):
+            pass
+        return "ok"
+    except urllib.error.HTTPError:
+        return "error"
+    except OSError:
+        return None
 
 
 def find_server() -> str | None:

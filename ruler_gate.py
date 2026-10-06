@@ -528,21 +528,18 @@ def main() -> None:
 
     label = os.path.splitext(os.path.basename(args.model))[0]
     os.makedirs(args.results_dir, exist_ok=True)
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{args.port}/health", timeout=2):
-            pass
+    probe = llama_server.port_serves_health(args.port)
+    if probe == "ok":
         sys.exit(
             f"port {args.port} already answers /health - a server is running there "
             "(a stale ruler/llama-server? pkill -f llama-server, or pass --port). "
             "Refusing to bench against it: the model and its ctx would be the wrong ones."
         )
-    except urllib.error.HTTPError:
+    if probe == "error":
         sys.exit(
             f"port {args.port} answers with an HTTP error but SOMETHING is there - "
             "a stale server. pkill -f llama-server, or pass --port."
         )
-    except OSError:
-        pass
     wanted_ctx = max(args.depths) + 2 * ANSWER_HEADROOM
     log_path = os.path.join(args.results_dir, f"{label}-server.log")
     extra_args = [
