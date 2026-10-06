@@ -1551,3 +1551,27 @@ def test_verdict_hook_fires_on_accept_and_dead(tmp_path):
         assert calls and calls[0][0] == "good" and calls[0][1] == "accept"
     finally:
         monkeypatch.undo()
+
+
+def test_force_rung_takes_optional_value():
+    """Addendum 33 regression: --force-rung accepts the rung directly
+    (--force-rung f16 == --rung f16 --force-rung) - the author's
+    natural typing of the f16 first pass was swallowed as a family
+    spec and hit HF as a repo id (404). Bare --force-rung keeps the
+    addendum-25 meaning (certify at --rung); a spec-shaped value is
+    rejected loudly, never silently treated as a rung or a family."""
+    import full_benchmark as fb
+
+    def parse(argv):
+        args = fb.build_parser().parse_args(argv)
+        if isinstance(args.rung_forced, str):
+            if "/" in args.rung_forced or "=" in args.rung_forced:
+                return "guard", args.rung_forced
+            args.rung = args.rung_forced
+            args.rung_forced = True
+        return args.rung, args.rung_forced, list(args.families)
+
+    assert parse(["--force-rung", "f16"]) == ("f16", True, [])
+    assert parse(["--force-rung"]) == ("Q8_0", True, [])
+    assert parse(["--rung", "Q4_K_M", "--force-rung"]) == ("Q4_K_M", True, [])
+    assert parse(["--force-rung", "test/fam"]) == ("guard", "test/fam")

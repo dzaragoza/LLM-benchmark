@@ -879,3 +879,17 @@ THE RUN (addendum 32 corrections, the author's rulings): the git tail is GONE - 
   pkill -f llama-server; git pull
   python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run
   python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16
+
+### Addendum 33 - --force-rung takes the rung (2026-10-06, the f16 dry-run 404)
+
+THE FAILURE: `--force-rung f16 --dry-run` died with huggingface_hub's RepositoryNotFoundError for `api/models/f16` - the rung name was queried as an HF REPO ID. The cause was argparse, not the hub: --force-rung was a store_true FLAG (addendum 25), so `f16` was swallowed as a POSITIONAL FAMILY SPEC and reached the downloader as `model_repo="f16"`. The author's natural typing of the command was never valid; the fix makes it valid.
+
+THE FIX: --force-rung now takes an OPTIONAL value (nargs="?", const=True, default=False). `--force-rung f16` == `--rung f16 --force-rung` (main() folds the value into args.rung); bare `--force-rung` keeps the addendum-25 meaning (certify every family at --rung, default Q8_0); a spec-shaped value (`/` or `=` in it) is rejected LOUDLY ("--force-rung takes a RUNG (e.g. f16, Q8_0), not a family") - never silently a rung or a family. Note: with positional families after the flag, prefer `--force-rung f16 fam1 fam2` order or the explicit `--rung f16 --force-rung` form; the guard catches the spec-shaped mistake either way.
+
+Tests: test_force_rung_takes_optional_value (the f16 fold, the bare flag, the --rung override, the spec-shaped guard). 199 tests total. All gates: pytest 199/199, ty 0, ruff clean, md_check.
+
+THE RUN (corrected - same as addendum 30-31, now actually typeable):
+  source .venv/bin/activate.fish
+  pkill -f llama-server; git pull
+  python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run
+  python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16
