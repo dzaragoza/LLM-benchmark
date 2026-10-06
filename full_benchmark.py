@@ -775,13 +775,32 @@ def main() -> None:
 
     if not args.families:
         # session 40: with no positional specs the families come from
-        # the state file - every family ever entered carries its spec
+        # the state file - every family ever entered carries its spec;
+        # addendum 28: the order is PARAM-ASCENDING (the registry's
+        # count; families outside the registry sort after, by name)
         saved = [
             (fst or {}).get("spec") or fam for fam, fst in (state.get("families") or {}).items()
         ]
-        args.families = [s for s in saved if s]
+        args.families = param_ascending_specs([s for s in saved if s])
         if not args.families:
-            ap.error("no family specs given and the state file has none")
+            # session 40, addendum 28 (the author's from-scratch ruling):
+            # a fresh state - no family ever entered - runs the FULL
+            # registered roster in PARAM-ASCENDING order (models.md's
+            # registry, smallest parameters first). The downloader stays
+            # on-demand: the orchestrator hands it specs one family at a
+            # time, in this order, and nothing is fetched ahead of need.
+            try:
+                from etc import registry_data
+
+                args.families = [
+                    registry_data.ROSTER[name] for name in registry_data.params_sorted_roster()
+                ]
+                stamp(
+                    f"fresh state: the full registered roster, param-ascending "
+                    f"({len(args.families)} models, smallest first)"
+                )
+            except Exception:
+                ap.error("no family specs given and the state file has none")
     if args.rescore:
         rescore_tournament(args.models_dir, state, args.state_file, not args.rescore_apply)
         return
@@ -1077,6 +1096,32 @@ def preflight_report(
         print("  --dry-run to start the real run.")
         return 1 if failed_families else 0
     return 0
+
+
+def _registry_params(repo: str) -> float | None:
+    """The repo's parameter count from the registry (session 40,
+    addendum 28) - None when the repo is not registered."""
+    from etc import registry_data
+
+    for name, r in registry_data.ROSTER.items():
+        if r == repo and registry_data.params_b(name) is not None:
+            return registry_data.params_b(name)
+    return None
+
+
+def param_ascending_specs(specs: list[str]) -> list[str]:
+    """Family specs in PARAM-ASCENDING order (session 40, addendum
+    28 - the author's from-scratch ruling): the model repo's registry
+    parameter count, smallest first; unregistered repos sort after
+    the counted ones, by repo name (never silently mixed in)."""
+    return sorted(
+        specs,
+        key=lambda s: (
+            _registry_params(s.partition("=")[0].rstrip("/")) is None,
+            _registry_params(s.partition("=")[0].rstrip("/")) or 0.0,
+            s.partition("=")[0].rstrip("/"),
+        ),
+    )
 
 
 def prepare_roster(args: argparse.Namespace) -> list[str]:
