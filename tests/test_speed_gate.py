@@ -1149,3 +1149,58 @@ def test_certify_acquires_from_each_family_own_spec(tmp_path, capsys):
         assert all(e and "model file not found" in e for e in errs)
     finally:
         monkeypatch.undo()
+
+
+def test_sigint_during_acquire_stops_the_run(tmp_path):
+    """Addendum 15 regression: the Ctrl-C handler exits via
+    SystemExit(130); _acquire_missing_model once swallowed EVERY
+    SystemExit (except SystemExit: return None) and the certify loop
+    moved to the next family - an interrupt during a download could
+    not stop the run. exit code 130 now propagates; a hub fail(1)
+    still returns None (per-family isolation)."""
+    import full_benchmark as fb
+    from infra import hf_download
+
+    def fake_list_repo_files(repo):
+        return []
+
+    def fake_acquire(
+        fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run
+    ):
+        if fam == "interrupted":
+            raise SystemExit(130)
+        raise SystemExit(1)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(hf_download, "require_hub", lambda: None)
+    monkeypatch.setattr(hf_download, "list_repo_files", fake_list_repo_files)
+    monkeypatch.setattr(hf_download, "acquire", fake_acquire)
+    try:
+        missing = str(tmp_path / "missing.gguf")
+        state: dict[str, Any] = {
+            "families": {
+                "interrupted": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": missing}},
+                },
+                "hub-fail": {
+                    "selected": "Q8_0",
+                    "runs": {"Q8_0": {"file": missing}},
+                },
+            }
+        }
+        specs = ["test/interrupted", "test/hub-fail"]
+        with pytest.raises(SystemExit) as ei:
+            fb.certify_rung_combined(
+                4096,
+                "1_sigma",
+                specs,
+                str(tmp_path),
+                state,
+                str(tmp_path / "st.json"),
+                8210,
+                False,
+            )
+        assert ei.value.code == 130
+    finally:
+        monkeypatch.undo()

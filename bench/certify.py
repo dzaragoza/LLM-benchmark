@@ -80,7 +80,9 @@ def _acquire_missing_model(
             source_files,
             dry_run,
         )
-    except SystemExit:
+    except SystemExit as e:
+        if e.code == 130:
+            raise
         return None
     if path:
         state["families"].setdefault(fam, {})["tournament_entry"] = {
