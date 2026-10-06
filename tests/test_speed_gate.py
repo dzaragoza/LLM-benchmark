@@ -17,6 +17,7 @@ import speed_gate as sg
 from bench import cells as bench_cells
 from bench import certify as bench_certify
 from bench import state_store as bench_state_store
+from infra import llama_server
 
 
 def _fixture(tmp_path, turns):
@@ -1575,3 +1576,77 @@ def test_force_rung_takes_optional_value():
     assert parse(["--force-rung"]) == ("Q8_0", True, [])
     assert parse(["--rung", "Q4_K_M", "--force-rung"]) == ("Q4_K_M", True, [])
     assert parse(["--force-rung", "test/fam"]) == ("guard", "test/fam")
+
+
+def test_evaluation_order_is_the_callers(tmp_path):
+    """Addendum 34 regression: the certify controllers evaluate the
+    families in the order the caller hands them - the addendum-29
+    WoW ruled out ANY hidden selection mechanism. The old promise
+    sort (historical passes, then tournament reliable_depth) let a
+    family with tournament history jump the param-ascending queue -
+    the f16 first pass opened on AI21-Jamba-Reasoning-3B instead of
+    the smallest registered model."""
+    import full_benchmark as fb
+
+    log: list[tuple[str, int]] = []
+
+    def fake_measure(task_, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        log.append((task_, run))
+        return False, 0, "faked cell (always fail)", 3.1
+
+    for task in ("fwe", "all"):
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
+        monkeypatch.setattr(
+            bench_cells,
+            "fwe_pass",
+            lambda *a, **k: (False, {"words_found": [0]}),
+        )
+        monkeypatch.setattr(
+            bench_cells,
+            "speed_pass",
+            lambda *a, **k: (False, {"worst": 0.0}),
+        )
+        monkeypatch.setattr(llama_server, "start_server", lambda *a, **k: (object(), True))
+        monkeypatch.setattr(llama_server, "stop_server", lambda *a, **k: None)
+        try:
+            fams: dict[str, Any] = {
+                "big-history": {"spec": "test/big-history"},
+                "small-new": {"spec": "test/small-new"},
+            }
+            state: dict[str, Any] = {
+                "families": fams,
+                "tournament": [{"family": "big-history", "reliable_depth": 65536}],
+            }
+            (tmp_path / "small-new-Q8_0.gguf").write_bytes(b"x")
+            (tmp_path / "big-history-Q8_0.gguf").write_bytes(b"x")
+            for fam in ("small-new", "big-history"):
+                state["families"][fam]["runs"] = {
+                    "Q8_0": {"file": str(tmp_path / f"{fam}-Q8_0.gguf")}
+                }
+            if task == "all":
+                res = fb.certify_rung_combined(
+                    4096,
+                    "at_least_one",
+                    ["test/small-new", "test/big-history"],
+                    str(tmp_path),
+                    state,
+                    str(tmp_path / "st.json"),
+                    8210,
+                    False,
+                )
+            else:
+                res = fb.certify_rung(
+                    4096,
+                    "at_least_one",
+                    ["test/small-new", "test/big-history"],
+                    str(tmp_path),
+                    state,
+                    str(tmp_path / "st.json"),
+                    8210,
+                    False,
+                    task="fwe",
+                )
+            assert [r["family"] for r in res] == ["small-new", "big-history"]
+        finally:
+            monkeypatch.undo()

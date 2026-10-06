@@ -137,8 +137,10 @@ def certify_rung(
     with a pass at the step), 1_sigma (reliable: 1-sigma Wilson
     lower bound >= 0.5, count >= half of n=20) or 2_sigma
     (conservative: the same bar at 2 sigma). Candidates are the
-    given families, ordered by promise (existing passes at the
-    rung, then reliable depth). Each candidate is tested cell by
+    given families, IN THE GIVEN ORDER (session 40, addendum 34:
+    the author's param-ascending ruling - no hidden selection
+    mechanism favoring any model; the caller's order IS the
+    evaluation order). Each candidate is tested cell by
     cell (direct single-rung FWE at the rung, seed = the run
     number, cells already measured are NEVER re-run) until EARLY
     ACCEPT or EARLY REJECT (mathematically dead: even passing
@@ -180,17 +182,6 @@ def certify_rung(
             cells = certify_cells(fst, depth, min_words, models_dir, fam, want, legacy)
         order.append((fam, fst, cells, spec))
 
-    def promise(item):
-        fam, fst, cells, _spec = item
-        k = sum(1 for ok in cells.values() if ok)
-        saved_rank = state.get("tournament") or []
-        rd = 0
-        for tr in saved_rank:
-            if tr.get("family") == fam:
-                rd = tr.get("reliable_depth") or 0
-        return (-k, -rd, fam)
-
-    order.sort(key=promise)
     results: list[dict[str, Any]] = []
     answered = False
     for fam, fst, cells0, spec in order:
@@ -468,17 +459,6 @@ def certify_rung_combined(
         cells = {t: _task_load(fst, depth, t, min_words, models_dir, fam) for t in COMBINED_TASKS}
         order.append((fam, fst, cells, spec))
 
-    def promise(item):
-        fam, fst, cells, _spec = item
-        k = sum(sum(1 for ok in t.values() if ok) for t in cells.values())
-        saved_rank = state.get("tournament") or []
-        rd = 0
-        for tr in saved_rank:
-            if tr.get("family") == fam:
-                rd = tr.get("reliable_depth") or 0
-        return (-k, -rd, fam)
-
-    order.sort(key=promise)
     results: list[dict[str, Any]] = []
     answered = False
     for fam, fst, cells0, spec in order:
