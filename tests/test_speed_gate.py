@@ -15,6 +15,7 @@ import pytest
 
 import speed_gate as sg
 from bench import cells as bench_cells
+from bench import certify as bench_certify
 from bench import state_store as bench_state_store
 
 
@@ -1108,5 +1109,43 @@ def test_speed_dead_stops_the_climb(tmp_path, capsys):
         assert calls == []
         assert res[0].get("skipped") == "speed gate died at 4,096"
         assert "not climbed" in capsys.readouterr().out
+    finally:
+        monkeypatch.undo()
+
+
+def test_certify_acquires_from_each_family_own_spec(tmp_path, capsys):
+    """Addendum 14 regression: the candidate loop once used the leaked
+    `spec` loop variable - with multiple families every candidate
+    acquired the LAST spec (the 2026-10-06 10:22 run downloaded
+    Mistral-7B safetensors for every family). The order tuple now
+    carries each family own spec."""
+    import full_benchmark as fb
+
+    acquired = []
+
+    def fake_acquire(spec, fam, famdir, rung, state, dry_run):
+        acquired.append((fam, spec))
+        return None
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(bench_certify, "_acquire_missing_model", fake_acquire)
+    try:
+        state: dict[str, Any] = {"families": {}}
+        res = fb.certify_rung_combined(
+            4096,
+            "1_sigma",
+            ["meta-llama/Llama-3.2-3B", "mistralai/Mistral-7B-Instruct-v0.3"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        assert acquired == [
+            ("Llama-3.2-3B", "meta-llama/Llama-3.2-3B"),
+            ("Mistral-7B-Instruct-v0.3", "mistralai/Mistral-7B-Instruct-v0.3"),
+        ]
+        errs = [r.get("error") for r in res]
+        assert all(e and "model file not found" in e for e in errs)
     finally:
         monkeypatch.undo()

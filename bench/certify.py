@@ -128,7 +128,7 @@ def certify_rung(
     n_total = TOURNAMENT_CLIMBS
     floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
     z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
-    order: list[tuple[str, dict[str, Any], dict[int, bool]]] = []
+    order: list[tuple[str, dict[str, Any], dict[int, bool], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
@@ -138,10 +138,10 @@ def certify_rung(
             cells = {r: p == 0 for r, p in speed_cells(fst, depth).items()}
         else:
             cells = certify_cells(fst, depth, min_words, models_dir, fam)
-        order.append((fam, fst, cells))
+        order.append((fam, fst, cells, spec))
 
     def promise(item):
-        fam, fst, cells = item
+        fam, fst, cells, _spec = item
         k = sum(1 for ok in cells.values() if ok)
         saved_rank = state.get("tournament") or []
         rd = 0
@@ -153,7 +153,7 @@ def certify_rung(
     order.sort(key=promise)
     results: list[dict[str, Any]] = []
     answered = False
-    for fam, fst, cells0 in order:
+    for fam, fst, cells0, spec in order:
         cells = dict(cells0)
         measured = len(cells)
         k = sum(1 for ok in cells.values() if ok)
@@ -398,15 +398,15 @@ def certify_rung_combined(
     n_total = TOURNAMENT_CLIMBS
     tier_bars = {"at_least_one": (0.5, 0.20), "1_sigma": (1.0, 0.375), "2_sigma": (2.0, 0.50)}
     z, bar_lo = tier_bars[level]
-    order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]]]] = []
+    order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
         cells = {t: _task_load(fst, depth, t, min_words, models_dir, fam) for t in COMBINED_TASKS}
-        order.append((fam, fst, cells))
+        order.append((fam, fst, cells, spec))
 
     def promise(item):
-        fam, fst, cells = item
+        fam, fst, cells, _spec = item
         k = sum(sum(1 for ok in t.values() if ok) for t in cells.values())
         saved_rank = state.get("tournament") or []
         rd = 0
@@ -418,7 +418,7 @@ def certify_rung_combined(
     order.sort(key=promise)
     results: list[dict[str, Any]] = []
     answered = False
-    for fam, fst, cells0 in order:
+    for fam, fst, cells0, spec in order:
         cells = {t: dict(v) for t, v in cells0.items()}
         entry: dict[str, Any] = {
             "family": fam,
