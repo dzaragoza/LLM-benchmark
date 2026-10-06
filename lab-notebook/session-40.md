@@ -788,3 +788,17 @@ THE RULING: crosshair is a once-in-a-while tool (the addendum-22 close) and now 
 THE STEPS, all verified locally before committing: coverage (the missing-test map, a discovery helper never a metric - 191 tests, 68% total), crosshair check tests/contracts.py (the eleven contract proofs, ~1 min), vulture --min-confidence 80 with the repo's artifact directories excluded (the known findings: signal-handler args, test kwargs - the false-positive class, fine for a discovery log), pre-commit autoupdate as a DRIFT REPORT (never auto-bumps: the diff prints HOOK DRIFT for review, nothing changes on its own). The hypothesis properties ride free - they run in the coverage step's pytest.
 
 MUTMUT stays out (the author's "too expensive" ruling, uninterrupted). Nothing in the weekly run blocks commits - artifacts land in the run log for the next session to read.
+
+### Addendum 25 - the full-capacity run: --force-rung (2026-10-06, the author's "all models at (q8, f16, f16) to measure their full capacity")
+
+THE RULING: before any compression thinking, every model measures at its FULL capacity - the study default variant (Q8_0 weights, f16 K, f16 V). Compression starts only when the speed gate is hit; the gate's verdict, not intuition, decides when.
+
+THE GAP: the certify controllers resolved each family's rung from its STORED selection (Phi-3's Q6_K, gemma's Q2_K, Qwen3.5-9B's Q5_K_M...) - selections made by the old blind search, i.e. ALREADY compressed choices. A full-capacity run was impossible without hand-editing state. THE FIX: --force-rung - both controllers take rung_override, applied ahead of the stored selection; without the flag nothing changes (the stored selections still govern). Test test_force_rung_overrides_stored_selection.
+
+THE COMMANDS (the author's machine; the two-command WoW - dry-run pre-flight, then the real run):
+  pkill -f llama-server; git pull
+  and time python3 full_benchmark.py --certify 2_sigma --task all --force-rung --dry-run
+  and time python3 full_benchmark.py --certify 2_sigma --task all --force-rung
+  git add results.txt; and git commit -m "full-capacity run"; and git push
+
+READ THIS BEFORE THE RUN: (1) the state carries 9 families, models/ has 8 - the run acquires the missing ones (addendum 20's phase-2 build path handles the safetensors repos). (2) At Q8_0 the big families are HEAVY - Llama-3.1-8B ~8.6 GiB, Mistral-7B ~7.7 GiB, Qwen3.5-9B ~9.2 GiB files, plus KV at depth; the ladder starts at 4,096 and the addendum-35 memory shortcut skips infeasible rungs before download. (3) The speed-dead climb stop (addendum 13) is active: a speed death at rung k permanently skips that family higher - with Q8_0 files the gate bites EARLIER, and those speed-death depths are exactly the compression signal the author wants. (4) Ctrl-C stops the run cleanly (addenda 8/15/17); a re-run resumes from stored cells, nothing re-measures.
