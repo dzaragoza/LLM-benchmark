@@ -102,3 +102,23 @@ def test_vt_scoring_all_names_required():
     # case-insensitive: models love lowercase
     ok, partial = rg.score_vt("abcde fghij klmno", names)
     assert ok is True and partial == 3
+
+
+def test_banner_window(tmp_path):
+    """Session 40, addendum 4, coverage-driven: _banner_window reads
+    the trained-context cap from a server launch log - two regexes
+    (the cap line, then n_ctx_train) and an OSError guard. Pure log
+    parsing, decision-relevant (the ceiling search starts below the
+    cap), and until now testless."""
+    import bench.cells as cells
+
+    log = tmp_path / "server.log"
+    log.write_text("llama-server: loading model\n")
+    assert cells._banner_window(str(log)) is None
+    log.write_text(
+        "llama_server_context: training context of the model (32768) max_pos_embeddings = 32768\n"
+    )
+    assert cells._banner_window(str(log)) == 32768
+    log.write_text("n_ctx_train = 8192\n")
+    assert cells._banner_window(str(log)) == 8192
+    assert cells._banner_window(str(tmp_path / "missing.log")) is None

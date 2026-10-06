@@ -114,3 +114,65 @@ addendum-21 wrapper, ruff check + format clean, md_check, js_check
 pass. Pre-commit runner still fails under the sandbox command
 wrapper (session-39 note); all hooks run manually green before the
 commit.
+
+## Addendum 4 - coverage as a discovery tool: three real bugs in code_edit.py, one testless gem in cells.py (2026-10-06, the author's "anything worth improving?")
+
+THE AUTHOR'S RULING: coverage.py is a HELPER TO DISCOVER MISSING
+TESTS, run from time to time - never a hook, never a metric. It
+entered the toolbox this session (pip-installed in the sandbox, not
+a repo dependency; no repo config committed).
+
+THE FIRST RUN (--branch, full suite): code_edit.py 79% with 53
+partial branches; the misses clustered in balance()'s character
+loop - the core of the delimiter checker. Probing those paths found
+THREE REAL BUGS (all mine per the tool-ownership ruling):
+
+BUG 1 (false pass): an unclosed triple quote at end of buffer
+returned None from balance() - the whole-buffer check (markup/json)
+accepted corrupted edits (reproduced: an edit leaving an unterminated
+""" sailed through). FIX: balance() now reports "unclosed triple
+quote" after the loop. Region mode unchanged: a triple quote that
+closes after the region is legal (a docstring opener) and the
+region check tolerates it by design.
+
+BUG 2 (false failure): _verify_result demanded the PATTERN still
+match the result after a replace_regex - false-failing every
+ordinary replacement (old_word -> new_word no longer matches
+old_word; reproduced). FIX: the verify now checks the literal
+replacement text is in the result, and skips the check when the
+replacement carries backreferences (its text is not literal).
+
+BUG 3 (false pass): balance() conflated a MISMATCHED closer (stack
+non-empty, wrong species - corruption) with closer UNDERFLOW (empty
+stack - legal, the opener may sit before the region), returning
+"unbalanced" for both; balance_no_underflow then filtered BOTH
+out, so a true mismatch inside a region was never caught. FIX:
+underflow gets its own message ("closer underflow") and only
+"unbalanced"/quote problems fail the region check - exactly what
+the docstring always claimed.
+
+TESTS ADDED: test_code_edit_balance_interior_paths (comments
+carrying brackets, escapes inside strings, mismatch-vs-underflow
+in the region), test_code_edit_unclosed_triple_quote_refused,
+test_code_edit_replace_regex_verify_literal (literal + backref),
+and test_banner_window in test_ruler_gate.py - bench/cells.py's
+_banner_window (the trained-context cap reader that anchors the
+ceiling search; pure log parsing, 9%-covered module) now has its
+first test.
+
+The mismatch test itself needed three attempts - my first two
+cases were underflow from the REGION's viewpoint (the opener sat
+outside it), teaching the design point afresh: regions are checked
+as units and cannot see the buffer around them.
+
+NUMBERS (discovery, not a metric): code_edit.py 79% -> 83%, 53 ->
+49 partial branches; bench/cells.py 9% -> 16% (the testable logic;
+the rest is live-hardware orchestration, correctly untested).
+state_store.py's 53% noted as the next-lowest pure-repo module -
+deferred, low priority.
+
+VERIFIED: 166/166 pytest (162 + 4 new test functions), ty 0 via
+the addendum-21 wrapper, ruff check +
+format clean, md_check, js_check pass. Pre-commit runner still
+fails under the sandbox command wrapper; all hooks run manually
+green before the commit.
