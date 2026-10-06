@@ -105,8 +105,6 @@ from ruler_gate import report_server_ctx
 
 CORPUS_DEFAULT = "./data/live-corpus-cal50.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
-STALL_RATE_MAX = 0.05  # recorded config of the diagnostic only (v4.x:
-# the verdict is strictly wps, addendum 37)
 # reader (Brysbaert 2019). Protocol v2.1:
 # the anchor is words, not tokens.
 
@@ -1053,7 +1051,6 @@ def analyze(
         "threshold": threshold,
         "verdict": verdict,
         "stall_rate": stall_rate,
-        "stall_rate_max": STALL_RATE_MAX,
         "wall_fail_turns": len(wall_fails),
         "catchup_events": total_catchup_events,
         "worst_catchup_s": worst_catchup_s,
