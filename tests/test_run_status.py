@@ -91,3 +91,40 @@ def test_render_is_a_standalone_page_with_gates():
     for gate in ("speed", "fwe", "vt", "arc"):
         assert gate in b1
     assert "fam" in b1 and "climber" in b1
+
+
+def test_infeasible_families_are_out_of_the_statistics(tmp_path, monkeypatch):
+    """Addendum 45: a family whose trained window cannot run the rung
+    (the addendum-130e cap error) is OUT of the benchmark - its cells
+    (all FAIL-by-400) and its kill never enter the kill-rate panel,
+    and its row says so."""
+    results = tmp_path / "results.txt"
+    results.write_text(
+        "===== 2026-10-06T19:00:00 | full_benchmark.py --task all --force-rung f16 =====\n"
+        "  cell 1 (rung 4,096) speed: 0 stall(s) in 5 turns -> PASS [30s] -> speed 1/1\n"
+        "  cell 1 (rung 4,096) fwe: 2/1 word(s) -> PASS [7s] -> fwe 1/1\n"
+        "  ERROR: server accepted -c 4352 but runs n_ctx 2048 (slots/cap "
+        "silently reduced it, addendum 130e/130f) - the depth budget "
+        "would overflow and every deep turn would 400\n"
+        "  cell 2 (rung 4,096) speed: 0 stall(s) in 0 turns -> FAIL [1s] -> speed 1/2\n"
+        "  cell 2 (rung 4,096) fwe: 0/1 word(s) -> FAIL [1s] -> fwe 1/2\n"
+        "  DEAD - speed cannot reach the bar at 4,096 (1/2, best lower bound"
+        " 0.4 < 0.5); next candidate\n"
+        "[2026-10-06T19:01:00] verdict: capped-family DEAD at rung 4,096"
+        " - committing partial results\n"
+        "  cell 1 (rung 4,096) speed: 0 stall(s) in 5 turns -> PASS [30s] -> speed 1/1\n"
+        "  DEAD - fwe cannot reach the bar at 4,096 (0/9, best lower bound"
+        " 0.4 < 0.5); next candidate\n"
+        "[2026-10-06T19:02:00] verdict: honest-family DEAD at rung 4,096"
+        " - committing partial results\n"
+    )
+    monkeypatch.setattr(run_status, "RESULTS", str(results))
+    inf = run_status.infeasible_families(run_status._pass_segment())
+    assert list(inf) == ["capped-family"]
+    kr = run_status.gate_kill_rates()
+    # the capped family's block (its PASS cell AND its FAIL-by-400
+    # cells and kill) never entered the counts - only the honest
+    # family's one speed cell remains
+    assert kr["speed"]["measured"] == 1 and kr["speed"]["passes"] == 1
+    assert kr["speed"]["kills"] == 0
+    assert kr["fwe"]["kills"] == 1

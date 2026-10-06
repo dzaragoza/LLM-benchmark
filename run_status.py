@@ -65,21 +65,55 @@ def esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def gate_kill_rates() -> dict[str, dict[str, int]]:
-    """Per gate, over the CURRENT pass (everything after the pass's
-    first run header): families killed, and the pass fraction of all
-    measured cells - the raw difficulty of the bar (addendum 43:
-    'difficulty' = kill rate, the author's ruling)."""
+def _pass_segment() -> str:
+    """results.txt scoped to the CURRENT pass: everything after the
+    pass's first --force-rung f16 header."""
     txt = open(RESULTS, encoding="utf-8", errors="replace").read()
-    # scope to THIS pass: the first --force-rung f16 header after the
-    # last non-f16 run (a header per controller call, so the pass's
-    # first header is the run's true start)
     starts = [
         m.start()
         for m in re.finditer(r"===== \S+ \| full_benchmark\.py[^=]*=====", txt)
         if "--force-rung f16" in m.group(0)
     ]
-    seg = txt[starts[0] :] if starts else txt
+    return txt[starts[0] :] if starts else txt
+
+
+def infeasible_families(seg: str) -> dict[str, int]:
+    """The families OUT of the benchmark (addendum 45): the trained
+    window cannot run the rung, so no cell was ever measurable - the
+    family's cells and kills never enter any statistic. Detected from
+    the addendum-130e error lines (the state's 'infeasible' field is
+    the live-run record; this covers families benched before the
+    verdict existed). Returns {family: trained window}."""
+    out: dict[str, int] = {}
+    for m in re.finditer(
+        r"===== \S+ \| full_benchmark\.py[^=]*=====(.*?)(?====== |\Z)",
+        seg,
+        re.S,
+    ):
+        block = m.group(0)
+        fam = re.search(r"verdict: ([\w.\-/]+) (?:DEAD|INFEASIBLE)", block)
+        capped = re.search(r"accepted -c \d+ but runs n_ctx (\d+)", block)
+        if fam and capped:
+            out[fam.group(1)] = int(capped.group(1))
+    return out
+
+
+def gate_kill_rates() -> dict[str, dict[str, int]]:
+    """Per gate, over the CURRENT pass (everything after the pass's
+    first run header): families killed, and the pass fraction of all
+    measured cells - the raw difficulty of the bar (addendum 43:
+    'difficulty' = kill rate, the author's ruling). INFEASIBLE families
+    (addendum 45) are OUT of the benchmark - their blocks are cut from
+    the segment before any count, so neither their kills nor their
+    cells (all FAIL-by-400) enter the statistics."""
+    seg = _pass_segment()
+    infeasible = infeasible_families(seg)
+    for fam in infeasible:
+        block = (
+            rf"===== \S+ \| full_benchmark\.py[^=]*=====(?:(?!===== ).)*?"
+            rf"verdict: {re.escape(fam)} (?:DEAD|INFEASIBLE)[^\n]*\n"
+        )
+        seg = re.sub(block, "", seg, flags=re.S)
     kills: dict[str, int] = {}
     for task, _ in re.findall(r"DEAD - (\w+) cannot reach the bar at [\d,]+ \(([\d/]+)", seg):
         kills[task] = kills.get(task, 0) + 1
@@ -116,6 +150,10 @@ def family_rows() -> list[dict]:
             "kill": "",
             "tally": "",
         }
+        if name in infeasible_families(txt):
+            # the family's own block shows the trained-window cap - no
+            # cell was ever measurable (addendum 45): out of the benchmark
+            row["verdict"] = "INFEASIBLE"
         if row["verdict"] == "DEAD":
             idx = txt.rfind(f"verdict: {name}")
             seg = txt[max(0, idx - 800) : idx]
@@ -220,6 +258,13 @@ def render(rows: list[dict]) -> str:
     out.append("<table>")
     out.append("<tr><th>family</th><th>status</th><th>killed by</th><th>last tally</th></tr>")
     for r in rows:
+        if r["verdict"] == "INFEASIBLE":
+            out.append(
+                f"<tr><td>{esc(r['name'])}</td>"
+                "<td>out of the benchmark &mdash; trained window below the "
+                "first rung (addendum 45)</td><td>&mdash;</td><td>&mdash;</td></tr>"
+            )
+            continue
         status = "climbing" if r["verdict"] == "climbing" else esc(r["verdict"].lower())
         rung = f" @ {esc(r['rung'])} ctx" if r["rung"] and r["verdict"] == "DEAD" else ""
         if r["kill"]:
