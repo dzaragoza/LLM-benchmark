@@ -101,11 +101,16 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         # pipeline's transient peak (source + gguf live together until
         # the verified delete), and dying mid-write leaves a corrupt
         # partial gguf that the next run's local_rung could trust
-        src_gib = sum(
-            os.path.getsize(os.path.join(st_dir, f))
-            for f in os.listdir(st_dir)
-            if os.path.isfile(os.path.join(st_dir, f))
-        ) / (1024**3) if os.path.isdir(st_dir) else 0.0
+        src_gib = (
+            sum(
+                os.path.getsize(os.path.join(st_dir, f))
+                for f in os.listdir(st_dir)
+                if os.path.isfile(os.path.join(st_dir, f))
+            )
+            / (1024**3)
+            if os.path.isdir(st_dir)
+            else 0.0
+        )
         disk = hf_download.free_disk_gib(famdir)
         if disk is not None and disk < src_gib:
             print(
