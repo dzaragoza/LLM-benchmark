@@ -18,7 +18,7 @@ import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 import ruler_gate
 from bench import cells as bench_cells
-from bench.constants import CORPUS_DEFAULT
+from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT
 from bench.tournament_helpers import _climb_csv_partial
 
 COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
@@ -33,17 +33,21 @@ def _task_load(
     min_words: int,
     models_dir: str,
     fam: str,
+    want: dict[str, Any] | None = None,
 ) -> dict[int, bool]:
     """The pass/fail cell map for one task at one rung, from whatever
     evidence already exists (combined mode: a cell's task measurement
-    is loaded if present, measured later only if missing)."""
+    is loaded if present, measured later only if missing). `want` is
+    the variant being certified (session 40, addendum 26): a stored
+    cell measured under another variant does NOT load."""
+    legacy = stored_variant(fst)
     if task == "vt":
-        return {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
+        return {r: p >= 5 for r, p in vt_cells(fst, depth, want, legacy).items()}
     if task == "speed":
-        return {r: p == 0 for r, p in speed_cells(fst, depth).items()}
+        return {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
     if task == "arc":
-        return {r: p >= ARC_CELL_K for r, p in arc_cells(fst).items()}
-    return certify_cells(fst, depth, min_words, models_dir, fam)
+        return {r: p >= ARC_CELL_K for r, p in arc_cells(fst, want, legacy).items()}
+    return certify_cells(fst, depth, min_words, models_dir, fam, want, legacy)
 
 
 def arc_cell_questions(run: int) -> list[dict[str, Any]]:
@@ -59,29 +63,99 @@ def arc_cell_questions(run: int) -> list[dict[str, Any]]:
     return questions[start : start + ARC_CELL_K]
 
 
-def _int_cells(direct: Any) -> dict[int, int]:
+def variant_of(
+    fst: dict[str, Any],
+    rung: str | None,
+    default_k: str | None = None,
+    default_v: str | None = None,
+) -> dict[str, Any] | None:
+    """The variant actually configured for a family at a rung
+    (session 40, addendum 26): rung + KV quants, resolved the same
+    way the certify controllers resolve them - the run's stored
+    quants, then the tournament entry's, then the state default."""
+    if not rung:
+        return None
+    run = (fst.get("runs") or {}).get(rung, {})
+    entry = fst.get("tournament_entry") or {}
+    return {
+        "rung": rung,
+        "kv_k": run.get("kv_quant_k") or entry.get("kv_quant_k") or default_k,
+        "kv_v": run.get("kv_quant_v") or entry.get("kv_quant_v") or default_v,
+    }
+
+
+def stored_variant(
+    fst: dict[str, Any],
+    default_k: str | None = None,
+    default_v: str | None = None,
+) -> dict[str, Any] | None:
+    """The variant the family's STORED selection resolves to - the
+    variant every pre-override (legacy int) cell was measured under,
+    by construction: before --force-rung the controllers always ran
+    the stored selection."""
+    rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
+    return variant_of(fst, rung, default_k, default_v)
+
+
+def _rec_variant(p: Any) -> tuple[Any, Any, Any] | None:
+    if not isinstance(p, dict):
+        return None
+    return (p.get("rung"), p.get("kv_k"), p.get("kv_v"))
+
+
+def _variant_key(v: dict[str, Any] | None) -> tuple[Any, Any, Any]:
+    return (v or {}).get("rung"), (v or {}).get("kv_k"), (v or {}).get("kv_v")
+
+
+def _int_cells(
+    direct: Any,
+    want: dict[str, Any] | None = None,
+    legacy: dict[str, Any] | None = None,
+) -> dict[int, int]:
     """{run: value} from a stored namespace, guarded (session 40,
     addendum 23, found by crosshair): a state file is loaded JSON -
     a corrupt non-numeric key once crashed int() and took the whole
     certify run down with it. Corrupt entries are skipped, not
-    fatal; the re-grade never sees them."""
+    fatal; the re-grade never sees them.
+    Variant filtering (session 40, addendum 26): a cell record may
+    carry the variant that measured it ({v, rung, kv_k, kv_v}). When
+    `want` is given, only matching-variant records load - a cell
+    measured under another variant is UNMEASURED for this run, not
+    silently trusted. Plain legacy records predate variant tracking
+    and match only the family's STORED selection (`legacy`) - by
+    construction that is the variant they were measured under."""
     cells: dict[int, int] = {}
     if not isinstance(direct, dict):
         return cells
     for r, p in direct.items():
         try:
-            cells[int(r)] = int(p)
+            if isinstance(p, dict):
+                value = int(p.get("v"))
+            else:
+                value = int(p)
+            if want is not None:
+                rec = _rec_variant(p)
+                if rec is not None:
+                    if rec != _variant_key(want):
+                        continue
+                elif _variant_key(legacy) != _variant_key(want):
+                    continue
+            cells[int(r)] = value
         except (TypeError, ValueError):
             continue
     return cells
 
 
-def arc_cells(fst: dict[str, Any]) -> dict[int, int]:
+def arc_cells(
+    fst: dict[str, Any],
+    want: dict[str, Any] | None = None,
+    legacy: dict[str, Any] | None = None,
+) -> dict[int, int]:
     """The ARC cell model: a cell is (family, run) with a 0..k graded
     record (correct answers of 5), stored in certify_arc ONCE per
     family - rung-independent (ARC ignores context depth). Pass at
     gold = 5/5."""
-    return _int_cells(fst.get("certify_arc"))
+    return _int_cells(fst.get("certify_arc"), want, legacy)
 
 
 def arc_pass(
@@ -138,18 +212,55 @@ def arc_pass(
         llama_server.stop_server(proc, port)
 
 
-def _task_store(fst: dict[str, Any], depth: int, task: str, run: int, value: int) -> None:
+def cell_record(
+    value: int,
+    variant: dict[str, Any] | None = None,
+) -> Any:
+    """A stored cell record: the graded value plus, when a variant is
+    known, the variant that measured it (session 40, addendum 26).
+    Legacy plain-int records remain readable - they predate variant
+    tracking and are attributed to the family's stored selection."""
+    if variant is None:
+        return value
+    return {
+        "v": value,
+        "rung": variant.get("rung"),
+        "kv_k": variant.get("kv_k"),
+        "kv_v": variant.get("kv_v"),
+    }
+
+
+def _task_store(
+    fst: dict[str, Any],
+    depth: int,
+    task: str,
+    run: int,
+    value: int,
+    variant: dict[str, Any] | None = None,
+) -> None:
     """Persist one cell's graded record in its own namespace (the
-    combined controller never re-measures a stored cell-task)."""
+    combined controller never re-measures a stored cell-task).
+    Session 40, addendum 26: the record carries the VARIANT that
+    measured it ({v, rung, kv_k, kv_v}) - the author will try
+    several variants per model, so a score without its variant is
+    unattributable."""
     ns = {
         "vt": "certify_vt",
         "speed": "certify_speed",
         "arc": "certify_arc",
     }.get(task, "certify")
+    record: Any = value
+    if variant is not None:
+        record = {
+            "v": value,
+            "rung": variant.get("rung"),
+            "kv_k": variant.get("kv_k"),
+            "kv_v": variant.get("kv_v"),
+        }
     if task == "arc":
-        fst.setdefault(ns, {})[str(run)] = value
+        fst.setdefault(ns, {})[str(run)] = record
         return
-    fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = value
+    fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = record
 
 
 def _task_measure(
@@ -223,6 +334,8 @@ def certify_cells(
     min_words: int = 1,
     models_dir: str | None = None,
     fam: str | None = None,
+    want: dict[str, Any] | None = None,
+    legacy: dict[str, Any] | None = None,
 ) -> dict[int, bool]:
     """Session 37, addendum 8: the CELL model - a cell is (model, run
     number, step) and is NEVER measured twice. The historical cells
@@ -255,33 +368,38 @@ def certify_cells(
             cells[int(key)] = True
         elif fall == depth:
             cells[int(key)] = False
-    direct = (fst.get("certify") or {}).get(str(depth)) or {}
-    for key, ok in direct.items():
-        if isinstance(ok, bool):
-            if min_words > 1:
-                continue
-            cells[int(key)] = ok
-        else:
-            cells[int(key)] = int(ok) >= min_words
+    direct = _int_cells((fst.get("certify") or {}).get(str(depth)), want, legacy)
+    for key, words in direct.items():
+        cells[int(key)] = words >= min_words
     return cells
 
 
-def speed_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
+def speed_cells(
+    fst: dict[str, Any],
+    depth: int,
+    want: dict[str, Any] | None = None,
+    legacy: dict[str, Any] | None = None,
+) -> dict[int, int]:
     """The redesigned speed gate's cell model (session 38, addendum 2):
     cell = (model, rung, conversation r), stored in certify_speed as
     {run: stall count}. Gold bar = 0 stalls; the counts re-grade at
     any 'at most x stalls' bar later without re-measuring."""
-    return _int_cells((fst.get("certify_speed") or {}).get(str(depth)))
+    return _int_cells((fst.get("certify_speed") or {}).get(str(depth)), want, legacy)
 
 
-def vt_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
+def vt_cells(
+    fst: dict[str, Any],
+    depth: int,
+    want: dict[str, Any] | None = None,
+    legacy: dict[str, Any] | None = None,
+) -> dict[int, int]:
     """The VT cell model: a cell is (model, run, task) and is NEVER
     measured twice. VT inherits NOTHING from the tournament (the
     climbs were FWE) - every cell is fresh, stored in the separate
     certify_vt namespace as {run: partial 0..5} (the graded score,
     like the FWE x/3 word count; pass = 5, re-gradable at any bar
     later without re-measuring)."""
-    return _int_cells((fst.get("certify_vt") or {}).get(str(depth)))
+    return _int_cells((fst.get("certify_vt") or {}).get(str(depth)), want, legacy)
 
 
 def stamp(msg: str) -> None:
