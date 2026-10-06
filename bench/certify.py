@@ -668,7 +668,14 @@ def combined_medal(fst: dict[str, Any], depth: int) -> str | None:
         if not records:
             return None
         bar = TASK_PASS_BARS[t]
-        k = sum(1 for p in records.values() if p >= bar)
+        # speed's bar is an EQUALITY (0 stalls = gold, addendum 2): a
+        # stall count is never >= 0-pass, so the medal must grade
+        # p == bar there - the same gold bar _task_load grades at
+        # (addendum 38, found by the accept/medal invariant test)
+        if t == "speed":
+            k = sum(1 for p in records.values() if p == bar)
+        else:
+            k = sum(1 for p in records.values() if p >= bar)
         lo_05s, _ = wilson_interval(k, len(records), 0.5)
         lo_1s, _ = wilson_interval(k, len(records), 1.0)
         lo_2s, _ = wilson_interval(k, len(records), 2.0)
