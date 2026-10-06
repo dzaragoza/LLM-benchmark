@@ -1054,3 +1054,59 @@ def test_sigint_shutdown_sequence(tmp_path, capsys):
     out = buf.getvalue()
     assert "SIGINT" in out
     assert "llama-server" in out
+
+
+def test_speed_dead_stops_the_climb(tmp_path, capsys):
+    """Addendum 13: a speed-gate death at rung k persists
+    speed_dead_at on the family - the climb stops there, every deeper
+    rung skips the family without measuring a single cell (the gate
+    measures at depth + 2 * ANSWER_HEADROOM, so a stall at k stalls
+    at every deeper rung too)."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        calls.append((task, run))
+        if task == "speed":
+            return False, 3, "speed: 3 stall(s)"
+        return True, {"fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok"
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
+    try:
+        model = tmp_path / "slow-Q8_0.gguf"
+        model.write_bytes(b"x")
+        state: dict[str, Any] = {
+            "families": {"slow": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}}}
+        }
+        res = fb.certify_rung_combined(
+            4096,
+            "1_sigma",
+            ["slow"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        r = res[0]
+        assert r["verdict"] == "dead"
+        assert r["speed_verdict"] == "dead"
+        assert state["families"]["slow"]["speed_dead_at"] == 4096
+        calls.clear()
+        res = fb.certify_rung_combined(
+            8192,
+            "1_sigma",
+            ["slow"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        assert calls == []
+        assert res[0].get("skipped") == "speed gate died at 4,096"
+        assert "not climbed" in capsys.readouterr().out
+    finally:
+        monkeypatch.undo()

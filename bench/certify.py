@@ -444,6 +444,12 @@ def certify_rung_combined(
             print("  SKIPPED - the rung is already answered")
             results.append(entry)
             continue
+        speed_dead_at = fst.get("speed_dead_at")
+        if speed_dead_at is not None and speed_dead_at <= depth:
+            entry["skipped"] = f"speed gate died at {speed_dead_at:,}"
+            print(f"  SKIPPED - speed gate died at {speed_dead_at:,} - not climbed")
+            results.append(entry)
+            continue
         famdir = os.path.join(models_dir, fam)
         rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
         run = (fst.get("runs") or {}).get(rung or "", {})
@@ -559,6 +565,11 @@ def certify_rung_combined(
             answered = True
         elif verdict == "dead":
             entry["verdict"] = "dead"
+            if dead_task == "speed":
+                prev = fst.get("speed_dead_at")
+                if prev is None or depth < prev:
+                    fst["speed_dead_at"] = depth
+                    save_state(state_path, state)
             ta = tallies[dead_task]
             print(
                 f"  DEAD - {dead_task} cannot reach the bar at {depth:,} "

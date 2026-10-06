@@ -34,4 +34,4 @@
 - [Session 37 — 2026-10-03 (the n=21 completion; medals; certify as type + range; closed 10-04)](session-37.md)
 - [Session 38 — 2026-10-04 (the VT gold certification graded; the speed gate redesign; the combined cell; the UMA census)](session-38.md)
 - [Session 39 — 2026-10-05 (registry hygiene: wow.md section 10; protocol.md catch-up addendum 140; the session-per-day audit)](session-39.md)
-- [Session 40 — 2026-10-06 (the VT heap ruling closed; the code_edit review — four bugs fixed, tool ownership transferred; the quality toolbox; the architecture audit; infra/ package; code_search; the certification redesign — n=20, equidistant medals, the ascending ladder, ruling B)](session-40.md)
+- [Session 40 — 2026-10-06 (the VT heap ruling closed; the code_edit review — four bugs fixed, tool ownership transferred; the quality toolbox; the architecture audit; infra/ package; code_search; the certification redesign — n=20, equidistant medals, the ascending ladder, ruling B; the tier rename, the nameless run, the speed-dead climb stop)](session-40.md)
