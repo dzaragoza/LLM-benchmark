@@ -19,7 +19,7 @@ import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 import ruler_gate
 from bench import cells as bench_cells
-from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT
+from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT, TASK_PASS_BARS
 
 COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
 ARC_CELL_K = 5  # questions per cell (the author's ruling: k=5, like VT's 5 names)
@@ -46,7 +46,10 @@ def _task_load(
     if task == "speed":
         return {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
     if task == "arc":
-        return {r: p >= ARC_CELL_K for r, p in arc_cells(fst, want, legacy).items()}
+        # addendum 52: the gate bar is TASK_PASS_BARS["arc"] (4/5), not
+        # the cell's k - the addendum-43/44 kill-rate recalibration: the
+        # 5/5 gate was below the >= 50% floor (27% per-cell pass)
+        return {r: p >= TASK_PASS_BARS["arc"] for r, p in arc_cells(fst, want, legacy).items()}
     return certify_cells(fst, depth, min_words, want, legacy)
 
 
@@ -207,7 +210,13 @@ def arc_pass(
                 gen = r["choices"][0]["text"].strip()
                 ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
             correct += 1 if ok else 0
-        return correct == len(questions), {"correct": correct, "k": len(questions)}
+        # addendum 52: the PASS/FAIL a cell prints is graded at the
+        # GATE bar (4/5) - same predicate as _task_load, so the run's
+        # printed verdicts and the stored re-grade agree
+        return (
+            correct >= min(TASK_PASS_BARS["arc"], len(questions)),
+            {"correct": correct, "k": len(questions)},
+        )
     finally:
         llama_server.stop_server(proc, port)
 

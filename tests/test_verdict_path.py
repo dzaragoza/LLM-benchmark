@@ -512,3 +512,19 @@ def test_f16_conversion_refuses_on_low_disk(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         cq.create("fam", str(famdir), "f16")
     assert not (famdir / "fam-f16.gguf").exists()
+
+
+def test_arc_gate_grades_at_the_task_pass_bar():
+    """Addendum 52: the arc GATE predicate is TASK_PASS_BARS["arc"]
+    (4/5), the same bar the medal grades at - the 5/5 gate was below
+    the >= 50% kill-rate floor (27% per-cell pass; 4/5 gives 59%).
+    Both predicates must agree: the stored-cell re-grade AND the
+    freshly measured cell's printed verdict."""
+    from bench import state_store
+
+    fst = {"certify_arc": {str(r): 4 for r in range(1, 21)}}
+    loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
+    assert all(loaded.values()) and len(loaded) == 20
+    fst = {"certify_arc": {str(r): 3 for r in range(1, 21)}}
+    loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
+    assert loaded and not any(loaded.values())

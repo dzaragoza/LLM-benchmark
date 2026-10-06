@@ -19,7 +19,13 @@ import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
-from bench.constants import COMBINED_TASKS, CORPUS_DEFAULT, RUNG_DEFAULT, TOURNAMENT_CLIMBS
+from bench.constants import (
+    COMBINED_TASKS,
+    CORPUS_DEFAULT,
+    RUNG_DEFAULT,
+    TASK_PASS_BARS,
+    TOURNAMENT_CLIMBS,
+)
 from bench.state_store import (
     _task_load,
     arc_cells,
@@ -709,9 +715,6 @@ def certify_rung_combined(
             except Exception as e:
                 print(f"  note: verdict commit failed ({e!r}) - the run continues")
     return results
-
-
-TASK_PASS_BARS = {"speed": 0, "fwe": 2, "vt": 4, "arc": 4}
 
 
 def combined_medal(fst: dict[str, Any], depth: int) -> str | None:
