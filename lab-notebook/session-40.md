@@ -429,3 +429,55 @@ fine ad hoc; the pinned-converter block changes only with a
 llama.cpp bump; pip-audit runs once in a while as a check that
 costs one command.
 MUTATION RUN (mutmut, first trial): 1922/1922 mutants -> 584 killed, 1069 survived, 263 suspicious (mutmut's 'tests' classification - the mutant made a test fail in a way mutmut flags as suspicious), 6 timeouts, 0 untested. The survival number is INFLATED by the narrow test selection: only the 4 pure test files (13 tests) run against mutants; test_seams.py (~25 tests, the strongest code_edit file) is excluded because mutmut's mutants/ staging dir cannot import the other root modules test_seams references. So the tally is directional, not a score. SAMPLED-MUTANT VERDICT (4 inspected): (1) code_edit.x__file_type__mutmut_3 - real gap, minor: flips the extension fallback for extension-less paths (no test uses such a path); (2) code_edit.x__apply__mutmut_11 - EQUIVALENT mutant: start index 0 -> None, buf[None:] == buf[0:] in Python, unkillable by any test; (3) code_edit.x__check_delimiters__mutmut_1 - real gap, structural: the whole prose path is exercised only by test_seams/test_ruler_gate, both outside the selection; (4) code_edit.x__find_replace_target__mutmut_3 - real gap: n == 1 -> n != 1 inverts the fast path, killed only by a duplicate-target test the selection lacks. Interpretation: the survived set mixes real gaps (mostly paths only test_seams covers), equivalent mutants, and mutant-mechanics artifacts (e.g. _as_lines/_lines_of reported 'no tests' because the staging dir rewrites helper calls). VERDICT: keep mutmut in the once-in-a-while toolbox per its ruling, but always with the selection caveat - a fair code_edit score requires test_seams in the run, which mutmut's staging-dir design makes infeasible today (it would need the imported root modules copied into mutants/). Removal clause stands: if a future trial adds no finding beyond what coverage + the gates already surface, remove it.
+
+## Addendum 11 - the certification redesign: equidistant medals, n=20, the ascending ladder (2026-10-06, the author's rulings)
+
+Three rulings, one redesign:
+
+1. N IS 20 AGAIN: TOURNAMENT_CLIMBS 21 -> 20. The author chose 21
+   for the mode, the mode is retired, and 20 is the minimum for a
+   2-sigma Wilson bound. All fixtures and docstrings re-pinned; the
+   accept/dead arithmetic shifted (an all-pass candidate accepts at
+   10 measured cells; an all-fail one dies at 8 consecutive fails).
+
+2. EQUIDISTANT MEDALS: the author's ruling - bronze 5, silver 10,
+   gold 15 at n=20. The mechanism: the sigma values stay 0.5/1/2,
+   the THRESHOLDS carry the spacing - bronze lo(0.5s) >= 0.20
+   (first k=5), silver lo(1s) >= 0.375 (first k=10), gold
+   lo(2s) >= 0.50 (first k=15). The majority floor (k >= ceil(n/2))
+   is DROPPED from combined_medal - at n=20 it demanded k >= 10 and
+   would forbid the bronze tier entirely. Interim history: the
+   author first asked for 0.5 sigma bronze, which landed one cell
+   below silver (k=12 vs 13 at n=21) because every tier shared the
+   lo >= 0.5 condition; the 0.25 threshold (k ~ 7) was tried, then
+   superseded by the equidistant ruling the same session.
+
+3. RUNG SELECTION: full_benchmark fills the LOWEST rung possible
+   before going up. --certify without --rungs now walks the
+   ascending ladder 4,096 -> 262,144; a rung is ANSWERED when a
+   model crowns the requested tier and the ladder STOPS there;
+   all-dead at a rung moves the ladder UP to the next depth.
+   Evaluation order unchanged: most-promising candidate first.
+
+RULING B (the author picked it over A): the certify LEVEL maps to
+the medal TIER - at_least_one = bronze, 1_sigma = silver,
+2_sigma = gold - and the combined controller's per-task accept/dead
+math IS the tier's own (z, threshold) bar. So the rung-stopping
+accept fires exactly when combined_medal returns the requested
+tier; no separate controller bar exists anymore.
+
+THE SPEED GATE clarification (the author): the gate is working as
+intended - strictly wps >= 5, k=1 one conversation per cell,
+n=20 cells. The stall-rate tolerance (PASS <= 5%) is an obsolete
+protocol-v3.1 banner concept that survives only in the single-run
+speed_gate output, not in the cell grading. The 100% speed pass
+rate across every family is a genuine result.
+
+RE-GRADED STATE (no re-measurement - cells re-grade from records):
+Qwen3.5-0.8B @4096 SILVER (speed 11/11, fwe 15/15, vt 11/11, arc
+5/8 - arc coverage is the gap); AI21-Jamba2-3B @131072 SILVER
+(fwe 10/11, vt 5/7, arc 6/7 - small-n vt/arc); MiniCPM5-2B @65536
+BRONZE; 15 other complete rungs none. The sandbox cannot run the
+benchmark (no GGUF weights, no llama-server, no GPU) - the run
+happens on the author's machine: python3 full_benchmark.py
+--certify 2_sigma --task all.
