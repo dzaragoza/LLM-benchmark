@@ -1048,9 +1048,18 @@ def test_sigint_shutdown_sequence(tmp_path, capsys):
     import io
 
     buf = io.StringIO()
+    # addendum 17: the handler now ends in os._exit(130), not
+    # sys.exit(130) - a SystemExit raised inside the handler unwinds
+    # through huggingface_hub ThreadPoolExecutor.__exit__, whose
+    # shutdown(wait=True) waits out every in-flight download; the
+    # hard exit is the only way the Ctrl-C actually stops the run.
+    # The stamps land before it, so the sequence is observable from
+    # the buffer; the process itself ends with code 130.
     with pytest.raises(SystemExit) as exc:
         with contextlib.redirect_stdout(buf):
-            fb.sigint_shutdown(signal.SIGINT, None, args)
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(fb.os, "_exit", lambda code: (_ for _ in ()).throw(SystemExit(code)))
+                fb.sigint_shutdown(signal.SIGINT, None, args)
     assert exc.value.code == 130
     out = buf.getvalue()
     assert "SIGINT" in out
@@ -1202,5 +1211,47 @@ def test_sigint_during_acquire_stops_the_run(tmp_path):
                 False,
             )
         assert ei.value.code == 130
+    finally:
+        monkeypatch.undo()
+
+
+def test_unselected_family_falls_back_to_default_rung(tmp_path):
+    """Addendum 17 regression: a family with selected=None (never
+    walked, e.g. Llama-3.1-8B in benchmark-state.json) once resolved
+    rung=None - _acquire_missing_model returned None without
+    touching the network and the candidate errored "model file not
+    found (None)". The rung now falls back to RUNG_DEFAULT (Q8_0) so
+    acquisition actually happens."""
+    import full_benchmark as fb
+    from infra import hf_download
+
+    asked = []
+
+    def fake_list_repo_files(repo):
+        return []
+
+    def fake_acquire(
+        fam, famdir, rung, model_repo, model_files, source_repo, source_files, dry_run
+    ):
+        asked.append((fam, rung))
+        return None, "plan"
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(hf_download, "require_hub", lambda: None)
+    monkeypatch.setattr(hf_download, "list_repo_files", fake_list_repo_files)
+    monkeypatch.setattr(hf_download, "acquire", fake_acquire)
+    try:
+        state: dict[str, Any] = {"families": {"never-walked": {"spec": "test/never-walked"}}}
+        fb.certify_rung_combined(
+            4096,
+            "1_sigma",
+            ["test/never-walked"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        assert asked == [("never-walked", "Q8_0")]
     finally:
         monkeypatch.undo()

@@ -1291,7 +1291,14 @@ def sigint_shutdown(signum, frame, args=None):
         except Exception as e:
             stamp(f"git tail failed (ignored): {e}")
     stamp("shutdown complete - goodbye")
-    sys.exit(130)
+    # os._exit, not sys.exit: a SystemExit raised inside the handler
+    # unwinds through huggingface_hub's ThreadPoolExecutor.__exit__,
+    # whose shutdown(wait=True) politely waits out every in-flight
+    # download - the Ctrl-C "did not stop". The clean shutdown above
+    # already ran; nothing is left to unwind.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(130)
 
 
 def install_sigint_handler(args: argparse.Namespace) -> None:

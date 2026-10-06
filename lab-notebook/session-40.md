@@ -644,3 +644,45 @@ Verification: the corpus default resolves and loads (50
 PROTOCOL NOTE: the protocol.md corpus row and the README thinking
    command now point at the true paths - protocol.md is current
    values only, and the current values changed.
+
+
+## Addendum 17 - the 10:57 run: two residuals fixed (2026-10-06)
+
+The 10:57 log shows the addendum-14 fix working (Llama-3.2-3B
+downloads from meta-llama, its OWN repo) - two residuals remained:
+
+1. THE NEVER-SELECTED FAMILY: Llama-3.1-8B-Instruct errored
+   "model file not found (None)" - its state entry has
+   selected=None (registered but never walked), so the rung
+   resolved to None and _acquire_missing_model returned None
+   without ever touching the network. Fix: the rung falls back to
+   RUNG_DEFAULT (Q8_0) in both controllers - a family in the
+   roster without a selection acquires at the study default.
+   Regression test test_unselected_family_falls_back_to_default_rung
+   asserts the acquisition asks for Q8_0, not None.
+
+2. CTRL-C STILL DID NOT STOP (the author's second report): the
+   handler ran - the SIGINT stamps ARE in results.txt - but the
+   process kept waiting. Root cause: sys.exit(130) raises
+   SystemExit inside the handler, and the main thread at that
+   moment sits inside huggingface_hub's snapshot_download, whose
+   hf_thread_map runs downloads in a ThreadPoolExecutor context
+   manager - unwinding passes through executor.__exit__ ->
+   shutdown(wait=True), which politely waits out every in-flight
+   download before the exit takes effect. Fix: the handler ends in
+   os._exit(130) AFTER the clean shutdown (llama-server killed, tee
+   uninstalled, git tail run, stamps flushed) - a hard exit no
+   executor can hold hostage. The addendum-8 sequence test
+   re-pinned to the hard exit (os._exit monkeypatched to raise).
+
+Both errors from the author's report are closed. 176/176 pytest,
+ty 0, ruff check+format clean, md_check, js_check.
+
+CODE_EDIT NOTE: the whitespace-flexible fallback once again
+misfired - the addendum-17 comment block landed one line off,
+gluing "args = argparse.Namespace(...)" onto the preceding assert
+line (a SyntaxError-free but broken edit, caught by the test
+failure and re-aimed). The fallback applying blocks at
+whitespace-flexible positions when the exact text misses is the
+recurring papercut; exact-match-or-refuse for non-twin regions is
+the candidate hardening, noted for the next code_edit review.
