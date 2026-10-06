@@ -128,3 +128,49 @@ def test_infeasible_families_are_out_of_the_statistics(tmp_path, monkeypatch):
     assert kr["speed"]["measured"] == 1 and kr["speed"]["passes"] == 1
     assert kr["speed"]["kills"] == 0
     assert kr["fwe"]["kills"] == 1
+
+
+def test_disqualified_row_shows_the_actual_total(tmp_path, monkeypatch):
+    """Addendum 47 (the author's request): the kill table carries the
+    disqualified families too - kills + disqualified = the actual
+    roster total, while their cells stay out of every statistic."""
+    results = tmp_path / "results.txt"
+    results.write_text(
+        "===== 2026-10-06T20:00:00 | full_benchmark.py --task all --force-rung f16 =====\n"
+        "  cell 1 (rung 4,096) speed: 0 stall(s) in 5 turns -> PASS [30s] -> speed 1/1\n"
+        "  DEAD - fwe cannot reach the bar at 4,096 (0/9, best lower bound"
+        " 0.4 < 0.5); next candidate\n"
+        "[2026-10-06T20:01:00] verdict: honest-family DEAD at rung 4,096"
+        " - committing partial results\n"
+        "  ERROR: server accepted -c 4352 but runs n_ctx 2048 (addendum 130e)\n"
+        "  cell 1 (rung 4,096) speed: 0 stall(s) in 0 turns -> FAIL [1s] -> speed 0/1\n"
+        "[2026-10-06T20:02:00] verdict: capped-family DEAD at rung 4,096"
+        " - committing partial results\n"
+    )
+    monkeypatch.setattr(run_status, "RESULTS", str(results))
+    kr = run_status.gate_kill_rates()
+    assert kr["fwe"]["kills"] == 1
+    rows = [
+        {
+            "name": "honest-family",
+            "verdict": "DEAD",
+            "rung": "4,096",
+            "kill": "fwe",
+            "tally": "0/9",
+        },
+        {
+            "name": "capped-family",
+            "verdict": "INFEASIBLE",
+            "rung": "",
+            "kill": "",
+            "tally": "",
+        },
+    ]
+    page = run_status.render(rows)
+    assert "disqualified" in page
+    assert "1</td><td>&mdash;</td><td>&mdash;</td></tr></table>" not in page
+    # the disqualified count line is present with its total
+    import re
+
+    m = re.search(r"addendum 45\)</td><td>(\d+)</td>", page)
+    assert m and m.group(1) == "1"
