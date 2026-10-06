@@ -35,6 +35,8 @@ GUIDE = {
         "pinned converter missing: ./llama.cpp must be the b10964 checkout",
         "quantizer missing: place the b10964 build at ./llama-b10964-gpu/",
         "RAM/disk: f16 conversion needs several GB of each",
+        "disk space: free some (the f16 gguf is written next to its "
+        "source; both live together until the verified delete)",
     ],
 }
 
@@ -94,6 +96,25 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         return None
     if not f16:
         out_f16 = os.path.join(famdir, fam + "-f16.gguf")
+        # addendum 48: the disk check is a HARD GATE before the
+        # conversion starts, not a warning - the f16 write is the
+        # pipeline's transient peak (source + gguf live together until
+        # the verified delete), and dying mid-write leaves a corrupt
+        # partial gguf that the next run's local_rung could trust
+        src_gib = sum(
+            os.path.getsize(os.path.join(st_dir, f))
+            for f in os.listdir(st_dir)
+            if os.path.isfile(os.path.join(st_dir, f))
+        ) / (1024**3) if os.path.isdir(st_dir) else 0.0
+        disk = hf_download.free_disk_gib(famdir)
+        if disk is not None and disk < src_gib:
+            print(
+                f"  [2] f16 conversion needs ~{src_gib:.1f} GiB free "
+                f"(the f16 is roughly the source's tensor payload) but only "
+                f"{disk:.1f} GiB is free - free disk space and rerun; "
+                "the script resumes from this phase"
+            )
+            fail(2, rung, "not enough disk for the f16 conversion", GUIDE[2])
         print(
             "  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)"
         )

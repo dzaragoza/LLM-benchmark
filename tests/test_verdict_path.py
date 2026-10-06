@@ -492,3 +492,23 @@ def test_window_cap_makes_the_family_infeasible_not_dead(tmp_path, monkeypatch):
         False,
     )
     assert res2[0].get("skipped", "").startswith("infeasible")
+
+
+def test_f16_conversion_refuses_on_low_disk(tmp_path, monkeypatch):
+    """Addendum 48: the disk check before the f16 conversion is a HARD
+    GATE, not a warning - the f16 write is the pipeline's transient
+    peak (source + gguf together until the verified delete), and a
+    mid-write death leaves a partial gguf a later run could trust."""
+    import infra.convert_quant as cq
+    import infra.hf_download as hf
+
+    famdir = tmp_path / "fam"
+    famdir.mkdir()
+    st_dir = famdir / "safetensors-source"
+    st_dir.mkdir()
+    (st_dir / "model-00001-of-00001.safetensors").write_bytes(b"x" * (2 * 1024**3))
+    monkeypatch.setattr(hf, "free_disk_gib", lambda path=".": 1.0)
+    monkeypatch.setattr(cq, "hf_download", hf)
+    with pytest.raises(SystemExit):
+        cq.create("fam", str(famdir), "f16")
+    assert not (famdir / "fam-f16.gguf").exists()

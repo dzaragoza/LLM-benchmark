@@ -61,6 +61,17 @@ CERT = (
 )
 
 
+def disk_free_gib() -> float | None:
+    """Free disk at the repo root (None if undetectable) - shown on
+    the page so the f16 pipeline's transient peak is watchable
+    (addendum 48)."""
+    try:
+        st = os.statvfs(ROOT)
+        return st.f_bavail * st.f_frsize / (1024**3)
+    except OSError:
+        return None
+
+
 def esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -224,6 +235,16 @@ def render(rows: list[dict]) -> str:
         "quality, full size - param-ascending; updated as the run commits "
         "its verdicts</p>"
     )
+    # addendum 48: the machine's own headroom next to the run's - the
+    # f16 write is the pipeline's transient peak (source + gguf
+    # together), so the free disk is run-relevant, not trivia
+    free = disk_free_gib()
+    if free is not None:
+        out.append(
+            f'<p class="sub">free disk: {free:.1f} GiB '
+            "(the f16 pipeline needs ~the source size free per family)"
+            "</p>"
+        )
 
     # the gates panel: difficulty per gate
     out.append('<div class="panel">')
