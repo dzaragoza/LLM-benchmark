@@ -17,7 +17,7 @@ import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
-from bench.constants import COMBINED_TASKS, CORPUS_DEFAULT, TOURNAMENT_CLIMBS
+from bench.constants import COMBINED_TASKS, CORPUS_DEFAULT, RUNG_DEFAULT, TOURNAMENT_CLIMBS
 from bench.state_store import (
     _task_load,
     arc_cells,
@@ -175,7 +175,9 @@ def certify_rung(
             results.append(entry)
             continue
         famdir = os.path.join(models_dir, fam)
-        rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
+        rung = (
+            fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
+        )
         run = (fst.get("runs") or {}).get(rung or "", {})
         model = (
             run.get("file")
@@ -453,7 +455,9 @@ def certify_rung_combined(
             results.append(entry)
             continue
         famdir = os.path.join(models_dir, fam)
-        rung = fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung")
+        rung = (
+            fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
+        )
         run = (fst.get("runs") or {}).get(rung or "", {})
         model = (
             run.get("file")
