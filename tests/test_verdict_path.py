@@ -610,3 +610,62 @@ def test_vt_pass_fresh_cell_grades_at_the_task_pass_bar():
     src = inspect.getsource(bench_cells.vt_pass)
     assert 'row["acc"] >= TASK_PASS_BARS["vt"] / 5.0' in src
     assert 'row["acc"] == 1.0' not in src
+
+
+def test_fresh_family_cells_persist_to_the_state_file(tmp_path, monkeypatch):
+    """Addendum 55: a FRESH family (not yet in the state) must store its
+    cells into the state's OWN entry. The bug: fst = get(fam, {}) bound
+    a detached dict, while _acquire_missing_model later created a
+    different dict via setdefault - every stored cell landed in the
+    orphan and save_state wrote the empty entry. The whole from-scratch
+    f16 pass stored zero cells; restarts re-measured everything."""
+    import json
+
+    import bench.certify as BC
+    import bench.state_store as SS
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        return (True, 0 if task == "speed" else 4, f"{task} ok", 2.0)
+
+    monkeypatch.setattr(SS, "_task_measure", fake_measure)
+    monkeypatch.setattr(BC.bench_state_store, "_task_measure", fake_measure)
+
+    class HD:
+        require_hub = staticmethod(lambda: None)
+        acquire = staticmethod(lambda *a, **k: ("./models/newfam/newfam-f16.gguf", "plan"))
+        list_repo_files = staticmethod(lambda repo: [])
+
+    monkeypatch.setattr(BC, "hf_download", HD())
+    monkeypatch.setattr(
+        BC, "convert_quant", type("cq", (), {"create": staticmethod(lambda *a, **k: None)})()
+    )
+    models = tmp_path / "models" / "newfam"
+    models.mkdir(parents=True)
+    (models / "newfam-f16.gguf").touch()
+    state = {"families": {}}
+    state_file = tmp_path / "state.json"
+    BC.certify_rung_combined(
+        4096,
+        ["newfam"],
+        str(tmp_path / "models"),
+        state,
+        str(state_file),
+        8210,
+        False,
+        min_words=2,
+    )
+    saved = json.loads(state_file.read_text())
+    fam = saved["families"]["newfam"]
+    assert [k for k in fam if k.startswith("certify")], "fresh family cells were lost"
+    # and the never-re-measure promise: the rerun measures nothing
+    res2 = BC.certify_rung_combined(
+        4096,
+        ["newfam"],
+        str(tmp_path / "models"),
+        saved,
+        str(state_file),
+        8210,
+        False,
+        min_words=2,
+    )
+    assert res2[0]["ran_now"] == 0
