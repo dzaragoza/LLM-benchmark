@@ -59,7 +59,7 @@ import bench.tee_output as tee_output
 import infra.llama_server as llama_server
 from law_fit import kv_gib
 
-CORPUS_DEFAULT = "./live-corpus-cal50.json"
+CORPUS_DEFAULT = "./data/live-corpus-cal50.json"
 PORT_DEFAULT = 8078
 CTX_DEFAULT = 4096
 DEPTH_DEFAULT = 4000

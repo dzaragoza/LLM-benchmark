@@ -303,7 +303,7 @@ rungs are self-quantized from google/gemma-3-1b-it safetensors (the
 ## Protocol notes (pre-registered, fixed)
 
 - **Speed metric (protocol v3.0/v3.1, addenda 55/66):** 50 fixed Arena
-  conversations (instrument corpus `live-corpus-cal50.json`, seed 1024,
+  conversations (instrument corpus `data/live-corpus-cal50.json`, seed 1024,
   reply-length p75 answer cap), each depth-prefilled to the 4096
   reference depth via a `/tokenize`-sized corpus-text blob (the KV
   cost is content-independent, so the blob guarantees the measurement

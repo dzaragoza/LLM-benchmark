@@ -51,7 +51,7 @@ from typing import Any
 
 import bench.tee_output as tee_output
 
-CORPUS_DEFAULT = "./live-corpus-cal50.json"
+CORPUS_DEFAULT = "./data/live-corpus-cal50.json"
 
 
 def count_words(text: str) -> int:
