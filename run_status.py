@@ -77,6 +77,20 @@ def disk_free_gib() -> tuple[float, str] | None:
         return None
 
 
+def run_disk() -> tuple[float, str, str] | None:
+    """The RUN'S OWN disk reading, stamped into the state file by
+    full_benchmark at startup (addendum 51): (free_gib, host, at).
+    None if the state file has no stamp yet."""
+    try:
+        with open(STATE, encoding="utf-8") as f:
+            d = json.load(f).get("disk") or {}
+        if d.get("free_gib") is not None:
+            return float(d["free_gib"]), str(d.get("host", "?")), str(d.get("at", "?"))
+    except Exception:
+        return None
+    return None
+
+
 def esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -242,18 +256,31 @@ def render(rows: list[dict]) -> str:
     )
     # addendum 48: the machine's own headroom next to the run's - the
     # f16 write is the pipeline's transient peak (source + gguf
-    # together), so the free disk is run-relevant, not trivia
-    free = disk_free_gib()
+    # together), so the free disk is run-relevant, not trivia.
+    # addendum 51: the RUN'S OWN reading wins - full_benchmark stamps
+    # its machine's disk into the state file at startup, so the page
+    # reports the benchmark machine's headroom no matter who regenerates
+    # the page. The local reading is the fallback only.
+    free = run_disk()
     if free is not None:
-        gib, host = free
+        gib, host, at = free
         out.append(
             f'<p class="sub">free disk: {gib:.1f} GiB on {esc(host)} '
-            "(the f16 pipeline needs ~the source size free per family; "
-            "the host is named because the page travels - this is the disk "
-            "of whichever machine regenerated it, not necessarily the "
-            "benchmark machine's)"
+            f"(the benchmark machine's own reading, stamped by the run at {esc(at)})"
             "</p>"
         )
+    else:
+        free = disk_free_gib()
+        if free is not None:
+            gib, host = free
+            out.append(
+                f'<p class="sub">free disk: {gib:.1f} GiB on {esc(host)} '
+                "(the f16 pipeline needs ~the source size free per family; "
+                "the host is named because the page travels - this is the disk "
+                "of whichever machine regenerated it, not necessarily the "
+                "benchmark machine's)"
+                "</p>"
+            )
 
     # the gates panel: difficulty per gate
     out.append('<div class="panel">')

@@ -29,15 +29,12 @@ ROSTER = {
     "Qwen3.5-0.8B": "Qwen/Qwen3.5-0.8B",
     "Qwen3.5-2B": "Qwen/Qwen3.5-2B",
     "Qwen3.5-4B": "Qwen/Qwen3.5-4B",
-    "Qwen3.5-9B": "Qwen/Qwen3.5-9B",
     "AI21-Jamba2-3B": "ai21labs/AI21-Jamba2-3B",
     "AI21-Jamba-Reasoning-3B": "ai21labs/AI21-Jamba-Reasoning-3B",
-    "AI21-Jamba2-Mini": "ai21labs/AI21-Jamba2-Mini",
     "RWKV7-World-2.9B": "RWKV/RWKV7-Goose-World3-2.9B-HF",
     "Qwen2.5-1.5B-Instruct": "Qwen/Qwen2.5-1.5B-Instruct",
     "Qwen3-1.7B": "Qwen/Qwen3-1.7B",
     "Qwen3-4B-Instruct-2507": "Qwen/Qwen3-4B-Instruct-2507",
-    "Qwen3-30B-A3B-Instruct-2507": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "phi-1": "microsoft/phi-1",
     "phi-2": "microsoft/phi-2",
     "phi-4-mini-instruct": "microsoft/phi-4-mini-instruct",
@@ -66,14 +63,14 @@ ROSTER = {
     "gemma-3-4b-it": "google/gemma-3-4b-it",
     "Ministral-3-3B-Instruct-2512": "mistralai/Ministral-3-3B-Instruct-2512",
     "Llama-3.2-1B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
-    "Llama-3.1-8B-Instruct": "meta-llama/Llama-3.1-8B-Instruct",
-    "gpt-oss-20b": "openai/gpt-oss-20b",
     "SmolLM3-3B": "HuggingFaceTB/SmolLM3-3B",
-    "Hunyuan-A13B-Instruct": "tencent/Hunyuan-A13B-Instruct",
-    "EXAONE-4.0-32B": "LGAI-EXAONE/EXAONE-4.0-32B",
-    "Ling-lite": "inclusionAI/Ling-lite",
-    "GLM-4.5-Air": "zai-org/GLM-4.5-Air",
 }
+# The roster is CUT at gemma-4-e2b-it (5.12B) - the author's 80 GB
+# disk ruling (session 40, addendum 51): every family above it (from
+# Llama-3.1-8B up) cannot fit the f16 pipeline, whose transient peak
+# is source + gguf together, roughly 2x the steady-state size. The
+# models.md rows stay as the geometry record of what was cut.
+CUT_BELOW_DISK = "gemma-4-e2b-it"
 
 # gated repos the study cannot fetch; geometry from the author's pull / public cards.
 # kept explicit so `check` knows why a row has no hub extract.
@@ -81,7 +78,6 @@ GATED = {
     "gemma-3-1b-it": "author pull (addendum 22)",
     "gemma-3-4b-it": "author pull (addendum 22)",
     "Llama-3.2-1B-Instruct": "author pull (addendum 22)",
-    "Llama-3.1-8B-Instruct": "public model card (addendum 24)",
 }
 
 
