@@ -1,8 +1,8 @@
-"""run_status tests (session 41, addenda 41/42): the live-status page
+"""run_status tests (session 41, addenda 41-43): the live-status page
 extracts the per-family verdicts correctly (the kill task from the
-DEAD block immediately before each family's own verdict line - a
-later family's DEAD must not leak into an earlier family's row), and
-renders a well-formed standalone page."""
+DEAD block immediately before each family's own verdict line), the
+per-gate kill rates scoped to the current pass, and renders a
+well-formed standalone page."""
 
 from __future__ import annotations
 
@@ -40,9 +40,39 @@ def test_verdict_extraction_from_results(tmp_path, monkeypatch):
     assert by_name["Qwen3.5-0.8B"]["tally"] == "2/8"
 
 
+def test_gate_kill_rates_scoped_to_the_pass(tmp_path, monkeypatch):
+    """The kill rates count ONLY the current f16 pass (the pass's first
+    --force-rung f16 header is the scope start; older runs must not
+    leak in), and the cells are counted per-CELL (the k/n in the cell
+    lines is a running tally - never summed)."""
+    results = tmp_path / "results.txt"
+    results.write_text(
+        # an OLDER run's history - must not count
+        "===== 2026-10-02T10:00:00 | full_benchmark.py --tournament =====\n"
+        "  DEAD - fwe cannot reach the bar at 4,096 (0/9, best lower bound"
+        " 0.4 < 0.5); next candidate\n"
+        "  cell 9 (rung 4,096) speed: 0 stalls -> PASS -> speed 9/9\n"
+        # THIS pass
+        "===== 2026-10-06T17:40:10 | full_benchmark.py --task all --force-rung f16 =====\n"
+        "  cell 1 (rung 4,096) fwe: 3/1 word(s) -> PASS [8s] -> fwe 1/1\n"
+        "  cell 2 (rung 4,096) fwe: 0/1 word(s) -> FAIL [8s] -> fwe 1/2\n"
+        "  cell 3 (rung 4,096) vt: 5/5 names -> PASS [6s] -> vt 1/1\n"
+        "  DEAD - vt cannot reach the bar at 4,096 (0/6, best lower bound"
+        " 0.477 < 0.5); next candidate\n"
+    )
+    monkeypatch.setattr(run_status, "RESULTS", str(results))
+    kr = run_status.gate_kill_rates()
+    assert kr["fwe"]["kills"] == 0  # the old fwe kill must not count
+    assert kr["fwe"]["passes"] == 1 and kr["fwe"]["measured"] == 2
+    assert kr["vt"]["kills"] == 1
+    assert kr["vt"]["passes"] == 1 and kr["vt"]["measured"] == 1
+    assert kr["speed"]["measured"] == 0  # the old speed cell must not count
+
+
 def test_render_is_a_standalone_page_with_gates():
-    """The page carries the four gates' difficulty panel, one row per
-    family, and the idempotence: rendering twice is identical."""
+    """The page carries the four gates' difficulty panel, the kill-rate
+    panel, one row per family, and idempotence: rendering twice is
+    identical."""
     rows = [
         {
             "name": "fam",
@@ -61,31 +91,3 @@ def test_render_is_a_standalone_page_with_gates():
     for gate in ("speed", "fwe", "vt", "arc"):
         assert gate in b1
     assert "fam" in b1 and "climber" in b1
-
-
-def test_gate_kill_rates_scoped_to_the_pass(tmp_path, monkeypatch):
-    """The kill rates count ONLY the current f16 pass - the pass's
-    first --force-rung f16 header is the scope start; anything before
-    it (older runs in results.txt) must not leak in."""
-    results = tmp_path / "results.txt"
-    results.write_text(
-        # an OLDER run's history - must not count
-        "===== 2026-10-02T10:00:00 | full_benchmark.py --tournament =====\n"
-        "  DEAD - fwe cannot reach the bar at 4,096 (0/9, best lower bound"
-        " 0.4 < 0.5); next candidate\n"
-        "  cell 9 speed: 0 stalls -> PASS -> speed 9/9\n"
-        # THIS pass
-        "===== 2026-10-06T17:40:10 | full_benchmark.py --task all --force-rung f16 =====\n"
-        "  cell 1 fwe: 3/1 word(s) -> PASS -> fwe 1/1\n"
-        "  cell 2 fwe: 0/1 word(s) -> FAIL -> fwe 1/2\n"
-        "  cell 3 vt: 5/5 names -> PASS -> vt 1/1\n"
-        "  DEAD - vt cannot reach the bar at 4,096 (0/6, best lower bound"
-        " 0.477 < 0.5); next candidate\n"
-    )
-    monkeypatch.setattr(run_status, "RESULTS", str(results))
-    kr = run_status.gate_kill_rates()
-    assert kr["fwe"]["kills"] == 0  # the old fwe kill must not count
-    assert kr["fwe"]["passes"] == 1 and kr["fwe"]["measured"] == 2
-    assert kr["vt"]["kills"] == 1
-    assert kr["vt"]["passes"] == 1 and kr["vt"]["measured"] == 1
-    assert kr["speed"]["measured"] == 0  # old speed cells must not count

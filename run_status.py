@@ -83,11 +83,13 @@ def gate_kill_rates() -> dict[str, dict[str, int]]:
     kills: dict[str, int] = {}
     for task, _ in re.findall(r"DEAD - (\w+) cannot reach the bar at [\d,]+ \(([\d/]+)", seg):
         kills[task] = kills.get(task, 0) + 1
+    # per-CELL outcomes (the k/n in the cell lines is a RUNNING tally -
+    # summing it double-counts; the PASS/FAIL verdict is per cell)
     tal: dict[str, list[int]] = {}
-    for task, k, n in re.findall(r"-> (\w+) (\d+)/(\d+)\s", seg):
+    for task, outcome in re.findall(r"cell \d+ \(rung [\d,]+\) (\w+): .*?-> (PASS|FAIL)", seg):
         a = tal.setdefault(task, [0, 0])
-        a[0] += int(k)
-        a[1] += int(n)
+        a[0] += 1 if outcome == "PASS" else 0
+        a[1] += 1
     return {
         task: {
             "kills": kills.get(task, 0),
