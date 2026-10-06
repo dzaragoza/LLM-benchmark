@@ -933,3 +933,5 @@ RULING 4 (the artifacts): "the html are live, they are the main artifact of the 
 RULING 5 (dead code): "fix." TOURNAMENT_MODEL_QUANTS / TOURNAMENT_KV_QUANTS (bench/constants.py), QUERY_TEMPLATE (ruler_gate.py), drop_file_cache (infra/llama_server.py) deleted. Three obsolete dump-reuse tests cut (they exercised the deleted bench()).
 
 Tests: 163 total (the three dump-reuse tests cut with the bench path). All gates: pytest 163/163, ty 0 (only the sandbox's missing huggingface_hub/pyarrow imports), ruff clean, md_check, vulture clean (the sigint handler's required signum/frame signature aside). Sanity: analyze() verdicted on correct-shape dumps - worst 2.50 wps -> FAIL, worst 20.00 wps -> PASS (confident), stall_rate present as data both times.
+
+ADDENDUM 37 CORRECTION (the author's follow-up): STALL_RATE_MAX is deleted entirely, with the stall_rate_max field of analyze's return - "we don't use it anymore. the decision of pass fail is sharp in the script. for the benchmark is about the medal it gets." The stall_rate stays as recorded data; there is no threshold anywhere.
