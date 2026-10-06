@@ -84,7 +84,7 @@ def gate_kill_rates() -> dict[str, dict[str, int]]:
     for task, _ in re.findall(r"DEAD - (\w+) cannot reach the bar at [\d,]+ \(([\d/]+)", seg):
         kills[task] = kills.get(task, 0) + 1
     tal: dict[str, list[int]] = {}
-    for task, k, n in re.findall(r"-> (\w+) (\d+)/(\d+) ", seg):
+    for task, k, n in re.findall(r"-> (\w+) (\d+)/(\d+)\s", seg):
         a = tal.setdefault(task, [0, 0])
         a[0] += int(k)
         a[1] += int(n)
