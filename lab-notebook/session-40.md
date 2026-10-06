@@ -772,3 +772,11 @@ THE FILES: tests/contracts.py (six contracts - wilson bounds, domain, z=0 degene
 THE WILSON LESSON registered honestly: my first "all-pass reaches 1" property was WRONG - Wilson's lower bound at k=n is 1/denom < 1 (the honest interval never claims certainty from finite evidence); hypothesis caught it in seconds. The corrected property pins hi=1 exactly and lo=1/denom - a better statement than I first wrote, which is the whole point of the method.
 
 RUN: `crosshair check tests/contracts.py` (proofs, ~1 min) and `python3 -m pytest tests/test_properties.py` (falsification, ~1.4 s). Not a pre-commit hook - the once-in-a-while class, like coverage and vulture.
+
+### Addendum 23 - the verification spread: estimate, KV arithmetic, the law, the cell loaders (2026-10-06, the author's "do it")
+
+THE SPREAD (the addendum-22 close: "good next candidates" - estimate_rung_gib, the law/ceiling functions, the cell arithmetic) is now under contract. tests/contracts.py grows to ELEVEN contracts (all proved): estimate_rung_gib (an estimate, when produced, is positive; no sources, no estimate - never a false skip), kv_gib (non-negative; linear in depth - kv(d)*2 == kv(2d)), law_worst (a positive fit predicts a positive worst-speed), and the three cell loaders (speed/vt/arc: the stored str-keys come back as exactly the stored int-keys - the state's stringly keys never leak).
+
+ONE REAL FINDING, THE BEST KIND: crosshair crashed arc_cells on a corrupt state entry - {'': 0} (a non-numeric run key) kills int() and would take a whole certify run down with it. The state file is loaded JSON; corruption is a real failure mode, not a hypothetical. THE FIX: a shared _int_cells loader in bench/state_store.py - non-dict namespaces yield {}, non-numeric keys/values are skipped (the re-grade never sees them), all three loaders route through it. Crosshair proves the guarded contract; hypothesis pounds it with junk (none, ints, text, lists) and mixed-type dicts.
+
+tests/test_properties.py grows to FOURTEEN properties: the loaders' roundtrip/depth-isolation/guarded/skips-corrupt quartet, kv_gib's linearity and monotonicity in depth, law_worst's positivity and decrease in size, the estimate's none-or-positive. 191 tests total. All gates: pytest 191/191, ty 0, ruff clean, md_check, crosshair ALL PROVED.

@@ -59,13 +59,29 @@ def arc_cell_questions(run: int) -> list[dict[str, Any]]:
     return questions[start : start + ARC_CELL_K]
 
 
+def _int_cells(direct: Any) -> dict[int, int]:
+    """{run: value} from a stored namespace, guarded (session 40,
+    addendum 23, found by crosshair): a state file is loaded JSON -
+    a corrupt non-numeric key once crashed int() and took the whole
+    certify run down with it. Corrupt entries are skipped, not
+    fatal; the re-grade never sees them."""
+    cells: dict[int, int] = {}
+    if not isinstance(direct, dict):
+        return cells
+    for r, p in direct.items():
+        try:
+            cells[int(r)] = int(p)
+        except (TypeError, ValueError):
+            continue
+    return cells
+
+
 def arc_cells(fst: dict[str, Any]) -> dict[int, int]:
     """The ARC cell model: a cell is (family, run) with a 0..k graded
     record (correct answers of 5), stored in certify_arc ONCE per
     family - rung-independent (ARC ignores context depth). Pass at
     gold = 5/5."""
-    direct = fst.get("certify_arc") or {}
-    return {int(r): int(p) for r, p in direct.items()}
+    return _int_cells(fst.get("certify_arc"))
 
 
 def arc_pass(
@@ -255,8 +271,7 @@ def speed_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
     cell = (model, rung, conversation r), stored in certify_speed as
     {run: stall count}. Gold bar = 0 stalls; the counts re-grade at
     any 'at most x stalls' bar later without re-measuring."""
-    direct = (fst.get("certify_speed") or {}).get(str(depth)) or {}
-    return {int(r): int(p) for r, p in direct.items()}
+    return _int_cells((fst.get("certify_speed") or {}).get(str(depth)))
 
 
 def vt_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
@@ -266,8 +281,7 @@ def vt_cells(fst: dict[str, Any], depth: int) -> dict[int, int]:
     certify_vt namespace as {run: partial 0..5} (the graded score,
     like the FWE x/3 word count; pass = 5, re-gradable at any bar
     later without re-measuring)."""
-    direct = (fst.get("certify_vt") or {}).get(str(depth)) or {}
-    return {int(r): int(p) for r, p in direct.items()}
+    return _int_cells((fst.get("certify_vt") or {}).get(str(depth)))
 
 
 def stamp(msg: str) -> None:
