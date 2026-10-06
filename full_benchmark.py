@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bench.tee_output as tee_output
 import infra.convert_quant as convert_quant
 import infra.git_ops as git_ops
+import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import cells as _cells
 from bench import certify as _certify
@@ -88,6 +89,27 @@ def save_state(path: str, state: dict[str, Any]) -> None:
         return
     with open(path, "w") as f:
         json.dump(state, f, indent=1)
+
+
+def stamp_disk(state: dict[str, Any], path: str) -> None:
+    """The RUN'S OWN disk reading (session 40, addendum 51): the run
+    stamps its machine's free disk and hostname into the state file,
+    so the live page always reports the benchmark machine's headroom
+    no matter which machine regenerates the page (the addendum-50
+    fix made the page name the host; this makes the page carry the
+    run's number itself)."""
+    import socket
+
+    try:
+        free = hf_download.free_disk_gib(os.path.dirname(os.path.abspath(path)) or ".")
+    except Exception:
+        return
+    if free is not None:
+        state["disk"] = {
+            "free_gib": round(free, 1),
+            "host": socket.gethostname(),
+            "at": time.strftime("%Y-%m-%d %H:%M"),
+        }
 
 
 # =========================================================== preflight
@@ -437,6 +459,7 @@ def main() -> None:
         kill_stale_server()
         check_tooling(args)
     state = load_state(args.state_file)
+    stamp_disk(state, args.state_file)
     if args.kv_quant_k:
         state["kv_quant_k"] = args.kv_quant_k
     if args.kv_quant_v:
