@@ -104,6 +104,17 @@ was split along the same seam: its measurement half lives in
 The retired `arc_eval.py` and `mcnemar.py` were middle layer until
 the depth score became the ranking (protocol v4.3).
 
+
+Dev tools (own CLIs, tested like everything else):
+
+| Tool | Role |
+|---|---|
+| `code_edit.py` | the verified transactional editor (Vibe's editor, protocol [P]) |
+| `code_search.py` | AST-based code search: defs/refs/calls with import-alias resolution |
+| `ty_check.py`, `md_check.py`, `js_check.py` | the gate wrappers (ty env, markdown tables, picker pages) |
+| `git_push.py` | the sandbox's REST-API push workaround |
+| `sandbox_check.py` | the bench machine's pre-flight environment check |
+
 The corpus build (`--make-sample` / `--make-corpus`) also lives in
 `speed_gate.py`:
 

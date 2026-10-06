@@ -314,3 +314,43 @@ root CLI (fb/sg/rg) and bench CLI (certify/size_table) exits 0; the
 stale-import grep is empty. --no-verify only because the pre-commit
 runner fails under this sandbox's command wrapper (all hooks run
 manually green).
+
+## Addendum 8 - code_search.py: the AST-based search tool (2026-10-06, the author's "implement it")
+
+THE AUTHOR'S PROPOSAL ACCEPTED: dedicated search tooling, with the
+standing removal clause - "if we find it not useful we can remove
+it". The honest sizing from the discussion stands: grep covers
+literal search fine; the gap is SEMANTIC search (grep cannot follow
+`import infra.llama_server as llama_server` to the call sites of
+start_server, or through assignment aliases like
+kill_stale_server = _cells.kill_stale_server).
+
+THE TOOL: code_search.py (root dev tool, own CLI + import), three
+commands on the AST:
+- defs SYMBOL: definition sites (def/class/assign alias/import
+  binding), refusing unknown symbols rather than returning empty;
+- refs SYMBOL: reference sites, resolving `from infra.hf_download
+  import RUNG_BITS`-style bindings;
+- calls FUNC: call sites, plain and module-qualified, resolving the
+  addendum-7 import aliases (llama_server.start_server() is reported
+  as infra.llama_server.start_server).
+Philosophy: same as code_edit - refuse rather than guess (an
+unresolvable alias is reported, never silently dropped).
+
+VALIDATED ON THE SESSION'S OWN SEAMS: defs kill_stale_server finds
+all three sites (infra def, bench wrapper, fb alias); calls
+start_server resolves every site across the addendum-7 seams; refs
+RUNG_BITS finds law_fit's from-import and the definition. This is
+exactly the query set the addendum-5 audit needed a dozen greps for.
+
+TESTS: tests/test_code_search.py - 5 tests (the three commands on
+the live seams + the two refusals).
+
+DOCS: README gains a dev-tools table (code_edit, code_search, the
+gate wrappers, git_push, sandbox_check) - the tool family was
+previously undocumented as a group.
+
+VERIFIED: 172/172 pytest (167 + 5), ty 0 via the addendum-21
+wrapper, ruff check + format clean, md_check, js_check pass.
+--no-verify only because the pre-commit runner fails under this
+sandbox's command wrapper (all hooks run manually green).
