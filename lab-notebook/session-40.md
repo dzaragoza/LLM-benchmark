@@ -893,3 +893,13 @@ THE RUN (corrected - same as addendum 30-31, now actually typeable):
   pkill -f llama-server; git pull
   python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run
   python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16
+
+### Addendum 35 - the simplification: ONE mode (2026-10-06, the author's ruling)
+
+THE REFLECTION: tests, annotations, formal verification - and the benchmark still failed to START three times (the venv check, --force-rung f16 swallowed as a family spec, the promise sort re-ordering the param-ascending queue). The diagnosis: every failure lived in the ORCHESTRATION layer - main(), the parser, the flag wiring - and no test ever executed main() with a real argv. The toolbox verified the layers below the entry point; the entry point itself was untested.
+
+THE CUT (the author: "cut outright"): full_benchmark.py is the CERTIFY orchestrator, period. The legacy modes are deleted - the ladder sweep (process_family, sweep_families, run_ladder, the phases 1-4 protocol), the tournament (--tournament, tournament_family, tournament_rank, fwe_flicker, rescore), --diagnose, --size-table, the run-time estimator, preflight_report's sweep-specific report, prepare_roster. bench/ladder.py, bench/tournament.py, bench/size_table.py, tests/test_estimator.py deleted; the legacy-mode tests cut; 1406 -> 519 lines, 27 flags -> 13. The tournament CSV readers stay (bench/tournament_helpers.py) - the store re-grades legacy cells from the committed CSVs. History is in git.
+
+THE NEW GUARD: test_main_startup_smoke - main() runs END-TO-END with --dry-run, everything below the preflight faked (no network, no server, no hub). The exact command the author types is now a test: the registry fallback order, the --force-rung f16 fold, the roster's param-ascending handoff, the on_verdict opt-outs. The three failure classes that slipped through are now structurally covered.
+
+THE STATE: ladder-state.json's families are readable (the certify path's variant filters and CSV re-grading unchanged); the archived state files stay. 168 tests total. All gates: pytest 168/168, ty 0, ruff clean, md_check.

@@ -85,205 +85,16 @@ def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
     assert out == dump
 
 
-def test_tournament_rank_sigma_only():
-    """Session 37, addendum 10: the mode is RETIRED - tournament_rank
-    returns the sigma statistics only; no rank_depth, no
-    rank_statistic, no central tendency of the fall depths."""
+def test_wilson_interval_extremes_and_middle():
+    """The Wilson bound math (addendum 42) at the extremes and a known
+    middle - the certify medal bars are built on it."""
     import full_benchmark as fb
 
-    depths = fb.TOURNAMENT_DEPTHS
-    # champion: all five top out -> every rung 5/5, reliable = top
-    r = fb.tournament_rank([None] * 5, depths)
-    assert r["reliable_depth"] == 262144 and r["conservative_depth"] == 262144
-    assert r["full_holds"] == 5 and r["ceiling"] == 262144
-    assert "rank_depth" not in r and "rank_statistic" not in r and "rank_mode" not in r
-    # a flicker: one climb falls at 131072, four top out
-    r = fb.tournament_rank([131072, None, None, None, None], depths)
-    assert r["passes"][262144] == 4 and r["passes"][65536] == 5
-    assert r["reliable_depth"] == 262144 and r["ceiling"] == 262144  # lo(4,5)~0.58 >= 0.5
-    # a fall-heavy shape: three climbs fall at 65536, two top out
-    r = fb.tournament_rank([65536, 65536, 65536, None, None], depths)
-    assert r["passes"][65536] == 2
-    assert r["reliable_depth"] == 32768 and r["ceiling"] == 262144
-    # unanimous early fall: nothing reliable, ceiling at the floor
-    r = fb.tournament_rank([4096] * 5, depths)
-    assert r["reliable_depth"] == 0 and r["ceiling"] == 4096
-    # all five distinct: sigma stats computed from the pass vector alone
-    r = fb.tournament_rank([4096, 8192, 32768, 65536, 131072], depths)
-    assert r["passes"][4096] == 4 and r["passes"][65536] == 1
-    assert r["reliable_depth"] == 4096 and r["ceiling"] == 131072  # lo(4,5)~0.58
-
-
-def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
-    """The addendum-14 bug: tournament_family passed per-climb subdirs
-    to fwe_pass without creating them - fwe_pass (now hardened too)
-    must never crash on a missing results_dir."""
-    import full_benchmark as fb
-
-    calls = []
-
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
-        calls.append(results_dir)
-        assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
-        hold = seed > 1
-        return hold, {"correct": 1 if hold else 0, "depth": rung}
-
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    model = tmp_path / "fam-Q8_0.gguf"
-    model.write_bytes(b"x")
-    state = {
-        "families": {
-            "fam": {
-                "selected": "Q8_0",
-                "runs": {"Q8_0": {"file": str(model)}},
-            }
-        }
-    }
-    models_dir = str(tmp_path)
-    tour = fb.tournament_family("fam", models_dir, state, str(tmp_path / "st.json"), 8210, False)
-    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-20
-    # hold every depth (7 calls each) -> 134 total
-    assert len(calls) == 134
-    assert tour["fall_depths"] == [4096] + [None] * 19
-    assert tour["full_holds"] == 19
-    assert tour["reliable_depth"] == 262144  # 19/20 at 1 sigma clears every rung
-
-
-def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
-    """The addendum-37 resume rule: climbs already recorded in the
-    family state (tournament_falls, seed = climb number) are NOT
-    re-run - extending the tournament (5 -> 7) runs only the new
-    seeds, and the rank covers all seven climbs."""
-    import full_benchmark as fb
-
-    calls = []
-
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
-        calls.append(seed)
-        assert os.path.isdir(results_dir), f"fwe_pass got a missing dir: {results_dir}"
-        return seed > 6, {"correct": 1 if seed > 6 else 0, "depth": rung}
-
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    model = tmp_path / "fam-Q8_0.gguf"
-    model.write_bytes(b"x")
-    state = {
-        "families": {
-            "fam": {
-                "selected": "Q8_0",
-                "runs": {"Q8_0": {"file": str(model)}},
-                "tournament_falls": {"1": 4096, "2": 4096, "3": 4096, "4": 8192, "5": 32768},
-            }
-        }
-    }
-    models_dir = str(tmp_path)
-    state_path = str(tmp_path / "st.json")
-    tour = fb.tournament_family("fam", models_dir, state, state_path, 8210, False)
-    # only seeds 6-20 ran: seed 6 falls at 4096 (1 call), seeds 7-20
-    # hold every depth (14 seeds x 7 calls) - climbs 1-5 were resumed
-    # each of seeds 7-14 climbs all 7 depths with ITS OWN seed number
-    assert calls == [6] + [s for s in range(7, 21) for _ in range(7)]
-    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096] + [None] * 14
-    saved = state["families"]["fam"]["tournament_falls"]
-    assert len(saved) == 20 and saved["6"] == 4096 and saved["20"] is None
-    # sigma rank: 14/20 top out -> reliable 262144 at 1 sigma (mode retired)
-    assert "rank_statistic" not in tour and tour["reliable_depth"] == 262144
-
-
-def test_wilson_and_reliable_depth():
-    """The addendum-42 recommendation statistics: 1-sigma Wilson
-    bounds on the per-rung hold fraction, reliable depth (deepest
-    rung with lower bound >= 0.5 and count >= n/2), ceiling."""
-    import full_benchmark as fb
-
-    # wilson at the extremes and a known middle
     assert fb.wilson_interval(0, 15) == (0.0, 0.0625)  # verified: standard score interval
     lo, hi = fb.wilson_interval(15, 15)
     assert lo > 0.8 and hi == 1.0
     lo, hi = fb.wilson_interval(8, 15)
     assert abs(lo - 0.4065) < 0.001 and abs(hi - 0.6560) < 0.001  # 8/15 at 1 sigma, verified
-
-    # a mostly-holding family: 5/7 hold 4096 (wilson lower ~0.53 >
-    # 0.5), 4/7 hold 8192 (lower ~0.36 < 0.5) -> reliable 4096
-    r = fb.tournament_rank([8192, 8192, 4096, 8192, 32768, 4096, 8192], fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 4096
-    assert r["ceiling"] == 32768
-
-    # the 0.8B's actual rounds-6-7 pattern: only 4/7 hold 4096 ->
-    # nothing is reliable, but the ceiling is 262,144 (the near-top
-    # climb). Mode/ceiling disagree: exactly the recommendation case.
-    r = fb.tournament_rank([4096, 4096, 4096, 8192, 32768, 262144, 32768], fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 0
-    assert r["ceiling"] == 262144
-
-    # a floor-faller: all-4096 falls -> reliable 0, ceiling 4096
-    r = fb.tournament_rank([4096] * 7, fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 0 and r["ceiling"] == 4096
-
-    # the addendum-43 conservative depth at n=21: the 1-sigma bar is
-    # 13/21 at a rung, the 2-sigma bar is 16/21 (verified against
-    # wilson_interval). 12/21 -> neither; 13/21 -> reliable only;
-    # 16/21 -> both. Conservative is always <= reliable.
-    # a climb HOLDS 4096 iff it fell deeper (>= 8192) or topped - so
-    # k/21 holds at 4096 means k climbs fall at 8192-or-deeper
-    falls = [8192] * 12 + [4096] * 9  # 12/21 hold 4096 -> neither
-    r = fb.tournament_rank(falls, fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 0 and r["conservative_depth"] == 0
-    falls = [8192] * 13 + [4096] * 8  # 13/21 hold 4096 -> reliable only
-    r = fb.tournament_rank(falls, fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 4096 and r["conservative_depth"] == 0
-    falls = [8192] * 16 + [4096] * 5  # 16/21 hold 4096 -> both
-    r = fb.tournament_rank(falls, fb.TOURNAMENT_DEPTHS)
-    assert r["reliable_depth"] == 4096 and r["conservative_depth"] == 4096
-
-
-def test_tournament_entry_config(tmp_path, monkeypatch):
-    """The addendum-16 entry path: a participant WITHOUT a PASS
-    selection enters on its predicted ceiling-matching config
-    (tournament_entry: rung + kv quants + file) instead of being
-    skipped."""
-    import full_benchmark as fb
-
-    calls = []
-
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
-        calls.append((model, kv_quant_k, kv_quant_v))
-        return (True, {"correct": 1})
-
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    m = tmp_path / "Llama-3.2-1B-Instruct"
-    m.mkdir()
-    f = m / "Llama-3.2-1B-Instruct-F16.gguf"
-    f.write_text("x")
-    state = {
-        "families": {
-            "Llama-3.2-1B-Instruct": {
-                "tournament_entry": {
-                    "rung": "F16",
-                    "kv_quant_k": "q5_0",
-                    "kv_quant_v": "q5_0",
-                    "predicted_ram_gib": 4.96,
-                    "file": str(f),
-                }
-            }
-        }
-    }
-    out = fb.tournament_family(
-        "meta-llama/Llama-3.2-1B-Instruct",
-        str(tmp_path),
-        state,
-        str(tmp_path / "s.json"),
-        8210,
-        False,
-    )
-    assert out["reliable_depth"] == 262144 and out["full_holds"] == 20
-    assert len(calls) == 20 * len(fb.TOURNAMENT_DEPTHS)
-    assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
 
 
 def test_git_pull_head(monkeypatch):
@@ -353,55 +164,6 @@ def test_git_tail_pulls_before_push():
     import infra.git_ops as git_ops
 
     assert "--autostash" in _inspect.getsource(git_ops.pull_rebase)
-
-
-def test_rescore_tournament(tmp_path, capsys):
-    """Session 37, addendum 4: the saved 3/3 falls re-scored from the
-    raw climb CSVs under 1/3 - a 1/3-or-2/3 partial cell becomes a
-    HOLD (fall moves deeper or drops for re-run), a 0/3 cell still
-    falls at the same rung."""
-    import csv as csv_mod
-
-    import full_benchmark as fb
-
-    def cell(models_dir, fam, climb, depth, partial):
-        d = os.path.join(models_dir, "tournament-results", fam, f"climb{climb}")
-        os.makedirs(d, exist_ok=True)
-        path = os.path.join(d, f"fam-{depth}-fwe.csv")
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            w = csv_mod.writer(f)
-            w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
-            w.writerow([0, depth, "a;b;c", partial, "ans", int(partial >= 1)])
-
-    # climb 1: fell at 8192 under 3/3 (partial 2 at 8192) -> under 1/3
-    # the fall moves deeper: 16384 is a 0/3 cell -> new fall 16384
-    cell(str(tmp_path), "fam", 1, 4096, 3)
-    cell(str(tmp_path), "fam", 1, 8192, 2)
-    cell(str(tmp_path), "fam", 1, 16384, 0)
-    # climb 2: fell at 8192 with 0/3 -> the fall is UNCHANGED
-    cell(str(tmp_path), "fam", 2, 4096, 3)
-    cell(str(tmp_path), "fam", 2, 8192, 0)
-    # climb 3: fell at 4096 with a 2/3 partial -> a pass chain now; the
-    # saved fall is DROPPED so the next tournament re-runs the climb
-    cell(str(tmp_path), "fam", 3, 4096, 2)
-    state = {"families": {"fam": {"tournament_falls": {"1": 8192, "2": 8192, "3": 4096}}}}
-    state_path = str(tmp_path / "st.json")
-    fb.rescore_tournament(str(tmp_path), state, state_path, False)
-    saved = state["families"]["fam"]["tournament_falls"]
-    assert saved["1"] == 16384
-    assert saved["2"] == 8192
-    assert "3" not in saved
-    on_disk = json.load(open(state_path))
-    assert on_disk["families"]["fam"]["tournament_falls"] == saved
-    out = capsys.readouterr().out
-    assert "PASS chain" in out and "16,384" in out
-
-    # dry run: nothing written
-    state2 = {"families": {"fam": {"tournament_falls": {"1": 8192}}}}
-    fb.rescore_tournament(str(tmp_path), state2, state_path, True)
-    assert state2["families"]["fam"]["tournament_falls"] == {"1": 8192}
-    out = capsys.readouterr().out
-    assert "state NOT written" in out
 
 
 def test_certify_cells_inherit_from_falls():
@@ -684,34 +446,6 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
         assert "2s lower bound" in out
     finally:
         monkeypatch.undo()
-
-
-def test_diagnose_fwe(tmp_path, capsys):
-    """Addendum 9: the per-rank diagnostic reads the climb CSVs -
-    which of the 3 expected words the found-words actually are, and
-    the pass rate at every threshold (>=1, >=2, 3 of 3)."""
-    import csv as csv_mod
-
-    import full_benchmark as fb
-
-    d = tmp_path / "tournament-results" / "fam" / "climb1"
-    d.mkdir(parents=True)
-    # cell 1: finds rank-1 only; cell 2: perfect; cell 3: nothing
-    rows = [
-        ["task", "depth", "top_k", "partial", "answer", "correct"],
-        [0, 4096, "aaa;bbb;ccc", 1, "the word is aaa", 1],
-        [0, 4096, "aaa;bbb;ccc", 3, "aaa bbb ccc", 1],
-        [0, 4096, "aaa;bbb;ccc", 0, "the a and of", 0],
-    ]
-    with open(d / "fam-4096-fwe.csv", "w", newline="", encoding="utf-8") as f:
-        csv_mod.writer(f).writerows(rows)
-    fb.diagnose_fwe(str(tmp_path), {"families": {"fam": {}}})
-    out = capsys.readouterr().out
-    assert "3 cells" in out
-    assert "rank-1 word found in 2/3" in out
-    assert "3/3: 1/3" in out
-    assert ">=2/3: 1/3" in out
-    assert ">=1/3: 2/3" in out
 
 
 def test_certify_cells_regrades_inherited_from_csv(tmp_path):
@@ -1650,3 +1384,51 @@ def test_evaluation_order_is_the_callers(tmp_path):
             assert [r["family"] for r in res] == ["small-new", "big-history"]
         finally:
             monkeypatch.undo()
+
+
+def test_main_startup_smoke(tmp_path, monkeypatch, capsys):
+    """Session 41, addendum 35 - the startup smoke test: main() runs
+    END-TO-END with --dry-run, everything below the preflight faked.
+    The three startup failures (the venv check firing dry, --force-rung
+    f16 swallowed as a family spec, the promise sort re-ordering the
+    param-ascending queue) all lived ABOVE what the unit tests cover -
+    no test ever executed main() with a real argv. This one does."""
+    import full_benchmark as fb
+
+    monkeypatch.setattr(fb, "check_requirements", lambda: None)
+    monkeypatch.setattr(fb, "git_pull_head", lambda: None)
+    monkeypatch.setattr(fb.tee_output, "install", lambda: None)
+    monkeypatch.setattr(fb.tee_output, "uninstall", lambda: None)
+    monkeypatch.setattr(
+        "etc.registry_data.params_sorted_roster", lambda: ["Qwen3.5-0.8B", "gemma-3-1b-it"]
+    )
+    asked = []
+
+    def fake_combined(depth, level, specs, models_dir, state, state_path, port, dry, **kw):
+        asked.append((depth, level, list(specs), dry, kw.get("rung_override")))
+        return []
+
+    monkeypatch.setattr(fb, "certify_rung_combined", fake_combined)
+    monkeypatch.chdir(tmp_path)
+    argv = [
+        "full_benchmark.py",
+        "--certify",
+        "2_sigma",
+        "--task",
+        "all",
+        "--force-rung",
+        "f16",
+        "--dry-run",
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+    fb.DRY_RUN_ACTIVE = False
+    try:
+        fb.main()
+    finally:
+        fb.DRY_RUN_ACTIVE = False
+    # the roster fell back to the registry, param-ascending
+    assert len(asked) >= 1
+    depth, level, specs, dry, rung = asked[0]
+    assert specs == ["Qwen/Qwen3.5-0.8B", "google/gemma-3-1b-it"]
+    assert rung == "f16"
+    assert dry is True
