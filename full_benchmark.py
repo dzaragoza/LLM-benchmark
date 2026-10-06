@@ -1000,6 +1000,8 @@ def sweep_families(args: argparse.Namespace, state: dict[str, Any]) -> list[tupl
                 args.rung,
             )
         except SystemExit as e:
+            if e.code == 130:
+                raise
             failed_families.append((spec, str(e) or "exit"))
             stamp(f"FAMILY FAILED: {spec} (recorded; the sweep continues - addendum 78)")
         except Exception as e:  # isolation is the point

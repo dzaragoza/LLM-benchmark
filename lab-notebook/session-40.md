@@ -579,3 +579,33 @@ replace_all for the genuinely shared lines plus context-anchored
 replace for the type lines. No code_edit change made: the refusal
 behavior is correct; the friction is aiming twin regions, and the
 occurrence-index idea (addendum 13) remains the candidate feature.
+
+
+## Addendum 15 - Ctrl-C during a download now stops the run (2026-10-06)
+
+THE SYMPTOM (the author's report): interrupting full_benchmark
+during a model download did not stop it - it just moved to the next
+model.
+
+THE ROOT CAUSE: the Ctrl-C handler (session 38, addendum 8) stops
+llama-server, stops logging, runs the git tail and exits via
+SystemExit(130). Two per-family isolation guards swallowed that
+exit: _acquire_missing_model in bench/certify.py (except
+SystemExit: return None - a hub phase fail(1) was the intended
+catch) and the sweep_families loop in full_benchmark.py (except
+SystemExit - a process_family abort was the intended catch). The
+130 was recorded as a family failure and the loop continued - the
+author pressing Ctrl-C once during a long download merely skipped
+to the next download.
+
+THE FIX: both guards now re-raise SystemExit when e.code == 130 -
+the interrupt is a RUN-level signal, not a family failure; every
+other exit code keeps the addendum-78 isolation (recorded, the
+sweep continues). The handler already does the clean shutdown, so
+nothing else changes.
+
+THE TEST: test_sigint_during_acquire_stops_the_run - a faked
+hf_download.acquire raises SystemExit(130) for one family and
+SystemExit(1) for the next; the 130 propagates out of
+certify_rung_combined, the 1 stays isolated. 175/175 pytest, ty 0,
+ruff check+format clean, md_check, js_check.
