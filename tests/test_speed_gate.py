@@ -115,27 +115,6 @@ def test_git_tail_pulls_before_push():
     assert "--autostash" in _inspect.getsource(git_ops.pull_rebase)
 
 
-def test_certify_cells_inherit_from_falls():
-    """Addendum 8: the cell model - climb s measured every rung up to
-    and including its fall; a fall DEEPER than the rung means the
-    cell passed, a fall AT the rung means it failed, a fall SHALLOWER
-    means the cell was never reached (unmeasured)."""
-    import full_benchmark as fb
-
-    fst = {
-        "tournament_falls": {
-            "1": 8192,  # fell at 8192: cell(1, 8192)=False, cell(1,4096)=True
-            "2": None,  # topped out: every cell True
-            "3": 4096,  # cell(3, 8192) unmeasured, cell(3,4096)=False
-        },
-        "certify": {"8192": {"3": True}},
-    }
-    cells = fb.certify_cells(fst, 8192)
-    assert cells == {1: False, 2: True, 3: True}
-    cells4k = fb.certify_cells(fst, 4096)
-    assert cells4k == {1: True, 2: True, 3: False}
-
-
 def test_certify_rung_accepts_and_skips(tmp_path, capsys):
     """The sequential controller: the promising candidate certifies
     from historical cells + fresh ones (never re-measuring a used
@@ -167,21 +146,11 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
                 "good": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": {
-                        "1": None,
-                        "2": None,
-                        "3": None,
-                        "4": None,
-                        "5": 16384,
-                        "6": 16384,
-                        "7": 16384,
-                        "8": 16384,
-                    },
+                    "certify": {"8192": {str(r): 3 for r in range(1, 9)}},
                 },
                 "other": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": {},
                 },
             }
         }
@@ -196,9 +165,9 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         )
         first = [r for r in res if r["family"] == "good"][0]
         assert first["verdict"] == "accept"
-        # historical cells at 8192: climbs 1-4 top + 5-8 fell deeper = 8 passes
-        # runs 9-20 are fresh (12 seeds), never re-measured; accept at
-        # 10 measured (10/10, lo(10,10,1)=0.909 >= 0.5, floor 10)
+        # stored cells at 8192: 8 direct passes; runs 9-20 are fresh
+        # (12 seeds), never re-measured; accept at 10 measured
+        # (10/10, lo(10,10,1)=0.909 >= 0.5, floor 10)
         assert sorted(ran) == [9, 10]
         assert first["cells_measured"] == 10 and first["passes"] == 10
         other = [r for r in res if r["family"] == "other"][0]
@@ -206,8 +175,11 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         # direct cells persisted
         good: dict[str, Any] = state["families"]["good"]
         direct = good["certify"]["8192"]
-        assert len(direct) == 2 and sorted(direct, key=int) == ["9", "10"]
-        for rec in direct.values():
+        # the 8 seeded legacy cells stay plain ints; the 2 fresh
+        # cells carry the full record (value, variant, {t})
+        fresh = {r: rec for r, rec in direct.items() if isinstance(rec, dict)}
+        assert sorted(fresh, key=int) == ["9", "10"]
+        for rec in fresh.values():
             assert rec["v"] == 1 and rec["rung"] == "Q8_0"
             assert rec["kv_k"] is None and rec["kv_v"] is None
             assert rec["t"] is not None and rec["t"] >= 0.0
@@ -233,15 +205,15 @@ def test_certify_rung_dead(tmp_path, capsys):
     try:
         model = tmp_path / "dead-Q8_0.gguf"
         model.write_bytes(b"x")
-        # 9 climbs FELL AT 8192 (9 measured fails, 12 remaining):
+        # 9 stored FAILS at 8192 (9 measured fails, 12 remaining):
         # best case 12/21 passes, lo(12,21)=0.463 < 0.5 -> dead
-        falls = {str(i): 8192 for i in range(1, 10)}
+        stored = {str(i): 0 for i in range(1, 10)}
         state = {
             "families": {
                 "dead": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": falls,
+                    "certify": {"8192": stored},
                 }
             }
         }
@@ -275,13 +247,13 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
     try:
         model = tmp_path / "s2-Q8_0.gguf"
         model.write_bytes(b"x")
-        falls = {str(i): 8192 for i in range(1, 10)}
+        stored = {str(i): 0 for i in range(1, 10)}
         state = {
             "families": {
                 "s2": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": falls,
+                    "certify": {"8192": stored},
                 }
             }
         }
@@ -294,39 +266,6 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
         assert "2s lower bound" in out
     finally:
         monkeypatch.undo()
-
-
-def test_certify_cells_regrades_inherited_from_csv(tmp_path):
-    """The 2/3 tightening: inherited tournament-fall cells are re-graded
-    from their committed climb CSV `partial` word counts instead of
-    being dropped - the fall only says pass/fail at 3/3, but the CSV
-    holds the actual words found."""
-    import csv as _csv
-
-    import full_benchmark as fb
-
-    fam = "fam"
-    cdir = tmp_path / "tournament-results" / fam / "climb7"
-    cdir.mkdir(parents=True)
-    with open(cdir / "fam-Q8_0-8192-fwe.csv", "w", newline="") as fh:
-        w = _csv.writer(fh)
-        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
-        w.writerow([0, 8192, "aaa;bbb;ccc", 1, "x", False])
-
-    fst = {"tournament_falls": {"7": None}}
-    cells = fb.certify_cells(fst, 8192, 2, str(tmp_path), fam)
-    assert cells == {7: False}
-
-    with open(cdir / "fam-Q8_0-8192-fwe.csv", "w", newline="") as fh:
-        w = _csv.writer(fh)
-        w.writerow(["task", "depth", "top_k", "partial", "answer", "correct"])
-        w.writerow([0, 8192, "aaa;bbb;ccc", 2, "x", True])
-    cells = fb.certify_cells(fst, 8192, 2, str(tmp_path), fam)
-    assert cells == {7: True}
-
-    # no models_dir: the inherited cell stays dropped (re-run, never guessed)
-    cells = fb.certify_cells(fst, 8192, 2)
-    assert cells == {}
 
 
 def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
@@ -356,7 +295,6 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
                     # an FWE certification exists at this rung - VT must not
                     # read it, write it, or inherit its cells
                     "certify": {"8192": {"1": True, "2": True, "3": True}},
-                    "tournament_falls": {"1": None, "2": None},
                 }
             }
         }
