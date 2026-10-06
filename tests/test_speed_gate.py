@@ -1415,14 +1415,18 @@ def test_param_ascending_selection():
 
     roster = registry_data.params_sorted_roster()
     assert len(roster) == len(registry_data.ROSTER)
+    # addendum 29: every count is RETRIEVED FROM HF and recorded with
+    # its source - never guessed, never missing
+    store = registry_data.json.loads(registry_data.STORE.read_text())
     assert all(registry_data.params_b(n) is not None for n in roster)
+    assert all(store[n].get("params_source") for n in roster)
     sizes = [registry_data.params_b(n) or 0.0 for n in roster]
     assert sizes == sorted(sizes)
-    # every roster model has a spec repo, and the orchestrator order is
-    # the roster order
+    # the orchestrator order is the roster order - the smallest models
+    # first (the granite 350ms and MiniCPM4-0.5B at the head)
     assert [registry_data.ROSTER[n] for n in roster][:3] == [
-        "ibm-granite/granite-4.0-350m",
         "ibm-granite/granite-4.0-h-350m",
+        "ibm-granite/granite-4.0-350m",
         "openbmb/MiniCPM4-0.5B",
     ]
 
