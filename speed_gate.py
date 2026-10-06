@@ -44,13 +44,10 @@ Protocol v2 (author ruling, Session 27 - the depth-prefill gate):
   - The server's own timing (timings.predicted_per_second) is the
     authoritative metric; an external wall-clock cross-check (generation
     span = wall time minus prompt processing) is computed per turn
-  - THE RESULT IS THE STALL RATE across all depth-conditioned turns;
-    verdict (protocol v3.1, addendum 73): PASS iff at most
-    STALL_RATE_MAX (5%) of turns catch up the reader - the author's
-    distributional guarantee ("a fast reader will only catch up to
-    5% of the turns"); the per-turn test is the addendum-55
-    collision simulation, unchanged; early-fail is deleted (a
-    rate verdict needs its denominator);
+  - The reader-wall collision simulation (addendum 55) is recorded
+    per turn as DIAGNOSTIC DATA (stall rate, catch-up seconds).
+    Verdict (protocol v4.x, addendum 37): strictly worst wps >= the
+    reader line; the stall rate is data, never a gate.
     first PASS = selected - which, at the reader line, walks the
     ladder to the TOP rung that still guarantees the reader (the old
     floor-20 gate was a headroom judgment and rejected rungs the
@@ -103,13 +100,13 @@ import time
 import urllib.error
 from typing import Any, NoReturn
 
-import bench.tee_output as tee_output
 import infra.llama_server as llama_server
 from ruler_gate import report_server_ctx
 
 CORPUS_DEFAULT = "./data/live-corpus-cal50.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
-STALL_RATE_MAX = 0.05  # protocol v3.1: PASS iff <= 5% of turns catch up
+STALL_RATE_MAX = 0.05  # recorded config of the diagnostic only (v4.x:
+# the verdict is strictly wps, addendum 37)
 # reader (Brysbaert 2019). Protocol v2.1:
 # the anchor is words, not tokens.
 
@@ -658,11 +655,10 @@ def bench_model(
     Protocol v2: per-conversation depth prefill to the reference
     depth, worst turn across all depth-conditioned turns, plus the
     same-depth noise samples. Returns (all_turns, summary).
-    Protocol v3.1 (addendum 73): the verdict is the STALL RATE -
-    at most STALL_RATE_MAX of turns may catch up the reader - so
-    every conversation always runs to completion; early-fail is
-    deleted (aborting at the first stall would truncate the
-    denominator and bias the rate downward)."""
+    Protocol v4.x (addendum 37): the verdict is strictly worst
+    wps >= the reader line; the collision simulation is recorded
+    per turn as diagnostic data. Every conversation always runs to
+    completion (early-fail would truncate the record)."""
     with open(corpus_file) as f:
         corpus = json.load(f)
     conversations = corpus["conversations"]
@@ -918,100 +914,6 @@ def live_dump_name(path: str, thinking: bool = False, no_thinking: bool = False)
     return path + ".live-dump.json"
 
 
-def bench(
-    path: str,
-    corpus: str,
-    dry_run: bool,
-    thinking: bool = False,
-    no_thinking: bool = False,
-    port: int = PORT_DEFAULT,
-    ctx: int = CTX_DEFAULT,
-    dump_override: str | None = None,
-    force: bool = False,
-    reader_wps: float | None = None,
-    conversations: int | None = None,
-) -> str:
-    """Phase 3: live-bench the model file; returns the dump path.
-    force: re-measure even if a valid newer dump exists (the resume
-    machinery is the pipeline default; --force is the re-measurement
-    path - e.g. after an instrument fix, when the existing dump
-    predates the fix and its noise records are missing/wrong).
-    reader_wps (addendum 34): enables the in-flight reader-wall
-    test on each turn (v3.1: the per-turn stall flags whose rate
-    is the verdict; the conversation is never aborted).
-    conversations (addendum 58, the w/t calibration pass): bench only
-    the first N conversations of the corpus (None = all)."""
-    dump = dump_override or live_dump_name(path, thinking, no_thinking)
-    label = os.path.basename(path)
-    if not dry_run and not os.path.isfile(path):
-        fail(
-            3,
-            label,
-            f"model file not found: {path}",
-            [
-                "the file was moved or deleted since the state marked it "
-                "ready (rerun full_benchmark.py - it detects the missing "
-                "file and re-acquires it automatically)",
-                "wrong path: verify it exists (ls)",
-                "run from the repo root so ./models/... resolves",
-            ],
-        )
-
-    def dump_valid() -> bool:
-        if not os.path.isfile(dump):
-            return False
-        try:
-            with open(dump) as f:
-                turns = json.load(f)
-        except Exception:
-            return False
-        mine = [t for t in turns if t.get("model") == label and t.get("server_tps")]
-        if not mine:
-            return False
-        ctxs = {t.get("ctx") for t in mine}
-        if ctx != CTX_DEFAULT and ctx not in ctxs:
-            return False
-        return True
-
-    mem_sidecar = dump + ".mem.json"
-    if not force and dump_valid() and os.path.getmtime(dump) > os.path.getmtime(path):
-        print("  [3] reusing existing dump (newer than model file; pass --force to re-measure)")
-        if os.path.isfile(mem_sidecar):
-            try:
-                with open(mem_sidecar) as f:
-                    mem = json.load(f)
-                totals = [m["weights_gib"] for m in mem if m.get("weights_gib")]
-                if totals:
-                    print(
-                        f"    memory (llama): weights {max(totals):.2f} GiB "
-                        "(from this dump's run; addendum 11)"
-                    )
-            except Exception:
-                pass
-        return dump
-    if dry_run:
-        return dump
-    turns, _, mem_reports = bench_model(
-        path,
-        corpus,
-        port,
-        ctx,
-        thinking,
-        no_thinking,
-        label=label,
-        reader_wps=reader_wps,
-        n_conversations=conversations,
-    )
-    with open(dump, "w") as f:
-        json.dump(turns, f, indent=1)
-    if mem_reports:
-        with open(mem_sidecar, "w") as f:
-            json.dump(mem_reports, f, indent=1)
-    if not dump_valid():
-        fail(3, label, "live bench produced no usable dump (see the output above)", GUIDE[3])
-    return dump
-
-
 def analyze(
     path: str,
     thinking: bool = False,
@@ -1097,7 +999,7 @@ def analyze(
     # speed, like session_replicate's resim mode; the bench-time
     # flags were computed with the same defaults). A turn stalls
     # iff the reader EVER hit the wall (any catch-up event); the
-    # rung passes iff at most STALL_RATE_MAX of turns stalled. The
+    # stall rate kept as data, not a gate (v4.x, addendum 37). The
     # flat w/s comparison stays a diagnostic only: it manufactured
     # fails on tiny answers (the addendum-54 degeneracy - the span
     # of a 5-token answer is pipeline overhead, not reading
@@ -1117,10 +1019,8 @@ def analyze(
         total_catchup_events += col["catchup_events"]
         worst_catchup_s = max(worst_catchup_s, col["catchup_s"] or 0.0)
     # Protocol v3.1 (addendum 73): the guarantee is the STALL RATE -
-    # PASS iff at most STALL_RATE_MAX of turns have a catch-up event.
-    stall_rate = len(wall_fails) / len(mine) if mine else 0.0
-    verdict = "PASS (confident)" if stall_rate <= STALL_RATE_MAX else "FAIL"
-    fail_rate = round(stall_rate, 4)
+    # stall rate is recorded per turn as diagnostic data.
+    stall_rate = round(len(wall_fails) / len(mine), 4) if mine else 0.0
 
     def turn_wps(t: dict[str, Any]) -> float:
         return t["server_wps"]
@@ -1130,6 +1030,9 @@ def analyze(
         convs.setdefault(t["conv"], []).append(turn_wps(t))
     conv_worsts = [min(v) for v in convs.values()]
     worst_wps = min(conv_worsts)
+    # Protocol v4.x (session 41, addendum 37): the verdict is STRICTLY
+    # wps >= the reader line - the stall rate is data, not a gate.
+    verdict = "PASS (confident)" if worst_wps >= reader_wps else "FAIL"
     mean_wps = sum(turn_wps(t) for t in mine) / len(mine)
     if len(conv_worsts) > 1:
         mu = sum(conv_worsts) / len(conv_worsts)
@@ -1149,7 +1052,7 @@ def analyze(
         "sigma": sigma,
         "threshold": threshold,
         "verdict": verdict,
-        "stall_rate": fail_rate,
+        "stall_rate": stall_rate,
         "stall_rate_max": STALL_RATE_MAX,
         "wall_fail_turns": len(wall_fails),
         "catchup_events": total_catchup_events,
@@ -1171,53 +1074,15 @@ def analyze(
 
 
 def main() -> None:
-    tee_output.install()
+    """The corpus-building CLI (protocol v4.x, session 41 addendum 37:
+    the bench path is the CELLS' library - bench_model/analyze are
+    called by bench/cells.py inside the certify controllers, never a
+    standalone sweep. The CLI stays for the one thing that may be
+    needed again: building a LARGER corpus."""
     ap = argparse.ArgumentParser(
-        description="speed gate: live-bench a model and grade the worst "
-        "turn against the reader line (absorbs the former "
-        "live-bench.py)"
+        description="speed_gate: the measurement library + the corpus "
+        "builder (the bench path is bench/cells.py's library)"
     )
-    ap.add_argument("--model", help=".gguf file to bench")
-    ap.add_argument("--corpus", default=CORPUS_DEFAULT)
-    ap.add_argument(
-        "--reader-wps",
-        type=float,
-        default=READER_WPS_DEFAULT,
-        help=f"the k=1 guarantee line in WORDS per second "
-        f"(default {READER_WPS_DEFAULT} w/s = 300 wpm, "
-        f"Brysbaert 2019 - match the fast reader; the "
-        f"t/s line is this divided by words/token)",
-    )
-    ap.add_argument(
-        "--dump",
-        default=None,
-        help="live-dump path override (default: next to the model file, mode-suffixed)",
-    )
-    ap.add_argument("--port", type=int, default=PORT_DEFAULT)
-    ap.add_argument("--ctx", type=int, default=CTX_DEFAULT)
-    ap.add_argument(
-        "--conversations",
-        type=int,
-        default=None,
-        help="bench only the first N conversations of the "
-        "corpus (the w/t calibration pass, addendum "
-        "58: more turns -> a registered per-family w/t "
-        "anchor; the default None = all)",
-    )
-    ap.add_argument(
-        "--thinking", action="store_true", help="thinking mode (category protocol, rule 8)"
-    )
-    ap.add_argument(
-        "--no-thinking", action="store_true", help="hybrid model, non-thinking category (rule 8)"
-    )
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument(
-        "--force",
-        action="store_true",
-        help="re-measure even if a valid newer dump exists "
-        "(default: reuse it - the resume machinery)",
-    )
-    # corpus-building steps (from the former live-bench.py)
     ap.add_argument(
         "--make-sample",
         action="store_true",
@@ -1234,10 +1099,6 @@ def main() -> None:
     ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)
     args = ap.parse_args()
-
-    if args.thinking and args.no_thinking:
-        ap.error("--thinking and --no-thinking are mutually exclusive")
-
     if args.make_sample:
         make_english_sample()
         return
@@ -1251,67 +1112,7 @@ def main() -> None:
             args.max_cap_tokens,
         )
         return
-
-    if not args.model:
-        ap.error("--model is required (or use --make-sample/--make-corpus)")
-    if not args.dry_run and not os.path.isfile(args.model):
-        sys.exit(f"model file not found: {args.model}")
-    if not args.dry_run and not os.path.isfile(args.corpus):
-        sys.exit(
-            f"corpus not found at {args.corpus} - build it: python3 speed_gate.py --make-corpus"
-        )
-
-    dump = bench(
-        args.model,
-        args.corpus,
-        args.dry_run,
-        args.thinking,
-        args.no_thinking,
-        args.port,
-        args.ctx,
-        args.dump,
-        args.force,
-        args.reader_wps,
-        conversations=args.conversations,
-    )
-    if args.dry_run:
-        print(
-            f"[4] would analyze (the reader-wall stall rate: a turn "
-            f"stalls iff the reader EVER hits the stream - PASS iff "
-            f"<= {STALL_RATE_MAX:.0%} of turns stall - reader "
-            f"{args.reader_wps:g} w/s, reaction "
-            f"{READER_REACTION_S}s, addendum 73)"
-        )
-        return
-    res = analyze(args.model, args.thinking, args.no_thinking, args.dump, args.reader_wps)
-    print(f"\nper-turn results written to {dump}")
-    print(
-        f"[4] {res['verdict']} — the reader-wall stall rate: "
-        f"{res['wall_fail_turns']} of {res['n_turns']} turns stalled "
-        f"({res['stall_rate']:.1%}; PASS <= {res['stall_rate_max']:.0%}), "
-        f"{res['catchup_events']} catch-up event(s), "
-        f"worst wait {res['worst_catchup_s']:.2f}s "
-        f"(reader {args.reader_wps:g} w/s, reaction "
-        f"{READER_REACTION_S}s; addendum 73)"
-    )
-    print(
-        f"    span diagnostics: worst {res['worst']:.2f} w/s "
-        f"(mean {res['mean']:.2f}, sigma {res['sigma']:.2f}) - "
-        "NOT the verdict (addendum 54: spans of tiny answers "
-        "are overhead, not reading experience)"
-    )
-    print(
-        f"    token-side view: worst {res['worst_tps']:.1f} t/s "
-        f"(mean {res['mean_tps']:.1f}); words/token "
-        f"{res['words_per_token']:.3f} (measured)"
-    )
-    print(
-        f"    w/t calibration (addendum 58): n={res['n_turns']} turns, "
-        f"min {res['words_per_token_min']:.3f}, "
-        f"p05 {res['words_per_token_p05']:.3f}, "
-        f"mean {res['words_per_token']:.3f} - the family anchor "
-        "candidates (min/p05)"
-    )
+    ap.error("nothing to do - use --make-sample or --make-corpus")
 
 
 if __name__ == "__main__":

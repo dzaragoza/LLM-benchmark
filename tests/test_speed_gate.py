@@ -13,7 +13,6 @@ from typing import Any
 
 import pytest
 
-import speed_gate as sg
 from bench import cells as bench_cells
 from bench import certify as bench_certify
 from bench import state_store as bench_state_store
@@ -33,56 +32,6 @@ def _fixture(tmp_path, turns):
 
 TURNS_4096 = [{"model": "m.gguf", "server_tps": 5.0, "conv": 1}]
 TURNS_32768 = [{"model": "m.gguf", "server_tps": 5.0, "conv": 1, "ctx": 32768}]
-
-
-def test_old_dump_reuses_at_default_ctx(tmp_path):
-    model, dump = _fixture(tmp_path, TURNS_4096)
-    out = sg.bench(
-        model,
-        "c.json",
-        dry_run=False,
-        no_thinking=True,
-        ctx=sg.CTX_DEFAULT,
-        dump_override=dump,
-        force=False,
-        port=1,
-    )
-    assert out == dump
-
-
-def test_unstamped_dump_refused_at_deeper_ctx(tmp_path):
-    model, dump = _fixture(tmp_path, TURNS_4096)
-    try:
-        sg.bench(
-            model,
-            "c.json",
-            dry_run=False,
-            no_thinking=True,
-            ctx=32768,
-            dump_override=dump,
-            force=False,
-            port=1,
-        )
-    except FileNotFoundError:
-        return
-    except SystemExit:
-        raise AssertionError("refused via fail() instead of benching") from None
-    raise AssertionError("reused a dump whose ctx does not match the run")
-
-
-def test_ctx_stamped_dump_reuses_at_same_ctx(tmp_path):
-    model, dump = _fixture(tmp_path, TURNS_32768)
-    out = sg.bench(
-        model,
-        "c.json",
-        dry_run=False,
-        no_thinking=True,
-        ctx=32768,
-        dump_override=dump,
-        force=False,
-        port=1,
-    )
-    assert out == dump
 
 
 def test_wilson_interval_extremes_and_middle():

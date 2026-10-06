@@ -123,14 +123,11 @@ def speed_pass(
         None,
     )
     verdict["mem_cost_gib"] = cost
-    # session 34 (addendum 18, refinement 3): the v4.2 speed verdict.
-    # >= 7.5 w/s: clean pass. 5 <= w < 7.5: pass, but this rung is the
-    # CEILING - the gallop stops here (every deeper rung is slower).
-    # < 5: fail (below the reader line).
-    stall_ok = verdict.get("stall_rate", 1.0) <= speed_gate.STALL_RATE_MAX
+    # session 41, addendum 37 (protocol v4.x): the speed verdict is
+    # STRICTLY wps >= 5 - the stall-rate tolerance is obsolete (the
+    # author's ruling); the stall rate stays recorded in the verdict
+    # as diagnostic data, never a gate.
     worst = verdict.get("worst")
-    if not stall_ok:
-        return False, verdict
     if worst is not None and worst < 5.0:
         return False, verdict
     verdict["ceiling_rung"] = worst is not None and worst < 7.5

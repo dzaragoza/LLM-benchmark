@@ -38,7 +38,6 @@ import bench.tee_output as tee_output
 import infra.llama_server as llama_server
 
 ANSWER_HEADROOM = 128
-QUERY_TEMPLATE = "What is the special magic number for {key}? Answer with the number only."
 
 # --- FWE (frequent-words extraction, RULER's aggregation Challenge tier,
 # addendum 136b) --- upstream constants: NVIDIA/RULER
