@@ -528,3 +528,56 @@ def test_arc_gate_grades_at_the_task_pass_bar():
     fst = {"certify_arc": {str(r): 3 for r in range(1, 21)}}
     loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
     assert loaded and not any(loaded.values())
+
+
+def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
+    """Addendum 52, the author's follow-up ("the ARC gate was wrong -
+    it should have been 4/5... we need to pay more attention"): the
+    FRESHLY measured arc cell grades at TASK_PASS_BARS["arc"] too, so
+    a refactor can never again reintroduce a 5/5 gate that disagrees
+    with both the stored re-grade and the medal bar."""
+    from bench import state_store
+    from bench.constants import TASK_PASS_BARS
+
+    questions = [{"q": f"q{i}", "choices": [("A", "a"), ("B", "b")], "ans": "A"} for i in range(5)]
+    monkeypatch.setattr(state_store, "arc_cell_questions", lambda run: questions)
+
+    class FakeProc:
+        pass
+
+    monkeypatch.setattr(
+        state_store.llama_server,
+        "start_server",
+        lambda model, port, extra, log_path="": (FakeProc(), True),
+    )
+    monkeypatch.setattr(state_store.llama_server, "wait_healthy", lambda port, proc=None: True)
+    monkeypatch.setattr(state_store.llama_server, "stop_server", lambda proc, port: None)
+
+    n_correct = len(questions) - 1  # 4/5 - one wrong
+    calls = {"i": 0}
+
+    def fake_post(port, path, payload, timeout=0):
+        letter = "A" if calls["i"] < n_correct else "B"
+        calls["i"] += 1
+        return {
+            "choices": [
+                {
+                    "text": f" {letter}",
+                    "logprobs": {
+                        "content": [
+                            {
+                                "top_logprobs": [
+                                    {"token": " A", "logprob": -0.1 if letter == "A" else -9.9},
+                                    {"token": " B", "logprob": -9.9 if letter == "A" else -0.1},
+                                ]
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(state_store.llama_server, "post_json", fake_post)
+    ok, rec = state_store.arc_pass("m.gguf", 1, 8210)
+    assert rec["correct"] == TASK_PASS_BARS["arc"]
+    assert ok is True  # 4/5 passes at the 4/5 gate - the 5/5 regression cannot return
