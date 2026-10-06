@@ -287,9 +287,9 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
         # the real failure modes - a MISMATCHED closer or an unclosed
         # quote - are not.
         problem = balance(text)
-        if problem and ("quote" in problem):
+        if problem and ("quote" in problem or "unbalanced" in problem):
             return problem
-        return None
+        return None  # unclosed/underflow at region end is legal
 
     pairs = {"(": ")", "[": "]", "{": "}"}
     closers = set(pairs.values())
@@ -341,13 +341,17 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
                 elif ch in pairs:
                     stack.append((ch, ln_no))
                 elif ch in closers:
-                    if not stack or pairs[stack[-1][0]] != ch:
+                    if not stack:
+                        return f"closer underflow {ch!r} (line {ln_no})"
+                    if pairs[stack[-1][0]] != ch:
                         return f"unbalanced {ch!r} (line {ln_no})"
                     stack.pop()
                 i += 1
             in_comment = False  # comments do not span lines here
         if quote:
             return f"unclosed quote {quote!r}"
+        if tq_open:
+            return f"unclosed triple quote {tq_open!r}"
         if stack:
             o, ln_no = stack[-1]
             return f"unclosed {o!r} (opened line {ln_no})"
@@ -859,14 +863,11 @@ def _verify_result(out: str, blocks: Sequence[tuple], path: str) -> None:
             raise CodeEditError(
                 f"{path}: block {i} verify failed (deleted text still in the result)"
             )
-        if kind == "replace_regex":
-            try:
-                if not re.search(block[1], out):
-                    raise CodeEditError(
-                        f"{path}: block {i} verify failed (pattern result not in the result)"
-                    )
-            except re.error as e:
-                raise CodeEditError(f"{path}: block {i}: bad regex: {e}") from e
+        if kind == "replace_regex" and "\\" not in block[2]:
+            if block[2] not in out:
+                raise CodeEditError(
+                    f"{path}: block {i} verify failed (replacement text not in the result)"
+                )
 
 
 def write(path: str, content: str) -> None:

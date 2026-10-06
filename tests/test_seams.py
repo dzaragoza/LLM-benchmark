@@ -1347,3 +1347,93 @@ def test_code_edit_check_single_read(tmp_path):
     diff = code_edit.check(str(p), [("replace", "x = 1", "x = 2")])
     assert "-x = 1" in diff and "+x = 2" in diff
     assert p.read_text() == "x = 1\n"  # nothing written
+
+
+def test_code_edit_balance_interior_paths(tmp_path):
+    """Session 40, addendum 4, coverage-driven: the character-level
+    loop inside balance() had rare paths no test exercised -
+    triple-quoted strings, comments carrying brackets, backslash
+    escapes, a mismatched closer, and closer underflow. These are
+    exactly the paths that catch a duplicated or truncated edit
+    fragment."""
+    import code_edit
+
+    def try_edit(p, blocks):
+        try:
+            code_edit.edit(str(p), blocks)
+            return None
+        except code_edit.CodeEditError as e:
+            return str(e)
+
+    # a comment's bracket must NOT mask a real imbalance elsewhere
+    p = tmp_path / "c1.c"
+    p.write_text("int a;\n")
+    err = try_edit(p, [("replace", "int a;", "int a;  /* ( */\nint b;\n")])
+    assert err is None  # the ( is inside a comment - legal
+    # a MISMATCHED closer species in the region IS caught; a stray
+    # closer with an empty stack is underflow - legal by design (the
+    # opener may sit before the region)
+    p2 = tmp_path / "c2.c"
+    p2.write_text("if (a) { b(); }\n")
+    # both the opener and the wrong-species closer INSIDE the region -
+    # a true mismatch, which must be caught
+    err = try_edit(p2, [("replace", "b();", "b(};")])
+    assert err and "unbalanced" in err
+    # a closer with an EMPTY stack is underflow - legal (the opener
+    # may sit before the region)
+    err = try_edit(p2, [("replace", "b();", "b(); extra )")])
+    assert err is None
+    # backslash escape inside a string does not eat the closing quote
+    p3 = tmp_path / "c3.c"
+    p3.write_text('char *s = "x";\n')
+    err = try_edit(p3, [("replace", '"x"', '"\\"")')])
+    assert err is None
+    # closer underflow in a region is legal (the opener sits before it)
+    p4 = tmp_path / "c4.c"
+    p4.write_text("call(1);\n")
+    err = try_edit(p4, [("replace", "1", "1, 2")])
+    assert err is None
+
+
+def test_code_edit_unclosed_triple_quote_refused(tmp_path):
+    """Session 40, addendum 4: an unclosed triple quote at end of
+    buffer returned None from balance() - the whole-buffer check
+    (markup/json) passed corrupted edits. balance() now reports it;
+    region mode still tolerates a triple quote that closes after
+    the region (a legal docstring opener)."""
+    import code_edit
+
+    p = tmp_path / "u.c"
+    p.write_text("int a;\n")
+    try:
+        code_edit.edit(str(p), [("replace", "int a;", 'int a; /* """ open')])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised, "an unclosed triple quote must be refused"
+    assert p.read_text() == "int a;\n"
+
+    p2 = tmp_path / "ok.py"
+    p2.write_text("def f():\n    return 1\n")
+    code_edit.edit(str(p2), [("replace", "return 1", '"""doc\n    return 1\n    """')])
+    assert '"""doc' in p2.read_text()  # legal region-local docstring
+
+
+def test_code_edit_replace_regex_verify_literal(tmp_path):
+    """Session 40, addendum 4: _verify_result demanded the PATTERN
+    still match the result after a replace_regex - a false failure
+    for every ordinary replacement (old_word -> new_word no longer
+    matches old_word). The verify now checks the replacement text is
+    in the result for literal replacements; backreference
+    replacements are exempt (their text is not literal)."""
+    import code_edit
+
+    p = tmp_path / "t.c"
+    p.write_text("int old_word;\n")
+    code_edit.edit(str(p), [("replace_regex", r"old_word", "new_word")])
+    assert "new_word" in p.read_text()
+
+    p2 = tmp_path / "t2.c"
+    p2.write_text("int old_word;\n")
+    code_edit.edit(str(p2), [("replace_regex", r"old_\w+", "/* \\g<0> */")])
+    assert "/* old_word */" in p2.read_text()
