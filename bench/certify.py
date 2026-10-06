@@ -206,6 +206,18 @@ def certify_rung(
             print("  SKIPPED - the rung is already answered")
             results.append(entry)
             continue
+        infeasible = fst.get("infeasible")
+        if infeasible is not None:
+            entry["skipped"] = (
+                f"infeasible at {infeasible.get('depth'):,} "
+                f"(trained window {infeasible.get('window_cap'):,}, addendum 45)"
+            )
+            print(
+                f"  SKIPPED - out of the benchmark: trained window "
+                f"{infeasible.get('window_cap'):,} cannot run the rungs"
+            )
+            results.append(entry)
+            continue
         famdir = os.path.join(models_dir, fam)
         rung = rung_override or (
             fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
@@ -304,6 +316,15 @@ def certify_rung(
                     kv_quant_v=kv_v,
                 )
                 ran += 1
+                if fv.get("error") == "capped to the window":
+                    verdict = "infeasible"
+                    entry["infeasible_reason"] = (
+                        f"trained window {fv.get('window_cap'):,} < the rung's ctx "
+                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                    )
+                    fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
+                    save_state(state_path, state)
+                    break
                 cells[next_run] = ok
                 stalls = int(fv.get("stalls") or 0)
                 n_turns = int(fv.get("turns") or 0)
@@ -333,6 +354,15 @@ def certify_rung(
                     kv_quant_v=kv_v,
                 )
                 ran += 1
+                if fv.get("error") == "capped to the window":
+                    verdict = "infeasible"
+                    entry["infeasible_reason"] = (
+                        f"trained window {fv.get('window_cap'):,} < the rung's ctx "
+                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                    )
+                    fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
+                    save_state(state_path, state)
+                    break
                 cells[next_run] = ok
                 partial = int((fv.get("words_found") or [0])[0] or 0)
                 direct[str(next_run)] = bench_state_store.cell_record(
@@ -361,6 +391,15 @@ def certify_rung(
                 min_words=min_words,
             )
             ran += 1
+            if fv.get("error") == "capped to the window":
+                verdict = "infeasible"
+                entry["infeasible_reason"] = (
+                    f"trained window {fv.get('window_cap'):,} < the rung's ctx "
+                    f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                )
+                fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
+                save_state(state_path, state)
+                break
             cells[next_run] = ok
             words = fv.get("words_found") or []
             direct[str(next_run)] = bench_state_store.cell_record(
@@ -386,6 +425,15 @@ def certify_rung(
                 f"lower bound {lo:.3f} >= {bar_lo} - {fam} answers the {depth:,} rung"
             )
             answered = True
+        elif verdict == "infeasible":
+            entry["verdict"] = "infeasible"
+            entry["cells_measured"] = 0
+            entry["passes"] = 0
+            entry["ran_now"] = 0
+            print(
+                f"  INFEASIBLE at {depth:,} - {entry['infeasible_reason']} - "
+                f"{fam} is out of the benchmark; next candidate"
+            )
         elif verdict == "dead":
             entry["verdict"] = "dead"
             print(
@@ -399,7 +447,7 @@ def certify_rung(
         results.append(entry)
         # session 40, addendum 31: partial data ASAP (see the combined
         # controller's twin)
-        if on_verdict is not None and verdict in ("accept", "dead"):
+        if on_verdict is not None and verdict in ("accept", "dead", "infeasible"):
             try:
                 on_verdict(fam, verdict, entry.get("medal"), depth)
             except Exception as e:
@@ -464,6 +512,18 @@ def certify_rung_combined(
         if answered:
             entry["skipped"] = "rung already answered"
             print("  SKIPPED - the rung is already answered")
+            results.append(entry)
+            continue
+        infeasible = fst.get("infeasible")
+        if infeasible is not None:
+            entry["skipped"] = (
+                f"infeasible at {infeasible.get('depth'):,} "
+                f"(trained window {infeasible.get('window_cap'):,}, addendum 45)"
+            )
+            print(
+                f"  SKIPPED - out of the benchmark: trained window "
+                f"{infeasible.get('window_cap'):,} cannot run the rungs"
+            )
             results.append(entry)
             continue
         speed_dead_at = fst.get("speed_dead_at")
@@ -537,6 +597,8 @@ def certify_rung_combined(
                 best_lo, _ = wilson_interval(best_k, n_total, z)
                 if best_lo < bar_lo:
                     verdicts[t] = "dead"
+            if verdict == "infeasible":
+                break
             if all(v == "accept" for v in verdicts.values()):
                 verdict = "accept"
                 break
@@ -557,9 +619,23 @@ def certify_rung_combined(
             for t in COMBINED_TASKS:
                 if next_run in cells[t]:
                     continue
-                ok, graded, line, secs = bench_state_store._task_measure(
-                    t, model, depth, results_dir, next_run, port, kv_k, kv_v, min_words
-                )
+                try:
+                    ok, graded, line, secs = bench_state_store._task_measure(
+                        t, model, depth, results_dir, next_run, port, kv_k, kv_v, min_words
+                    )
+                except bench_state_store.WindowCap as e:
+                    # session 41, addendum 45: the trained window cannot
+                    # run the rung - the cell was never measurable. The
+                    # family is OUT of the benchmark (the author's
+                    # ruling); no cell of it enters any statistic.
+                    verdict = "infeasible"
+                    entry["infeasible_reason"] = (
+                        f"trained window {e.window_cap:,} < the rung's ctx "
+                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                    )
+                    fst["infeasible"] = {"window_cap": e.window_cap, "depth": depth}
+                    save_state(state_path, state)
+                    break
                 ran += 1
                 cells[t][next_run] = ok
                 tallies[t]["measured"] += 1
@@ -590,6 +666,21 @@ def certify_rung_combined(
                 f"- {fam} answers the {depth:,} rung"
             )
             answered = True
+        elif verdict == "infeasible":
+            # addendum 45: OUT of the benchmark - the trained window
+            # cannot run the rung; no cell of this family enters any
+            # statistic (the entries above are zeroed for it)
+            entry["verdict"] = "infeasible"
+            entry["cells_measured"] = 0
+            entry["ran_now"] = 0
+            entry["passes"] = 0
+            for t in COMBINED_TASKS:
+                entry[f"{t}_passes"] = 0
+                entry[f"{t}_cells"] = 0
+            print(
+                f"  INFEASIBLE at {depth:,} - {entry['infeasible_reason']} - "
+                f"{fam} is out of the benchmark; next candidate"
+            )
         elif verdict == "dead":
             entry["verdict"] = "dead"
             if dead_task == "speed":
@@ -612,7 +703,7 @@ def certify_rung_combined(
         # session 40, addendum 31: partial data ASAP - every VERDICT
         # (a medal or a death) is committed and pushed immediately, so
         # the author can watch the run from the repo
-        if on_verdict is not None and verdict in ("accept", "dead"):
+        if on_verdict is not None and verdict in ("accept", "dead", "infeasible"):
             try:
                 on_verdict(fam, verdict, entry.get("medal"), depth)
             except Exception as e:

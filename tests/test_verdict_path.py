@@ -441,3 +441,54 @@ def test_resolve_f16_local_never_matches_a_quant(tmp_path):
     assert hf_download.resolve_f16_local(str(tmp_path)) is None
     (tmp_path / "MiniCPM-sft-f16.gguf").write_bytes(b"x")
     assert hf_download.resolve_f16_local(str(tmp_path)) == str(tmp_path / "MiniCPM-sft-f16.gguf")
+
+
+def test_window_cap_makes_the_family_infeasible_not_dead(tmp_path, monkeypatch):
+    """Addendum 45 (the author's ruling): a family whose trained window
+    cannot run the rung (the server capped -c to n_ctx_train, every
+    turn 400s) is OUT of the benchmark - verdict 'infeasible', never
+    'dead', zero cells in its entry, the window recorded in the state,
+    never re-attempted at any rung."""
+    import full_benchmark as fb
+
+    model = tmp_path / "capped-Q8_0.gguf"
+    model.write_bytes(b"x")
+    state: dict[str, Any] = {
+        "families": {"capped": {"selected": "Q8_0", "runs": {"Q8_0": {"file": str(model)}}}}
+    }
+
+    def fake_measure(task, *a, **kw):
+        raise bench_state_store.WindowCap(2048)
+
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
+    res = fb.certify_rung_combined(
+        4096,
+        ["capped"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+    )
+    r = res[0]
+    assert r["verdict"] == "infeasible"
+    assert r["cells_measured"] == 0 and r["passes"] == 0 and r["ran_now"] == 0
+    assert "2,048" in r["infeasible_reason"]
+    fst = state["families"]["capped"]
+    assert fst["infeasible"] == {"window_cap": 2048, "depth": 4096}
+    # never re-attempted: a second controller call skips the family
+    monkeypatch.setattr(
+        bench_state_store,
+        "_task_measure",
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("must not re-measure")),
+    )
+    res2 = fb.certify_rung_combined(
+        4096,
+        ["capped"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+    )
+    assert res2[0].get("skipped", "").startswith("infeasible")

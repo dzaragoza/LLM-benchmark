@@ -270,6 +270,19 @@ def _task_store(
     fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = record
 
 
+class WindowCap(Exception):
+    """The model's trained window cannot run the rung at all (session
+    41, addendum 45): the server capped the requested -c down to
+    n_ctx_train, so the depth budget overflows and every deep turn
+    400s - the cell was never measurable. The family is OUT of the
+    benchmark (the author's ruling), never re-attempted, and its
+    cells never enter any statistic."""
+
+    def __init__(self, window_cap: int | None) -> None:
+        self.window_cap = window_cap
+        super().__init__(f"trained window {window_cap} caps the rung")
+
+
 def _task_measure(
     task: str,
     model: str,
@@ -285,7 +298,10 @@ def _task_measure(
     record, human line, wall seconds - session 40, addendum 32: the
     per-test cost, so the expensive tests are visible). The graded
     record is the speed stall count, the FWE word count, the VT 5-name
-    count - all re-gradable at any bar later without re-measuring."""
+    count - all re-gradable at any bar later without re-measuring.
+    Raises WindowCap when the launch's banner shows the trained
+    window below the rung's ctx (addendum 45) - that is not a FAIL,
+    the cell was never measurable."""
     t0 = time.time()
     if task == "speed":
         ok, fv = bench_cells.speed_cell(
@@ -298,6 +314,8 @@ def _task_measure(
             kv_quant_k=kv_k,
             kv_quant_v=kv_v,
         )
+        if fv.get("error") == "capped to the window":
+            raise WindowCap(fv.get("window_cap"))
         stalls = int(fv.get("stalls") or 0)
         n_turns = int(fv.get("turns") or 0)
         return (
@@ -326,6 +344,8 @@ def _task_measure(
             kv_quant_k=kv_k,
             kv_quant_v=kv_v,
         )
+        if fv.get("error") == "capped to the window":
+            raise WindowCap(fv.get("window_cap"))
         partial = int((fv.get("words_found") or [0])[0] or 0)
         return (
             ok,
@@ -343,6 +363,8 @@ def _task_measure(
         kv_quant_v=kv_v,
         min_words=min_words,
     )
+    if fv.get("error") == "capped to the window":
+        raise WindowCap(fv.get("window_cap"))
     words = fv.get("words_found") or []
     count = words[0] if words else int(ok)
     return (

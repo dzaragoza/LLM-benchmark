@@ -286,7 +286,12 @@ def verdict_commit(
     """Session 40, addendum 31: every VERDICT commits and pushes
     IMMEDIATELY, so the run is watchable while it goes. A git failure
     never stops the run."""
-    what = f"{fam} {'MEDAL ' + str(medal) if verdict == 'accept' else 'DEAD'} at rung {depth:,}"
+    if verdict == "accept":
+        what = f"{fam} MEDAL {medal} at rung {depth:,}"
+    elif verdict == "infeasible":
+        what = f"{fam} INFEASIBLE at rung {depth:,} - out of the benchmark (addendum 45)"
+    else:
+        what = f"{fam} DEAD at rung {depth:,}"
     stamp(f"verdict: {what} - committing partial results")
     tee_output.uninstall()
     try:
@@ -490,7 +495,7 @@ def main() -> None:
         if "accept" in verdicts:
             stamp(f"rung {depth:,} ANSWERED - the ladder stops here")
             break
-        if verdicts and all(v == "dead" for v in verdicts):
+        if verdicts and all(v in ("dead", "infeasible") for v in verdicts):
             stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
             continue
     if not args.no_git and not args.dry_run:
