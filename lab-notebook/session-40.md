@@ -953,3 +953,27 @@ THE PROPERTIES (ruling c): test_task_store_roundtrip (a stored cell loads back e
 THE RULING: "remove it, it is obsolete." bench/tournament_helpers.py - the CSV reader that re-graded inherited tournament-fall cells from their committed climb CSVs - is deleted, and with it the whole inheritance path: certify_cells loses its models_dir/fam parameters and the tournament_falls loop (every cell is the certify run's own); _task_load's FWE wrapper and certify.py's caller updated. The roots scripts stay (ruling 1: "leave the scripts alone, I don't know what to do with them yet"); js_check stays (ruling 2: "keep it"). The tournament_entry fallback in variant_of/stored_variant STAYS - that is the live state's stored-selection field, not the CSV inheritance.
 
 Tests: the two inheritance tests cut (test_certify_cells_inherit_from_falls, test_certify_cells_regrades_inherited_from_csv); the accepts_and_skips/dead/2-sigma-dead/vt tests reseeded on direct certify records instead of falls (the cell evidence the v4.x protocol actually stores). 180 tests total. All gates: pytest 180/180, ty 0, ruff clean, md_check, vulture clean.
+
+### Addendum 40 - pre-registered: the missing ~25% of the bandwidth story, and the (k,v) scaling ladder (2026-10-06, the author's ruling + discussion)
+
+THE CONTEXT: the f16 first pass ((f16,f16,f16), full capacity, param-ascending) is running. Its purpose: per-model wps degradation curves, the RAM ceiling where the speed gate bites, and the census + wps tuples that let us extrapolate above and below our 102.4 GB/s machine - the practitioner-recommendation layer of the study.
+
+THE DECOMPOSITION (the discussion): decode cost per token has TWO depth-linear terms - the bandwidth term (bytes moved per token = weights(q) + KV(R)*bits/16) and the COMPUTE term (attention FLOPs over every cached position, also linear in R). So far the bandwidth story explains ~75% of the observed wps; the author's hypothesis: the missing ~25% is compute.
+
+PRE-REGISTERED PREDICTIONS (framed BEFORE the ladder data exists, so the answer cannot be fitted to the result):
+
+P1 (the discriminator - the (k,v) quant separates the terms): shrinking (k,v) f16->q8_0 HALVES the bandwidth term's depth-linear part but leaves the attention FLOPs unchanged. IF the missing ~25% is compute, a KV halving recovers LESS than the one-rung-of-speed the pure-bandwidth model predicts - and the shortfall IS the compute term, measured directly. If KV halving recovers exactly the bandwidth share, the residual is elsewhere (prefill interference, memory latency at larger working sets, TLB/page-table effects on system RAM).
+
+P2 (the cheaper check, from the f16 pass alone): fit 1/wps(R) = a + b*R per family (pure bandwidth: a = weights bytes, b = KV bytes). The intercept predicts wps(0) ~= B/weights; if the MEASURED flat-context speed (the 4k rung, negligible KV) is already below B/W, part of the residual is depth-INDEPENDENT per-token compute (dequant, GEMM over weights - real on CPU), not the attention term. Depth-dependent residual beyond the KV-byte prediction = attention compute. NOTE: the f16 pass ALONE cannot separate the two linear-in-depth terms - the (k,v) ladder (P1) is the separator.
+
+THE SCALING LADDER (the rule, pre-registered - a rule the orchestrator walks, not a hidden selection): when a model dies at the speed gate at rung R, the forward path is the (k,v) lever FIRST, then (q):
+  1. (f16, f16, f16) dies at R
+  2. (f16, q8_0, q8_0) - halves KV: exactly one rung of memory headroom, plus reduced attention bandwidth (may recover speed at R itself) - THE FIRST MOVE at every speed-gate death
+  3. (f16, q4_0, q4_0) - quarters KV: two rungs
+  4. asymmetric (f16, q8_0, q4_0) etc. - K and V tolerances differ (KIVI et al.); which side degrades less is an empirical question our cells answer per family
+  5. only when KV is exhausted: (q8_0, ...) - the one-shot lever, paid on every task, LAST because it degrades the QUALITY axes (FWE/VT/ARC), not the depth axis
+Why (k,v) first: the KV term is what DOUBLES each rung, so it is the rung-climbing lever; (q) buys a fixed GiB amount once. The memory equation total(R) = weights(q) + KV(R)*bits(k,v)/16 + compute is depth-separable, and every census already records its three terms per launch.
+
+PRACTITIONER IMPLICATIONS (pre-registered): if P1 confirms compute, the recommendation flips qualitatively - on slower-bandwidth systems the KV quant is the dominant lever (memory-bound), on faster systems the compute ceiling dominates and NO quant helps (the crossover). Extrapolating BELOW our bandwidth is interpolation on the fitted slope (safe); extrapolating far ABOVE may hit the compute ceiling and flip from the memory story to a FLOPs story. The death-run patterns across families will locate the crossover.
+
+FUTURE OPTIMIZATIONS (parked, the author's ruling "we can look it up later"): ARC could run first on a family's first cell (cheapest launch, hard kill); fwe+vt share the identical server shape (-c rung --parallel 1) and could ride ONE launch per cell - the biggest single amortization of the ~4 launches per cell; check the {t} records once the run produces them.
