@@ -42,7 +42,10 @@ def _task_load(
     cell measured under another variant does NOT load."""
     legacy = stored_variant(fst)
     if task == "vt":
-        return {r: p >= 5 for r, p in vt_cells(fst, depth, want, legacy).items()}
+        # addendum 54: the gate bar is TASK_PASS_BARS["vt"] (4/5), same
+        # consistency ruling as arc (addenda 52-53) - the 5/5 gate was
+        # the refactor's drift, not a difficulty choice
+        return {r: p >= TASK_PASS_BARS["vt"] for r, p in vt_cells(fst, depth, want, legacy).items()}
     if task == "speed":
         return {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
     if task == "arc":

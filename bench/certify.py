@@ -183,8 +183,10 @@ def certify_rung(
         legacy = bench_state_store.stored_variant(
             fst, state.get("kv_quant_k"), state.get("kv_quant_v")
         )
-        if task == "vt":
-            cells = {r: p >= 5 for r, p in vt_cells(fst, depth, want, legacy).items()}
+        if task == "vt":  # addendum 54: gate = TASK_PASS_BARS["vt"] (4/5)
+            cells = {
+                r: p >= TASK_PASS_BARS["vt"] for r, p in vt_cells(fst, depth, want, legacy).items()
+            }
         elif task == "speed":
             cells = {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
         else:

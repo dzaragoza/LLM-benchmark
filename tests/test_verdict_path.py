@@ -581,3 +581,32 @@ def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
     ok, rec = state_store.arc_pass("m.gguf", 1, 8210)
     assert rec["correct"] == TASK_PASS_BARS["arc"]
     assert ok is True  # 4/5 passes at the 4/5 gate - the 5/5 regression cannot return
+
+
+def test_vt_gate_grades_at_the_task_pass_bar():
+    """Addendum 54: "Be consistent, we chose 4/5 for a reason" - the vt
+    GATE predicate is TASK_PASS_BARS["vt"] (4/5), the same consistency
+    ruling as arc (addenda 52-53): the 5/5 gate was the refactor's
+    drift, not a difficulty choice."""
+    from bench import state_store
+
+    fst = {"certify_vt": {"4096": {str(r): 4 for r in range(1, 21)}}}
+    loaded = state_store._task_load(fst, 4096, "vt", 2, "models", "fam")
+    assert loaded and all(loaded.values())
+    fst = {"certify_vt": {"4096": {str(r): 3 for r in range(1, 21)}}}
+    loaded = state_store._task_load(fst, 4096, "vt", 2, "models", "fam")
+    assert loaded and not any(loaded.values())
+
+
+def test_vt_pass_fresh_cell_grades_at_the_task_pass_bar():
+    """Addendum 54: vt_pass launches a real server, so the fresh-cell
+    grading is pinned at the source level: its return expression must
+    grade row["acc"] at TASK_PASS_BARS["vt"] / 5 - a drifted 5/5 gate
+    (acc == 1.0) fails this test, not the run."""
+    import inspect
+
+    from bench import cells as bench_cells
+
+    src = inspect.getsource(bench_cells.vt_pass)
+    assert 'row["acc"] >= TASK_PASS_BARS["vt"] / 5.0' in src
+    assert 'row["acc"] == 1.0' not in src
