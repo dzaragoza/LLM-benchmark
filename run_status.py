@@ -85,17 +85,39 @@ def infeasible_families(seg: str) -> dict[str, int]:
     the live-run record; this covers families benched before the
     verdict existed). Returns {family: trained window}."""
     out: dict[str, int] = {}
-    for m in re.finditer(
-        r"===== \S+ \| full_benchmark\.py[^=]*=====(.*?)(?====== |\Z)",
-        seg,
-        re.S,
-    ):
-        block = m.group(0)
-        fam = re.search(r"verdict: ([\w.\-/]+) (?:DEAD|INFEASIBLE)", block)
+    verdicts = list(re.finditer(r"verdict: ([\w.\-/]+) (?:DEAD|INFEASIBLE)", seg))
+    bounds = [0] + [m.end() for m in verdicts]
+    for i, m in enumerate(verdicts):
+        block = seg[bounds[i] : bounds[i + 1]]
         capped = re.search(r"accepted -c \d+ but runs n_ctx (\d+)", block)
-        if fam and capped:
-            out[fam.group(1)] = int(capped.group(1))
+        if capped:
+            out[m.group(1)] = int(capped.group(1))
     return out
+
+
+def _cut_infeasible_segments(seg: str) -> str:
+    """Cut every infeasible family's OWN segment (from the previous
+    verdict line - or the pass header - up to its own verdict line)
+    out of the pass, linearly: a verdict line closes each family's
+    block, so the slice between two consecutive verdict lines belongs
+    to exactly one family. A later infeasible verdict can never
+    swallow an honest family benched before it."""
+    verdicts = list(re.finditer(r"verdict: ([\w.\-/]+) (?:DEAD|INFEASIBLE)", seg))
+    if not verdicts:
+        return seg
+    infeasible = set(infeasible_families(seg))
+    if not infeasible:
+        return seg
+    # a family's block runs from the previous verdict (or start) to its
+    # own verdict line inclusive; INFEASIBLE families' blocks are cut
+    bounds = [0] + [m.end() for m in verdicts]
+    out = []
+    for i, m in enumerate(verdicts):
+        block = seg[bounds[i] : bounds[i + 1]]
+        if m.group(1) not in infeasible:
+            out.append(block)
+    out.append(seg[bounds[-1] :])
+    return "".join(out)
 
 
 def gate_kill_rates() -> dict[str, dict[str, int]]:
@@ -106,14 +128,7 @@ def gate_kill_rates() -> dict[str, dict[str, int]]:
     (addendum 45) are OUT of the benchmark - their blocks are cut from
     the segment before any count, so neither their kills nor their
     cells (all FAIL-by-400) enter the statistics."""
-    seg = _pass_segment()
-    infeasible = infeasible_families(seg)
-    for fam in infeasible:
-        block = (
-            rf"===== \S+ \| full_benchmark\.py[^=]*=====(?:(?!===== ).)*?"
-            rf"verdict: {re.escape(fam)} (?:DEAD|INFEASIBLE)[^\n]*\n"
-        )
-        seg = re.sub(block, "", seg, flags=re.S)
+    seg = _cut_infeasible_segments(_pass_segment())
     kills: dict[str, int] = {}
     for task, _ in re.findall(r"DEAD - (\w+) cannot reach the bar at [\d,]+ \(([\d/]+)", seg):
         kills[task] = kills.get(task, 0) + 1
@@ -228,6 +243,7 @@ def render(rows: list[dict]) -> str:
     # the difficulty panel: kill rate per gate (this pass)
     kr = gate_kill_rates()
     total_kills = sum(v["kills"] for v in kr.values())
+    total_infeasible = len(infeasible_families(_pass_segment()))
     out.append('<div class="panel">')
     out.append("<h2>Difficulty &mdash; the kill rate, this pass</h2>")
     out.append("<table>")
@@ -243,13 +259,17 @@ def render(rows: list[dict]) -> str:
         )
     out.append(
         f"<tr><td><strong>any</strong></td><td>{total_kills}</td><td>&mdash;</td><td>&mdash;</td></tr>"
+        f"<tr><td><strong>disqualified</strong> (trained window below the "
+        f"first rung, addendum 45)</td><td>{total_infeasible}</td>"
+        "<td>&mdash;</td><td>&mdash;</td></tr>"
     )
     out.append("</table>")
     out.append(
         '<p class="footnote">families killed = the gate that mathematically '
         "could not reach the 2-sigma bar; pass rate = passed cells / measured "
         "cells across every family this pass &mdash; the raw lethality of "
-        "each bar.</p>"
+        "each bar. Disqualified families never entered the cells or the "
+        "kills - their row shows the actual roster total.</p>"
     )
     out.append("</div>")
 
