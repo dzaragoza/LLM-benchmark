@@ -388,8 +388,8 @@ def certify_rung_combined(
     tallies and their own accept/dead verdicts. The candidate certifies
     the rung when ALL THREE accept; it dies when ANY ONE is dead (the
     next candidate is picked up). Session 40, ruling B: the certify
-    LEVEL maps to a MEDAL TIER - at_least_one = bronze (0.5 sigma,
-    0.20), 1_sigma = silver (1 sigma, 0.375), 2_sigma = gold
+    LEVEL maps to a MEDAL TIER - at_least_one = 0.5_sigma (0.5 sigma,
+    0.20), 1_sigma = 1_sigma (1 sigma, 0.375), 2_sigma = 2_sigma
     (2 sigma, 0.50) - and the accept/dead math per task IS the tier's
     own bar, so the rung-stopping accept fires exactly when
     combined_medal returns the requested tier."""
@@ -580,11 +580,13 @@ TASK_PASS_BARS = {"speed": 0, "fwe": 2, "vt": 4, "arc": 4}
 def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
     """The combined medal (session 38, addendum 7 - the author's
     refinement): the medals are PURE CONFIDENCE TIERS over each task's
-    pass bar - gold = 2 sigma in EVERY test, silver = at least 1 sigma
-    in EVERY test, bronze = 0.5 sigma in EVERY test (session 40, the
-    equidistant ruling: the thresholds land the tiers on round cell
-    counts at n=20 - bronze k=5, silver k=10, gold k=15 - and the
-    majority floor is dropped: it would forbid bronze). The pass
+    pass bar - 2_sigma = 2 sigma in EVERY test, 1_sigma = at least 1
+    sigma in EVERY test, 0.5_sigma = 0.5 sigma in EVERY test (session
+    40, the equidistant ruling: the thresholds land the tiers on
+    round cell counts at n=20 - 0.5_sigma k=5, 1_sigma k=10,
+    2_sigma k=15; the majority floor is dropped: it would forbid
+    0.5_sigma; the tier names ARE the sigma names, the consistency
+    ruling). The pass
     bars (the difficulty knob) live in TASK_PASS_BARS and never move
     the medals; tuning a test's difficulty changes what a pass means,
     not what the medals mean. A task with no measured cells has no
@@ -613,14 +615,14 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
         lo_1s, _ = wilson_interval(k, len(records), 1.0)
         lo_2s, _ = wilson_interval(k, len(records), 2.0)
         grades[t] = {
-            "gold": lo_2s >= 0.50,
-            "silver": lo_1s >= 0.375,
-            "bronze": lo_05s >= 0.20,
+            "2_sigma": lo_2s >= 0.50,
+            "1_sigma": lo_1s >= 0.375,
+            "0.5_sigma": lo_05s >= 0.20,
         }
-    if all(grades[t]["gold"] for t in COMBINED_TASKS):
-        return "gold"
-    if all(grades[t]["silver"] for t in COMBINED_TASKS):
-        return "silver"
-    if all(grades[t]["bronze"] for t in COMBINED_TASKS):
-        return "bronze"
+    if all(grades[t]["2_sigma"] for t in COMBINED_TASKS):
+        return "2_sigma"
+    if all(grades[t]["1_sigma"] for t in COMBINED_TASKS):
+        return "1_sigma"
+    if all(grades[t]["0.5_sigma"] for t in COMBINED_TASKS):
+        return "0.5_sigma"
     return None

@@ -521,7 +521,11 @@ def build_parser() -> argparse.ArgumentParser:
         "ladder table is the ranking"
     )
     ap.add_argument(
-        "families", nargs="+", help='family specs: "model_repo" or "model_repo=source_repo"'
+        "families",
+        nargs="*",
+        help='family specs: "model_repo" or "model_repo=source_repo"; '
+        "omitted = every family already in the state file (the certify "
+        "ladder needs no names - the state carries the specs)",
     )
     ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument(
@@ -761,7 +765,14 @@ def main() -> None:
         state["kv_quant_v"] = args.kv_quant_v
 
     if not args.families:
-        ap.error("no family specs given")
+        # session 40: with no positional specs the families come from
+        # the state file - every family ever entered carries its spec
+        saved = [
+            (fst or {}).get("spec") or fam for fam, fst in (state.get("families") or {}).items()
+        ]
+        args.families = [s for s in saved if s]
+        if not args.families:
+            ap.error("no family specs given and the state file has none")
     if args.rescore:
         rescore_tournament(args.models_dir, state, args.state_file, not args.rescore_apply)
         return

@@ -880,9 +880,9 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         r = res[0]
         assert r["verdict"] == "accept"
         assert all(r[f"{t}_verdict"] == "accept" for t in fb.COMBINED_TASKS)
-        # ruling B: the 1_sigma level ANSWERS at the silver tier - the
+        # ruling B: the 1_sigma level ANSWERS at the 1_sigma tier - the
         # controller bar and the medal bar are the same thing now
-        assert r["medal"] == "silver"
+        assert r["medal"] == "1_sigma"
         ns: dict[str, Any] = state["families"]["fam"]
         assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
         assert ns["certify_arc"]  # rung-independent, stored once
@@ -951,9 +951,10 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
 
 def test_combined_medal_grading_from_records():
     """Addendum 7 (the author's refinement): the medals are PURE
-    confidence tiers over each task's pass bar - gold = 2 sigma in
-    every test, silver = at least 1 sigma in every test, bronze =
-    0.5 sigma in every test (session 40: at-least-one-pass retired).
+    confidence tiers over each task pass bar - 2_sigma = 2 sigma in
+    every test, 1_sigma = at least 1 sigma in every test,
+    0.5_sigma = 0.5 sigma in every test (session 40: the tier names
+    are the sigma names, the consistency ruling).
     Re-graded from stored records alone."""
     import full_benchmark as fb
 
@@ -966,7 +967,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(gold, 8192, "2_sigma") == "gold"
+    assert fb.combined_medal(gold, 8192, "2_sigma") == "2_sigma"
 
     silver = {
         "certify": {"8192": {str(r): 3 if r <= 10 else 0 for r in range(1, 21)}},
@@ -974,7 +975,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(silver, 8192, "2_sigma") == "silver"
+    assert fb.combined_medal(silver, 8192, "2_sigma") == "1_sigma"
 
     bronze = {
         "certify": {"8192": {str(r): 3 if r <= 5 else 0 for r in range(1, 21)}},
@@ -982,7 +983,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(bronze, 8192, "2_sigma") == "bronze"
+    assert fb.combined_medal(bronze, 8192, "2_sigma") == "0.5_sigma"
 
     weak_bronze = {
         "certify": {"8192": {str(r): 3 if r <= 4 else 0 for r in range(1, 21)}},
@@ -1026,7 +1027,7 @@ def test_arc_rung_independence_and_namespace():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
         "certify_arc": {str(r): 5 for r in range(1, 12)},
     }
-    assert fb.combined_medal(arc_gold, 8192, "1_sigma") == "gold"
+    assert fb.combined_medal(arc_gold, 8192, "1_sigma") == "2_sigma"
     no_arc = {k: v for k, v in arc_gold.items() if k != "certify_arc"}
     assert fb.combined_medal(no_arc, 8192, "1_sigma") is None
 
