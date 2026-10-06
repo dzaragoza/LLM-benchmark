@@ -61,3 +61,31 @@ def test_render_is_a_standalone_page_with_gates():
     for gate in ("speed", "fwe", "vt", "arc"):
         assert gate in b1
     assert "fam" in b1 and "climber" in b1
+
+
+def test_gate_kill_rates_scoped_to_the_pass(tmp_path, monkeypatch):
+    """The kill rates count ONLY the current f16 pass - the pass's
+    first --force-rung f16 header is the scope start; anything before
+    it (older runs in results.txt) must not leak in."""
+    results = tmp_path / "results.txt"
+    results.write_text(
+        # an OLDER run's history - must not count
+        "===== 2026-10-02T10:00:00 | full_benchmark.py --tournament =====\n"
+        "  DEAD - fwe cannot reach the bar at 4,096 (0/9, best lower bound"
+        " 0.4 < 0.5); next candidate\n"
+        "  cell 9 speed: 0 stalls -> PASS -> speed 9/9\n"
+        # THIS pass
+        "===== 2026-10-06T17:40:10 | full_benchmark.py --task all --force-rung f16 =====\n"
+        "  cell 1 fwe: 3/1 word(s) -> PASS -> fwe 1/1\n"
+        "  cell 2 fwe: 0/1 word(s) -> FAIL -> fwe 1/2\n"
+        "  cell 3 vt: 5/5 names -> PASS -> vt 1/1\n"
+        "  DEAD - vt cannot reach the bar at 4,096 (0/6, best lower bound"
+        " 0.477 < 0.5); next candidate\n"
+    )
+    monkeypatch.setattr(run_status, "RESULTS", str(results))
+    kr = run_status.gate_kill_rates()
+    assert kr["fwe"]["kills"] == 0  # the old fwe kill must not count
+    assert kr["fwe"]["passes"] == 1 and kr["fwe"]["measured"] == 2
+    assert kr["vt"]["kills"] == 1
+    assert kr["vt"]["passes"] == 1 and kr["vt"]["measured"] == 1
+    assert kr["speed"]["measured"] == 0  # old speed cells must not count
