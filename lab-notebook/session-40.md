@@ -354,3 +354,30 @@ VERIFIED: 172/172 pytest (167 + 5), ty 0 via the addendum-21
 wrapper, ruff check + format clean, md_check, js_check pass.
 --no-verify only because the pre-commit runner fails under this
 sandbox's command wrapper (all hooks run manually green).
+
+## Addendum 9 - the code-tools charter (2026-10-06, the author's ruling)
+
+THE AUTHOR'S RULING on the code-tool family (code_edit, code_search,
+the checkers): "The goal for the code tools is to improve the
+workflow when gaps are detected. No point in reinventing the well if
+other tools already do it well."
+
+Standing interpretation: (1) a tool is BUILT when a concrete gap is
+detected in the workflow (code_edit: verify-before-write edits; the
+addendum-6 flexible-rescue and not-found diagnostics: the
+formatting-drift gap; code_search: the semantic-search gap the
+addendum-5/7 refactors exposed) - never speculatively; (2) existing
+tools that already do the job well are ADOPTED, not rebuilt (ty for
+type-checking via the wrapper, ruff for lint+format, pytest,
+vulture for dead-code discovery, coverage.py as the missing-test
+discovery helper - none of them reimplemented); (3) a built tool
+carries a removal clause (code_search: "if we find it not useful we
+can remove it") - usefulness is judged by whether it actually
+improves the workflow, and honest reports back to the author; (4)
+before building, the first question is always: does something
+already existing do this well?
+
+VERIFIED: md_check pass (notebook-only change; the code gates are
+untouched - no --no-verify needed for a markdown-only commit, but
+the pre-commit runner still fails under this sandbox's command
+wrapper, so the md hook's check was run manually).
