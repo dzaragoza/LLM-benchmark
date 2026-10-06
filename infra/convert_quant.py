@@ -117,6 +117,12 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         if os.path.isdir(st_dir):
             shutil.rmtree(st_dir)
             print("  [2] safetensors-source deleted (the f16 is the quant source from here)")
+    # session 40, addendum 30: the f16 rung IS the f16 - no quantize
+    # step (the full-capacity pass measures (f16, f16, f16); quanting
+    # f16 -> f16 through llama-quantize would be a wasteful copy)
+    if rung.lower() == "f16":
+        print(f"  [2] f16 rung - {os.path.basename(f16)} is the rung file (no quantize step)")
+        return f16
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
     print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")

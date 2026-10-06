@@ -835,6 +835,7 @@ def main() -> None:
                     args.dry_run,
                     min_words=args.fwe_min_words,
                     rung_override=args.rung if args.rung_forced else None,
+                    on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
                 )
             else:
                 results = certify_rung(
@@ -849,6 +850,7 @@ def main() -> None:
                     min_words=args.fwe_min_words,
                     task=args.task,
                     rung_override=args.rung if args.rung_forced else None,
+                    on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
                 )
             state["certify"] = results
             save_state(args.state_file, state)
@@ -1246,6 +1248,31 @@ def git_pull_head() -> None:
         stamp(f"git pull: {out.splitlines()[0]}")
     else:
         stamp("git pull: already up to date")
+
+
+def partial_commit_hook(args: argparse.Namespace) -> Any:
+    """The on_verdict callback handed to the certify controllers: the
+    partial-data-ASAP commit (session 40, addendum 31). Built lazily so
+    the callback closes over the run's args."""
+    return lambda fam, verdict, medal, depth: verdict_commit(args, fam, verdict, medal, depth)
+
+
+def verdict_commit(
+    args: argparse.Namespace, fam: str, verdict: str, medal: Any, depth: int
+) -> None:
+    """Session 40, addendum 31 - the author's partial-data-ASAP ruling:
+    every VERDICT (a family's medal or its death at a rung) commits and
+    pushes the artifacts IMMEDIATELY, so the run is watchable from the
+    repo while it is still going. The same artifact set as the git tail
+    (state, results.txt, dumps, sidecars); a failure here never stops
+    the run - the tail catches the remainder at the end."""
+    what = f"{fam} {'MEDAL ' + str(medal) if verdict == 'accept' else 'DEAD'} at rung {depth:,}"
+    stamp(f"verdict: {what} - committing partial results")
+    tee_output.uninstall()  # results.txt must be complete on disk before commit
+    try:
+        git_tail(args)
+    finally:
+        tee_output.install()
 
 
 def git_tail(args: argparse.Namespace) -> None:

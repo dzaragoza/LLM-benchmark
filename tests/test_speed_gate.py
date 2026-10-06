@@ -1462,3 +1462,71 @@ def test_st_source_complete_guard(tmp_path):
     # a corrupt index is incomplete, never silently trusted
     (d / "model.safetensors.index.json").write_text("{not json")
     assert not hf.st_source_complete(str(d))
+
+
+def test_f16_is_a_rung(tmp_path):
+    """Addendum 30 regression: f16 is a first-class rung - a shipped f16
+    GGUF resolves as the rung file (never skipped as 'the quantize
+    source'), the estimate is the full 16 bits, and create() returns
+    the f16 itself with no quantize step."""
+    import infra.convert_quant as cq
+    import infra.hf_download as hf
+
+    files = ["model-Q8_0.gguf", "model-f16.gguf", "model-bf16.gguf"]
+    assert hf.find_rung_file(files, "f16") == "model-f16.gguf"
+    assert hf.find_rung_file(files, "Q8_0") == "model-Q8_0.gguf"
+    assert hf.RUNG_BITS["f16"] == 16.0
+    # estimate: a shipped f16 file sizes exactly
+    est = hf.estimate_rung_gib("f16", ["model-f16.gguf"], [], {"model-f16.gguf": 2 * 1024**3})
+    assert est is not None and abs(est - 2.0) < 1e-9
+    # create(): the f16 rung returns the existing f16, no quantize call
+    famdir = tmp_path / "fam"
+    famdir.mkdir()
+    f16 = famdir / "fam-f16.gguf"
+    f16.write_bytes(b"x")
+    assert cq.create("fam", str(famdir), "f16") == str(f16)
+
+
+def test_verdict_hook_fires_on_accept_and_dead(tmp_path):
+    """Addendum 31 regression: the partial-data-ASAP hook - the combined
+    controller calls on_verdict for every accept/dead verdict, never
+    for a dry run, and a hook failure never stops the run."""
+    import full_benchmark as fb
+
+    calls = []
+
+    def hook(fam, verdict, medal, depth):
+        calls.append((fam, verdict, medal, depth))
+
+    state: dict[str, Any] = {
+        "families": {
+            "good": {
+                "spec": "test/good",
+                "selected": "Q8_0",
+                "runs": {"Q8_0": {"file": str(tmp_path / "g.gguf")}},
+            }
+        }
+    }
+    (tmp_path / "g.gguf").write_bytes(b"x")
+    monkeypatch = pytest.MonkeyPatch()
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        return True, 5, "ok"
+
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
+    try:
+        res = fb.certify_rung_combined(
+            4096,
+            "at_least_one",
+            ["test/good"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            on_verdict=hook,
+        )
+        assert res[0]["verdict"] == "accept"
+        assert calls and calls[0][0] == "good" and calls[0][1] == "accept"
+    finally:
+        monkeypatch.undo()

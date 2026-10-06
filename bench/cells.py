@@ -78,9 +78,6 @@ def speed_pass(
     to n_ctx_train the rung is ABOVE the window, and the caller makes
     it the ceiling (the window itself is the search bound, not a
     benched rung)."""
-    dropped = llama_server.drop_file_cache(model)
-    if not dropped:
-        print("    note: cache drop unavailable - cost may read warm (137k)")
     turns, _, mem_reports = speed_gate.bench_model(
         model,
         corpus,
@@ -163,7 +160,6 @@ def fwe_pass(
     if os.path.exists(csv_path):
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
-    llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     # session 35, addendum 8: separate K/V (the combined flag is gone);
@@ -301,7 +297,6 @@ def vt_pass(
     if os.path.exists(csv_path):
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-vt-server.log")
-    llama_server.drop_file_cache(model)
     mem_before = llama_server.system_memavailable_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     if kv_quant_k or kv_quant_v:

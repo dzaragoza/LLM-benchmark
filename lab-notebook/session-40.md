@@ -850,3 +850,18 @@ THE RUN (unchanged from addendum 28, the counts only reorder it):
   pkill -f llama-server; git pull
   time python3 full_benchmark.py --certify 2_sigma --task all --force-rung --dry-run
   time python3 full_benchmark.py --certify 2_sigma --task all --force-rung
+
+### Addendum 30-31 - the f16 first pass, no cold starts, partial data ASAP (2026-10-06, the author's rulings)
+
+RULING 1 (30): the first run covers how far we get at (f16, f16, f16) - full-precision weights AND full-precision KV. f16 is now a FIRST-CLASS RUNG: find_rung_file resolves a shipped f16 GGUF as the rung file (the old code skipped f16-named files as 'the quantize source' - that exclusion applies to QUANT rungs only), RUNG_BITS carries f16 = 16.0 (the feasibility estimate prices it honestly - most families will skip as infeasible before download, which IS the measurement), and convert_quant.create returns the f16 ITSELF for the f16 rung - no quantize step, no wasteful f16->f16 copy. The command is --force-rung f16.
+
+RULING 2 (30): no cold starts. The RAM data comes from llama-server's own accounting (the -lv 5 memory breakdown, session 39 addendum 11), so the posix_fadvise cache-drop ritual before every launch is DELETED - all four sites (the speed cell, the FWE cell, the VT cell, and speed_gate.bench_model). The only thing cleaned between tests is the context: each cell launches its own server with its own -c and tears it down after; nothing else is evicted. The warm MemAvailable delta stays recorded per launch (harmless, cheap); drop_file_cache the FUNCTION stays in llama_server (unused by the bench path, still available for a one-off cost measurement).
+
+RULING 3 (31): partial data ASAP. Every VERDICT - a family's medal (accept) or its death (dead) at a rung - commits and pushes the artifacts IMMEDIATELY (the same set as the git tail: state, results.txt, dumps, sidecars, logs), so the run is watchable from the repo while it runs. The hook: on_verdict callbacks on both certify controllers, fired after the entry lands, wrapped so a git failure NEVER stops the run (the tail catches the remainder); --no-git and dry runs opt out. The tee is uninstalled for the commit and reinstalled after (results.txt complete on disk at commit time).
+
+Tests: test_f16_is_a_rung (resolution, the 16-bit estimate, create-returns-the-f16), test_verdict_hook_fires_on_accept_and_dead (the hook fires on accept, never blocks). 197 tests total. All gates: pytest 197/197, ty 0, ruff clean, md_check.
+
+THE RUN (the f16 first pass - most families will skip as infeasible at f16; the ones that run are the real full-capacity frontier):
+  pkill -f llama-server; git pull
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16

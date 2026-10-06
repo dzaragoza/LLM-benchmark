@@ -155,6 +155,7 @@ def remote_file_sizes(repo: str) -> dict[str, int]:
 # bits-per-weight of each ladder rung (llama.cpp quant formats) - the
 # conversion path scales linearly: rung_gib ~= fp16_gib * bits / 16
 RUNG_BITS = {
+    "f16": 16.0,
     "Q8_0": 8.5,
     "Q6_K": 6.6,
     "Q5_K_M": 5.7,
@@ -213,6 +214,16 @@ def find_rung_file(names: list[str] | tuple[str, ...], rung: str) -> str | None:
     for f in names:
         low = f.lower()
         if not low.endswith(".gguf") or "mmproj" in low:
+            continue
+        # f16 IS a rung now (session 40, addendum 30 - the full-
+        # capacity pass measures (f16, f16, f16)); the f16-source
+        # exclusion below applies to QUANT rungs only: an f16 file
+        # is never the QUANTIZE SOURCE for the f16 rung (nothing to
+        # quantize), so for tok == f16 the search wants the shipped
+        # f16 GGUF and must not fall through to the skip.
+        if tok == "f16":
+            if "f16" in low or "fp16" in low:
+                return f
             continue
         if "f16" in low or "fp16" in low or "bf16" in low:
             continue
