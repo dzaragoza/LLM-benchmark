@@ -238,7 +238,6 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         }
         res = fb.certify_rung(
             8192,
-            "1_sigma",
             ["good", "other"],
             str(tmp_path),
             state,
@@ -298,111 +297,11 @@ def test_certify_rung_dead(tmp_path, capsys):
             }
         }
         res = fb.certify_rung(
-            8192, "1_sigma", ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            8192, ["dead"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
         assert res[0]["verdict"] == "dead"
         assert ran == []
         assert "DEAD" in capsys.readouterr().out
-    finally:
-        monkeypatch.undo()
-
-
-def test_certify_rung_at_least_one(tmp_path, capsys):
-    """Addendum 18: at_least_one accepts a candidate with a single
-    historical pass - no fresh cells needed - and skips the rest."""
-    import full_benchmark as fb
-
-    ran = []
-
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
-        ran.append(seed)
-        return True, {"correct": 1, "depth": rung}
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    try:
-        model = tmp_path / "one-Q8_0.gguf"
-        model.write_bytes(b"x")
-        state = {
-            "families": {
-                "one": {
-                    "selected": "Q8_0",
-                    "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": {"1": None},
-                },
-                "none": {
-                    "selected": "Q8_0",
-                    "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": {},
-                },
-            }
-        }
-        res = fb.certify_rung(
-            16384,
-            "at_least_one",
-            ["one", "none"],
-            str(tmp_path),
-            state,
-            str(tmp_path / "st.json"),
-            8210,
-            False,
-        )
-        first = [r for r in res if r["family"] == "one"][0]
-        # climb 1 topped out, so its 16384 cell passed historically -> no fresh cells
-        assert first["verdict"] == "accept"
-        assert first["passes"] == 1 and first["ran_now"] == 0
-        assert ran == []
-        other = [r for r in res if r["family"] == "none"][0]
-        assert other.get("skipped") == "rung already answered"
-        assert "at least one pass" in capsys.readouterr().out
-    finally:
-        monkeypatch.undo()
-
-
-def test_certify_rung_at_least_one_dead(tmp_path, capsys):
-    """Addendum 18: at_least_one with all 21 cells measured and zero
-    passes is DEAD - every remaining candidate gets its turn."""
-    import full_benchmark as fb
-
-    ran = []
-
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
-        ran.append(seed)
-        return False, {"correct": 0, "depth": rung}
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    try:
-        model = tmp_path / "zero-Q8_0.gguf"
-        model.write_bytes(b"x")
-        falls = {str(i): 16384 for i in range(1, 21)}
-        state = {
-            "families": {
-                "zero": {
-                    "selected": "Q8_0",
-                    "runs": {"Q8_0": {"file": str(model)}},
-                    "tournament_falls": falls,
-                }
-            }
-        }
-        res = fb.certify_rung(
-            16384,
-            "at_least_one",
-            ["zero"],
-            str(tmp_path),
-            state,
-            str(tmp_path / "st.json"),
-            8210,
-            False,
-        )
-        assert res[0]["verdict"] == "dead"
-        assert ran == []
-        out = capsys.readouterr().out
-        assert "no pass" in out and "DEAD" in out
     finally:
         monkeypatch.undo()
 
@@ -438,7 +337,7 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
             }
         }
         res = fb.certify_rung(
-            8192, "2_sigma", ["s2"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
+            8192, ["s2"], str(tmp_path), state, str(tmp_path / "st.json"), 8210, False
         )
         assert res[0]["verdict"] == "dead"
         assert ran == []
@@ -514,7 +413,6 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
         }
         res = fb.certify_rung(
             8192,
-            "1_sigma",
             ["good"],
             str(tmp_path),
             state,
@@ -524,14 +422,15 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
             task="vt",
         )
         first = res[0]
-        # 0 passes, dead by EARLY REJECT at 8 consecutive fails
-        # (best 12/20, lo 0.488 < 0.5 - the remaining 12 cells are not run)
+        # 0 passes, dead by EARLY REJECT at 6 consecutive fails under the
+        # fixed 2-sigma bar (best 14/20, lo 0.477 < 0.50 - addendum 36:
+        # 2 sigma is the only goal; the remaining 14 cells are not run)
         assert first["verdict"] == "dead"
-        assert len(ran) == 8
+        assert len(ran) == 6
         # the partials landed in certify_vt - 4/5 per cell, FAIL at the 5/5 bar
         good_ns: dict[str, Any] = state["families"]["good"]
         vt = good_ns["certify_vt"]["8192"]
-        assert all(p["v"] == 4 for p in vt.values()) and len(vt) == 8
+        assert all(p["v"] == 4 for p in vt.values()) and len(vt) == 6
         # the FWE namespace is untouched
         assert good_ns["certify"] == {"8192": {"1": True, "2": True, "3": True}}
         # re-grade the SAME cells at the 4/5 bar from the stored partials
@@ -567,7 +466,6 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
         }
         res = fb.certify_rung(
             8192,
-            "1_sigma",
             ["vt"],
             str(tmp_path),
             state,
@@ -608,7 +506,6 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         }
         res = fb.certify_rung_combined(
             8192,
-            "1_sigma",
             ["fam"],
             str(tmp_path),
             state,
@@ -620,9 +517,9 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         r = res[0]
         assert r["verdict"] == "accept"
         assert all(r[f"{t}_verdict"] == "accept" for t in fb.COMBINED_TASKS)
-        # ruling B: the 1_sigma level ANSWERS at the 1_sigma tier - the
-        # controller bar and the medal bar are the same thing now
-        assert r["medal"] == "1_sigma"
+        # addendum 36: the medal is DERIVED from the evidence - a clean
+        # 20/20 accept grades 2_sigma; the lower tiers are consequences
+        assert r["medal"] == "2_sigma"
         ns: dict[str, Any] = state["families"]["fam"]
         assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
         assert ns["certify_arc"]  # rung-independent, stored once
@@ -630,7 +527,6 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         calls.clear()
         res = fb.certify_rung_combined(
             8192,
-            "1_sigma",
             ["fam"],
             str(tmp_path),
             state,
@@ -670,7 +566,6 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
         }
         res = fb.certify_rung_combined(
             4096,
-            "2_sigma",
             ["a"],
             str(tmp_path),
             state,
@@ -707,7 +602,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(gold, 8192, "2_sigma") == "2_sigma"
+    assert fb.combined_medal(gold, 8192) == "2_sigma"
 
     silver = {
         "certify": {"8192": {str(r): 3 if r <= 10 else 0 for r in range(1, 21)}},
@@ -715,7 +610,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(silver, 8192, "2_sigma") == "1_sigma"
+    assert fb.combined_medal(silver, 8192) == "1_sigma"
 
     bronze = {
         "certify": {"8192": {str(r): 3 if r <= 5 else 0 for r in range(1, 21)}},
@@ -723,7 +618,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(bronze, 8192, "2_sigma") == "0.5_sigma"
+    assert fb.combined_medal(bronze, 8192) == "0.5_sigma"
 
     weak_bronze = {
         "certify": {"8192": {str(r): 3 if r <= 4 else 0 for r in range(1, 21)}},
@@ -731,7 +626,7 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(weak_bronze, 8192, "2_sigma") is None
+    assert fb.combined_medal(weak_bronze, 8192) is None
 
     no_pass = {
         "certify": {"8192": {str(r): 0 for r in range(1, 21)}},
@@ -739,9 +634,9 @@ def test_combined_medal_grading_from_records():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
         "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
-    assert fb.combined_medal(no_pass, 8192, "2_sigma") is None
+    assert fb.combined_medal(no_pass, 8192) is None
     empty = {}
-    assert fb.combined_medal(empty, 8192, "2_sigma") is None
+    assert fb.combined_medal(empty, 8192) is None
 
 
 def test_arc_rung_independence_and_namespace():
@@ -767,9 +662,9 @@ def test_arc_rung_independence_and_namespace():
         "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
         "certify_arc": {str(r): 5 for r in range(1, 12)},
     }
-    assert fb.combined_medal(arc_gold, 8192, "1_sigma") == "2_sigma"
+    assert fb.combined_medal(arc_gold, 8192) == "2_sigma"
     no_arc = {k: v for k, v in arc_gold.items() if k != "certify_arc"}
-    assert fb.combined_medal(no_arc, 8192, "1_sigma") is None
+    assert fb.combined_medal(no_arc, 8192) is None
 
 
 def test_sigint_shutdown_sequence(tmp_path, capsys):
@@ -831,7 +726,6 @@ def test_speed_dead_stops_the_climb(tmp_path, capsys):
         }
         res = fb.certify_rung_combined(
             4096,
-            "1_sigma",
             ["slow"],
             str(tmp_path),
             state,
@@ -846,7 +740,6 @@ def test_speed_dead_stops_the_climb(tmp_path, capsys):
         calls.clear()
         res = fb.certify_rung_combined(
             8192,
-            "1_sigma",
             ["slow"],
             str(tmp_path),
             state,
@@ -881,7 +774,6 @@ def test_certify_acquires_from_each_family_own_spec(tmp_path, capsys):
         state: dict[str, Any] = {"families": {}}
         res = fb.certify_rung_combined(
             4096,
-            "1_sigma",
             ["meta-llama/Llama-3.2-3B", "mistralai/Mistral-7B-Instruct-v0.3"],
             str(tmp_path),
             state,
@@ -941,7 +833,6 @@ def test_sigint_during_acquire_stops_the_run(tmp_path):
         with pytest.raises(SystemExit) as ei:
             fb.certify_rung_combined(
                 4096,
-                "1_sigma",
                 specs,
                 str(tmp_path),
                 state,
@@ -983,7 +874,6 @@ def test_unselected_family_falls_back_to_default_rung(tmp_path):
         state: dict[str, Any] = {"families": {"never-walked": {"spec": "test/never-walked"}}}
         fb.certify_rung_combined(
             4096,
-            "1_sigma",
             ["test/never-walked"],
             str(tmp_path),
             state,
@@ -1037,7 +927,6 @@ def test_certify_builds_the_model_when_acquire_returns_a_plan(tmp_path, capsys):
         state: dict[str, Any] = {"families": {"built-family": {"spec": "test/built-family"}}}
         res = fb.certify_rung_combined(
             4096,
-            "1_sigma",
             ["test/built-family"],
             str(tmp_path),
             state,
@@ -1083,7 +972,6 @@ def test_force_rung_overrides_stored_selection(tmp_path, capsys):
         }
         fb.certify_rung_combined(
             4096,
-            "1_sigma",
             ["test/compressed"],
             str(tmp_path),
             state,
@@ -1273,7 +1161,6 @@ def test_verdict_hook_fires_on_accept_and_dead(tmp_path):
     try:
         res = fb.certify_rung_combined(
             4096,
-            "at_least_one",
             ["test/good"],
             str(tmp_path),
             state,
@@ -1361,7 +1248,6 @@ def test_evaluation_order_is_the_callers(tmp_path):
             if task == "all":
                 res = fb.certify_rung_combined(
                     4096,
-                    "at_least_one",
                     ["test/small-new", "test/big-history"],
                     str(tmp_path),
                     state,
@@ -1372,7 +1258,6 @@ def test_evaluation_order_is_the_callers(tmp_path):
             else:
                 res = fb.certify_rung(
                     4096,
-                    "at_least_one",
                     ["test/small-new", "test/big-history"],
                     str(tmp_path),
                     state,
@@ -1404,16 +1289,14 @@ def test_main_startup_smoke(tmp_path, monkeypatch, capsys):
     )
     asked = []
 
-    def fake_combined(depth, level, specs, models_dir, state, state_path, port, dry, **kw):
-        asked.append((depth, level, list(specs), dry, kw.get("rung_override")))
+    def fake_combined(depth, specs, models_dir, state, state_path, port, dry, **kw):
+        asked.append((depth, list(specs), dry, kw.get("rung_override")))
         return []
 
     monkeypatch.setattr(fb, "certify_rung_combined", fake_combined)
     monkeypatch.chdir(tmp_path)
     argv = [
         "full_benchmark.py",
-        "--certify",
-        "2_sigma",
         "--task",
         "all",
         "--force-rung",
@@ -1428,7 +1311,7 @@ def test_main_startup_smoke(tmp_path, monkeypatch, capsys):
         fb.DRY_RUN_ACTIVE = False
     # the roster fell back to the registry, param-ascending
     assert len(asked) >= 1
-    depth, level, specs, dry, rung = asked[0]
+    depth, specs, dry, rung = asked[0]
     assert specs == ["Qwen/Qwen3.5-0.8B", "google/gemma-3-1b-it"]
     assert rung == "f16"
     assert dry is True

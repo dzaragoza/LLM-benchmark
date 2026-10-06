@@ -53,7 +53,14 @@ def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
     return max(0.0, center - half), min(1.0, center + half)
 
 
-CERTIFY_LEVELS = ["at_least_one", "1_sigma", "2_sigma"]
+# session 41, addendum 36: certification is ALWAYS 2 sigma - the
+# author's ruling ("dead, 0.5 sigma and 1 sigma are consequences,
+# not goals"). The controller accepts at the 2-sigma bar; the medal
+# (2_sigma / 1_sigma / 0.5_sigma) is DERIVED from the evidence by
+# combined_medal, never chosen up front.
+CERTIFY_Z = 2.0
+CERTIFY_BAR = 0.50
+CERTIFY_FLOOR = 10  # ceil(0.5 * 20): at least half the cells measured
 
 
 def _acquire_missing_model(
@@ -118,7 +125,6 @@ def _acquire_missing_model(
 
 def certify_rung(
     depth: int,
-    level: str,
     specs: list[str],
     models_dir: str,
     state: dict[str, Any],
@@ -132,11 +138,11 @@ def certify_rung(
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
-    Session 37, addendum 18: the certification TYPE is chosen per
-    rung - at_least_one (the practitioner's question 1: any model
-    with a pass at the step), 1_sigma (reliable: 1-sigma Wilson
-    lower bound >= 0.5, count >= half of n=20) or 2_sigma
-    (conservative: the same bar at 2 sigma). Candidates are the
+    Session 41, addendum 36: certification is ALWAYS 2 sigma (the
+    author: "dead, 0.5 sigma and 1 sigma are consequences, not
+    goals") - the accept bar is the 2-sigma Wilson lower bound, and
+    the medal is DERIVED from the evidence by combined_medal.
+    Candidates are the
     given families, IN THE GIVEN ORDER (session 40, addendum 34:
     the author's param-ascending ruling - no hidden selection
     mechanism favoring any model; the caller's order IS the
@@ -153,11 +159,8 @@ def certify_rung(
     if a recommendation is ever doubted. The first accepted
     candidate ANSWERS the rung; the rest are skipped (the
     practitioner wants ONE model per rung)."""
-    if level not in CERTIFY_LEVELS:
-        raise ValueError(f"unknown certify level {level!r}")
     n_total = TOURNAMENT_CLIMBS
-    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
-    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
+    z, bar_lo, floor = CERTIFY_Z, CERTIFY_BAR, CERTIFY_FLOOR
     order: list[tuple[str, dict[str, Any], dict[int, bool], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
@@ -191,7 +194,7 @@ def certify_rung(
         entry = {
             "family": fam,
             "depth": depth,
-            "level": level,
+            "level": "2_sigma",
             "historical_passes": k,
             "historical_cells": measured,
         }
@@ -250,41 +253,32 @@ def certify_rung(
             # consecutive fails kill - the author's addendum-20 request
             to_accept = None
             to_dead = None
-            if level == "at_least_one":
-                if k >= 1:
-                    verdict = "accept"
+            if measured >= floor and lo >= bar_lo:
+                verdict = "accept"
+                break
+            best_k = k + remaining
+            best_lo, _ = wilson_interval(best_k, n_total, z)
+            if best_lo < bar_lo or best_k < floor:
+                verdict = "dead"
+                break
+            for j in range(1, remaining + 1):
+                lo_j, _ = wilson_interval(k + j, measured + j, z)
+                if measured + j >= floor and lo_j >= bar_lo:
+                    to_accept = j
                     break
-                if remaining == 0:
-                    verdict = "dead"
+            for j in range(1, remaining + 1):
+                bk = k + (remaining - j)
+                bl, _ = wilson_interval(bk, n_total, z)
+                if bl < bar_lo or bk < floor:
+                    to_dead = j
                     break
-                to_accept = 1
-            else:
-                if measured >= floor and lo >= 0.5:
-                    verdict = "accept"
-                    break
-                best_k = k + remaining
-                best_lo, _ = wilson_interval(best_k, n_total, z)
-                if best_lo < 0.5 or best_k < floor:
-                    verdict = "dead"
-                    break
-                for j in range(1, remaining + 1):
-                    lo_j, _ = wilson_interval(k + j, measured + j, z)
-                    if measured + j >= floor and lo_j >= 0.5:
-                        to_accept = j
-                        break
-                for j in range(1, remaining + 1):
-                    bk = k + (remaining - j)
-                    bl, _ = wilson_interval(bk, n_total, z)
-                    if bl < 0.5 or bk < floor:
-                        to_dead = j
-                        break
             if ran == 0:
                 plan = (
                     f"  PLAN @ {depth:,}: {measured}/{n_total} cells measured, {remaining} left - "
                 )
                 plan += (
                     f"{to_accept if to_accept else remaining} consecutive pass(es) certify; "
-                    if to_accept is not None or level == "at_least_one"
+                    if to_accept is not None
                     else ""
                 )
                 plan += (
@@ -386,27 +380,18 @@ def certify_rung(
         entry["ran_now"] = ran
         if verdict == "accept":
             entry["verdict"] = "accept"
-            if level == "at_least_one":
-                print(
-                    f"  ACCEPT at {k}/{measured} - at least one pass at "
-                    f"{depth:,} - {fam} answers the {depth:,} rung"
-                )
-            else:
-                lo = wilson_interval(k, measured, z)[0]
-                print(
-                    f"  ACCEPT at {k}/{measured} - {level.replace('_', ' ')} "
-                    f"lower bound {lo:.3f} >= 0.5 - {fam} answers the {depth:,} rung"
-                )
+            lo = wilson_interval(k, measured, z)[0]
+            print(
+                f"  ACCEPT at {k}/{measured} - 2 sigma "
+                f"lower bound {lo:.3f} >= {bar_lo} - {fam} answers the {depth:,} rung"
+            )
             answered = True
         elif verdict == "dead":
             entry["verdict"] = "dead"
-            if level == "at_least_one":
-                print(f"  DEAD - every cell measured, no pass at {depth:,}; next candidate")
-            else:
-                print(
-                    f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
-                    f"(best {int(z)}s lower bound {best_lo:.3f} < 0.5); next candidate"
-                )
+            print(
+                f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
+                f"(best {int(z)}s lower bound {best_lo:.3f} < {bar_lo}); next candidate"
+            )
         elif verdict == "would-run":
             entry["verdict"] = "would-run"
             nxt = min(r for r in range(1, n_total + 1) if r not in cells)
@@ -424,7 +409,6 @@ def certify_rung(
 
 def certify_rung_combined(
     depth: int,
-    level: str,
     specs: list[str],
     models_dir: str,
     state: dict[str, Any],
@@ -441,17 +425,12 @@ def certify_rung_combined(
     if missing (never twice); the three tasks carry their own pass/fail
     tallies and their own accept/dead verdicts. The candidate certifies
     the rung when ALL THREE accept; it dies when ANY ONE is dead (the
-    next candidate is picked up). Session 40, ruling B: the certify
-    LEVEL maps to a MEDAL TIER - at_least_one = 0.5_sigma (0.5 sigma,
-    0.20), 1_sigma = 1_sigma (1 sigma, 0.375), 2_sigma = 2_sigma
-    (2 sigma, 0.50) - and the accept/dead math per task IS the tier's
-    own bar, so the rung-stopping accept fires exactly when
-    combined_medal returns the requested tier."""
-    if level not in CERTIFY_LEVELS:
-        raise ValueError(f"unknown certify level {level!r}")
+    next candidate is picked up). Session 41, addendum 36: the accept
+    bar is ALWAYS the 2-sigma tier (z=2, lower bound >= 0.50, floor
+    10 of 20); the rung-stopping accept fires when the evidence
+    grades 2_sigma - the lower medals are DERIVED consequences."""
     n_total = TOURNAMENT_CLIMBS
-    tier_bars = {"at_least_one": (0.5, 0.20), "1_sigma": (1.0, 0.375), "2_sigma": (2.0, 0.50)}
-    z, bar_lo = tier_bars[level]
+    z, bar_lo = CERTIFY_Z, CERTIFY_BAR
     order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
@@ -466,7 +445,7 @@ def certify_rung_combined(
         entry: dict[str, Any] = {
             "family": fam,
             "depth": depth,
-            "level": level,
+            "level": "2_sigma",
             "task": "all",
         }
         for t in COMBINED_TASKS:
@@ -595,7 +574,7 @@ def certify_rung_combined(
         entry["cells_measured"] = sum(tallies[t]["measured"] for t in COMBINED_TASKS)
         entry["ran_now"] = ran
         entry["passes"] = sum(tallies[t]["k"] for t in COMBINED_TASKS)
-        entry["medal"] = combined_medal(fst, depth, level)
+        entry["medal"] = combined_medal(fst, depth)
         for t in COMBINED_TASKS:
             entry[f"{t}_passes"] = tallies[t]["k"]
             entry[f"{t}_cells"] = tallies[t]["measured"]
@@ -644,7 +623,7 @@ def certify_rung_combined(
 TASK_PASS_BARS = {"speed": 0, "fwe": 2, "vt": 4, "arc": 4}
 
 
-def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
+def combined_medal(fst: dict[str, Any], depth: int) -> str | None:
     """The combined medal (session 38, addendum 7 - the author's
     refinement): the medals are PURE CONFIDENCE TIERS over each task's
     pass bar - 2_sigma = 2 sigma in EVERY test, 1_sigma = at least 1
