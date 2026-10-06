@@ -41,7 +41,10 @@ We make predictions and measure results. To be rigorous:
 ## 2. We work with a lab notebook
 
 The notebook is separated by sessions; each session starts and ends
-on a day. All entries are timestamped, so separating sessions is
+on a day, and there is exactly ONE session per working day (the
+session-40 addendum-19 ruling). A session opens on the first day work
+is done and keeps that day's number even when the working day runs
+past midnight - an early-morning finish belongs to the day it started. All entries are timestamped, so separating sessions is
 easy. The notebook is the single source of truth for: rulings,
 pre-registrations, incident reports, predictor calibrations, and
 anything the current session needs from a previous one. If it is not

@@ -721,3 +721,20 @@ the (narrowed) literature term; "lineage" was never a code term
 (the lineage STUDIES compared releases, and their artifacts were
 already consolidated in addendum 16). protocol.md change-log row
 18 registers the section.
+
+### Addendum 19 - the session-uniformity restructure: one session per working day (2026-10-06, the author's ruling)
+
+THE RULING: a session starts every day there's work done; there cannot be more than one session per day. Fuzzy ends are the author's early-morning finishes - best judgement applies, and the judgement is the ALREADY-REGISTERED precedent: an early-morning finish belongs to the working day it started ("the working day ran past midnight - recorded, not split").
+
+THE AUDIT: the notebook had five working days carrying multiple session openers, all pre-09-30 (the session-39 addendum-19 audit had already unified the 09-30+ era). Merged per the ruling - content verbatim, session numbers and addendum numbers UNCHANGED (citations across protocol.md, the registry, and the notebook reference session numbers constantly; the notebook never rewrites history, it only moves content by registered addendum):
+
+1. 2026-09-21: sessions 1-13 + the session-3 prep merged into session-01.md (the lowest number of the day; the megafile's 09-21 sections - the selection-algorithm v2, directory rules, sessions 8-13 - moved in). Three pre-notebook commits on 2026-09-20 are noted in the merge header.
+2. 2026-09-22: sessions 14, 15, 16 and 18b extracted from the session-07.md megafile into the NEW session-14.md.
+3. 2026-09-23: sessions 18c-18v, 19, 20 (megafile) plus the session-21/22 files merged into the NEW session-18.md. The megafile session-07.md is now EMPTY OF FOREIGN SESSIONS and deleted; session 7's own content lives in session-01.md.
+4. 2026-09-24: sessions 23, 24, 25 (and 26, already inside 25) merged into session-23.md. The 00:40-01:47 commits on 2026-09-25 are session 26's fuzzy tail of the 09-24 day - there is NO 2026-09-25 session (09-25 has no daytime work; its only commits are the early-morning tail).
+5. 2026-09-26: sessions 27, 28, 29 merged into session-27.md (all three opened the 26th; 29's tail runs into the 27th, recorded not split).
+6. 2026-09-28: sessions 31, 32, 33 merged into session-31.md (all three opened the 28th; 33's tail runs through 09-30, recorded not split - so there is no 2026-09-29 session either).
+
+KEPT AS-IS: session 30 (opened the 27th), sessions 34-40 (one per day since 09-30, already compliant). Day-spanning sessions keep their OPENING day.
+
+THE INDEX: one entry per working day; the merged entries name the day's first session and carry the day's session range. wow.md section 2 restated with the one-per-day rule and the fuzzy-end clause. Merge headers at the top of every merged file state the ruling, the day, and "content verbatim; session numbers unchanged" (the session-39 addendum-19 split precedent applied in reverse). Verified: every merged file's body reconstructs byte-identical from the pre-merge originals (a scripted line-exact diff against git HEAD).
