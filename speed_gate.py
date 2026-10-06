@@ -695,8 +695,6 @@ def bench_model(
         extra += ["--reasoning-format", "deepseek"]
     if no_thinking:
         extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
-    if not llama_server.drop_file_cache(model):
-        print("    note: cache drop unavailable - cost may read warm (137k)")
     mem_before = llama_server.system_memavailable_gib()
     proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
     try:

@@ -127,6 +127,7 @@ def certify_rung(
     min_words: int = 1,
     task: str = "fwe",
     rung_override: str | None = None,
+    on_verdict: Any = None,
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
@@ -412,6 +413,13 @@ def certify_rung(
             nxt = min(r for r in range(1, n_total + 1) if r not in cells)
             print(f"  dry run - would test {remaining} cell(s) from run {nxt}")
         results.append(entry)
+        # session 40, addendum 31: partial data ASAP (see the combined
+        # controller's twin)
+        if on_verdict is not None and verdict in ("accept", "dead"):
+            try:
+                on_verdict(fam, verdict, entry.get("medal"), depth)
+            except Exception as e:
+                print(f"  note: verdict commit failed ({e!r}) - the run continues")
     return results
 
 
@@ -426,6 +434,7 @@ def certify_rung_combined(
     dry_run: bool,
     min_words: int = 1,
     rung_override: str | None = None,
+    on_verdict: Any = None,
 ) -> list[dict[str, Any]]:
     """The combined controller (session 38, addendum 3 - the author's
     ruling): a cell is (model, rung, run) carrying THREE independent
@@ -633,6 +642,14 @@ def certify_rung_combined(
             entry["verdict"] = "would-run"
             print("  dry run - would measure the missing cell-tasks above")
         results.append(entry)
+        # session 40, addendum 31: partial data ASAP - every VERDICT
+        # (a medal or a death) is committed and pushed immediately, so
+        # the author can watch the run from the repo
+        if on_verdict is not None and verdict in ("accept", "dead"):
+            try:
+                on_verdict(fam, verdict, entry.get("medal"), depth)
+            except Exception as e:
+                print(f"  note: verdict commit failed ({e!r}) - the run continues")
     return results
 
 
