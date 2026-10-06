@@ -107,7 +107,7 @@ import bench.tee_output as tee_output
 import infra.llama_server as llama_server
 from ruler_gate import report_server_ctx
 
-CORPUS_DEFAULT = "./live-corpus-cal50.json"
+CORPUS_DEFAULT = "./data/live-corpus-cal50.json"
 READER_WPS_DEFAULT = 5.0  # k=1 guarantee line, WORDS/s: 300 wpm fast
 STALL_RATE_MAX = 0.05  # protocol v3.1: PASS iff <= 5% of turns catch up
 # reader (Brysbaert 2019). Protocol v2.1:

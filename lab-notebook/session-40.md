@@ -609,3 +609,38 @@ hf_download.acquire raises SystemExit(130) for one family and
 SystemExit(1) for the next; the 130 propagates out of
 certify_rung_combined, the 1 stays isolated. 175/175 pytest, ty 0,
 ruff check+format clean, md_check, js_check.
+
+
+## Addendum 16 - the root-json cleanup (2026-10-06, the author's "do it")
+
+24 JSON files lived at the repo root; three classes, one ruling:
+
+1. THE STUDY TWINS MOVED TO state/ (19 files): every
+   benchmark-results-<study>.json (ceil1 ceil4 ceilj ceilr f4k
+   failed1k kvq4-q4 kvq8-q4 lineage lineage2 o8probe p2 q4 rebench
+   sentinel) had its state twin already in state/ - the results now
+   sit beside them. Four stray STATE files (thinking, kvprobe,
+   sentinel, lineage) were root orphans of the same consolidation;
+   the README already claimed state/benchmark-state-thinking.json,
+   so the move fixed a real inconsistency. git mv preserves
+   history. benchmark-results.json STAYS at the root: it is the
+   RESULTS_FILE_DEFAULT of the default run.
+
+2. THE CORPUS MOVED TO data/ (1 file): live-corpus-cal50.json is
+   benchmark INPUT, not an artifact - its own directory.
+   CORPUS_DEFAULT updated in speed_gate.py, tokenizer_probe.py,
+   depth_probe.py, session_replicate.py (full_benchmark.py inherits
+   speed_gate's); README and protocol references updated with it.
+
+3. THE ONE-OFFS DELETED (3 files): live-dump-gallop.json,
+   selection-recovered.json, selection-results.json - unreferenced
+   by any code, added 2026-10-03 in a manual inspection session;
+   git history keeps them.
+
+Verification: the corpus default resolves and loads (50
+   conversations), full_benchmark argparse intact, 175/175 pytest,
+   ty 0, ruff check+format clean, md_check, js_check.
+
+PROTOCOL NOTE: the protocol.md corpus row and the README thinking
+   command now point at the true paths - protocol.md is current
+   values only, and the current values changed.
