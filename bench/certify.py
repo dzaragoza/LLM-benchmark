@@ -158,12 +158,24 @@ def certify_rung(
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
         fst = state["families"].get(fam, {})
+        want = bench_state_store.variant_of(
+            fst,
+            rung_override
+            or fst.get("selected")
+            or (fst.get("tournament_entry") or {}).get("rung")
+            or RUNG_DEFAULT,
+            state.get("kv_quant_k"),
+            state.get("kv_quant_v"),
+        )
+        legacy = bench_state_store.stored_variant(
+            fst, state.get("kv_quant_k"), state.get("kv_quant_v")
+        )
         if task == "vt":
-            cells = {r: p >= 5 for r, p in vt_cells(fst, depth).items()}
+            cells = {r: p >= 5 for r, p in vt_cells(fst, depth, want, legacy).items()}
         elif task == "speed":
-            cells = {r: p == 0 for r, p in speed_cells(fst, depth).items()}
+            cells = {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
         else:
-            cells = certify_cells(fst, depth, min_words, models_dir, fam)
+            cells = certify_cells(fst, depth, min_words, models_dir, fam, want, legacy)
         order.append((fam, fst, cells, spec))
 
     def promise(item):
@@ -203,6 +215,9 @@ def certify_rung(
             fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
         )
         run = (fst.get("runs") or {}).get(rung or "", {})
+        want = bench_state_store.variant_of(
+            fst, rung, state.get("kv_quant_k"), state.get("kv_quant_v")
+        )
         model = (
             run.get("file")
             or (fst.get("tournament_entry") or {}).get("file")
@@ -304,7 +319,7 @@ def certify_rung(
                 cells[next_run] = ok
                 stalls = int(fv.get("stalls") or 0)
                 n_turns = int(fv.get("turns") or 0)
-                direct[str(next_run)] = stalls
+                direct[str(next_run)] = bench_state_store.cell_record(stalls, want)
                 measured += 1
                 k += 1 if ok else 0
                 fst.setdefault("certify_speed", {})[str(depth)] = direct
@@ -329,7 +344,7 @@ def certify_rung(
                 ran += 1
                 cells[next_run] = ok
                 partial = int((fv.get("words_found") or [0])[0] or 0)
-                direct[str(next_run)] = partial
+                direct[str(next_run)] = bench_state_store.cell_record(partial, want)
                 measured += 1
                 k += 1 if ok else 0
                 fst.setdefault("certify_vt", {})[str(depth)] = direct
@@ -354,7 +369,9 @@ def certify_rung(
             ran += 1
             cells[next_run] = ok
             words = fv.get("words_found") or []
-            direct[str(next_run)] = words[0] if words else int(ok)
+            direct[str(next_run)] = bench_state_store.cell_record(
+                words[0] if words else int(ok), want
+            )
             measured += 1
             k += 1 if ok else 0
             fst.setdefault("certify", {})[str(depth)] = direct
@@ -484,6 +501,9 @@ def certify_rung_combined(
             fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
         )
         run = (fst.get("runs") or {}).get(rung or "", {})
+        want = bench_state_store.variant_of(
+            fst, rung, state.get("kv_quant_k"), state.get("kv_quant_v")
+        )
         model = (
             run.get("file")
             or (fst.get("tournament_entry") or {}).get("file")
@@ -568,7 +588,7 @@ def certify_rung_combined(
                 cells[t][next_run] = ok
                 tallies[t]["measured"] += 1
                 tallies[t]["k"] += 1 if ok else 0
-                bench_state_store._task_store(fst, depth, t, next_run, graded)
+                bench_state_store._task_store(fst, depth, t, next_run, graded, want)
                 save_state(state_path, state)
                 print(
                     f"  cell {next_run} (rung {depth:,}) {line} -> {t} "
@@ -634,21 +654,33 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
     not what the medals mean. A task with no measured cells has no
     medal contribution (None overall until every task has evidence)."""
     grades: dict[str, dict[str, bool]] = {}
+    legacy = bench_state_store.stored_variant(fst)
     for t in COMBINED_TASKS:
         if t == "fwe":
             raw = (fst.get("certify") or {}).get(str(depth)) or {}
             records = {}
             for r, p in raw.items():
-                if isinstance(p, bool):
-                    records[int(r)] = 3 if p else 0
-                else:
-                    records[int(r)] = int(p)
+                try:
+                    if isinstance(p, dict):
+                        if (
+                            p.get("rung"),
+                            p.get("kv_k"),
+                            p.get("kv_v"),
+                        ) != bench_state_store._variant_key(legacy):
+                            continue
+                        records[int(r)] = int(p.get("v"))
+                    elif isinstance(p, bool):
+                        records[int(r)] = 3 if p else 0
+                    else:
+                        records[int(r)] = int(p)
+                except (TypeError, ValueError):
+                    continue
         elif t == "vt":
-            records = vt_cells(fst, depth)
+            records = vt_cells(fst, depth, legacy, legacy)
         elif t == "arc":
-            records = arc_cells(fst)
+            records = arc_cells(fst, legacy, legacy)
         else:
-            records = speed_cells(fst, depth)
+            records = speed_cells(fst, depth, legacy, legacy)
         if not records:
             return None
         bar = TASK_PASS_BARS[t]

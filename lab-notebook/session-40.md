@@ -802,3 +802,17 @@ THE COMMANDS (the author's machine; the two-command WoW - dry-run pre-flight, th
   git add results.txt; and git commit -m "full-capacity run"; and git push
 
 READ THIS BEFORE THE RUN: (1) the state carries 9 families, models/ has 8 - the run acquires the missing ones (addendum 20's phase-2 build path handles the safetensors repos). (2) At Q8_0 the big families are HEAVY - Llama-3.1-8B ~8.6 GiB, Mistral-7B ~7.7 GiB, Qwen3.5-9B ~9.2 GiB files, plus KV at depth; the ladder starts at 4,096 and the addendum-35 memory shortcut skips infeasible rungs before download. (3) The speed-dead climb stop (addendum 13) is active: a speed death at rung k permanently skips that family higher - with Q8_0 files the gate bites EARLIER, and those speed-death depths are exactly the compression signal the author wants. (4) Ctrl-C stops the run cleanly (addenda 8/15/17); a re-run resumes from stored cells, nothing re-measures.
+
+### Addendum 26 - cells carry their variant (2026-10-06, the author's "we are going to try different variants for the same model, so let's keep track")
+
+THE QUESTION: does a cell keep record of the model variant (q, k, v) that achieved the score? The honest answer was NO - the four cell namespaces stored only the graded value (stall count, word count, VT partial, ARC correct). The variant lived at FAMILY level (selected rung + the run's kv_quant_k/v), which was recoverable for cells measured under the stored selection - but the addendum-25 full-capacity run made the gap dangerous: a --force-rung Q8_0 cell is INDISTINGUISHABLE from a stored-selection cell in the same namespace, and the never-re-measure rule would silently trust a Q8_0 score for the stored Q6_K run later.
+
+THE FIX, two halves:
+
+(1) STORE: every cell record now carries the variant that measured it - {v: graded value, rung, kv_k, kv_v}. _task_store (the combined controller) and the single-task direct[...] stores route through the same record shape via cell_record. The variant is resolved exactly as the controllers resolve the model (the run's quants, then the tournament entry's, then the state default) - variant_of in bench/state_store.py.
+
+(2) LOAD: the loaders (speed_cells, vt_cells, arc_cells, certify_cells via _int_cells) take the variant being certified (want) and the family's stored selection (legacy). A dict record loads only when its variant matches want; a LEGACY plain-int record - every pre-addendum-26 cell - matches only the stored selection, which is by construction the variant it was measured under (before --force-rung the controllers always ran the stored selection). A non-matching cell is UNMEASURED for the run, never silently trusted; it re-measures under the current variant. No filter (want=None) keeps the old read-everything behavior for discovery views.
+
+THE MEDAL: combined_medal grades the STORED selection's variant only - a forced-rung medal would be meaningless, the medal is the family's certification of its selected config.
+
+TESTS: test_cells_record_and_filter_by_variant (the record shape, the want/legacy filter, the no-filter view, the store's record), plus the three updated assertions on the new record shape. 193 tests total. All gates: pytest 193/193, ty 0, ruff clean, md_check.

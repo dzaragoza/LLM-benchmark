@@ -495,7 +495,9 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         # direct cells persisted
         good: dict[str, Any] = state["families"]["good"]
         direct = good["certify"]["8192"]
-        assert direct == {str(r): True for r in (9, 10)}
+        assert direct == {
+            str(r): {"v": 1, "rung": "Q8_0", "kv_k": None, "kv_v": None} for r in (9, 10)
+        }
     finally:
         monkeypatch.undo()
 
@@ -792,7 +794,7 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
         # the partials landed in certify_vt - 4/5 per cell, FAIL at the 5/5 bar
         good_ns: dict[str, Any] = state["families"]["good"]
         vt = good_ns["certify_vt"]["8192"]
-        assert all(p == 4 for p in vt.values()) and len(vt) == 8
+        assert all(p["v"] == 4 for p in vt.values()) and len(vt) == 8
         # the FWE namespace is untouched
         assert good_ns["certify"] == {"8192": {"1": True, "2": True, "3": True}}
         # re-grade the SAME cells at the 4/5 bar from the stored partials
@@ -842,7 +844,7 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
         assert res[0]["cells_measured"] == 10
         vt_ns: dict[str, Any] = state["families"]["vt"]
         vt = vt_ns["certify_vt"]["8192"]
-        assert all(p == 5 for p in vt.values())
+        assert all(p["v"] == 5 for p in vt.values())
     finally:
         monkeypatch.undo()
 
@@ -1356,3 +1358,32 @@ def test_force_rung_overrides_stored_selection(tmp_path, capsys):
         assert asked == [("compressed", "Q8_0")]
     finally:
         monkeypatch.undo()
+
+
+def test_cells_record_and_filter_by_variant():
+    """Addendum 26 regression: a stored cell records the VARIANT that
+    measured it; a certify run at a different variant treats the cell
+    as UNMEASURED (never silently trusting a score from another
+    config), while legacy plain-int cells load only under the family's
+    stored selection."""
+    fst: dict[str, Any] = {
+        "selected": "Q6_K",
+        "runs": {"Q6_K": {"kv_quant_k": "q5_0"}},
+        "certify_vt": {
+            "8192": {
+                "1": {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None},
+                "2": 4,
+            }
+        },
+    }
+    q8 = {"rung": "Q8_0", "kv_k": None, "kv_v": None}
+    stored = {"rung": "Q6_K", "kv_k": "q5_0", "kv_v": None}
+    assert bench_state_store.vt_cells(fst, 8192, q8, stored) == {1: 5}
+    assert bench_state_store.vt_cells(fst, 8192, stored, stored) == {2: 4}
+    # no filter: every readable record loads (the discovery view)
+    assert bench_state_store.vt_cells(fst, 8192) == {1: 5, 2: 4}
+    # the store writes the record with its variant
+    bench_state_store._task_store(fst, 8192, "vt", 3, 5, q8)
+    rec = fst["certify_vt"]["8192"]["3"]
+    assert rec == {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None}
+    assert bench_state_store.vt_cells(fst, 8192, stored, stored).get(3) is None
