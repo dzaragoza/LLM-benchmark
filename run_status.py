@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""run_status.py - the live f16 run's status, injected into the picker page.
+"""run_status.py - the live f16 run's status page (live_status.html).
 
-Session 41, addendum 41 (the author's ruling: "start updating the web
-pages with this info - it helps me visualize"). Reads the state file +
-results.txt the run is already committing (the addendum-31 verdict
-pushes), derives the per-family verdict table for the CURRENT pass, and
-rewrites the <div id="runStatus"> block in cpu-picker.html in place.
-Idempotent: the div's content is regenerated wholesale each run.
+Session 41, addendum 42 (the author's ruling: "better not mess up with
+the html. Create live_status.html for this info. Put also the difficulty
+in each gate"). Standalone page - the picker pages stay untouched.
+Reads the state file + results.txt the run is already committing (the
+addendum-31 verdict pushes), derives the per-family verdict table for
+the CURRENT pass, and rewrites live_status.html wholesale - idempotent.
 
 The pass being visualized: the (f16,f16,f16) full-capacity first pass -
-every family at the 4,096 rung first, param-ascending, each cell's four
+every family param-ascending at the 4,096 rung first, each cell's four
 tasks (speed/fwe/vt/arc) at the 2-sigma bar, medals derived from the
 stored evidence. Statuses: DEAD (which task killed it, at which rung,
 with which tally), or the live cell tallies when still climbing.
@@ -25,16 +25,40 @@ import sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(ROOT, "state", "benchmark-state.json")
 RESULTS = os.path.join(ROOT, "results.txt")
-PAGE = os.path.join(ROOT, "cpu-picker.html")
+PAGE = os.path.join(ROOT, "live_status.html")
 
-MARK = '<div id="runStatus"'
-
-TASK_LABELS = {
-    "speed": "streaming speed (the 5 w/s reader line)",
-    "fwe": "hidden-word retrieval (FWE)",
-    "vt": "variable tracking (VT)",
-    "arc": "ARC-Challenge answers",
+# the four gates, their difficulty (the pass bar), and what a cell does
+GATES = {
+    "speed": {
+        "label": "streaming speed",
+        "difficulty": "worst words/s >= 5 (a fast reader's line, 300 wpm); "
+        "0 stalls per conversation",
+        "measures": "can it stream an answer at reading pace at this depth?",
+    },
+    "fwe": {
+        "label": "hidden-word retrieval (FWE)",
+        "difficulty": ">= 2 of 3 hidden words found in a long coded text",
+        "measures": "does it actually find things buried in its context?",
+    },
+    "vt": {
+        "label": "variable tracking (VT)",
+        "difficulty": "all 5 assigned values recalled across 4 chain hops",
+        "measures": "does it track state through a long conversation?",
+    },
+    "arc": {
+        "label": "ARC-Challenge answers",
+        "difficulty": ">= 4 of 5 grade-school science questions correct",
+        "measures": "can it reason at all? (rung-independent, asked once)",
+    },
 }
+
+CERT = (
+    "certification: 2 sigma - a family certifies a rung only when every "
+    "gate's pass count clears the Wilson lower bound >= 0.50 at n=20 cells; "
+    "a gate that cannot mathematically reach the bar kills the family at "
+    "that rung (dead), and the medals (0.5/1/2 sigma) are derived from the "
+    "stored evidence, never requested"
+)
 
 
 def esc(s: str) -> str:
@@ -64,7 +88,6 @@ def family_rows() -> list[dict]:
             if d:
                 row["kill"], row["rung"], row["tally"] = d[-1]
         else:
-            # live tallies: the last cell lines for this family
             idx = txt.rfind(f"{name} speed:")
             seg = txt[idx : idx + 4000] if idx >= 0 else ""
             tally = re.findall(r"-> (\w+) (\d+)/(\d+) ", seg)
@@ -75,54 +98,94 @@ def family_rows() -> list[dict]:
 
 
 def render(rows: list[dict]) -> str:
-    out = ['<div id="runStatus" class="panel">']
+    out = []
+    out.append("<!doctype html>")
+    out.append('<html lang="en">')
+    out.append('<head><meta charset="utf-8" />')
+    out.append('<meta name="viewport" content="width=device-width, initial-scale=1" />')
+    out.append("<title>LLM benchmark &mdash; live run status</title>")
     out.append(
-        "<h2>Live: the f16 full-capacity pass (all models, (f16,f16,f16), param-ascending)</h2>"
+        """<style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0 auto; max-width: 900px; padding: 1.5rem 1rem 4rem;
+        line-height: 1.55;
+      }
+      h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+      .sub { color: #666; font-size: 0.95rem; font-style: italic;
+             margin-bottom: 1.4rem; }
+      h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+      table { border-collapse: collapse; width: 100%; margin: 0.6rem 0 1.2rem;
+              font-size: 0.92rem; }
+      th, td { border: 1px solid #bbb; padding: 0.35rem 0.55rem;
+               text-align: left; vertical-align: top; }
+      th { font-family: Verdana, Arial, sans-serif; font-size: 0.75rem; }
+      .panel { border: 1px solid #bbb; border-radius: 8px;
+               padding: 1rem 1.2rem; margin: 0.6rem 0 1.2rem;
+               background: rgba(127, 127, 127, 0.06); }
+      .footnote { font-size: 0.8rem; color: #666; }
+      code { font-family: monospace; }
+    </style>"""
     )
+    out.append("</head><body>")
+    out.append("<h1>Live run status &mdash; the f16 full-capacity pass</h1>")
     out.append(
-        '<p style="font-size: 0.9rem">Every registered family, measured at its '
-        "full capacity &mdash; no quantization &mdash; starting at the 4,096 "
-        "rung. Each cell runs the four tasks; a family dies when any one "
-        "cannot reach the 2-sigma bar. Updated as verdicts are committed.</p>"
+        '<p class="sub">every registered family at (f16,f16,f16) - full '
+        "quality, full size - param-ascending; updated as the run commits "
+        "its verdicts</p>"
     )
+
+    # the gates panel: difficulty per gate
+    out.append('<div class="panel">')
+    out.append("<h2>The four gates and their difficulty</h2>")
     out.append("<table>")
-    out.append("<tr><th>family</th><th>status</th><th>killed by</th><th>tally</th></tr>")
+    out.append("<tr><th>gate</th><th>difficulty (the pass bar)</th><th>what it measures</th></tr>")
+    for key, g in GATES.items():
+        out.append(
+            f"<tr><td><strong>{key}</strong><br>{esc(g['label'])}</td>"
+            f"<td>{esc(g['difficulty'])}</td>"
+            f"<td>{esc(g['measures'])}</td></tr>"
+        )
+    out.append("</table>")
+    out.append(f"<p class='footnote'>{esc(CERT)}</p>")
+    out.append("</div>")
+
+    # the verdict table
+    out.append("<h2>The families, in evaluation order</h2>")
+    out.append("<table>")
+    out.append("<tr><th>family</th><th>status</th><th>killed by</th><th>last tally</th></tr>")
     for r in rows:
         status = "climbing" if r["verdict"] == "climbing" else esc(r["verdict"].lower())
-        kill = esc(r["kill"]) if r["kill"] else "&mdash;"
-        kill_full = f"{kill} ({TASK_LABELS[r['kill']]})" if r["kill"] in TASK_LABELS else kill
-        tally = esc(r["tally"]) if r["tally"] else "&mdash;"
         rung = f" @ {esc(r['rung'])} ctx" if r["rung"] and r["verdict"] == "DEAD" else ""
+        if r["kill"]:
+            g = GATES.get(r["kill"], {})
+            kill = f"<strong>{esc(r['kill'])}</strong>" + (
+                f"<br>{esc(g.get('label', ''))}" if g else ""
+            )
+        else:
+            kill = "&mdash;"
+        tally = esc(r["tally"]) if r["tally"] else "&mdash;"
         out.append(
             f"<tr><td>{esc(r['name'])}</td><td>{status}{rung}</td>"
-            f"<td>{kill_full}</td><td>{tally}</td></tr>"
+            f"<td>{kill}</td><td>{tally}</td></tr>"
         )
     out.append("</table>")
     out.append(
-        '<p style="font-size: 0.8rem; color: #666">Source: the run\'s own commits '
-        "(addendum 31: every verdict is pushed immediately). Regenerate with "
+        '<p class="footnote">Source: the run\'s own commits (addendum 31: '
+        "every verdict is pushed immediately). Regenerate with "
         "<code>python3 run_status.py</code>.</p>"
     )
-    out.append("</div>")
+    out.append("</body></html>")
     return "\n".join(out)
 
 
 def main() -> None:
     rows = family_rows()
-    block = render(rows)
-    with open(PAGE, encoding="utf-8") as f:
-        page = f.read()
-    if MARK in page:
-        pre, post = page.split(MARK, 1)
-        post = post.split("</div>", 1)[1] if "</div>" in post else ""
-        page = pre + block + post
-    else:
-        anchor = "<h2>All measured models"
-        pre, post = page.split(anchor, 1)
-        page = pre + block + "\n    " + anchor + post
     with open(PAGE, "w", encoding="utf-8") as f:
-        f.write(page)
-    print(f"runStatus updated: {len(rows)} families")
+        f.write(render(rows))
+    print(f"live_status.html written: {len(rows)} families")
 
 
 if __name__ == "__main__":

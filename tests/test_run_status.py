@@ -1,6 +1,8 @@
-"""run_status tests (session 41, addendum 41): the live-status block is
-idempotent, extracts the per-family verdicts correctly, and never
-breaks the picker page's script."""
+"""run_status tests (session 41, addenda 41/42): the live-status page
+extracts the per-family verdicts correctly (the kill task from the
+DEAD block immediately before each family's own verdict line - a
+later family's DEAD must not leak into an earlier family's row), and
+renders a well-formed standalone page."""
 
 from __future__ import annotations
 
@@ -8,9 +10,6 @@ import run_status
 
 
 def test_verdict_extraction_from_results(tmp_path, monkeypatch):
-    """The per-family row: verdict, rung, and the kill task taken from
-    the DEAD block IMMEDIATELY BEFORE the family's own verdict line
-    (a later family's DEAD must not leak into an earlier family's row)."""
     results = tmp_path / "results.txt"
     results.write_text(
         "  some log\n"
@@ -41,9 +40,9 @@ def test_verdict_extraction_from_results(tmp_path, monkeypatch):
     assert by_name["Qwen3.5-0.8B"]["tally"] == "2/8"
 
 
-def test_render_is_idempotent_and_wellformed():
-    """Rendering twice produces the same block, and the block carries
-    the runStatus marker the page updater keys on."""
+def test_render_is_a_standalone_page_with_gates():
+    """The page carries the four gates' difficulty panel, one row per
+    family, and the idempotence: rendering twice is identical."""
     rows = [
         {
             "name": "fam",
@@ -51,10 +50,14 @@ def test_render_is_idempotent_and_wellformed():
             "rung": "4,096",
             "kill": "arc",
             "tally": "0/6",
-        }
+        },
+        {"name": "climber", "verdict": "climbing", "rung": "", "kill": "", "tally": ""},
     ]
     b1 = run_status.render(rows)
     b2 = run_status.render(rows)
     assert b1 == b2
-    assert 'id="runStatus"' in b1
-    assert "fam" in b1 and "arc" in b1
+    assert b1.startswith("<!doctype html>")
+    assert "difficulty" in b1 and "2 sigma" in b1
+    for gate in ("speed", "fwe", "vt", "arc"):
+        assert gate in b1
+    assert "fam" in b1 and "climber" in b1
