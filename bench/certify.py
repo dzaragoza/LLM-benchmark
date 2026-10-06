@@ -170,7 +170,13 @@ def certify_rung(
     order: list[tuple[str, dict[str, Any], dict[int, bool], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
-        fst = state["families"].get(fam, {})
+        # addendum 55: BIND fst to the state's entry - setdefault, never
+        # a detached get(fam, {}). A fresh family's cells were stored
+        # into an orphan dict and silently lost on save_state (the
+        # whole from-scratch f16 pass stored zero cells), because
+        # _acquire_missing_model later created a DIFFERENT dict for the
+        # same family via state["families"].setdefault(fam, {}).
+        fst = state["families"].setdefault(fam, {})
         want = bench_state_store.variant_of(
             fst,
             rung_override
@@ -490,7 +496,10 @@ def certify_rung_combined(
     order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]], str]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
-        fst = state["families"].get(fam, {})
+        # addendum 55: BIND fst to the state's entry (setdefault, never a
+        # detached get) - a fresh family's cells were stored into an orphan
+        # dict and lost on save_state (the f16 pass stored zero cells)
+        fst = state["families"].setdefault(fam, {})
         cells = {t: _task_load(fst, depth, t, min_words, models_dir, fam) for t in COMBINED_TASKS}
         order.append((fam, fst, cells, spec))
 
