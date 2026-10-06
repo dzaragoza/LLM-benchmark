@@ -835,3 +835,18 @@ THE RUN (the author's machine; the state file is fresh - the roster fallback fir
   time python3 full_benchmark.py --certify 2_sigma --task all --force-rung
   git add results.txt; git commit -m "param-ascending from-scratch run"; git push
 NOTE: at Q8_0 the roster's big models (Qwen3-30B, EXAONE-32B, GLM-4.5-Air 106B) are far over the machine's RAM - the addendum-35 memory shortcut skips infeasible rungs before download, and phase-A per-family isolation (addendum 78) records the failure and CONTINUES; their small-param cousins run first, as the author ordered.
+
+### Addendum 29 - the new WoW: params from HF, never guessed (2026-10-06, the author's ruling)
+
+THE RULING: (1) never guess a model's parameter count - RETRIEVE it from HF; (2) the goal is fast data acquisition - small rungs and small models first, NO hidden selection mechanism favoring any model, a super-easy next-pick; (3) difficulty tuning comes later - start with the current bars, adjust from the results.
+
+THE RETRIEVAL: the name-parsing and the hand-declared override table from addendum 28 are DELETED. etc/registry_data.py fetches the counts from the hub: (1) safetensors repos - model_info's safetensors.total, the EXACT tensor count HF itself sums; (2) the three bin-only repos (MiniCPM-1B/2B-sft, MiniCPM3-4B) - HF exposes no tensor count for pickles, so the count is the exact pytorch_model.bin SIZE divided by the storage width the repo ships (bf16, 2 bytes/param) - a retrieved-from-HF value with an auditable derivation. Each entry records params_b AND params_source; the registry check fails when any roster model has no retrieved count (params not retrieved from HF: none today).
+
+THE CORRECTIONS the real counts made to the guesses: Jamba2-Mini is 51.57B (not 12B), the granite micros are 3.19/3.40B (not 7B), phi-1 is 1.42B (not 1.3B), Hunyuan-A13B is 80.39B total. The order's head: granite-4.0-h-350m (0.34B), granite-4.0-350m (0.35B), MiniCPM4-0.5B (0.43B), Qwen3.5-0.8B (0.87B) ... tail: GLM-4.5-Air (110.47B). 45/48 via safetensors.total, 3 via bin size; all 48 recorded in the store, checked in.
+
+THE MECHANISM (item 2, unchanged in shape, now honest in counts): the order is PARAM-ASCENDING x RUNG-ASCENDING - the smallest model at the smallest rung is always next; nothing about a family's history, promise, or ranking moves it. Test updated: test_param_ascending_selection asserts the retrieved sources and the new head order. 195 tests total. All gates: pytest 195/195, ty 0, ruff clean, md_check, registry check.
+
+THE RUN (unchanged from addendum 28, the counts only reorder it):
+  pkill -f llama-server; git pull
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung --dry-run
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung

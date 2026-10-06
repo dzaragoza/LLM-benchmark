@@ -86,47 +86,50 @@ GATED = {
 }
 
 
-# parameter counts in billions, total (dense) or declared total (MoE).
-# Parsed from the roster name where the name carries the size (the
-# author's roster naming); explicit for the names that don't (phi's
-# mini naming, the MoE trade names, the granite micros) - sources:
-# the model cards, recorded in models.md where they are discussed.
-PARAMS_B_OVERRIDE = {
-    "phi-1": 1.3,
-    "phi-2": 2.7,
-    "phi-4-mini-instruct": 3.8,
-    "Phi-3.5-mini-instruct": 3.8,
-    "Phi-3-mini-4k-instruct": 3.8,
-    "granite-4.0-micro": 7.0,
-    "granite-4.0-h-micro": 7.0,
-    "AI21-Jamba2-Mini": 12.0,
-    "Ling-lite": 16.8,
-    "GLM-4.5-Air": 106.0,
-}
+# parameter counts in billions, RETRIEVED FROM HF (session 40,
+# addendum 29 - the author's WoW: never guessed). Two retrieval
+# paths, both from the hub: (1) safetensors repos - model_info's
+# safetensors.total is the EXACT tensor count summed by HF;
+# (2) bin-only repos (the MiniCPM trio) - HF exposes no tensor
+# count for pickles, so the count is the exact pytorch_model.bin
+# size divided by the storage width the repo ships (bf16 = 2
+# bytes/param), recorded with its source so the derivation is
+# auditable. Both land in the STORE at fetch time; nothing is
+# parsed from names and nothing is hand-declared.
+
+
+def _params_b_from_hub(repo: str) -> tuple[float | None, str]:
+    """(params_b, source) retrieved from HF for one repo."""
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    info = api.model_info(repo, files_metadata=True)
+    st = getattr(info, "safetensors", None)
+    total = getattr(st, "total", None) if st else None
+    if total:
+        return total / 1e9, f"hub safetensors.total ({total:,} tensors)"
+    for s in info.siblings or []:
+        if s.rfilename == "pytorch_model.bin" and s.size:
+            return s.size / 2 / 1e9, f"hub pytorch_model.bin size {s.size:,} / 2 (bf16)"
+    return None, "NO PARAMS ON HUB"
 
 
 def params_b(name: str) -> float | None:
     """The model's parameter count in billions (session 40, addendum
-    28: the param-ascending roster order). Total params - MoE counts
-    the declared total, not the active subset; active-params ranking
-    is a different question and the roster names carry totals."""
-    import re
-
-    if name in PARAMS_B_OVERRIDE:
-        return PARAMS_B_OVERRIDE[name]
-    m = re.search(r"([0-9]+(?:\.[0-9]+)?)([bm])", name, re.IGNORECASE)
-    if not m:
-        return None
-    value = float(m.group(1))
-    return value if m.group(2).lower() == "b" else value / 1000.0
+    28: the param-ascending roster order; addendum 29: retrieved from
+    HF via the STORE, never guessed). Total params - MoE counts the
+    total, not the active subset."""
+    store = json.loads(STORE.read_text())
+    entry = store.get(name) or {}
+    return entry.get("params_b")
 
 
 def params_sorted_roster() -> list[str]:
     """The roster in param-ascending order (session 40, addendum 28 -
     the author's from-scratch ruling: all registered models, smallest
-    parameters first; the orchestrator consumes this order). Unknown
-    sizes sort last, alphabetically - the registry check flags them
-    so an uncounted model is never silently misplaced."""
+    parameters first, retrieved from HF - addendum 29). Unknown counts
+    (a fetch failure) sort last, alphabetically - the registry check
+    flags them so an uncounted model is never silently misplaced."""
     return sorted(
         ROSTER,
         key=lambda n: (
@@ -207,7 +210,15 @@ def fetch():
     out = {"_meta": {"roster_size": len(ROSTER), "gated": GATED}}
     for name, repo in ROSTER.items():
         if name in GATED:
-            out[name] = {"repo": repo, "source": GATED[name], "extract": None}
+            entry = {"repo": repo, "source": GATED[name], "extract": None}
+            try:
+                pb, psrc = _params_b_from_hub(repo)
+                if pb:
+                    entry["params_b"] = round(pb, 4)
+                    entry["params_source"] = psrc
+            except Exception:
+                pass
+            out[name] = entry
             continue
         if hf_hub_download is None:
             out[name] = {
@@ -220,12 +231,20 @@ def fetch():
             raw = json.load(open(hf_hub_download(repo, "config.json")))
             c, trail = unwrap(raw)
             extract = {k: c.get(k) for k in FETCH_FIELDS}
-            out[name] = {
+            entry = {
                 "repo": repo,
                 "source": "hub config.json" + (f" ({'/'.join(trail)})" if trail else ""),
                 "extract": extract,
                 "geometry": geometry(c),
             }
+            try:
+                pb, psrc = _params_b_from_hub(repo)
+                if pb:
+                    entry["params_b"] = round(pb, 4)
+                    entry["params_source"] = psrc
+            except Exception:
+                pass
+            out[name] = entry
         except Exception as e:
             out[name] = {"repo": repo, "source": f"FETCH ERROR {type(e).__name__}", "extract": None}
     STORE.write_text(json.dumps(out, indent=1) + "\n")
@@ -239,7 +258,7 @@ def fetch():
 def check():
     store = json.loads(STORE.read_text())
     models_md = (ROOT / "docs" / "models.md").read_text()
-    missing, unsourced = [], []
+    missing, unsourced, uncounted = [], [], []
     for name in ROSTER:
         if (
             name not in models_md
@@ -254,11 +273,14 @@ def check():
             continue
         if v.get("source", "").startswith("FETCH ERROR"):
             unsourced.append(name)
+        if not v.get("params_b"):
+            uncounted.append(name)
     print(
         f"store: {len(store) - 1} models; roster missing from models.md:"
-        f" {missing or 'none'}; fetch errors: {unsourced or 'none'}"
+        f" {missing or 'none'}; fetch errors: {unsourced or 'none'};"
+        f" params not retrieved from HF: {uncounted or 'none'}"
     )
-    return 1 if (missing or unsourced) else 0
+    return 1 if (missing or unsourced or uncounted) else 0
 
 
 def show(name):
