@@ -65,6 +65,39 @@ def esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def gate_kill_rates() -> dict[str, dict[str, int]]:
+    """Per gate, over the CURRENT pass (everything after the pass's
+    first run header): families killed, and the pass fraction of all
+    measured cells - the raw difficulty of the bar (addendum 43:
+    'difficulty' = kill rate, the author's ruling)."""
+    txt = open(RESULTS, encoding="utf-8", errors="replace").read()
+    # scope to THIS pass: the first --force-rung f16 header after the
+    # last non-f16 run (a header per controller call, so the pass's
+    # first header is the run's true start)
+    starts = [
+        m.start()
+        for m in re.finditer(r"===== \S+ \| full_benchmark\.py[^=]*=====", txt)
+        if "--force-rung f16" in m.group(0)
+    ]
+    seg = txt[starts[0] :] if starts else txt
+    kills: dict[str, int] = {}
+    for task, _ in re.findall(r"DEAD - (\w+) cannot reach the bar at [\d,]+ \(([\d/]+)", seg):
+        kills[task] = kills.get(task, 0) + 1
+    tal: dict[str, list[int]] = {}
+    for task, k, n in re.findall(r"-> (\w+) (\d+)/(\d+) ", seg):
+        a = tal.setdefault(task, [0, 0])
+        a[0] += int(k)
+        a[1] += int(n)
+    return {
+        task: {
+            "kills": kills.get(task, 0),
+            "passes": tal.get(task, [0, 0])[0],
+            "measured": tal.get(task, [0, 0])[1],
+        }
+        for task in GATES
+    }
+
+
 def family_rows() -> list[dict]:
     """One row per family in the state file, enriched from results.txt."""
     with open(STATE, encoding="utf-8") as f:
@@ -150,6 +183,34 @@ def render(rows: list[dict]) -> str:
         )
     out.append("</table>")
     out.append(f"<p class='footnote'>{esc(CERT)}</p>")
+    out.append("</div>")
+
+    # the difficulty panel: kill rate per gate (this pass)
+    kr = gate_kill_rates()
+    total_kills = sum(v["kills"] for v in kr.values())
+    out.append('<div class="panel">')
+    out.append("<h2>Difficulty &mdash; the kill rate, this pass</h2>")
+    out.append("<table>")
+    out.append(
+        "<tr><th>gate</th><th>families killed</th><th>cells passed</th><th>pass rate</th></tr>"
+    )
+    for key, v in kr.items():
+        rate = (v["passes"] / v["measured"]) if v["measured"] else 0.0
+        out.append(
+            f"<tr><td><strong>{key}</strong></td><td>{v['kills']}</td>"
+            f"<td>{v['passes']}/{v['measured']}</td>"
+            f"<td>{rate:.0%}</td></tr>"
+        )
+    out.append(
+        f"<tr><td><strong>any</strong></td><td>{total_kills}</td><td>&mdash;</td><td>&mdash;</td></tr>"
+    )
+    out.append("</table>")
+    out.append(
+        '<p class="footnote">families killed = the gate that mathematically '
+        "could not reach the 2-sigma bar; pass rate = passed cells / measured "
+        "cells across every family this pass &mdash; the raw lethality of "
+        "each bar.</p>"
+    )
     out.append("</div>")
 
     # the verdict table
