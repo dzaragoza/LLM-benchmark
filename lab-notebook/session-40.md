@@ -865,3 +865,11 @@ THE RUN (the f16 first pass - most families will skip as infeasible at f16; the 
   pkill -f llama-server; git pull
   time python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run
   time python3 full_benchmark.py --certify 2_sigma --task all --force-rung f16
+
+### Addendum 32 - the per-test wall seconds (2026-10-06, the author's ruling)
+
+RULING: the cell keeps the time per test. Every stored cell record now carries {t} - the WALL SECONDS the test took, rounded to 0.1s - so the expensive tests are visible and the cheap ones are too.
+
+THE PLUMBING: _task_measure (bench/state_store.py) wraps each cell task in time.time() and returns the seconds as a fourth element; _task_store persists them into the record ({v, rung, kv_k, kv_v, t}); cell_record (the single-task controllers' writer) gains the same seconds parameter. The combined controller prints the seconds inline ([12s] in the cell line). Legacy records without {t} read as t=None - they predate timing; plain-int records (no variant) stay plain-int. The loaders/verdict math are untouched - {t} is bookkeeping, never a gate.
+
+Tests: test_cell_record_carries_wall_seconds (the record shape, the rounding, the None, the plain-int legacy), the five _task_measure fakes and the direct-cell assertion updated for the fourth return element and the new record shape. 198 tests total. All gates: pytest 198/198, ty 0, ruff clean, md_check.

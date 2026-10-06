@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import os
 import sys
+import time
 from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -306,6 +307,7 @@ def certify_rung(
                 break
             next_run = min(r for r in range(1, n_total + 1) if r not in cells)
             if task == "speed":
+                t0 = time.time()
                 ok, fv = bench_cells.speed_cell(
                     model,
                     depth + 2 * ruler_gate.ANSWER_HEADROOM,
@@ -320,7 +322,9 @@ def certify_rung(
                 cells[next_run] = ok
                 stalls = int(fv.get("stalls") or 0)
                 n_turns = int(fv.get("turns") or 0)
-                direct[str(next_run)] = bench_state_store.cell_record(stalls, want)
+                direct[str(next_run)] = bench_state_store.cell_record(
+                    stalls, want, time.time() - t0
+                )
                 measured += 1
                 k += 1 if ok else 0
                 fst.setdefault("certify_speed", {})[str(depth)] = direct
@@ -333,6 +337,7 @@ def certify_rung(
                 )
                 continue
             if task == "vt":
+                t0 = time.time()
                 ok, fv = bench_cells.vt_pass(
                     model,
                     depth + 2 * ruler_gate.ANSWER_HEADROOM,
@@ -345,7 +350,9 @@ def certify_rung(
                 ran += 1
                 cells[next_run] = ok
                 partial = int((fv.get("words_found") or [0])[0] or 0)
-                direct[str(next_run)] = bench_state_store.cell_record(partial, want)
+                direct[str(next_run)] = bench_state_store.cell_record(
+                    partial, want, time.time() - t0
+                )
                 measured += 1
                 k += 1 if ok else 0
                 fst.setdefault("certify_vt", {})[str(depth)] = direct
@@ -357,6 +364,7 @@ def certify_rung(
                     f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
                 )
                 continue
+            t0 = time.time()
             ok, fv = bench_cells.fwe_pass(
                 model,
                 depth + 2 * ruler_gate.ANSWER_HEADROOM,
@@ -371,7 +379,7 @@ def certify_rung(
             cells[next_run] = ok
             words = fv.get("words_found") or []
             direct[str(next_run)] = bench_state_store.cell_record(
-                words[0] if words else int(ok), want
+                words[0] if words else int(ok), want, time.time() - t0
             )
             measured += 1
             k += 1 if ok else 0
@@ -590,17 +598,17 @@ def certify_rung_combined(
             for t in COMBINED_TASKS:
                 if next_run in cells[t]:
                     continue
-                ok, graded, line = bench_state_store._task_measure(
+                ok, graded, line, secs = bench_state_store._task_measure(
                     t, model, depth, results_dir, next_run, port, kv_k, kv_v, min_words
                 )
                 ran += 1
                 cells[t][next_run] = ok
                 tallies[t]["measured"] += 1
                 tallies[t]["k"] += 1 if ok else 0
-                bench_state_store._task_store(fst, depth, t, next_run, graded, want)
+                bench_state_store._task_store(fst, depth, t, next_run, graded, want, secs)
                 save_state(state_path, state)
                 print(
-                    f"  cell {next_run} (rung {depth:,}) {line} -> {t} "
+                    f"  cell {next_run} (rung {depth:,}) {line} [{secs:.0f}s] -> {t} "
                     f"{tallies[t]['k']}/{tallies[t]['measured']} "
                     f"(1s lower bound {task_lo(t):.3f})"
                 )
