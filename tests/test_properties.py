@@ -201,3 +201,83 @@ def test_law_worst_positive_and_decreasing(a, b, s):
 def test_estimate_none_or_positive(files, sizes):
     est = estimate_rung_gib("Q8_0", files, files, sizes)
     assert est is None or est > 0.0
+
+
+# ================================================== addendum 38, ruling c:
+# the state roundtrip and the medal's monotonicity
+
+
+@settings(max_examples=50)
+@given(
+    task=st.sampled_from(["vt", "speed", "arc", "fwe"]),
+    depth=st.integers(4096, 262144),
+    run=st.integers(1, 21),
+    value=st.integers(0, 5),
+    secs=st.floats(0.0, 10000.0),
+)
+def test_task_store_roundtrip(task, depth, run, value, secs):
+    """A cell record stores and loads back EXACTLY: the graded value,
+    the variant, and the wall seconds - the store may lose nothing
+    (a re-graded medal must see the evidence that was measured)."""
+    from bench import state_store
+
+    variant = {"rung": "Q8_0", "kv_k": None, "kv_v": None}
+    fst: dict = {}
+    state_store._task_store(fst, depth, task, run, value, variant, secs)
+    ns = {"vt": "certify_vt", "speed": "certify_speed", "arc": "certify_arc"}.get(task, "certify")
+    box = fst[ns][str(run)] if task == "arc" else fst[ns][str(depth)][str(run)]
+    assert box["v"] == value
+    assert box["t"] == round(secs, 1)
+    assert (box["rung"], box["kv_k"], box["kv_v"]) == ("Q8_0", None, None)
+    # and the loader with the matching variant sees the same value
+    want = dict(variant)
+    legacy = dict(variant)
+    if task == "vt":
+        loaded = state_store.vt_cells(fst, depth, want, legacy)
+    elif task == "speed":
+        loaded = state_store.speed_cells(fst, depth, want, legacy)
+    elif task == "arc":
+        loaded = state_store.arc_cells(fst, want, legacy)
+    else:
+        # the FWE loader grades at the bar: {run: passed}, not raw
+        loaded = state_store.certify_cells(fst, depth, 1, want=want, legacy=legacy)
+        assert loaded.get(run) == (value >= 1)
+        return
+    assert loaded.get(run) == value
+
+
+@settings(max_examples=50)
+@given(
+    n_pass=st.integers(0, 20),
+    others_gold=st.booleans(),
+)
+def test_combined_medal_monotone_in_evidence(n_pass, others_gold):
+    """The medal is MONOTONE in the evidence: turning failing cells
+    into passes can never LOWER the tier - a state that grades 1_sigma
+    with k passes still grades at least 1_sigma with k+1."""
+    from bench.certify import combined_medal
+
+    def fst_with(k_fwe):
+        return {
+            "certify": {"8192": {str(r): 3 if r <= k_fwe else 0 for r in range(1, 21)}},
+            "certify_vt": {
+                "8192": {
+                    str(r): (5 if others_gold else (4 if r <= 10 else 0)) for r in range(1, 21)
+                }
+            },
+            "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+            "certify_arc": {
+                str(r): (5 if others_gold else (4 if r <= 10 else 0)) for r in range(1, 21)
+            },
+        }
+
+    tier_rank = {"0.5_sigma": 1, "1_sigma": 2, "2_sigma": 3}
+
+    def rank(fst):
+        m = combined_medal(fst, 8192)
+        return tier_rank.get(m, 0)
+
+    base = fst_with(n_pass)
+    if n_pass < 20:
+        improved = fst_with(n_pass + 1)
+        assert rank(improved) >= rank(base)
