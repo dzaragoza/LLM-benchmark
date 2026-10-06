@@ -63,10 +63,13 @@ FWE_PASS_MIN = 1
 # upstream: NVIDIA/RULER scripts/data/synthetic/variable_tracking.py
 # @ main: type_haystack 'noise', num_chains 1, num_hops 4 (so 5 variable
 # names per chain), names are 5 uppercase letters, the first link is
-# 'VAR X = <5-digit value>' and each hop 'VAR Y = VAR X', the chain is
-# shuffled into the noise with a heap so sub-list order (the chain's
-# own order) is preserved, the query asks for every variable assigned
-# the chain's base value, scored as the hit-count of expected names.
+# 'VAR X = <5-digit value>' and each hop 'VAR Y = VAR X'; the noise
+# branch inserts each chain's sentences at random positions via
+# rng.sample (upstream's generate_input_output noise path verbatim,
+# session 40 addendum 2 - the heap interleave belongs to the essay
+# branch we never implemented), the query asks for every variable
+# assigned the chain's base value, scored as the hit-count of
+# expected names.
 VT_HAYSTACK = (
     "The grass is green. The sky is blue. \nThe sun is yellow. Here we go. There and back again."
 )
@@ -84,25 +87,6 @@ VT_NUM_HOPS = 4
 VT_GEN_TOKENS = 128
 
 
-def _vt_shuffle_sublists_heap(lst: list[list[str]], rng: random.Random) -> list[str]:
-    """Upstream's shuffle_sublists_heap verbatim in shape: interleave the
-    chains with random priorities while PRESERVING each chain's internal
-    order (a heap of (priority, list, index)); a chain read backwards is
-    a different task, so the order guarantee is the point."""
-    import heapq
-
-    heap: list[tuple[float, int, int]] = []
-    for i in range(len(lst)):
-        heapq.heappush(heap, (rng.random(), i, 0))
-    out: list[str] = []
-    while heap:
-        _, list_idx, elem_idx = heapq.heappop(heap)
-        out.append(lst[list_idx][elem_idx])
-        if elem_idx + 1 < len(lst[list_idx]):
-            heapq.heappush(heap, (rng.random(), list_idx, elem_idx + 1))
-    return out
-
-
 def build_vt_task(
     port: int,
     depth_tokens: int,
@@ -114,8 +98,9 @@ def build_vt_task(
     Faithful to upstream's generate_input_output: a chain of num_hops+1
     five-letter uppercase names, the first assigned a random 5-digit
     value and each next 'VAR Y = VAR X'; the chain's sentences are
-    shuffled into the noise haystack (heap shuffle, chain order
-    preserved); the query asks for every variable assigned the chain's
+    inserted into the noise haystack at random positions (upstream's
+    noise path verbatim; chain order preserved); the query asks for
+    every variable assigned the chain's
     base value - multi-hop tracing, the reasoning-flavored gate.
     Token-budget by probe-and-trim like build_fwe_task: measure the
     noise sentence's tokens once, fill the budget, trim-verify."""
