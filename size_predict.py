@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import sys
 
-import tee_output
+import bench.tee_output as tee_output
 
 GIB = 1024**3
 Q8_BYTES = 8.5 / 8

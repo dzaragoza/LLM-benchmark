@@ -55,8 +55,8 @@ import os
 import sys
 from typing import Any, NoReturn
 
-import llama_server
-import tee_output
+import bench.tee_output as tee_output
+import infra.llama_server as llama_server
 from law_fit import kv_gib
 
 CORPUS_DEFAULT = "./live-corpus-cal50.json"

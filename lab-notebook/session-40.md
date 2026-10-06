@@ -279,3 +279,38 @@ VERIFIED: 167/167 pytest, ty 0 via the addendum-21 wrapper, ruff
 check + format clean, md_check (with the new protocol row), js_check
 pass. --no-verify only because the pre-commit runner fails under
 this sandbox's command wrapper (all hooks run manually green).
+
+## Addendum 7 - the bottom layer becomes infra/ (2026-10-06, the author's proposal)
+
+THE AUTHOR'S PROPOSAL: the bottom layer becomes a package, so only
+CLI-usable scripts live in the root directory. Ruled this session:
+the package is infra/ (the author's pick from the options) and
+tee_output.py is MIDDLE layer - it rides to bench/ ("that should be
+layer 2. In bench").
+
+THE MOVES (git mv, history preserved): hf_download.py, convert_quant.py llama_server.py, git_ops.py -> infra/; tee_output.py
+-> bench/tee_output.py. infra/__init__.py created.
+
+THE ROOT NOW: full_benchmark.py (top), speed_gate.py, ruler_gate.py,
+depth_probe.py, session_replicate.py, size_predict.py, lag_analyze.py,
+law_fit.py, tokenizer_probe.py (middle, all CLI+import), plus the
+dev/tools that are their own CLIs (code_edit.py, git_push.py,
+md_check.py, js_check.py, sandbox_check.py, ty_check.py).
+
+REWIRING: every import site aliased to keep the call sites untouched
+(import infra.llama_server as llama_server) - zero behavioral change,
+all 9 root scripts, 5 bench modules, 3 test files; one from-import
+(law_fit's RUNG_BITS) moved to from infra.hf_download. All edits via
+code_edit per the addendum-6 protocol row.
+
+DOCS: README layer table rows updated to infra/ paths; protocol.md's
+Where-column citations (RAM reserve, snapshot scope, converter pins,
+RUNG_BITS, memory witness, health timeouts) and model-selection.md's
+RUNG_BITS citation updated.
+
+VERIFIED: 167/167 pytest, ty 0 via the addendum-21 wrapper, ruff
+check + format clean, md_check, js_check pass; --help smoke on every
+root CLI (fb/sg/rg) and bench CLI (certify/size_table) exits 0; the
+stale-import grep is empty. --no-verify only because the pre-commit
+runner fails under this sandbox's command wrapper (all hooks run
+manually green).

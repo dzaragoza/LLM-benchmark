@@ -57,7 +57,7 @@ import os
 import sys
 from typing import Any
 
-import tee_output
+import bench.tee_output as tee_output
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 

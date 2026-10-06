@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import glob  # noqa: F401  (used by the rescore csv walk)
 
-import convert_quant
-import hf_download
+import infra.convert_quant as convert_quant
+import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
 from bench.certify import wilson_interval

@@ -13,7 +13,7 @@ from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import hf_download
+import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store

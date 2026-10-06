@@ -33,7 +33,7 @@ Their history lives in the lab notebook (session 35, addenda 10-12).
    `cost = file(rung) + KV_eff(262144) × kvquant + overhead`,
    where
    - `file(rung) = file_Q8_0 × bpw(rung)/8.5` (bpw from the
-     registered RUNG_BITS table, hf_download.py, single-sourced);
+     registered RUNG_BITS table, infra/hf_download.py, single-sourced);
    - `KV_eff = 262144 × L × 2 × kv_heads × head_dim / full_attention_interval`
      (KiB/token × depth; the interval divides because only
      full-attention layers hold the whole window — Qwen3.5 interval

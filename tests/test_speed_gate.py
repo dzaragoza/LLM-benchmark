@@ -288,7 +288,7 @@ def test_git_pull_head(monkeypatch):
     """Addendum 32: the forgotten pull, made structural - git_pull_head
     runs before the state loads; a failed pull is a hard stop."""
     import full_benchmark as fb
-    import git_ops
+    import infra.git_ops as git_ops
 
     calls = []
 
@@ -328,7 +328,7 @@ def test_git_pull_before_tee():
     assert body.index("git_pull_head()") < body.index("tee_output.install()")
     src = inspect.getsource(fb.git_pull_head)
     assert "pull_rebase(no_verify=True)" in src
-    import git_ops
+    import infra.git_ops as git_ops
 
     assert "--autostash" in inspect.getsource(git_ops.pull_rebase)
 
@@ -348,7 +348,7 @@ def test_git_tail_pulls_before_push():
     assert i_commit < i_pull < i_push, "order must be commit -> pull -> push"
     import inspect as _inspect
 
-    import git_ops
+    import infra.git_ops as git_ops
 
     assert "--autostash" in _inspect.getsource(git_ops.pull_rebase)
 

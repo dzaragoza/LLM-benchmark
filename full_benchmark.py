@@ -53,12 +53,12 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import convert_quant
-import git_ops
-import hf_download
-import llama_server
+import bench.tee_output as tee_output
+import infra.convert_quant as convert_quant
+import infra.git_ops as git_ops
+import infra.hf_download as hf_download
+import infra.llama_server as llama_server
 import speed_gate
-import tee_output
 
 # session 34 (addendum 32): the ladder floor is 4096 - the corpus's
 # structural floor (the worst conversation's side is ~2,670 tokens +
