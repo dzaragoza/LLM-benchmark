@@ -14,8 +14,8 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import hf_download
-import llama_server
+import infra.hf_download as hf_download
+import infra.llama_server as llama_server
 import ruler_gate
 from bench import cells as bench_cells
 from bench.constants import CORPUS_DEFAULT

@@ -60,11 +60,11 @@ import os
 import sys
 from typing import Any
 
-import tee_output
+import bench.tee_output as tee_output
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from hf_download import RUNG_BITS  # single source (addendum 44): the bpw
+from infra.hf_download import RUNG_BITS  # single source (addendum 44): the bpw
 
 # table lives here once; law_fit's copy
 # (BPW_APPROX) is deleted

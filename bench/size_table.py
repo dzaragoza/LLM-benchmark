@@ -28,7 +28,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import llama_server
+import infra.llama_server as llama_server
 import speed_gate
 from bench.constants import READER_WPS_DEFAULT, TOURNAMENT_DEPTHS
 

@@ -2,7 +2,7 @@
 
 import io
 
-import tee_output
+import bench.tee_output as tee_output
 
 
 def test_install_tees_stdout(tmp_path, monkeypatch):

@@ -6,7 +6,7 @@ import os
 
 import code_edit
 import full_benchmark as fb
-import hf_download
+import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
@@ -77,7 +77,7 @@ def test_dry_run_no_local_file_does_not_assert(tmp_path, monkeypatch, capsys):
     rung file (the network-acquisition case) must reach the would-bench
     prints - the path-is-None assert is a REAL-run invariant and must
     not fire before the dry-run guard."""
-    import hf_download
+    import infra.hf_download as hf_download
 
     monkeypatch.setattr(fb, "RUNG_DEFAULT", "Q8_0")
     monkeypatch.setattr(hf_download, "require_hub", lambda: None)
@@ -880,7 +880,7 @@ def test_convert_quant_deletes_tensors_after_f16(tmp_path, monkeypatch):
     # addendum 42: the safetensors are dead weight once the f16 exists;
     # create() deletes safetensors-source only after the conversion is
     # verified on disk, and never when the f16 was already local
-    import convert_quant
+    import infra.convert_quant as convert_quant
 
     famdir = tmp_path / "fam"
     famdir.mkdir()
@@ -1170,7 +1170,7 @@ def test_code_edit_md_gate_not_applied_to_python(tmp_path):
 
 
 def test_memory_breakdown_gib(tmp_path):
-    import llama_server as ls
+    import infra.llama_server as ls
 
     """Addendum 11: llama's own memory-breakdown table replaces the smaps
     census. Both row shapes (paren'd GPU line, flat Host line), the

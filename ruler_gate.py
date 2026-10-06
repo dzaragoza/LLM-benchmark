@@ -34,8 +34,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-import llama_server
-import tee_output
+import bench.tee_output as tee_output
+import infra.llama_server as llama_server
 
 ANSWER_HEADROOM = 128
 QUERY_TEMPLATE = "What is the special magic number for {key}? Answer with the number only."

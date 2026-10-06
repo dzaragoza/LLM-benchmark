@@ -103,8 +103,8 @@ import time
 import urllib.error
 from typing import Any, NoReturn
 
-import llama_server
-import tee_output
+import bench.tee_output as tee_output
+import infra.llama_server as llama_server
 from ruler_gate import report_server_ctx
 
 CORPUS_DEFAULT = "./live-corpus-cal50.json"

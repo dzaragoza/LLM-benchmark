@@ -51,8 +51,8 @@ import sys
 import time
 from typing import Any
 
-import llama_server
-import tee_output
+import bench.tee_output as tee_output
+import infra.llama_server as llama_server
 from speed_gate import (
     CTX_DEFAULT,
     READER_REACTION_S,

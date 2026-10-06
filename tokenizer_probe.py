@@ -49,7 +49,7 @@ import os
 import sys
 from typing import Any
 
-import tee_output
+import bench.tee_output as tee_output
 
 CORPUS_DEFAULT = "./live-corpus-cal50.json"
 
@@ -87,7 +87,7 @@ def corpus_texts(corpus_path: str) -> list[str]:
 
 def arc_texts(arc_config: str, arc_num: int) -> list[str]:
     """The ARC prompt set - the second registered text set."""
-    import hf_download
+    import infra.hf_download as hf_download
 
     questions = hf_download.load_questions(arc_config, arc_num)
     return [q["q"] if isinstance(q, dict) else str(q) for q in questions]

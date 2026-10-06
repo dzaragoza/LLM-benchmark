@@ -20,7 +20,7 @@ import subprocess
 import sys
 from typing import NoReturn
 
-import hf_download
+import infra.hf_download as hf_download
 
 QUANTIZE_BIN = os.path.join(
     ".", "llama-b10964-gpu", "llama-quantize.exe" if os.name == "nt" else "llama-quantize"

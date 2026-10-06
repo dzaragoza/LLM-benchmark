@@ -91,16 +91,16 @@ touch only the orchestrator's CLI:
 | Middle | `bench/state_store.py` | state load/save, task measurement and storage helpers | import only |
 | Middle | `speed_gate.py` | the worst-turn speed gate (live conversations, mode-suffixed dumps, verdict) | CLI + import |
 | Middle | `ruler_gate.py` | the RULER instrument: VT (variable tracking), FWE, and the depth probes | CLI + import |
-| Bottom | `hf_download.py` | every Hugging Face interaction: downloads, repo listings, ARC question fetch | import only |
-| Bottom | `convert_quant.py` | llama.cpp conversion tooling: safetensors -> f16, f16 -> rung | import only |
-| Bottom | `llama_server.py` | llama-server lifecycle (launch, health, teardown), HTTP, and stale-server kills | import only |
-| Bottom | `git_ops.py` | the git binary seam: add/commit/pull/push for the artifact tail (session 40, addendum 5) | import only |
+| Bottom | `infra/hf_download.py` | every Hugging Face interaction: downloads, repo listings, ARC question fetch | import only |
+| Bottom | `infra/convert_quant.py` | llama.cpp conversion tooling: safetensors -> f16, f16 -> rung | import only |
+| Bottom | `infra/llama_server.py` | llama-server lifecycle (launch, health, teardown), HTTP, and stale-server kills | import only |
+| Bottom | `infra/git_ops.py` | the git binary seam: add/commit/pull/push for the artifact tail (session 40, addendum 5) | import only |
 
 The middle layer never talks to an outside tool directly — all
 Hugging Face, llama.cpp-converter, llama-server and git contact
 happens in the bottom-layer interfaces. The former `live-bench.py`
 was split along the same seam: its measurement half lives in
-`speed_gate.py`, its server-management half in `llama_server.py`.
+`speed_gate.py`, its server-management half in `infra/llama_server.py`.
 The retired `arc_eval.py` and `mcnemar.py` were middle layer until
 the depth score became the ranking (protocol v4.3).
 
