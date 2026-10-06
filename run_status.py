@@ -61,13 +61,18 @@ CERT = (
 )
 
 
-def disk_free_gib() -> float | None:
-    """Free disk at the repo root (None if undetectable) - shown on
-    the page so the f16 pipeline's transient peak is watchable
-    (addendum 48)."""
+def disk_free_gib() -> tuple[float, str] | None:
+    """Free disk at the repo root and WHICH MACHINE measured it
+    (None if undetectable). The host matters: the page is often
+    regenerated away from the benchmark machine (the sandbox pulls
+    the run's commits and rewrites the page), and the sandbox's disk
+    is NOT the run's disk - the addendum-48 line must never pose as
+    the benchmark machine's headroom (addendum 50)."""
     try:
+        import socket
+
         st = os.statvfs(ROOT)
-        return st.f_bavail * st.f_frsize / (1024**3)
+        return st.f_bavail * st.f_frsize / (1024**3), socket.gethostname()
     except OSError:
         return None
 
@@ -240,9 +245,13 @@ def render(rows: list[dict]) -> str:
     # together), so the free disk is run-relevant, not trivia
     free = disk_free_gib()
     if free is not None:
+        gib, host = free
         out.append(
-            f'<p class="sub">free disk: {free:.1f} GiB '
-            "(the f16 pipeline needs ~the source size free per family)"
+            f'<p class="sub">free disk: {gib:.1f} GiB on {esc(host)} '
+            "(the f16 pipeline needs ~the source size free per family; "
+            "the host is named because the page travels - this is the disk "
+            "of whichever machine regenerated it, not necessarily the "
+            "benchmark machine's)"
             "</p>"
         )
 
