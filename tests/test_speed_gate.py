@@ -495,9 +495,11 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         # direct cells persisted
         good: dict[str, Any] = state["families"]["good"]
         direct = good["certify"]["8192"]
-        assert direct == {
-            str(r): {"v": 1, "rung": "Q8_0", "kv_k": None, "kv_v": None} for r in (9, 10)
-        }
+        assert len(direct) == 2 and sorted(direct, key=int) == ["9", "10"]
+        for rec in direct.values():
+            assert rec["v"] == 1 and rec["rung"] == "Q8_0"
+            assert rec["kv_k"] is None and rec["kv_v"] is None
+            assert rec["t"] is not None and rec["t"] >= 0.0
     finally:
         monkeypatch.undo()
 
@@ -859,7 +861,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
 
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         calls.append((task, run))
-        return True, {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok"
+        return True, {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok", 12.3
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
@@ -918,8 +920,8 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         calls.append((task, run))
         if task == "vt":
-            return False, 0, "vt 0/5"
-        return True, {"speed": 0, "fwe": 3, "arc": 5}[task], f"{task} ok"
+            return False, 0, "vt 0/5", 4.5
+        return True, {"speed": 0, "fwe": 3, "arc": 5}[task], f"{task} ok", 12.3
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
@@ -1081,8 +1083,8 @@ def test_speed_dead_stops_the_climb(tmp_path, capsys):
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         calls.append((task, run))
         if task == "speed":
-            return False, 3, "speed: 3 stall(s)"
-        return True, {"fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok"
+            return False, 3, "speed: 3 stall(s)", 7.7
+        return True, {"fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok", 12.3
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
@@ -1293,7 +1295,7 @@ def test_certify_builds_the_model_when_acquire_returns_a_plan(tmp_path, capsys):
 
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         measured.append((task, run))
-        return False, 0, "faked cell (always fail)"
+        return False, 0, "faked cell (always fail)", 3.1
 
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
     try:
@@ -1371,7 +1373,7 @@ def test_cells_record_and_filter_by_variant():
         "runs": {"Q6_K": {"kv_quant_k": "q5_0"}},
         "certify_vt": {
             "8192": {
-                "1": {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None},
+                "1": {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None, "t": None},
                 "2": 4,
             }
         },
@@ -1385,8 +1387,27 @@ def test_cells_record_and_filter_by_variant():
     # the store writes the record with its variant
     bench_state_store._task_store(fst, 8192, "vt", 3, 5, q8)
     rec = fst["certify_vt"]["8192"]["3"]
-    assert rec == {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None}
+    assert rec == {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None, "t": None}
     assert bench_state_store.vt_cells(fst, 8192, stored, stored).get(3) is None
+
+
+def test_cell_record_carries_wall_seconds():
+    """Addendum 32 regression: a stored cell carries the wall seconds
+    the test took ({t}), rounded to 0.1s - the per-test cost, so the
+    expensive tests are visible. A record without seconds stores
+    t=None; a plain-int record (no variant) stays plain-int - legacy
+    cells predate both variant tracking and timing."""
+    v = {"rung": "Q8_0", "kv_k": None, "kv_v": None}
+    rec = bench_state_store.cell_record(5, v, 12.34)
+    assert rec == {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None, "t": 12.3}
+    assert bench_state_store.cell_record(5, v, 0.049)["t"] == 0.0
+    assert bench_state_store.cell_record(5, v)["t"] is None
+    assert bench_state_store.cell_record(5) == 5
+    fst: dict[str, Any] = {}
+    bench_state_store._task_store(fst, 8192, "vt", 1, 5, v, 3.25)
+    assert fst["certify_vt"]["8192"]["1"]["t"] == 3.2
+    bench_state_store._task_store(fst, 4096, "arc", 1, 5, v, 9.0)
+    assert fst["certify_arc"]["1"]["t"] == 9.0
 
 
 def test_param_ascending_selection():
@@ -1511,7 +1532,7 @@ def test_verdict_hook_fires_on_accept_and_dead(tmp_path):
     monkeypatch = pytest.MonkeyPatch()
 
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
-        return True, 5, "ok"
+        return True, 5, "ok", 9.9
 
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
     try:

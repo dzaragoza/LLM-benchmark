@@ -10,6 +10,7 @@ import json
 import os
 import random
 import sys
+import time
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -215,9 +216,11 @@ def arc_pass(
 def cell_record(
     value: int,
     variant: dict[str, Any] | None = None,
+    seconds: float | None = None,
 ) -> Any:
     """A stored cell record: the graded value plus, when a variant is
     known, the variant that measured it (session 40, addendum 26).
+    Addendum 32: carries the wall seconds ({t}) - the per-test cost.
     Legacy plain-int records remain readable - they predate variant
     tracking and are attributed to the family's stored selection."""
     if variant is None:
@@ -227,6 +230,7 @@ def cell_record(
         "rung": variant.get("rung"),
         "kv_k": variant.get("kv_k"),
         "kv_v": variant.get("kv_v"),
+        "t": round(seconds, 1) if seconds is not None else None,
     }
 
 
@@ -237,13 +241,16 @@ def _task_store(
     run: int,
     value: int,
     variant: dict[str, Any] | None = None,
+    seconds: float | None = None,
 ) -> None:
     """Persist one cell's graded record in its own namespace (the
     combined controller never re-measures a stored cell-task).
     Session 40, addendum 26: the record carries the VARIANT that
     measured it ({v, rung, kv_k, kv_v}) - the author will try
     several variants per model, so a score without its variant is
-    unattributable."""
+    unattributable. Addendum 32: the record carries the WALL SECONDS
+    the test took ({t}) - the per-test cost, so the expensive tests
+    are visible and the cheap ones are too."""
     ns = {
         "vt": "certify_vt",
         "speed": "certify_speed",
@@ -256,6 +263,7 @@ def _task_store(
             "rung": variant.get("rung"),
             "kv_k": variant.get("kv_k"),
             "kv_v": variant.get("kv_v"),
+            "t": round(seconds, 1) if seconds is not None else None,
         }
     if task == "arc":
         fst.setdefault(ns, {})[str(run)] = record
@@ -273,11 +281,13 @@ def _task_measure(
     kv_k: str | None,
     kv_v: str | None,
     min_words: int,
-) -> tuple[bool, int, str]:
+) -> tuple[bool, int, str, float]:
     """Measure one cell's one task. Returns (passed_at_gold, graded
-    record, human line). The graded record is the speed stall count,
-    the FWE word count, the VT 5-name count - all re-gradable at any
-    bar later without re-measuring."""
+    record, human line, wall seconds - session 40, addendum 32: the
+    per-test cost, so the expensive tests are visible). The graded
+    record is the speed stall count, the FWE word count, the VT 5-name
+    count - all re-gradable at any bar later without re-measuring."""
+    t0 = time.time()
     if task == "speed":
         ok, fv = bench_cells.speed_cell(
             model,
@@ -295,12 +305,18 @@ def _task_measure(
             ok,
             stalls,
             (f"speed: {stalls} stall(s) in {n_turns} turns -> {'PASS' if ok else 'FAIL'}"),
+            time.time() - t0,
         )
     if task == "arc":
         ok, fv = arc_pass(model, run, port)
         correct = int(fv.get("correct") or 0)
         k_q = int(fv.get("k") or ARC_CELL_K)
-        return ok, correct, f"arc: {correct}/{k_q} answers -> {'PASS' if ok else 'FAIL'}"
+        return (
+            ok,
+            correct,
+            f"arc: {correct}/{k_q} answers -> {'PASS' if ok else 'FAIL'}",
+            time.time() - t0,
+        )
     if task == "vt":
         ok, fv = bench_cells.vt_pass(
             model,
@@ -312,7 +328,12 @@ def _task_measure(
             kv_quant_v=kv_v,
         )
         partial = int((fv.get("words_found") or [0])[0] or 0)
-        return ok, partial, f"vt: {partial}/5 names -> {'PASS' if ok else 'FAIL'}"
+        return (
+            ok,
+            partial,
+            f"vt: {partial}/5 names -> {'PASS' if ok else 'FAIL'}",
+            time.time() - t0,
+        )
     ok, fv = bench_cells.fwe_pass(
         model,
         depth + 2 * ruler_gate.ANSWER_HEADROOM,
@@ -325,7 +346,12 @@ def _task_measure(
     )
     words = fv.get("words_found") or []
     count = words[0] if words else int(ok)
-    return ok, count, f"fwe: {count}/{max(1, min_words)} word(s) -> {'PASS' if ok else 'FAIL'}"
+    return (
+        ok,
+        count,
+        f"fwe: {count}/{max(1, min_words)} word(s) -> {'PASS' if ok else 'FAIL'}",
+        time.time() - t0,
+    )
 
 
 def certify_cells(
