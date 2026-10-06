@@ -738,3 +738,19 @@ THE AUDIT: the notebook had five working days carrying multiple session openers,
 KEPT AS-IS: session 30 (opened the 27th), sessions 34-40 (one per day since 09-30, already compliant). Day-spanning sessions keep their OPENING day.
 
 THE INDEX: one entry per working day; the merged entries name the day's first session and carry the day's session range. wow.md section 2 restated with the one-per-day rule and the fuzzy-end clause. Merge headers at the top of every merged file state the ruling, the day, and "content verbatim; session numbers unchanged" (the session-39 addendum-19 split precedent applied in reverse). Verified: every merged file's body reconstructs byte-identical from the pre-merge originals (a scripted line-exact diff against git HEAD).
+
+### Addendum 20 - the missing phase 2: the certify path builds, not just downloads (2026-10-06, the author's "model download still broken")
+
+THE REPORT: SIGINT behaves properly now (the 11:12 run's stamps show the clean shutdown), but every family in the nameless certify run still errored model-file-not-found. The 10:22 run's wrong-repo symptom was the addendum-14 leaked-spec bug (already fixed); the 11:12 run downloaded each family's OWN repo correctly - and then errored anyway.
+
+THE ROOT CAUSE: _acquire_missing_model stops at PHASE 1. hf_download.acquire returns a FILE only when the rung GGUF can be downloaded ready-made; the Llama/Mistral/Phi repos ship safetensors, so acquire returns (None, "safetensors from <repo>, convert + quantize") - the file must be BUILT in phase 2 (convert_quant.create: safetensors -> f16 -> llama-quantize -> the rung). The certify controllers never ran phase 2 - the tournament path (full_benchmark.process_family) does, the certify path did not - so every build-required family errored model-file-not-found and the sweep moved on. The disk cleanup had deleted the built models, so the whole state roster tripped it at once.
+
+THE FIX (both layers, the smallest correct change): (1) bench/certify._acquire_missing_model now runs convert_quant.create(fam, famdir, rung, plan) when acquire returns a plan without a file - the same phase 2 the tournament path runs; the built path lands in the family's tournament_entry exactly like a downloaded one. (2) infra/convert_quant.create guards its build: phase 1 must leave a source on disk (the rung file, an f16, or a safetensors/pytorch_model snapshot) before phase 2 can build - building from nothing crashed run_quiet on the missing family directory; it now reports "no local source to build <rung> from" and returns None (the candidate is recorded not-built, the run continues).
+
+TESTS: test_certify_builds_the_model_when_acquire_returns_a_plan (the controller proceeds to measuring with the built file; 177 total). All gates: pytest 177/177, ty 0, ruff clean, md_check, js_check.
+
+### Addendum 21 - the docs/ directory (2026-10-06, the author's ruling)
+
+THE RULING: all root-level .md study documents move to docs/ - README.md alone stays at the root (the universal entry point), and the lab notebook keeps its own lab-notebook/ directory (its files are session artifacts, not study documents). Moved with git mv (history preserved): conversation up to 2026-09-27.md, lab-notebook-llms-on-102-4-gb-s-system-ram-machines.md, llm-benchmark-session-handoff-2026-09-24-conversation-refresh.md, model-selection.md, models.md, notebook.md, practitioner-goals.md, protocol.md, wow.md.
+
+CROSS-REFERENCES UPDATED THE SAME COMMIT (the wow.md section-8 rule): etc/registry_data.py reads docs/models.md (the check command re-verified: 48 models, none missing); README.md links to docs/model-selection.md, docs/practitioner-goals.md, docs/protocol.md; the legacy notebook pointer's lab-notebook/index.md link re-anchored to ../lab-notebook/. Code's .md mentions elsewhere are comments/docstrings, not paths. wow.md section 8 registers the new home.

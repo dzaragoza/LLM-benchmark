@@ -1255,3 +1255,68 @@ def test_unselected_family_falls_back_to_default_rung(tmp_path):
         assert asked == [("never-walked", "Q8_0")]
     finally:
         monkeypatch.undo()
+
+
+def test_certify_builds_the_model_when_acquire_returns_a_plan(tmp_path, capsys):
+    """Addendum 20 regression: _acquire_missing_model once stopped at
+    phase 1 - when acquire returns (None, "safetensors ..., convert +
+    quantize") the model must be BUILT (phase 2, convert_quant.create),
+    not reported missing. The 2026-10-06 11:12 run errored
+    model-file-not-found for every family whose model has to be built
+    rather than downloaded."""
+    import full_benchmark as fb
+    from infra import hf_download
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(hf_download, "require_hub", lambda: None)
+    monkeypatch.setattr(hf_download, "list_repo_files", lambda repo: [])
+    monkeypatch.setattr(
+        hf_download,
+        "acquire",
+        lambda *a, **k: (None, "safetensors from test/source, convert + quantize"),
+    )
+    built = []
+
+    def fake_create(fam, famdir, rung, plan="", dry_run=False):
+        built.append((fam, rung, plan))
+        path = os.path.join(famdir, f"{fam}-{rung}.gguf")
+        os.makedirs(famdir, exist_ok=True)
+        open(path, "w").close()
+        return path
+
+    import infra.convert_quant as convert_quant
+
+    monkeypatch.setattr(convert_quant, "create", fake_create)
+    measured = []
+
+    def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
+        measured.append((task, run))
+        return False, 0, "faked cell (always fail)"
+
+    monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
+    try:
+        state: dict[str, Any] = {"families": {"built-family": {"spec": "test/built-family"}}}
+        res = fb.certify_rung_combined(
+            4096,
+            "1_sigma",
+            ["test/built-family"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+        )
+        assert built == [
+            (
+                "built-family",
+                "Q8_0",
+                "safetensors from test/source, convert + quantize",
+            )
+        ]
+        assert "model file not found" not in capsys.readouterr().out
+        fam_state: Any = state["families"]["built-family"]
+        assert fam_state["tournament_entry"]["file"].endswith("built-family-Q8_0.gguf")
+        assert res[0].get("error") is None
+        assert measured, "the controller must proceed to measuring with the built file"
+    finally:
+        monkeypatch.undo()

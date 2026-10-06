@@ -105,7 +105,9 @@ Documents are lowercase-kebab (`models.md`, `model-selection.md`,
 `practitioner-goals.md`, `protocol.md`, `wow.md`, `session-NN.md`) -
 named artifacts like the code's data files. ALL-CAPS is reserved for
 `README.md` alone, the universal entry-point convention. Renames
-update every cross-reference in the same commit.
+update every cross-reference in the same commit. Study documents live
+in `docs/` (session 40, addendum 21); `README.md` stays at the root
+and the lab notebook keeps its own `lab-notebook/` directory.
 
 ## 9. Daniela is always available to help
 
