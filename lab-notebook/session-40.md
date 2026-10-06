@@ -686,3 +686,38 @@ failure and re-aimed). The fallback applying blocks at
 whitespace-flexible positions when the exact text misses is the
 recurring papercut; exact-match-or-refuse for non-twin regions is
 the candidate hardening, noted for the next code_edit review.
+
+
+## Addendum 18 - the taxonomy ruling (2026-10-06, the author's terms clarified)
+
+THE QUESTION (the author): a lineage is a series of versions
+(model1.0, model2.0...); a family is the same model at different
+parameters (model1.0-1b, model1.0-3b...); a model is a specific
+config (model1.0-1b q8 / q4...). Does the literature match?
+
+THE ANSWER: close, but three adjustments. (1) The literature word
+for the version axis is RELEASE (or version/generation); "lineage"
+in the literature means PROVENANCE - what a model derives from
+(fine-tune ancestry), not versioning. (2) FAMILY matches, but the
+literature's extension is WIDER - a family bundles the sizes AND
+the variants (instruct, base) of one release, sometimes across
+releases; the study's usage narrows it to the size axis of a
+single release. (3) The literature word for the config level is
+VARIANT (or model instance/checkpoint; the GGUF community says
+quant); the study's variant is the (family, rung, kv_k, kv_v)
+tuple - the unit that gets a model file, a server launch, and
+cells.
+
+THE RULING: literature-compatible terms with EXPLICIT study
+extensions, registered as a Taxonomy section in protocol.md
+(between The anchor and [A]) - a term alone is not enough; what
+the term COVERS here is stated, so there is no confusion:
+release > family > variant, with examples (Qwen3.5-0.8B and
+Qwen3.5-2B are ONE family; Qwen3.5-2B and Qwen2.5-3B are NOT) and
+the literature note per term.
+
+THE MIGRATION: none needed in code - the `families` key matches
+the (narrowed) literature term; "lineage" was never a code term
+(the lineage STUDIES compared releases, and their artifacts were
+already consolidated in addendum 16). protocol.md change-log row
+18 registers the section.
