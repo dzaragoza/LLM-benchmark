@@ -4,7 +4,7 @@ kept checked-in so audits are a git diff, not 50 hub fetches.
 
 Usage:
   python3 etc/registry_data.py fetch        # re-pull configs -> etc/registry_data.json
-  python3 etc/registry_data.py check        # verify models.md rows against the store
+  python3 etc/registry_data.py check        # verify docs/models.md rows against the store
   python3 etc/registry_data.py geometry ID  # print derived geometry for one model
 
 The JSON carries the RAW config fields plus derived geometry (window,
@@ -186,7 +186,7 @@ def fetch():
 
 def check():
     store = json.loads(STORE.read_text())
-    models_md = (ROOT / "models.md").read_text()
+    models_md = (ROOT / "docs" / "models.md").read_text()
     missing, unsourced = [], []
     for name in ROSTER:
         if (

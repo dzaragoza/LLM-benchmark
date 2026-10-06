@@ -13,6 +13,7 @@ from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import infra.convert_quant as convert_quant
 import infra.hf_download as hf_download
 import ruler_gate
 from bench import cells as bench_cells
@@ -89,7 +90,22 @@ def _acquire_missing_model(
             "rung": rung,
             "file": path,
         }
-    return path
+        return path
+    if dry_run:
+        return None
+    # acquire returned a plan but no file (session 40, addendum 20): the
+    # safetensors/bin download branches end in "convert + quantize" - the
+    # same phase 2 the tournament path runs (full_benchmark phase 2). The
+    # certify controllers previously stopped at phase 1 and errored
+    # model-file-not-found for every family whose model must be built, not
+    # downloaded - the whole 11:12 run died on it.
+    built = convert_quant.create(fam, famdir, rung, plan, dry_run)
+    if built:
+        state["families"].setdefault(fam, {})["tournament_entry"] = {
+            "rung": rung,
+            "file": built,
+        }
+    return built
 
 
 def certify_rung(

@@ -15,6 +15,7 @@ Imported by full_benchmark.py; file helpers shared from hf_download.py.
 
 from __future__ import annotations
 
+import glob
 import os
 import subprocess
 import sys
@@ -80,8 +81,18 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     if dry_run:
         return None
     f16 = hf_download.resolve_f16_local(famdir)
+    st_dir = os.path.join(famdir, "safetensors-source")
+    has_st = os.path.isdir(st_dir) and (
+        glob.glob(os.path.join(st_dir, "*.safetensors"))
+        or glob.glob(os.path.join(st_dir, "pytorch_model*.bin"))
+    )
+    if not f16 and not has_st:
+        print(
+            f"  [2] no local source to build {rung} from "
+            "(no rung file, no f16, no safetensors-source)"
+        )
+        return None
     if not f16:
-        st_dir = os.path.join(famdir, "safetensors-source")
         out_f16 = os.path.join(famdir, fam + "-f16.gguf")
         print(
             "  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)"
