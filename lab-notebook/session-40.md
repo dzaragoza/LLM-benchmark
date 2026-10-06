@@ -481,3 +481,20 @@ BRONZE; 15 other complete rungs none. The sandbox cannot run the
 benchmark (no GGUF weights, no llama-server, no GPU) - the run
 happens on the author's machine: python3 full_benchmark.py
 --certify 2_sigma --task all.
+
+## Addendum 12 - the tier rename + the nameless run (2026-10-06, the author's rulings)
+
+1. THE TIERS ARE THE SIGMAS: bronze/silver/gold renamed to
+   0.5_sigma / 1_sigma / 2_sigma - the author's consistency ruling.
+   The certify level and the medal tier now share one vocabulary:
+   at_least_one answers at 0.5_sigma, 1_sigma at 1_sigma, 2_sigma
+   at 2_sigma. combined_medal returns the sigma names; the tests and
+   docstrings re-pinned.
+
+2. THE NAMELESS RUN: the families positional is now optional
+   (nargs="*"). Omitted, full_benchmark takes every family already
+   in the state file - each entry carries its spec (Qwen/Qwen3.5-0.8B
+   etc.), so the certify ladder needs no names on the command line:
+   python3 full_benchmark.py --certify 2_sigma --task all
+   The state is the roster now. Explicit specs still override for
+   fresh families.
