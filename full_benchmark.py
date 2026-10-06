@@ -549,11 +549,17 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--force-rung",
         dest="rung_forced",
-        action="store_true",
+        nargs="?",
+        const=True,
+        default=False,
+        metavar="RUNG",
         help="certify EVERY family at --rung, ignoring each family's stored "
         "selection (session 40, addendum 25 - the full-capacity run: all "
         "models at the study default (Q8_0, f16 K, f16 V) before any "
-        "compression thinking)",
+        "compression thinking). Addendum 33: an OPTIONAL value sets the "
+        "rung too (--force-rung f16 == --rung f16 --force-rung) - the "
+        "author's natural typing of the f16 first pass was swallowed as a "
+        "family spec and hit HF as a repo id (404).",
     )
     ap.add_argument(
         "--roster",
@@ -738,6 +744,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     ap = build_parser()
     args = ap.parse_args()
+    if isinstance(args.rung_forced, str):
+        if "/" in args.rung_forced or "=" in args.rung_forced:
+            ap.error(
+                f"--force-rung takes a RUNG (e.g. f16, Q8_0), not a family - "
+                f"families are positional: {args.rung_forced!r}"
+            )
+        args.rung = args.rung_forced
+        args.rung_forced = True
     global DRY_RUN_ACTIVE
     DRY_RUN_ACTIVE = args.dry_run
     install_sigint_handler(args)
