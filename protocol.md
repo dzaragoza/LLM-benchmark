@@ -67,6 +67,32 @@ fails on tiny answers (the addendum-54 degeneracy: the span of a
 
 ---
 
+## Taxonomy - the study's model vocabulary (session 40, addendum 18)
+
+Literature-compatible terms, each with the study's EXPLICIT
+extension (what the word covers HERE - the literature sometimes uses
+them wider or narrower; the ruling is what the study means):
+
+| Term | The study means | Example | Literature note |
+|---|---|---|---|
+| release | one versioned generation of a vendor's model | Qwen3.5 (all sizes); Llama-3.2 (1B, 3B, 11B, 90B) | The literature says release / version / generation. The study previously used "lineage" informally; in the literature "lineage" means PROVENANCE (what a model derives from), so the study avoids it for the version axis. |
+| family | the size range of ONE release - same version, different parameter counts | Qwen3.5-0.8B and Qwen3.5-2B are ONE family; Qwen3.5-2B and Qwen2.5-3B are NOT | The literature's "model family" is WIDER (sizes AND variants of one release, sometimes across releases); the study NARROWS it to the size axis of a single release. The state key (e.g. `Qwen3.5-0.8B`) names a family entry. |
+| variant | one specific configuration: family x weights quant x KV quants (k, v) | Qwen3.5-2B (Q8_0, f16, f16); Qwen3.5-2B (Q4_K_M, q8_0, q4_0) | The literature says model instance / checkpoint / variant; the GGUF community says quant. The study's variant is the (family, rung, kv_k, kv_v) tuple - the unit that gets a model file, a server launch, and cells. |
+
+Three levels, top to bottom: release > family > variant. The
+benchmark's experimental unit is the variant; the certification
+medals are per (family, rung) - the selected variant carries the
+family's flag (the Q8_0-default rule; a family competes as one
+variant per study, addendum 86).
+
+THE MIGRATION NOTE: the CODE KEEPS "families" as its key name (the
+state's `families` dict, `--families` CLI, `families` positional) -
+the key matches the literature term and the study's extension of
+it, so nothing renames. "Lineage" was never a code term (only old
+study artifacts named lineage.json - the lineage STUDIES compared
+releases); the artifacts were already moved to state/ in addendum
+16 and need no further action.
+
 ## [A] Author choices (ruled, on record)
 
 | Constant | Value | Where | Ruling / derivation |
@@ -194,3 +220,4 @@ when the roster changes, BOTH pages update from the same measurement record
 | 2026-09-28 | Catch-up registration (addendum 102): the registry is brought current with addenda 74-101. New [A] rows: roster ceiling (4.92B params / 5.27 GiB), the lineage selection mechanism (data availability, ALL matching models, no cherry-picking), quant scope (Q8_0 only), n=50 conversations, ARC always. New [D] rows: the v3.1 candidate pool (7 qwen members, all PASS, stall rates 0.0-2.6%) and its measured values. New [M] rows: the linear bandwidth law (the pages' most load-bearing unvalidated number), the halving factor 0.50, GPU tier bandwidths [P], the GPU cost carryover. Fixed: the ladder row (the rung walk is REMOVED, RUNG = "Q8_0", addendum 86), the bandwidth tiers row (51.2 is future work, 102.4 is the single class), the duplicate reaction-time row merged. New sections: Practitioner-facing claims (the pages are the report, addendum 96) and Deferred validations (the future-work tracker). Known debt on record: the CANDIDATES pool is duplicated across both pages (no-build-step tradeoff; the registry row is the sync contract). | 102 |
 | 2026-10-05 | Catch-up registration (addendum 140): the registry is brought current with notebook sessions 36-38, which had shipped code without registry rows. New [A] rows: certify bars (speed 0, fwe 2/3, vt 4/5, arc 4/5 - calibrated under the author's >=50% floor rule), medals (gold/silver/bronze confidence tiers), the speed corpus (21 conversations, per-cell stall counts - session 38 addendum 2's redesign), n per task (FWE 3 / VT 5 / speed 5 / ARC 5). New [P] rows: tournament depth grid + 21 climbs, combined cell, depth budget, two-gate orthogonality. New [D] rows: memory witness (llama's own -lv 5 accounting supersedes the smaps census, session 38 addendum 11), the hybrid architecture finding (5 of 9 families SSM/recurrent - the law exception is architectural), size_table (the per-context recommendation curve). New [M] rows: FWE and VT upstream constants (NVIDIA/RULER verbatim). SUPERSEDED: the addendum-86 Q8_0-only ruling - the tournament re-opened the quant axis (TOURNAMENT_MODEL_QUANTS Q2_K-Q8_0, KV q4_0-f16); the certify path standardizes on (q8, f16, f16). The anchor-chain section now separates the two consumers of the per-turn collision test: the ladder still grades by stall rate (v3.1), the certify path grades by per-cell stall count - both use the unchanged binary per-turn event. | 140 |
 | 2026-09-28 | Protocol v3.1 (addendum 73, author ruling, pre-run): the guarantee is the STALL RATE - PASS iff wall-failing turns / total turns <= 0.05 ("a fast reader will only catch up to 5% of the turns"); the per-turn collision test unchanged inside it. STALL_RATE_MAX = 0.05 registered [A] (speed_gate, single-sourced); at n=50 convs (267 turns) the pass edge is <= 13 stalls. Early-fail DELETED (a rate verdict needs its denominator - the aborted addendum-68 run would have scored a false 1.1% PASS; speed_gate loses --no-early-fail; full tails are now the only protocol, and full_benchmark inherits them by default). Recorded v3.0 verdicts stand as v3.0 verdicts; prospective v3.1 grades on record: the 4B sentinel (2.2%) and qwen Q5 9B (3.4%) would PASS v3.1, mistral Q5 (6.4%) stays FAIL. The addendum-71 overnight grading set updated prospectively (both 4B cells now predict PASS; no cell predicts v3.1 FAIL). | 73 |
+| 2026-10-06 | Taxonomy section added (session 40, addendum 18): release > family > variant defined with explicit study extensions - literature-compatible terms, the study narrower family and the (family, rung, kv_k, kv_v) variant registered; lineage retired from the version sense (provenance is its literature meaning). Code keeps `families` as the key name - it matches. | 18 |
