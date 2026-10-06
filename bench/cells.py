@@ -342,4 +342,9 @@ def vt_pass(
             row["mem_cost_gib"] = cost
     finally:
         llama_server.stop_server(proc, port)
-    return row["acc"] == 1.0, row
+    # addendum 54: the vt cell grades at the GATE bar 4/5 (row["acc"] is
+    # the 0..5 names as a fraction) - the same source of truth as the
+    # stored re-grade and the medal bar, never a drifted 5/5
+    from bench.constants import TASK_PASS_BARS
+
+    return row["acc"] >= TASK_PASS_BARS["vt"] / 5.0, row
