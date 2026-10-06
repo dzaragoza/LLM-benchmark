@@ -381,3 +381,51 @@ VERIFIED: md_check pass (notebook-only change; the code gates are
 untouched - no --no-verify needed for a markdown-only commit, but
 the pre-commit runner still fails under this sandbox's command
 wrapper, so the md hook's check was run manually).
+
+## Addendum 10 - the quality-toolbox rulings (2026-10-06, the author's four rulings)
+
+ON THE "anything missing?" QUESTION, four rulings:
+
+1. MUTATION TESTING: adopted for a once-in-a-while trial, per the
+   coverage clause - a helper to find weak tests, never a metric,
+   never a hook. mutmut installed sandbox-side (not a repo
+   dependency); [tool.mutmut] in pyproject.toml points it at
+   code_edit.py + md_check.py with the four pure test files
+   (test_code_edit, test_python_syntax_gate, test_replace_verified,
+   test_safe_append_md - test_seams imports other root modules and
+   mutmut's staging dir does not copy them, so the selection is the
+   files that exercise the mutated module alone).
+
+2. CI RUNNER: REJECTED - the author's ruling: "you see the only one
+   changing code" is Vibe; the pre-commit hooks + the notebook's
+   VERIFIED lines are the enforcement. No GitHub Actions.
+
+3. DEPENDENCY AUDITING: adopted as once-in-a-while (pip-audit,
+   sandbox-side). FIRST RUN: requirements.txt -> "No known
+   vulnerabilities found". The author's version question answered
+   below (addendum 10 closing).
+
+4. COMPLEXITY MEASUREMENT: REJECTED - the author's ruling verbatim:
+   "that is an arbitrary metric, that leads to uncle Bob style
+   code: a plethora of small functions that do something minimal,
+   and instead of being able to read a piece of code in one place,
+   you end up reading the same split in small functions everywhere
+   in the code." The registry records: no complexity tool, ever;
+   readability is judged by the reader, not by a number.
+
+THE AUTHOR'S VERSION QUESTION ("isn't it simpler to just update to
+the latest versions instead of checking for vulnerability?"): YES
+for this repo - the honest answer from the repo's own constraints:
+the workflow is simple (no service, no exposed surface), so the
+pip-audit finding (currently clean) mostly duplicates what an
+update would fix anyway. The caveat that keeps the audit in the
+toolbox: requirements.txt is NOT fully free - the converter pins
+are llama.cpp-b10964-compatible (torch, transformers, gguf,
+sentencepiece must stay compatible with the pinned checkout, the
+requirements.txt header says so). "Update everything to latest" can
+break the pinned converter path in ways an audit would not predict
+and an update would not fix. Registered practice: updates are
+fine ad hoc; the pinned-converter block changes only with a
+llama.cpp bump; pip-audit runs once in a while as a check that
+costs one command.
+MUTATION RUN (mutmut, first trial): 1922/1922 mutants -> 584 killed, 1069 survived, 263 suspicious (mutmut's 'tests' classification - the mutant made a test fail in a way mutmut flags as suspicious), 6 timeouts, 0 untested. The survival number is INFLATED by the narrow test selection: only the 4 pure test files (13 tests) run against mutants; test_seams.py (~25 tests, the strongest code_edit file) is excluded because mutmut's mutants/ staging dir cannot import the other root modules test_seams references. So the tally is directional, not a score. SAMPLED-MUTANT VERDICT (4 inspected): (1) code_edit.x__file_type__mutmut_3 - real gap, minor: flips the extension fallback for extension-less paths (no test uses such a path); (2) code_edit.x__apply__mutmut_11 - EQUIVALENT mutant: start index 0 -> None, buf[None:] == buf[0:] in Python, unkillable by any test; (3) code_edit.x__check_delimiters__mutmut_1 - real gap, structural: the whole prose path is exercised only by test_seams/test_ruler_gate, both outside the selection; (4) code_edit.x__find_replace_target__mutmut_3 - real gap: n == 1 -> n != 1 inverts the fast path, killed only by a duplicate-target test the selection lacks. Interpretation: the survived set mixes real gaps (mostly paths only test_seams covers), equivalent mutants, and mutant-mechanics artifacts (e.g. _as_lines/_lines_of reported 'no tests' because the staging dir rewrites helper calls). VERDICT: keep mutmut in the once-in-a-while toolbox per its ruling, but always with the selection caveat - a fair code_edit score requires test_seams in the run, which mutmut's staging-dir design makes infeasible today (it would need the imported root modules copied into mutants/). Removal clause stands: if a future trial adds no finding beyond what coverage + the gates already surface, remove it.
