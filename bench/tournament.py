@@ -1,5 +1,5 @@
 """bench.tournament -- the climb/fall machinery (session 38, addendum
-15: the full_benchmark.py refactor). The 21 climbs per family, the
+15: the full_benchmark.py refactor). The 20 climbs per family, the
 fall ranking, the re-score and the tournament table. Extracted
 verbatim."""
 
@@ -81,8 +81,8 @@ def _rank_extra(rank: dict[str, Any], depths: list[int]) -> dict[str, Any]:
     (the deepest rung whose 1-sigma LOWER Wilson bound on the hold
     probability is >= 0.5 - the rung holds FWE on most seeds, with
     1-sigma confidence), conservative depth (the same at 2 sigma -
-    the claim that survives skeptical review; addendum 43, n=21 puts
-    the 2-sigma certify bar at 15/21 observed holds), ceiling (the
+    the claim that survives skeptical review; at n=20 the 2-sigma
+    certify bar sits at 15/20 observed holds), ceiling (the
     deepest rung held EVER), and the per-rung 1-sigma Wilson bounds."""
     n = len(rank["fall_depths"])
     passes = rank["passes"]

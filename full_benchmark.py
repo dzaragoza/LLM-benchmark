@@ -195,7 +195,7 @@ RUNG_DEFAULT = "Q8_0"
 # same five task ladders. Upstream RULER FWE parameters exactly
 # (k=3, alpha 2.0 - addendum 7/8 verification).
 TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
-TOURNAMENT_CLIMBS = 21
+TOURNAMENT_CLIMBS = 20
 TOURNAMENT_MODEL_QUANTS = ["Q2_K", "Q3_K", "Q4_K", "Q5_K", "Q6_K", "Q8_0"]
 TOURNAMENT_KV_QUANTS = ["q4_0", "q5_0", "q6_K", "q8_0", "f16"]
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT
@@ -617,7 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
         "mathematically dead; the first accepted model answers the rung; "
         "the rest are skipped. LEVEL is the certification type: "
         "at_least_one (any model with a pass at the step), 1_sigma "
-        "(reliable: 1-sigma Wilson lower bound >= 0.5, n=21), 2_sigma "
+        "(reliable: 1-sigma Wilson lower bound >= 0.5, n=20), 2_sigma "
         "(conservative: the same bar at 2 sigma)",
     )
     ap.add_argument(
@@ -652,7 +652,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="fwe",
         choices=["fwe", "vt", "speed", "all"],
         help="session 37 (the VT certification): with --certify, run the "
-        "variable-tracking task instead of FWE - same stack, n=21, "
+        "variable-tracking task instead of FWE - same stack, n=20, "
         "seeds and sequential controller, but a separate cell namespace "
         "(certify_vt - the FWE evidence is never touched), pass = ALL "
         "5 chain names, the 0..5 partial stored per cell as the graded "
@@ -769,14 +769,19 @@ def main() -> None:
         diagnose_fwe(args.models_dir, state)
         return
     if args.certify:
-        if not args.rungs:
-            ap.error("--certify needs --rungs D1,D2,...")
-        try:
-            rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
-        except ValueError:
-            ap.error(f"--rungs must be comma-separated integers, got {args.rungs!r}")
-        if not rung_list:
-            ap.error("--rungs needs at least one depth")
+        if args.rungs:
+            try:
+                rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
+            except ValueError:
+                ap.error(f"--rungs must be comma-separated integers, got {args.rungs!r}")
+            if not rung_list:
+                ap.error("--rungs needs at least one depth")
+        else:
+            # session 40, the rung-selection ruling: with no --rungs the
+            # ladder walks UP from 4,096 - fill the cells at the lowest
+            # rung first; a rung is ANSWERED when a candidate crowns the
+            # requested medal, and ALL-DEAD also moves the ladder up.
+            rung_list = list(TOURNAMENT_DEPTHS)
         all_results: list[dict[str, Any]] = []
         for depth in sorted(rung_list):
             if args.task == "all":
@@ -817,6 +822,17 @@ def main() -> None:
                     f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
                 )
             all_results.extend(results)
+            # session 40, the rung-selection ruling: the ladder only
+            # moves UP - stop as soon as this rung is ANSWERED (a
+            # candidate accepted at the requested level); all-dead is
+            # the other exit, the next rung starts the next pass.
+            verdicts = [r.get("verdict") for r in results if "verdict" in r]
+            if "accept" in verdicts:
+                stamp(f"rung {depth:,} ANSWERED - the ladder stops here")
+                break
+            if verdicts and all(v == "dead" for v in verdicts):
+                stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
+                continue
         # the gold-run lesson (2026-10-03): the certify branch returned
         # bare and skipped the git tail - the artifacts (results.txt,
         # state) never committed and had to be pushed by hand

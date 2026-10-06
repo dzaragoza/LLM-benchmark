@@ -107,7 +107,7 @@ def certify_rung(
     Session 37, addendum 18: the certification TYPE is chosen per
     rung - at_least_one (the practitioner's question 1: any model
     with a pass at the step), 1_sigma (reliable: 1-sigma Wilson
-    lower bound >= 0.5, count >= half of n=21) or 2_sigma
+    lower bound >= 0.5, count >= half of n=20) or 2_sigma
     (conservative: the same bar at 2 sigma). Candidates are the
     given families, ordered by promise (existing passes at the
     rung, then reliable depth). Each candidate is tested cell by
@@ -387,13 +387,17 @@ def certify_rung_combined(
     if missing (never twice); the three tasks carry their own pass/fail
     tallies and their own accept/dead verdicts. The candidate certifies
     the rung when ALL THREE accept; it dies when ANY ONE is dead (the
-    next candidate is picked up). Gold = all three at gold; silver =
-    all three at least silver; bronze = any pass at all."""
+    next candidate is picked up). Session 40, ruling B: the certify
+    LEVEL maps to a MEDAL TIER - at_least_one = bronze (0.5 sigma,
+    0.20), 1_sigma = silver (1 sigma, 0.375), 2_sigma = gold
+    (2 sigma, 0.50) - and the accept/dead math per task IS the tier's
+    own bar, so the rung-stopping accept fires exactly when
+    combined_medal returns the requested tier."""
     if level not in CERTIFY_LEVELS:
         raise ValueError(f"unknown certify level {level!r}")
     n_total = TOURNAMENT_CLIMBS
-    floor = 1 if level == "at_least_one" else math.ceil(0.5 * n_total)
-    z = 0.0 if level == "at_least_one" else float(level.split("_")[0])
+    tier_bars = {"at_least_one": (0.5, 0.20), "1_sigma": (1.0, 0.375), "2_sigma": (2.0, 0.50)}
+    z, bar_lo = tier_bars[level]
     order: list[tuple[str, dict[str, Any], dict[str, dict[int, bool]]]] = []
     for spec in specs:
         fam = os.path.basename(spec.partition("=")[0].rstrip("/"))
@@ -493,19 +497,13 @@ def certify_rung_combined(
                 k, measured = ta["k"], ta["measured"]
                 remaining = n_total - measured
                 lo = task_lo(t)
-                if level == "at_least_one":
-                    if k >= 1:
-                        verdicts[t] = "accept"
-                    elif remaining == 0:
-                        verdicts[t] = "dead"
-                else:
-                    if measured >= floor and lo >= 0.5:
-                        verdicts[t] = "accept"
-                        continue
-                    best_k = k + remaining
-                    best_lo, _ = wilson_interval(best_k, n_total, z)
-                    if best_lo < 0.5 or best_k < floor:
-                        verdicts[t] = "dead"
+                if lo >= bar_lo:
+                    verdicts[t] = "accept"
+                    continue
+                best_k = k + remaining
+                best_lo, _ = wilson_interval(best_k, n_total, z)
+                if best_lo < bar_lo:
+                    verdicts[t] = "dead"
             if all(v == "accept" for v in verdicts.values()):
                 verdict = "accept"
                 break
@@ -565,7 +563,8 @@ def certify_rung_combined(
             print(
                 f"  DEAD - {dead_task} cannot reach the bar at {depth:,} "
                 f"({ta['k']}/{ta['measured']}, best lower bound "
-                f"{wilson_interval(ta['k'] + (n_total - ta['measured']), n_total, z)[0]:.3f} < 0.5)"
+                f"{wilson_interval(ta['k'] + (n_total - ta['measured']), n_total, z)[0]:.3f}"
+                f" < {bar_lo})"
                 "; next candidate"
             )
         elif verdict == "would-run":
@@ -582,13 +581,14 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
     """The combined medal (session 38, addendum 7 - the author's
     refinement): the medals are PURE CONFIDENCE TIERS over each task's
     pass bar - gold = 2 sigma in EVERY test, silver = at least 1 sigma
-    in EVERY test, bronze = at least one pass in EVERY test. The pass
+    in EVERY test, bronze = 0.5 sigma in EVERY test (session 40, the
+    equidistant ruling: the thresholds land the tiers on round cell
+    counts at n=20 - bronze k=5, silver k=10, gold k=15 - and the
+    majority floor is dropped: it would forbid bronze). The pass
     bars (the difficulty knob) live in TASK_PASS_BARS and never move
     the medals; tuning a test's difficulty changes what a pass means,
     not what the medals mean. A task with no measured cells has no
     medal contribution (None overall until every task has evidence)."""
-    n_total = TOURNAMENT_CLIMBS
-    floor = math.ceil(0.5 * n_total)
     grades: dict[str, dict[str, bool]] = {}
     for t in COMBINED_TASKS:
         if t == "fwe":
@@ -609,12 +609,13 @@ def combined_medal(fst: dict[str, Any], depth: int, level: str) -> str | None:
             return None
         bar = TASK_PASS_BARS[t]
         k = sum(1 for p in records.values() if p >= bar)
+        lo_05s, _ = wilson_interval(k, len(records), 0.5)
         lo_1s, _ = wilson_interval(k, len(records), 1.0)
         lo_2s, _ = wilson_interval(k, len(records), 2.0)
         grades[t] = {
-            "gold": k >= floor and lo_2s >= 0.5,
-            "silver": k >= floor and lo_1s >= 0.5,
-            "bronze": k >= 1,
+            "gold": lo_2s >= 0.50,
+            "silver": lo_1s >= 0.375,
+            "bronze": lo_05s >= 0.20,
         }
     if all(grades[t]["gold"] for t in COMBINED_TASKS):
         return "gold"

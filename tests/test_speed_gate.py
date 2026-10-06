@@ -141,12 +141,12 @@ def test_tournament_family_creates_climb_dirs(tmp_path, monkeypatch):
     }
     models_dir = str(tmp_path)
     tour = fb.tournament_family("fam", models_dir, state, str(tmp_path / "st.json"), 8210, False)
-    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-21
-    # hold every depth (7 calls each) -> 141 total
-    assert len(calls) == 141
-    assert tour["fall_depths"] == [4096] + [None] * 20
-    assert tour["full_holds"] == 20
-    assert tour["reliable_depth"] == 262144  # 20/21 at 1 sigma clears every rung
+    # climb 1 (seed 1) falls at 4096 -> early stop (1 call); climbs 2-20
+    # hold every depth (7 calls each) -> 134 total
+    assert len(calls) == 134
+    assert tour["fall_depths"] == [4096] + [None] * 19
+    assert tour["full_holds"] == 19
+    assert tour["reliable_depth"] == 262144  # 19/20 at 1 sigma clears every rung
 
 
 def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
@@ -180,14 +180,14 @@ def test_tournament_family_resumes_saved_climbs(tmp_path, monkeypatch):
     models_dir = str(tmp_path)
     state_path = str(tmp_path / "st.json")
     tour = fb.tournament_family("fam", models_dir, state, state_path, 8210, False)
-    # only seeds 6-21 ran: seed 6 falls at 4096 (1 call), seeds 7-21
-    # hold every depth (15 seeds x 7 calls) - climbs 1-5 were resumed
-    # each of seeds 7-15 climbs all 7 depths with ITS OWN seed number
-    assert calls == [6] + [s for s in range(7, 22) for _ in range(7)]
-    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096] + [None] * 15
+    # only seeds 6-20 ran: seed 6 falls at 4096 (1 call), seeds 7-20
+    # hold every depth (14 seeds x 7 calls) - climbs 1-5 were resumed
+    # each of seeds 7-14 climbs all 7 depths with ITS OWN seed number
+    assert calls == [6] + [s for s in range(7, 21) for _ in range(7)]
+    assert tour["fall_depths"] == [4096, 4096, 4096, 8192, 32768, 4096] + [None] * 14
     saved = state["families"]["fam"]["tournament_falls"]
-    assert len(saved) == 21 and saved["6"] == 4096 and saved["21"] is None
-    # sigma rank: 15/21 top out -> reliable 262144 at 1 sigma (mode retired)
+    assert len(saved) == 20 and saved["6"] == 4096 and saved["20"] is None
+    # sigma rank: 14/20 top out -> reliable 262144 at 1 sigma (mode retired)
     assert "rank_statistic" not in tour and tour["reliable_depth"] == 262144
 
 
@@ -279,8 +279,8 @@ def test_tournament_entry_config(tmp_path, monkeypatch):
         8210,
         False,
     )
-    assert out["reliable_depth"] == 262144 and out["full_holds"] == 21
-    assert len(calls) == 21 * len(fb.TOURNAMENT_DEPTHS)
+    assert out["reliable_depth"] == 262144 and out["full_holds"] == 20
+    assert len(calls) == 20 * len(fb.TOURNAMENT_DEPTHS)
     assert all(c[1] == "q5_0" and c[2] == "q5_0" for c in calls)
 
 
@@ -485,15 +485,16 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         first = [r for r in res if r["family"] == "good"][0]
         assert first["verdict"] == "accept"
         # historical cells at 8192: climbs 1-4 top + 5-8 fell deeper = 8 passes
-        # runs 9-21 are fresh (13 seeds), never re-measured
-        assert sorted(ran) == [9, 10, 11]
-        assert first["cells_measured"] == 11 and first["passes"] == 11
+        # runs 9-20 are fresh (12 seeds), never re-measured; accept at
+        # 10 measured (10/10, lo(10,10,1)=0.909 >= 0.5, floor 10)
+        assert sorted(ran) == [9, 10]
+        assert first["cells_measured"] == 10 and first["passes"] == 10
         other = [r for r in res if r["family"] == "other"][0]
         assert other.get("skipped") == "rung already answered"
         # direct cells persisted
         good: dict[str, Any] = state["families"]["good"]
         direct = good["certify"]["8192"]
-        assert direct == {str(r): True for r in (9, 10, 11)}
+        assert direct == {str(r): True for r in (9, 10)}
     finally:
         monkeypatch.undo()
 
@@ -610,7 +611,7 @@ def test_certify_rung_at_least_one_dead(tmp_path, capsys):
     try:
         model = tmp_path / "zero-Q8_0.gguf"
         model.write_bytes(b"x")
-        falls = {str(i): 16384 for i in range(1, 22)}
+        falls = {str(i): 16384 for i in range(1, 21)}
         state = {
             "families": {
                 "zero": {
@@ -783,14 +784,14 @@ def test_certify_rung_vt_separate_namespace_and_partial(tmp_path, capsys):
             task="vt",
         )
         first = res[0]
-        # 0 passes, dead by EARLY REJECT at 9 consecutive fails
-        # (best 12/21, lo 0.463 < 0.5 - the remaining 12 cells are not run)
+        # 0 passes, dead by EARLY REJECT at 8 consecutive fails
+        # (best 12/20, lo 0.488 < 0.5 - the remaining 12 cells are not run)
         assert first["verdict"] == "dead"
-        assert len(ran) == 9
+        assert len(ran) == 8
         # the partials landed in certify_vt - 4/5 per cell, FAIL at the 5/5 bar
         good_ns: dict[str, Any] = state["families"]["good"]
         vt = good_ns["certify_vt"]["8192"]
-        assert all(p == 4 for p in vt.values()) and len(vt) == 9
+        assert all(p == 4 for p in vt.values()) and len(vt) == 8
         # the FWE namespace is untouched
         assert good_ns["certify"] == {"8192": {"1": True, "2": True, "3": True}}
         # re-grade the SAME cells at the 4/5 bar from the stored partials
@@ -836,8 +837,8 @@ def test_certify_rung_vt_accepts_on_5_of_5(tmp_path, capsys):
             task="vt",
         )
         assert res[0]["verdict"] == "accept"
-        assert sorted(ran) == list(range(1, 12))
-        assert res[0]["cells_measured"] == 11
+        assert sorted(ran) == list(range(1, 11))
+        assert res[0]["cells_measured"] == 10
         vt_ns: dict[str, Any] = state["families"]["vt"]
         vt = vt_ns["certify_vt"]["8192"]
         assert all(p == 5 for p in vt.values())
@@ -879,7 +880,9 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         r = res[0]
         assert r["verdict"] == "accept"
         assert all(r[f"{t}_verdict"] == "accept" for t in fb.COMBINED_TASKS)
-        assert r["medal"] == "gold"
+        # ruling B: the 1_sigma level ANSWERS at the silver tier - the
+        # controller bar and the medal bar are the same thing now
+        assert r["medal"] == "silver"
         ns: dict[str, Any] = state["families"]["fam"]
         assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
         assert ns["certify_arc"]  # rung-independent, stored once
@@ -949,42 +952,51 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
 def test_combined_medal_grading_from_records():
     """Addendum 7 (the author's refinement): the medals are PURE
     confidence tiers over each task's pass bar - gold = 2 sigma in
-    every test, silver = at least 1 sigma in every test, bronze = at
-    least one pass in every test. Re-graded from stored records alone."""
+    every test, silver = at least 1 sigma in every test, bronze =
+    0.5 sigma in every test (session 40: at-least-one-pass retired).
+    Re-graded from stored records alone."""
     import full_benchmark as fb
 
     def recs(n):
         return {str(r): 3 for r in range(1, n + 1)}
 
     gold = {
-        "certify": {"8192": recs(21)},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 22)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 22)}},
-        "certify_arc": {str(r): 5 for r in range(1, 22)},
+        "certify": {"8192": recs(20)},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
     assert fb.combined_medal(gold, 8192, "2_sigma") == "gold"
 
     silver = {
-        "certify": {"8192": {str(r): 3 if r <= 13 else 0 for r in range(1, 22)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 22)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 22)}},
-        "certify_arc": {str(r): 5 for r in range(1, 22)},
+        "certify": {"8192": {str(r): 3 if r <= 10 else 0 for r in range(1, 21)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
     assert fb.combined_medal(silver, 8192, "2_sigma") == "silver"
 
     bronze = {
-        "certify": {"8192": {str(r): 3 if r <= 2 else 0 for r in range(1, 22)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 22)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 22)}},
-        "certify_arc": {str(r): 5 for r in range(1, 22)},
+        "certify": {"8192": {str(r): 3 if r <= 5 else 0 for r in range(1, 21)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
     assert fb.combined_medal(bronze, 8192, "2_sigma") == "bronze"
 
+    weak_bronze = {
+        "certify": {"8192": {str(r): 3 if r <= 4 else 0 for r in range(1, 21)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_arc": {str(r): 5 for r in range(1, 21)},
+    }
+    assert fb.combined_medal(weak_bronze, 8192, "2_sigma") is None
+
     no_pass = {
-        "certify": {"8192": {str(r): 0 for r in range(1, 22)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 22)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 22)}},
-        "certify_arc": {str(r): 5 for r in range(1, 22)},
+        "certify": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
+        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
+        "certify_arc": {str(r): 5 for r in range(1, 21)},
     }
     assert fb.combined_medal(no_pass, 8192, "2_sigma") is None
     empty = {}
