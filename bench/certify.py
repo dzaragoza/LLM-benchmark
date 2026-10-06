@@ -35,14 +35,21 @@ def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
     """The Wilson score interval at 1 sigma (addendum 42): the
     honest CI for a binomial hold fraction at tournament n. At n=15
     a 2-sigma interval is too wide to separate models - 1 sigma is
-    the pre-registered choice."""
-    if n == 0:
+    the pre-registered choice. Domain (session 40, addendum 22,
+    found by crosshair): 0 <= k <= n, n >= 0, z >= 0 - outside it
+    the math is undefined (negative n underflows to NaN, k > n
+    breaks the sqrt); the caller's tallies are inside by
+    construction, the guard makes the contract explicit."""
+    if n <= 0 or k < 0 or k > n or z < 0:
         return 0.0, 0.0
     p = k / n
     denom = 1 + z * z / n
     center = (p + z * z / (2 * n)) / denom
     half = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return center - half, center + half
+    # clamp (session 40, addendum 22, found by hypothesis): float
+    # rounding at p=0/1 drifts the bound outside [0, 1] by ~1e-18 -
+    # a CI bound outside the parameter space is nonsense, clamp it
+    return max(0.0, center - half), min(1.0, center + half)
 
 
 CERTIFY_LEVELS = ["at_least_one", "1_sigma", "2_sigma"]

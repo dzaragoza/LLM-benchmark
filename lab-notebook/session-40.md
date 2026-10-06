@@ -754,3 +754,21 @@ TESTS: test_certify_builds_the_model_when_acquire_returns_a_plan (the controller
 THE RULING: all root-level .md study documents move to docs/ - README.md alone stays at the root (the universal entry point), and the lab notebook keeps its own lab-notebook/ directory (its files are session artifacts, not study documents). Moved with git mv (history preserved): conversation up to 2026-09-27.md, lab-notebook-llms-on-102-4-gb-s-system-ram-machines.md, llm-benchmark-session-handoff-2026-09-24-conversation-refresh.md, model-selection.md, models.md, notebook.md, practitioner-goals.md, protocol.md, wow.md.
 
 CROSS-REFERENCES UPDATED THE SAME COMMIT (the wow.md section-8 rule): etc/registry_data.py reads docs/models.md (the check command re-verified: 48 models, none missing); README.md links to docs/model-selection.md, docs/practitioner-goals.md, docs/protocol.md; the legacy notebook pointer's lab-notebook/index.md link re-anchored to ../lab-notebook/. Code's .md mentions elsewhere are comments/docstrings, not paths. wow.md section 8 registers the new home.
+
+### Addendum 22 - the formal-methods pair: crosshair proves, hypothesis falsifies (2026-10-06, the author's "let's do crosshair and hypothesis")
+
+THE AUTHOR, LEARNING FORMAL METHODS, RULED: crosshair (SMT-backed contract verification) + hypothesis (property-based testing) join the quality toolbox. The division of labor: a CONTRACT states what must hold for all inputs - crosshair PROVES it (z3) or returns a concrete counterexample; hypothesis SEARCHES for counterexamples where proof is infeasible (state, strings, corpus-shaped data). Same contracts, two tools.
+
+THE INSTALL: pip package is crosshair-TOOL (a bare `pip install crosshair` grabs an unrelated SSH tool - found the hard way). Both added to requirements.txt under the tooling block.
+
+THE TARGETS (the study's pure functions - the first honest beneficiaries): bench/certify.wilson_interval (the accept/dead math of every certify run) and infra/hf_download's file matchers (find_rung_file, has_safetensors).
+
+TWO REAL FINDINGS ALREADY, ON DAY ONE:
+1. CROSSHAIR: wilson_interval had no domain guard - negative n underflows to NaN, k > n breaks the sqrt (math domain error). The callers' tallies are inside the domain by construction, but the contract made it explicit: the guard now returns (0.0, 0.0) outside 0 <= k <= n, n >= 0, z >= 0.
+2. HYPOTHESIS: float rounding at p=0/1 drifts the bound outside [0, 1] by ~1e-18 - a CI bound outside the parameter space is nonsense. Clamped: max(0.0, lo), min(1.0, hi).
+
+THE FILES: tests/contracts.py (six contracts - wilson bounds, domain, z=0 degeneracy, the rung-file matcher's membership/token/no-gguf-no-match, the safetensors iff) - ALL PROVED, `crosshair check tests/contracts.py` exits clean. tests/test_properties.py (six properties - bounds, monotone-in-k, z=0 collapse, matcher membership, safetensors iff, all-pass saturation hi=1/lo=1/denom) - 6 passed. 183 tests total.
+
+THE WILSON LESSON registered honestly: my first "all-pass reaches 1" property was WRONG - Wilson's lower bound at k=n is 1/denom < 1 (the honest interval never claims certainty from finite evidence); hypothesis caught it in seconds. The corrected property pins hi=1 exactly and lo=1/denom - a better statement than I first wrote, which is the whole point of the method.
+
+RUN: `crosshair check tests/contracts.py` (proofs, ~1 min) and `python3 -m pytest tests/test_properties.py` (falsification, ~1.4 s). Not a pre-commit hook - the once-in-a-while class, like coverage and vulture.
