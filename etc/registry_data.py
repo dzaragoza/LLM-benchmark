@@ -36,7 +36,6 @@ ROSTER = {
     "RWKV7-World-2.9B": "RWKV/RWKV7-Goose-World3-2.9B-HF",
     "Qwen2.5-1.5B-Instruct": "Qwen/Qwen2.5-1.5B-Instruct",
     "Qwen3-1.7B": "Qwen/Qwen3-1.7B",
-    "Qwen3-4B": "Qwen/Qwen3-4B",
     "Qwen3-4B-Instruct-2507": "Qwen/Qwen3-4B-Instruct-2507",
     "Qwen3-30B-A3B-Instruct-2507": "Qwen/Qwen3-30B-A3B-Instruct-2507",
     "phi-1": "microsoft/phi-1",
