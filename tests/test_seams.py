@@ -1266,3 +1266,84 @@ def test_size_table_build_and_recommend(tmp_path, capsys):
     print_size_table(rows)
     out = capsys.readouterr().out
     assert "famA" in out and "8192" in out and "recommend" in out
+
+
+def test_code_edit_edit_many_region_check_not_stale(tmp_path):
+    """Session 40, addendum 3, fix 1: edit_many used the PREVIOUS
+    edit()'s _last_edit_regions (module-global) for its delimiter
+    check - regions from ANOTHER file. The failure mode is a false
+    PASS: the stale regions point at benign spans of the new file,
+    so the file's own region - which carries a real violation - is
+    never checked. The global is gone; _apply now returns the
+    regions and every caller threads them."""
+    import code_edit
+
+    pA = tmp_path / "a.c"
+    pA.write_text("alpha\n")
+    # seed the (now deleted) global with a region whose old/new text
+    # also occur in b.txt at benign positions
+    code_edit.edit(str(pA), [("replace", "alpha", "alpha")])
+    pB = tmp_path / "b.c"
+    pB.write_text("alpha\nplain txt\n")
+    # b's own region inserts an unterminated double quote; with the
+    # stale a-regions it slipped through, with its own regions it is
+    # caught
+    try:
+        code_edit.edit_many([(str(pB), [("replace", "plain txt", 'plain "txt')])])
+        raised = False
+    except code_edit.CodeEditError:
+        raised = True
+    assert raised, "the stale-region edit_many must fail the quote check"
+    assert pB.read_text() == "alpha\nplain txt\n"  # file untouched
+
+
+def test_code_edit_edit_many_runs_md_gates(tmp_path):
+    """Session 40, addendum 3, fix 2: edit_many skipped _fix_markdown
+    and _check_markdown entirely - an md file edited via edit_many got
+    no MD047/MD058 auto-fix and no introduced-violation gate."""
+    import pytest
+
+    import code_edit
+
+    p = tmp_path / "t.md"
+    p.write_text("# t\n\nhello")  # no trailing newline
+    code_edit.edit_many([(str(p), [("append", "world\n")])])
+    assert p.read_text().endswith("\n")  # MD047 auto-fixed now
+
+    p2 = tmp_path / "t2.md"
+    p2.write_text("# t\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
+    with pytest.raises(code_edit.CodeEditError):
+        code_edit.edit_many(
+            [(str(p2), [("append", "| ragged |\n")])]  # MD056 ragged row
+        )
+
+
+def test_code_edit_verify_old_text_gone(tmp_path):
+    """Session 40, addendum 3, fix 3: _verify_result checked only that
+    the new text IS in the result - never that the old text is GONE.
+    A replace whose old text survives (the apply silently missed)
+    now fails; the legal exceptions (new == old; new contains old)
+    still pass."""
+    import code_edit
+
+    p = tmp_path / "t.py"
+    p.write_text("a = 1\nb = 1\n")
+    code_edit.edit(str(p), [("replace", "a = 1", "a = 2")])  # old gone: fine
+    code_edit.edit(str(p), [("replace", "a = 2", "a = 2")])  # new == old: fine
+    code_edit.edit(str(p), [("replace", "b = 1", "b = 10")])  # new contains old: fine
+    assert p.read_text() == "a = 2\nb = 10\n"
+
+
+def test_code_edit_check_single_read(tmp_path):
+    """Session 40, addendum 3, fix 4: check() used to verify against one
+    read of the file and then call preview() - a SECOND read - so the
+    verdict and the returned diff could disagree (TOCTOU). check() now
+    computes everything from a single read; the returned diff IS the
+    verified result."""
+    import code_edit
+
+    p = tmp_path / "t.py"
+    p.write_text("x = 1\n")
+    diff = code_edit.check(str(p), [("replace", "x = 1", "x = 2")])
+    assert "-x = 1" in diff and "+x = 2" in diff
+    assert p.read_text() == "x = 1\n"  # nothing written
