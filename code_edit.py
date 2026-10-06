@@ -158,9 +158,6 @@ def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
     return a, a + tail.index(end)
 
 
-_last_edit_regions: list[tuple[str, str]] = []
-
-
 def _file_type(path: str) -> str:
     """The check rules differ per file type (session 35, addendum 4):
     prose files legally contain unbalanced quotes and brackets."""
@@ -265,7 +262,7 @@ def _strip_apostrophes(text: str) -> str:
     return text.replace("'", "")
 
 
-def _check_delimiters(src: str, out: str, path: str) -> None:
+def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str, str]]) -> None:
     """Sanity check that the edit did not unbalance quotes, brackets,
     braces or parens. File-type aware (session 35, addendum 4):
     - prose (md/txt/...): NO check - apostrophes and brackets in
@@ -280,8 +277,6 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
     ftype = _file_type(path)
     if ftype == "prose":
         return
-    pairs = {"(": ")", "[": "]", "{": "}"}
-    closers = set(pairs.values())
 
     def balance_no_underflow(text: str) -> str | None:
         # a region may OPEN a delimiter that closes after it (an edit
@@ -384,14 +379,14 @@ def _check_delimiters(src: str, out: str, path: str) -> None:
         # a TRUNCATED or DUPLICATED fragment, and that is a property of
         # the edited REGION, not of any single line: each region must
         # balance as a unit.)
-        src2, regions = src, []
-        for old_text, new_text in _last_edit_regions:
+        src2, covered = src, []
+        for old_text, new_text in regions:
             i = src2.find(old_text)
             j = out.find(new_text)
             if i >= 0 and j >= 0:
-                regions.append((j, j + len(new_text)))
+                covered.append((j, j + len(new_text)))
             src2 = src2.replace(old_text, "", 1)
-        covered = list(regions)
+        covered = list(covered)
         if not covered and balance(src) is None:
             # insert/delete-only edit: like with like - the whole-buffer
             # check applies only when the source already balanced
@@ -605,12 +600,14 @@ def _sep(anchor: str, new: str, after: bool) -> str:
     return new
 
 
-def _apply(src: str, blocks: Sequence[tuple]) -> str:
+def _apply(src: str, blocks: Sequence[tuple]) -> tuple[str, list[tuple[str, str]]]:
     buf = src
+    regions: list[tuple[str, str]] = []
     for block in blocks:
         kind = block[0]
         if kind == "replace":
             buf = buf.replace(block[1], block[2], 1)
+            regions.append((block[1], block[2]))
         elif kind == "delete":
             buf = buf.replace(block[1], "", 1)
         elif kind == "replace_all":
@@ -663,7 +660,7 @@ def _apply(src: str, blocks: Sequence[tuple]) -> str:
             buf = buf + block[1]
         elif kind == "prepend":
             buf = block[1] + buf
-    return buf
+    return buf, regions
 
 
 def safe_append(path: str, addition: str) -> str:
@@ -801,10 +798,8 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
         src = f.read()
     blocks = [_normalize_block(tuple(b)) for b in blocks]
     _verify_blocks(src, blocks)
-    out = _apply(src, blocks)
-    _last_edit_regions.clear()
-    _last_edit_regions.extend((b[1], b[2]) for b in blocks if b[0] == "replace")
-    _check_delimiters(src, out, path)
+    out, regions = _apply(src, blocks)
+    _check_delimiters(src, out, path, regions)
     _check_python_syntax(src, out, path)
     # verify every post-condition against the IN-MEMORY result BEFORE
     # touching disk (session 35, addendum 4: these checks used to run
@@ -835,6 +830,13 @@ def _verify_result(out: str, blocks: Sequence[tuple], path: str) -> None:
         kind = block[0]
         if kind in ("replace", "replace_all", "replace_n") and block[2] and block[2] not in out:
             raise CodeEditError(f"{path}: block {i} verify failed (new text not in the result)")
+        if (
+            kind in ("replace", "replace_all")
+            and block[2] != block[1]
+            and block[1] not in block[2]
+            and block[1] in out
+        ):
+            raise CodeEditError(f"{path}: block {i} verify failed (old text still in the result)")
         if (
             kind
             in (
@@ -887,8 +889,8 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
     with open(path, encoding="utf-8") as f:
         src = f.read()
     _verify_blocks(src, blocks)
-    out = _apply(src, blocks)
-    _check_delimiters(src, out, path)
+    out, regions = _apply(src, blocks)
+    _check_delimiters(src, out, path, regions)
     out = _fix_markdown(out, path)
     _check_markdown(src, out, path)
     return "".join(
@@ -915,10 +917,12 @@ def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
         with open(path, encoding="utf-8") as f:
             src = f.read()
         _verify_blocks(src, blocks)
-        out = _apply(src, blocks)
-        _check_delimiters(src, out, path)
+        out, regions = _apply(src, blocks)
+        _check_delimiters(src, out, path, regions)
         _check_python_syntax(src, out, path)
         _verify_result(out, blocks, path)
+        out = _fix_markdown(out, path)
+        _check_markdown(src, out, path)
         specs.append((path, src, out))
     for path, _src, out in specs:
         _atomic_write_sync(path, out)
@@ -939,11 +943,22 @@ def check(path: str, blocks: Sequence[tuple]) -> str:
         src = f.read()
     blocks = [_normalize_block(tuple(b)) for b in blocks]
     _verify_blocks(src, blocks)
-    out = _apply(src, blocks)
-    _check_delimiters(src, out, path)
+    out, regions = _apply(src, blocks)
+    _check_delimiters(src, out, path, regions)
     _check_python_syntax(src, out, path)
     _verify_result(out, blocks, path)
-    return preview(path, blocks)
+    out = _fix_markdown(out, path)
+    _check_markdown(src, out, path)
+    import difflib
+
+    return "".join(
+        difflib.unified_diff(
+            src.splitlines(keepends=True),
+            out.splitlines(keepends=True),
+            fromfile=path,
+            tofile=path + " (edited)",
+        )
+    )
 
 
 def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:

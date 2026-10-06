@@ -34,4 +34,4 @@
 - [Session 37 — 2026-10-03 (the n=21 completion; medals; certify as type + range; closed 10-04)](session-37.md)
 - [Session 38 — 2026-10-04 (the VT gold certification graded; the speed gate redesign; the combined cell; the UMA census)](session-38.md)
 - [Session 39 — 2026-10-05 (registry hygiene: wow.md section 10; protocol.md catch-up addendum 140; the session-per-day audit)](session-39.md)
-- [Session 40 — 2026-10-06 (opens with the recommended_max_rung ruling on the table)](session-40.md)
+- [Session 40 — 2026-10-06 (the VT heap ruling closed; the code_edit review — four bugs fixed, tool ownership transferred)](session-40.md)
