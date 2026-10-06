@@ -547,6 +547,15 @@ def build_parser() -> argparse.ArgumentParser:
         "context-over-parameters test)",
     )
     ap.add_argument(
+        "--force-rung",
+        dest="rung_forced",
+        action="store_true",
+        help="certify EVERY family at --rung, ignoring each family's stored "
+        "selection (session 40, addendum 25 - the full-capacity run: all "
+        "models at the study default (Q8_0, f16 K, f16 V) before any "
+        "compression thinking)",
+    )
+    ap.add_argument(
         "--roster",
         default=None,
         help="restrict the run's notes to these families "
@@ -806,6 +815,7 @@ def main() -> None:
                     state.get("ladder_port", 8210),
                     args.dry_run,
                     min_words=args.fwe_min_words,
+                    rung_override=args.rung if args.rung_forced else None,
                 )
             else:
                 results = certify_rung(
@@ -819,6 +829,7 @@ def main() -> None:
                     args.dry_run,
                     min_words=args.fwe_min_words,
                     task=args.task,
+                    rung_override=args.rung if args.rung_forced else None,
                 )
             state["certify"] = results
             save_state(args.state_file, state)

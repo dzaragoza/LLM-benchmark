@@ -1320,3 +1320,39 @@ def test_certify_builds_the_model_when_acquire_returns_a_plan(tmp_path, capsys):
         assert measured, "the controller must proceed to measuring with the built file"
     finally:
         monkeypatch.undo()
+
+
+def test_force_rung_overrides_stored_selection(tmp_path, capsys):
+    """Addendum 25 regression: --force-rung certifies every family at
+    the given rung, ignoring the stored selection - the full-capacity
+    run measures (Q8_0, f16, f16) even for families whose selected
+    rung is lower."""
+    import full_benchmark as fb
+    from bench import certify as bench_certify
+
+    asked = []
+
+    def fake_acquire(spec, fam, famdir, rung, state, dry_run):
+        asked.append((fam, rung))
+        return None
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(bench_certify, "_acquire_missing_model", fake_acquire)
+    try:
+        state: dict[str, Any] = {
+            "families": {"compressed": {"spec": "test/compressed", "selected": "Q2_K"}}
+        }
+        fb.certify_rung_combined(
+            4096,
+            "1_sigma",
+            ["test/compressed"],
+            str(tmp_path),
+            state,
+            str(tmp_path / "st.json"),
+            8210,
+            False,
+            rung_override="Q8_0",
+        )
+        assert asked == [("compressed", "Q8_0")]
+    finally:
+        monkeypatch.undo()

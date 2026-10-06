@@ -126,6 +126,7 @@ def certify_rung(
     dry_run: bool,
     min_words: int = 1,
     task: str = "fwe",
+    rung_override: str | None = None,
 ) -> list[dict[str, Any]]:
     """Session 37, addendum 8 (the practitioner-certified map): fill
     ONE rung - the sequential controller of session-36 addendum 50.
@@ -198,7 +199,7 @@ def certify_rung(
             results.append(entry)
             continue
         famdir = os.path.join(models_dir, fam)
-        rung = (
+        rung = rung_override or (
             fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
         )
         run = (fst.get("runs") or {}).get(rung or "", {})
@@ -407,6 +408,7 @@ def certify_rung_combined(
     port: int,
     dry_run: bool,
     min_words: int = 1,
+    rung_override: str | None = None,
 ) -> list[dict[str, Any]]:
     """The combined controller (session 38, addendum 3 - the author's
     ruling): a cell is (model, rung, run) carrying THREE independent
@@ -478,7 +480,7 @@ def certify_rung_combined(
             results.append(entry)
             continue
         famdir = os.path.join(models_dir, fam)
-        rung = (
+        rung = rung_override or (
             fst.get("selected") or (fst.get("tournament_entry") or {}).get("rung") or RUNG_DEFAULT
         )
         run = (fst.get("runs") or {}).get(rung or "", {})
