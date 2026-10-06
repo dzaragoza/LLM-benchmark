@@ -538,3 +538,44 @@ The uniqueness friction seen twice here (the "rung already answered"
 skip block appears in both the single-task and combined controllers)
 is the known code_edit papercut - context disambiguation, not a tool
 bug; an occurrence-index escape hatch remains a future improvement.
+
+
+## Addendum 14 - the model-retrieval bug: the leaked spec (2026-10-06)
+
+THE SYMPTOM (the author's report, the 10:22 certify run in
+results.txt): every family that needed acquisition downloaded the
+SAME wrong repo - Llama-3.2-3B, Phi-3, Phi-4 all printed
+"[1] downloading safetensors from mistralai/Mistral-7B-Instruct-v0.3"
+- and then every candidate errored "model file not found".
+
+THE ROOT CAUSE: a leaked loop variable. Both controllers
+(certify_rung, certify_rung_combined) build the candidate order with
+`for spec in specs:` and later, in the candidate loop, call
+`_acquire_missing_model(spec, ...)`. The candidate loop reuses the
+name `spec` for the LAST value of the roster loop - so with the
+nameless run (addendum 12) over benchmark-state.json every family
+acquired the roster's last spec (Mistral-7B-Instruct-v0.3). With a
+single-family roster the bug is invisible: the leak and the truth
+coincide. The nameless run made the roster long and the bug loud.
+
+THE FIX: the order tuple now carries each family own spec -
+(fam, fst, cells, spec) - and the candidate loop unpacks it; the
+promise sort unpacks it as _spec. Both controllers fixed; no
+behavior change beyond the acquisition target.
+
+THE REGRESSION TEST: test_certify_acquires_from_each_family_own_spec
+- two families with missing models, a faked _acquire_missing_model
+records what each candidate asks for; asserts each family gets its
+OWN spec, not the last one. 174/174 pytest, ty 0, ruff check+format
+clean, md_check, js_check.
+
+CODE_EDIT NOTE (the owner's honesty): the fix needed 6 aimed edits
+across two near-twin controller bodies. The exact `replace` blocks
+collided with the twin (found 2 times) and the whitespace-flexible
+fallback then landed some blocks on the WRONG twin, producing a
+syntax error - caught and refused by the syntax gate, file
+untouched both times, exactly as designed. The working path was
+replace_all for the genuinely shared lines plus context-anchored
+replace for the type lines. No code_edit change made: the refusal
+behavior is correct; the friction is aiming twin regions, and the
+occurrence-index idea (addendum 13) remains the candidate feature.
