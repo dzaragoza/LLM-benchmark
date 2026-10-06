@@ -816,3 +816,22 @@ THE FIX, two halves:
 THE MEDAL: combined_medal grades the STORED selection's variant only - a forced-rung medal would be meaningless, the medal is the family's certification of its selected config.
 
 TESTS: test_cells_record_and_filter_by_variant (the record shape, the want/legacy filter, the no-filter view, the store's record), plus the three updated assertions on the new record shape. 193 tests total. All gates: pytest 193/193, ty 0, ruff clean, md_check.
+
+### Addendum 27 - the partial-download guard (2026-10-06, the author's "there was an error")
+
+THE ERROR: the full-capacity run died at phase 2 for Llama-3.2-3B - the converter crashed on FileNotFoundError model-00001-of-00002.safetensors, inside the family's own safetensors-source. THE CAUSE: an incomplete download. The repo ships TWO shards; the earlier interrupted run left ONE on disk. Both guards that decide "the safetensors are already here, skip the download" checked only that AT LEAST ONE *.safetensors exists - the partial source passed, the re-download never happened, and the converter died on the missing shard. THE FIX: st_source_complete in infra/hf_download.py - a safetensors-source counts as present only when EVERY shard named in its own model.safetensors.index.json exists on disk (unsharded repos: the single shard; a corrupt or unreadable index is incomplete, never silently trusted). Wired into both guards: the acquire skip check (a partial source now re-downloads) and the post-download verification (a second pass, then a hard fail if shards are still missing), plus the convert-side source check in infra/convert_quant.py. Test test_st_source_complete_guard (empty, unsharded, one-shard-missing, complete, corrupt-index).
+
+### Addendum 28 - the from-scratch reset: param-ascending, on demand (2026-10-06, the author's ruling)
+
+THE NEW RULES: (1) starting from scratch for models - the current state is ARCHIVED (state/benchmark-state-session40-archived.json, git mv, history preserved; to continue the old run later: --state-file that path), (2) the roster is EVERY model registered in models.md - all 48, including the REJECTED (the author's explicit choice: a fresh, machine-measured verdict for every registered model), (3) the order is BY PARAMETERS, ASCENDING - granite-4.0-350m first, GLM-4.5-Air last, (4) the downloader stays ON DEMAND: the orchestrator hands it specs one family at a time in this order, nothing is fetched ahead of need (already true - phase 1 runs per family inside the certify loop).
+
+THE PARAMETER COUNTS: etc/registry_data.py grows params_b - parsed from the roster name where the name carries the size (0.8B, 350m...), explicit in PARAMS_B_OVERRIDE for the names that don't (phi-1 1.3B, phi-2 2.7B, the Phi minis 3.8B, the granite micros 7B, Jamba2-Mini 12B, Ling-lite 16.8B, GLM-4.5-Air 106B - model-card totals, MoE counts declared TOTAL not active). params_sorted_roster is the registry order; the registry check flags any roster model without a count (UNKNOWN: none today - all 48 counted).
+
+THE ORCHESTRATOR: with no positional specs the families come from the state file as before - but now re-sorted param-ascending (param_ascending_specs; unregistered repos sort after the counted ones, by name, never silently mixed in); and when the state is FRESH - no family ever entered - the roster IS the registry's param-ascending list (the full-registered-roster fallback, stamped in the run log). etc/ becomes a package (__init__.py) for the import. Tests: test_param_ascending_selection (the spec sort, the roster completeness, the ascending invariant, the first-three order). 195 tests total. All gates: pytest 195/195, ty 0, ruff clean, md_check, registry check.
+
+THE RUN (the author's machine; the state file is fresh - the roster fallback fires):
+  pkill -f llama-server; git pull
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung --dry-run
+  time python3 full_benchmark.py --certify 2_sigma --task all --force-rung
+  git add results.txt; git commit -m "param-ascending from-scratch run"; git push
+NOTE: at Q8_0 the roster's big models (Qwen3-30B, EXAONE-32B, GLM-4.5-Air 106B) are far over the machine's RAM - the addendum-35 memory shortcut skips infeasible rungs before download, and phase-A per-family isolation (addendum 78) records the failure and CONTINUES; their small-param cousins run first, as the author ordered.

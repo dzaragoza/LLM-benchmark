@@ -246,6 +246,35 @@ def has_safetensors(names: list[str]) -> bool:
     return any(f.lower().endswith(".safetensors") for f in names)
 
 
+def st_source_complete(st_dir: str) -> bool:
+    """A safetensors-source is COMPLETE only when every shard named in
+    its own model.safetensors.index.json exists on disk (session 40,
+    addendum 27, found in the full-capacity run): the old guard was
+    'at least one *.safetensors exists', so a PARTIAL download - the
+    earlier run interrupted mid-shard - passed the skip guard, the
+    re-download never happened, and the converter died on
+    model-00001-of-00002.safetensors not found. Unsharded repos (no
+    index) are complete iff their single shard is present."""
+    if not os.path.isdir(st_dir):
+        return False
+    shards = sorted(glob.glob(os.path.join(st_dir, "*.safetensors")))
+    if not shards:
+        return False
+    index_path = os.path.join(st_dir, "model.safetensors.index.json")
+    if not os.path.isfile(index_path):
+        return True
+    try:
+        with open(index_path, encoding="utf-8") as f:
+            index = json.load(f)
+        needed = sorted(set((index.get("weight_map") or {}).values()))
+    except (OSError, ValueError, AttributeError):
+        return False
+    if not needed:
+        return True
+    on_disk = {os.path.basename(p) for p in shards}
+    return all(name in on_disk for name in needed)
+
+
 def has_pytorch_bin(names: list[str]) -> bool:
     """pytorch_model.bin (+ sharded index) - the legacy pickle format the
     pinned b10964 converter loads natively (conversion/base.py falls
@@ -378,7 +407,7 @@ def acquire(
         return None, f"downloaded f16 from {source_repo}, quantize"
     if has_safetensors(source_files):
         st_dir = os.path.join(famdir, "safetensors-source")
-        if dry_run or (os.path.isdir(st_dir) and glob.glob(os.path.join(st_dir, "*.safetensors"))):
+        if dry_run or st_source_complete(st_dir):
             return None, f"safetensors from {source_repo}, convert + quantize"
         try:
             print(
@@ -401,6 +430,27 @@ def acquire(
             fail(1, rung, f"safetensors download from {source_repo} failed: {e}", GUIDE[1])
         if not glob.glob(os.path.join(st_dir, "*.safetensors")):
             fail(1, rung, "snapshot download finished, no safetensors found", GUIDE[1])
+        if not st_source_complete(st_dir):
+            print("  [1] WARNING: shard index names missing shards - re-downloading")
+            snap_get(
+                source_repo,
+                local_dir=st_dir,
+                allow_patterns=[
+                    "*.safetensors",
+                    "*.json",
+                    "*.txt",
+                    "tokenizer.model",
+                    "tokenizer.model.v3",
+                ],
+            )
+            if not st_source_complete(st_dir):
+                fail(
+                    1,
+                    rung,
+                    "snapshot download finished but shards named in "
+                    "model.safetensors.index.json are still missing",
+                    GUIDE[1],
+                )
         return None, f"safetensors from {source_repo}, convert + quantize"
     if has_pytorch_bin(source_files):
         st_dir = os.path.join(famdir, "safetensors-source")

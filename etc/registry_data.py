@@ -85,6 +85,58 @@ GATED = {
     "Llama-3.1-8B-Instruct": "public model card (addendum 24)",
 }
 
+
+# parameter counts in billions, total (dense) or declared total (MoE).
+# Parsed from the roster name where the name carries the size (the
+# author's roster naming); explicit for the names that don't (phi's
+# mini naming, the MoE trade names, the granite micros) - sources:
+# the model cards, recorded in models.md where they are discussed.
+PARAMS_B_OVERRIDE = {
+    "phi-1": 1.3,
+    "phi-2": 2.7,
+    "phi-4-mini-instruct": 3.8,
+    "Phi-3.5-mini-instruct": 3.8,
+    "Phi-3-mini-4k-instruct": 3.8,
+    "granite-4.0-micro": 7.0,
+    "granite-4.0-h-micro": 7.0,
+    "AI21-Jamba2-Mini": 12.0,
+    "Ling-lite": 16.8,
+    "GLM-4.5-Air": 106.0,
+}
+
+
+def params_b(name: str) -> float | None:
+    """The model's parameter count in billions (session 40, addendum
+    28: the param-ascending roster order). Total params - MoE counts
+    the declared total, not the active subset; active-params ranking
+    is a different question and the roster names carry totals."""
+    import re
+
+    if name in PARAMS_B_OVERRIDE:
+        return PARAMS_B_OVERRIDE[name]
+    m = re.search(r"([0-9]+(?:\.[0-9]+)?)([bm])", name, re.IGNORECASE)
+    if not m:
+        return None
+    value = float(m.group(1))
+    return value if m.group(2).lower() == "b" else value / 1000.0
+
+
+def params_sorted_roster() -> list[str]:
+    """The roster in param-ascending order (session 40, addendum 28 -
+    the author's from-scratch ruling: all registered models, smallest
+    parameters first; the orchestrator consumes this order). Unknown
+    sizes sort last, alphabetically - the registry check flags them
+    so an uncounted model is never silently misplaced."""
+    return sorted(
+        ROSTER,
+        key=lambda n: (
+            params_b(n) is None,
+            params_b(n) if params_b(n) is not None else 0.0,
+            n,
+        ),
+    )
+
+
 FETCH_FIELDS = [
     "max_position_embeddings",
     "num_hidden_layers",

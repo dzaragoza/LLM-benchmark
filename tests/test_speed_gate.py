@@ -1387,3 +1387,74 @@ def test_cells_record_and_filter_by_variant():
     rec = fst["certify_vt"]["8192"]["3"]
     assert rec == {"v": 5, "rung": "Q8_0", "kv_k": None, "kv_v": None}
     assert bench_state_store.vt_cells(fst, 8192, stored, stored).get(3) is None
+
+
+def test_param_ascending_selection():
+    """Addendum 28 regression: with no specs and no state families the
+    roster comes from the registry, param-ascending; state-carried
+    specs are re-sorted param-ascending too, unregistered last."""
+    import full_benchmark as fb
+
+    ordered = fb.param_ascending_specs(
+        [
+            "meta-llama/Llama-3.1-8B-Instruct",
+            "Qwen/Qwen3.5-0.8B",
+            "microsoft/phi-1",
+            "not/a-registered-model",
+            "openbmb/MiniCPM4-0.5B",
+        ]
+    )
+    assert ordered == [
+        "openbmb/MiniCPM4-0.5B",
+        "Qwen/Qwen3.5-0.8B",
+        "microsoft/phi-1",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "not/a-registered-model",
+    ]
+    from etc import registry_data
+
+    roster = registry_data.params_sorted_roster()
+    assert len(roster) == len(registry_data.ROSTER)
+    assert all(registry_data.params_b(n) is not None for n in roster)
+    sizes = [registry_data.params_b(n) or 0.0 for n in roster]
+    assert sizes == sorted(sizes)
+    # every roster model has a spec repo, and the orchestrator order is
+    # the roster order
+    assert [registry_data.ROSTER[n] for n in roster][:3] == [
+        "ibm-granite/granite-4.0-350m",
+        "ibm-granite/granite-4.0-h-350m",
+        "openbmb/MiniCPM4-0.5B",
+    ]
+
+
+def test_st_source_complete_guard(tmp_path):
+    """Addendum 27 regression: a safetensors-source counts as present
+    only when every shard named in its index exists - the partial
+    download that killed the full-capacity run at phase 2."""
+    import infra.hf_download as hf
+
+    d = tmp_path / "st"
+    d.mkdir()
+    assert not hf.st_source_complete(str(d))
+    # one shard on disk, no index: complete (unsharded repo)
+    (d / "model.safetensors").write_bytes(b"x")
+    assert hf.st_source_complete(str(d))
+    # sharded repo with a two-shard index and one shard missing
+    (d / "model.safetensors").unlink()
+    (d / "model-00001-of-00002.safetensors").write_bytes(b"x")
+    (d / "model.safetensors.index.json").write_text(
+        json.dumps(
+            {
+                "weight_map": {
+                    "a": "model-00001-of-00002.safetensors",
+                    "b": "model-00002-of-00002.safetensors",
+                }
+            }
+        )
+    )
+    assert not hf.st_source_complete(str(d))
+    (d / "model-00002-of-00002.safetensors").write_bytes(b"x")
+    assert hf.st_source_complete(str(d))
+    # a corrupt index is incomplete, never silently trusted
+    (d / "model.safetensors.index.json").write_text("{not json")
+    assert not hf.st_source_complete(str(d))

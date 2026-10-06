@@ -83,7 +83,7 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     f16 = hf_download.resolve_f16_local(famdir)
     st_dir = os.path.join(famdir, "safetensors-source")
     has_st = os.path.isdir(st_dir) and (
-        glob.glob(os.path.join(st_dir, "*.safetensors"))
+        hf_download.st_source_complete(st_dir)
         or glob.glob(os.path.join(st_dir, "pytorch_model*.bin"))
     )
     if not f16 and not has_st:
