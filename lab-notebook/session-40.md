@@ -498,3 +498,43 @@ happens on the author's machine: python3 full_benchmark.py
    python3 full_benchmark.py --certify 2_sigma --task all
    The state is the roster now. Explicit specs still override for
    fresh families.
+
+
+## Addendum 13 - the speed-dead climb stop (2026-10-06, the author's optimization)
+
+THE RULING: if a model is dead at rung k due to the SPEED gate, stop
+climbing that model - it will not pass the gate at a higher rung,
+because of the way the speed gate works. The gate measures at
+depth + 2 * ANSWER_HEADROOM context, and stalling is monotonically
+harder with depth, so a speed death at rung k is a permanent verdict
+for every deeper rung of the ladder.
+
+THE IMPLEMENTATION (bench/certify.py, the combined controller):
+1. When the dead task is speed, the family persists
+   fst["speed_dead_at"] = depth (saved immediately, before the
+   DEAD printout) - the marker is family-level and lives in the
+   state file, so it survives the rung loop and future invocations.
+   A shallower death overwrites a deeper one (the earliest rung the
+   gate failed is the truth); a non-speed death never writes it.
+2. At candidate selection, before any measuring: a family whose
+   speed_dead_at is set and <= the current rung is SKIPPED with
+   entry["skipped"] = "speed gate died at {rung}" - mirroring the
+   answered-rung skip, zero cells measured. The ascending ladder
+   in full_benchmark.py shares the state object across rungs, so
+   the marker applies naturally at every deeper rung.
+
+HISTORICAL DATA: the marker is NOT seeded from the existing state -
+no family has a recorded speed death yet (the gate passes 100%
+everywhere in the current state), so there is nothing to backfill;
+the marker accrues the first time a speed death actually happens.
+
+TEST: test_speed_dead_stops_the_climb - a family whose speed cells
+all fail gets verdict dead with speed_dead_at persisted; the deeper
+rung skips it with zero _task_measure calls. 173/173 pytest, ty 0,
+ruff check+format clean, md_check, js_check.
+
+PROTOCOL ROW (P): both program-file edits went through code_edit.
+The uniqueness friction seen twice here (the "rung already answered"
+skip block appears in both the single-task and combined controllers)
+is the known code_edit papercut - context disambiguation, not a tool
+bug; an occurrence-index escape hatch remains a future improvement.
