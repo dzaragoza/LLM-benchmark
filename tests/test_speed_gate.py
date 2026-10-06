@@ -288,32 +288,31 @@ def test_git_pull_head(monkeypatch):
     """Addendum 32: the forgotten pull, made structural - git_pull_head
     runs before the state loads; a failed pull is a hard stop."""
     import full_benchmark as fb
+    import git_ops
 
     calls = []
 
-    class R:
-        def __init__(self, rc, out):
-            self.returncode = rc
-            self.stdout = out
-            self.stderr = ""
+    def fake_inside():
+        calls.append("inside")
+        return True
 
-    def fake_run(cmd, capture_output=True, text=True):
-        calls.append(cmd)
-        if cmd[0] == "git" and cmd[1] == "rev-parse":
-            return R(0, "true\n")
-        return R(1, "")
+    def fake_pull(autostash=True, no_verify=False):
+        calls.append(("pull", autostash, no_verify))
+        return (1, "", "diverged")
 
-    monkeypatch.setattr(fb.subprocess, "run", fake_run)
+    monkeypatch.setattr(git_ops, "inside_work_tree", fake_inside)
+    monkeypatch.setattr(git_ops, "pull_rebase", fake_pull)
     try:
         fb.git_pull_head()
         raise AssertionError("failed pull did not stop the run")
     except SystemExit:
         pass
-    assert any(c[:2] == ["git", "pull"] for c in calls)
+    assert calls == ["inside", ("pull", True, True)]
 
-    monkeypatch.setattr(
-        fb.subprocess, "run", lambda cmd, capture_output=True, text=True: R(0, "true\n")
-    )
+    def fake_pull_ok(autostash=True, no_verify=False):
+        return (0, "Already up to date", "")
+
+    monkeypatch.setattr(git_ops, "pull_rebase", fake_pull_ok)
     fb.git_pull_head()  # pull succeeds -> no exit
 
 
@@ -328,7 +327,10 @@ def test_git_pull_before_tee():
     body = inspect.getsource(fb.main)
     assert body.index("git_pull_head()") < body.index("tee_output.install()")
     src = inspect.getsource(fb.git_pull_head)
-    assert "--autostash" in src
+    assert "pull_rebase(no_verify=True)" in src
+    import git_ops
+
+    assert "--autostash" in inspect.getsource(git_ops.pull_rebase)
 
 
 def test_git_tail_pulls_before_push():
@@ -340,11 +342,15 @@ def test_git_tail_pulls_before_push():
     import full_benchmark as fb
 
     src = inspect.getsource(fb.git_tail)
-    i_commit = src.index('["git", "commit", "-m", msg]')
-    i_pull = src.index('["git", "pull", "--rebase", "--autostash"]')
-    i_push = src.index('subprocess.run(["git", "push"]')
+    i_commit = src.index("git_ops.commit(msg)")
+    i_pull = src.index("git_ops.pull_rebase()")
+    i_push = src.index("git_ops.push()")
     assert i_commit < i_pull < i_push, "order must be commit -> pull -> push"
-    assert "--autostash" in src
+    import inspect as _inspect
+
+    import git_ops
+
+    assert "--autostash" in _inspect.getsource(git_ops.pull_rebase)
 
 
 def test_rescore_tournament(tmp_path, capsys):

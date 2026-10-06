@@ -176,3 +176,59 @@ the addendum-21 wrapper, ruff check +
 format clean, md_check, js_check pass. Pre-commit runner still
 fails under the sandbox command wrapper; all hooks run manually
 green before the commit.
+
+## Addendum 5 - the three-layer audit: architecture intact, README drifted, three bypasses removed (2026-10-06, the author's "A) do it, B) no bypasses")
+
+THE AUDIT (against README's "Repository layout (three layers)", the
+author's early definition): the layering DIRECTION holds - the top
+is one orchestrator, the middle measures, the bottom owns ALL
+outside contact; every HF/llama.cpp/llama-server call site verified
+to route through the bottom interfaces. Two drifts and three
+bypasses found; the author ruled "A) do it, B) no bypasses".
+
+DRIFT (A - fixed): the README table still listed the retired
+arc_eval.py and mcnemar.py (removed when the depth score became the
+ranking, protocol v4.3) and omitted ruler_gate.py and the ENTIRE
+bench/ package (born session 39 addendum 15 - the biggest structural
+change since the table was written). The table now matches the
+tree: bench/cells, certify, tournament, ladder, size_table,
+state_store as middle layer; ruler_gate.py added; the retired
+scripts noted below the table; git_ops.py added (below).
+
+BYPASS 1 - bench/cells.py kill_stale_server shelled pkill
+directly (middle layer process control). FIX: the subprocess moved
+down into llama_server.kill_stale_server() (bottom); cells keeps
+the thin wrapper with its prints. The same helper now also serves
+full_benchmark's SIGINT shutdown, which had its OWN pkill - one
+seam, two former bypasses gone.
+
+BYPASS 2 - full_benchmark.py ran the git binary via subprocess in
+git_pull_head, git_tail (add/commit/pull/push) and the SIGINT
+handler: top-layer direct outside contact. FIX: new bottom-layer
+git_ops.py (inside_work_tree, pull_rebase, add, commit,
+staged_changes_exist, push - import only); git_tail and
+git_pull_head rewired; behavior unchanged (the addendum-47
+commit->pull->push order and the addendum-34 pre-tee pull both
+preserved and still test-pinned). Distinct from git_push.py - that
+is the sandbox's REST-API push workaround, not the bench machine's
+plain-git seam; the docstrings cross-reference.
+
+BYPASS 3 - ruler_gate.py probed http://127.0.0.1:{port}/health
+with its own urllib (duplicating the HTTP layer). FIX:
+llama_server.port_serves_health(port) returns "ok"/"error"/None;
+ruler_gate's stale-server refusal rewired onto it, message text
+unchanged.
+
+TESTS: test_git_pull_head rewritten onto the git_ops seam
+(monkeypatching full_benchmark.subprocess patched a module that no
+longer imports it); test_git_pull_before_tee and
+test_git_tail_pulls_before_push re-pinned to the new call names -
+their regression PURPOSE is unchanged (the sequence and the
+--autostash live in git_ops now, still asserted).
+
+VERIFIED: 166/166 pytest, ty 0 via the addendum-21 wrapper, ruff
+check + format clean, md_check, js_check pass. The final grep
+audit: no git/pkill/urllib-urlopen contact outside the bottom
+layers (the one hit is a package-name string in the requirements
+check). --no-verify only because the pre-commit runner fails under
+this sandbox's command wrapper (all hooks run manually green).

@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 from typing import Any
 
@@ -27,13 +26,10 @@ MIN_RUNG_FAIL = 16384  # session 34 (addendum 19): a floor below the start
 def kill_stale_server() -> None:
     """Session 34 (addendum 19, refinement 1): the pkill moves into the
     instrument. A stale llama-server would hold the port and the RAM;
-    the sweep's own launches replace whatever was there."""
-    r = subprocess.run(
-        ["pkill", "-f", "llama-server"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    if r.returncode == 0:
+    the sweep's own launches replace whatever was there. Session 40
+    (addendum 5): the subprocess moved down into llama_server (bottom
+    layer) - this is the thin middle-layer wrapper with its prints."""
+    if llama_server.kill_stale_server():
         print("  [0] stale llama-server killed (pkill -f llama-server)")
     else:
         print("  [0] no stale llama-server found")

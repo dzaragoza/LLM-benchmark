@@ -83,18 +83,26 @@ touch only the orchestrator's CLI:
 | Layer | Script | Role | Callable as |
 |---|---|---|---|
 | Top | `full_benchmark.py` | the orchestrator: state/resume, the per-family ladder walk, results assembly | CLI (the main entry point) |
-| Middle | `speed_gate.py` | phases 3–4: the worst-turn speed gate (live conversations, mode-suffixed dumps, verdict) | CLI + import |
-| Middle | `arc_eval.py` | phase 5: strict ARC-Challenge evaluation | CLI + import |
-| Middle | `mcnemar.py` | phase 6: pairwise exact McNemar, the final ranking | CLI + import |
+| Middle | `bench/cells.py` | one-cell primitives: the speed, FWE and VT cell measurements (session 39, addendum 15) | import only |
+| Middle | `bench/certify.py` | the gold-certification ladder walk (certify cells, medals) | CLI + import |
+| Middle | `bench/tournament.py` | the multi-family tournament (depth ladder per family, medals) | CLI + import |
+| Middle | `bench/ladder.py` | ladder helpers (the depth ladder walk) | import only |
+| Middle | `bench/size_table.py` | the per-context recommendation table (recommend = fits AND 0 stalls) | CLI + import |
+| Middle | `bench/state_store.py` | state load/save, task measurement and storage helpers | import only |
+| Middle | `speed_gate.py` | the worst-turn speed gate (live conversations, mode-suffixed dumps, verdict) | CLI + import |
+| Middle | `ruler_gate.py` | the RULER instrument: VT (variable tracking), FWE, and the depth probes | CLI + import |
 | Bottom | `hf_download.py` | every Hugging Face interaction: downloads, repo listings, ARC question fetch | import only |
 | Bottom | `convert_quant.py` | llama.cpp conversion tooling: safetensors -> f16, f16 -> rung | import only |
-| Bottom | `llama_server.py` | llama-server lifecycle (launch, health, teardown) and HTTP | import only |
+| Bottom | `llama_server.py` | llama-server lifecycle (launch, health, teardown), HTTP, and stale-server kills | import only |
+| Bottom | `git_ops.py` | the git binary seam: add/commit/pull/push for the artifact tail (session 40, addendum 5) | import only |
 
 The middle layer never talks to an outside tool directly — all
-Hugging Face, llama.cpp-converter and llama-server contact happens in
-the bottom-layer interfaces. The former `live-bench.py` was split
-along the same seam: its measurement half lives in `speed_gate.py`,
-its server-management half in `llama_server.py`.
+Hugging Face, llama.cpp-converter, llama-server and git contact
+happens in the bottom-layer interfaces. The former `live-bench.py`
+was split along the same seam: its measurement half lives in
+`speed_gate.py`, its server-management half in `llama_server.py`.
+The retired `arc_eval.py` and `mcnemar.py` were middle layer until
+the depth score became the ranking (protocol v4.3).
 
 The corpus build (`--make-sample` / `--make-corpus`) also lives in
 `speed_gate.py`:

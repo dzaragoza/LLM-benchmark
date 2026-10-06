@@ -47,7 +47,6 @@ import glob
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
 from typing import Any
@@ -55,6 +54,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import convert_quant
+import git_ops
 import hf_download
 import llama_server
 import speed_gate
@@ -1149,19 +1149,14 @@ def git_pull_head() -> None:
     wrong thing with confidence."""
     if os.environ.get("BENCH_NO_GIT_PULL"):
         return
-    r = subprocess.run(
-        ["git", "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True
-    )
-    if r.returncode != 0 or r.stdout.strip() != "true":
+    if not git_ops.inside_work_tree():
         stamp("git pull skipped - not a git work tree")
         return
-    r = subprocess.run(
-        ["git", "pull", "--rebase", "--autostash", "--no-verify"], capture_output=True, text=True
-    )
-    if r.returncode != 0:
-        stamp(f"git pull failed - FIX BEFORE RUNNING: {r.stderr.strip()[:200]}")
+    rc, out, err = git_ops.pull_rebase(no_verify=True)
+    if rc != 0:
+        stamp(f"git pull failed - FIX BEFORE RUNNING: {err.strip()[:200]}")
         raise SystemExit(1)
-    out = r.stdout.strip()
+    out = out.strip()
     if out and "Already up to date" not in out:
         stamp(f"git pull: {out.splitlines()[0]}")
     else:
@@ -1208,12 +1203,11 @@ def git_tail(args: argparse.Namespace) -> None:
     if not existing:
         stamp("nothing to commit - no artifacts found")
         return
-    r = subprocess.run(["git", "add", "-f", "--"] + existing, capture_output=True, text=True)
-    if r.returncode != 0:
-        stamp(f"git add failed: {r.stderr.strip()}")
+    rc, err = git_ops.add(existing)
+    if rc != 0:
+        stamp(f"git add failed: {err.strip()}")
         return
-    r = subprocess.run(["git", "diff", "--cached", "--quiet"])
-    if r.returncode == 0:
+    if not git_ops.staged_changes_exist():
         stamp("nothing new to commit")
         return
     msg = (
@@ -1221,23 +1215,23 @@ def git_tail(args: argparse.Namespace) -> None:
         "(addendum 78 auto-commit): state, results, per-turn dumps, "
         "mem sidecars, ladder dumps"
     )
-    r = subprocess.run(["git", "commit", "-m", msg], capture_output=True, text=True)
-    if r.returncode != 0:
-        stamp(f"commit failed: {r.stderr.strip()}")
+    rc, out = git_ops.commit(msg)
+    if rc != 0:
+        stamp(f"commit failed: {out.strip()}")
         return
-    stamp(f"committed: {r.stdout.strip().splitlines()[0]}")
+    stamp(f"committed: {out.strip().splitlines()[0]}")
     # addendum 47: the artifact push can race origin (rules land on
     # main DURING a long run - the addendum-46 lesson: stale data on
     # my side for hours). Pull-rebase-autostash AFTER the commit and
     # BEFORE the push, so the artifact commit replays on top of
     # whatever landed meanwhile; the autostash covers tree dirt.
-    r = subprocess.run(["git", "pull", "--rebase", "--autostash"], capture_output=True, text=True)
-    if r.returncode != 0:
+    rc, out, err = git_ops.pull_rebase()
+    if rc != 0:
         hint = "run: git pull --rebase --autostash; and git push"
-        stamp(f"pull before push failed: {r.stderr.strip()} - {hint}")
-    r = subprocess.run(["git", "push"], capture_output=True, text=True)
-    if r.returncode != 0:
-        stamp(f"push failed: {r.stderr.strip()} - run: git pull --rebase --autostash; and git push")
+        stamp(f"pull before push failed: {err.strip()} - {hint}")
+    rc, err = git_ops.push()
+    if rc != 0:
+        stamp(f"push failed: {err.strip()} - run: git pull --rebase --autostash; and git push")
     else:
         stamp("pushed")
 
@@ -1250,12 +1244,8 @@ def sigint_shutdown(signum, frame, args=None):
     results file, --no-git). Dry runs skip the tail (nothing to
     commit that pre-flight didn't already plan to)."""
     stamp("SIGINT - shutting down cleanly (addendum 8)")
-    r = subprocess.run(
-        ["pkill", "-f", "llama-server"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    stamp("llama-server stopped" if r.returncode == 0 else "no llama-server to stop")
+    stopped = llama_server.kill_stale_server()
+    stamp("llama-server stopped" if stopped else "no llama-server to stop")
     try:
         tee_output.uninstall()
         stamp("results logging stopped")
