@@ -903,3 +903,17 @@ THE CUT (the author: "cut outright"): full_benchmark.py is the CERTIFY orchestra
 THE NEW GUARD: test_main_startup_smoke - main() runs END-TO-END with --dry-run, everything below the preflight faked (no network, no server, no hub). The exact command the author types is now a test: the registry fallback order, the --force-rung f16 fold, the roster's param-ascending handoff, the on_verdict opt-outs. The three failure classes that slipped through are now structurally covered.
 
 THE STATE: ladder-state.json's families are readable (the certify path's variant filters and CSV re-grading unchanged); the archived state files stay. 168 tests total. All gates: pytest 168/168, ty 0, ruff clean, md_check.
+
+### Addendum 36 - always 2 sigma; the medals are consequences (2026-10-06, the author's ruling)
+
+THE RULING: "get rid of the --certify flag. we always certify to 2 sigma: dead, 0.5 sigma and 1 sigma are consequences, not goals." The --certify LEVEL flag is DELETED; certification is ALWAYS the 2-sigma bar (z=2, Wilson lower bound >= 0.50, floor 10 of 20 cells). The controller accepts at that bar and nothing else; a candidate that cannot reach it is dead.
+
+THE CONSEQUENCES, DERIVED: combined_medal (unchanged math) grades the STORED evidence after the run - a clean accept is 2_sigma, weaker evidence grades 1_sigma or 0.5_sigma, none grades dead. The tiers were never separate goals; they are what the evidence says once the 2-sigma question has been asked.
+
+THE MECHANICS: both controllers lose the level parameter; CERTIFY_LEVELS and the at_least_one branches are deleted (bench/constants.py, bench/certify.py); CERTIFY_Z / CERTIFY_BAR / CERTIFY_FLOOR are the single-sourced fixed bar. The entry dicts record level: "2_sigma" as a label of what was asked. Tests: the two at_least_one tests cut (the mode is gone), the VT early-reject updated (6 consecutive fails kill at the 2-sigma bar, best 14/20 -> lo 0.477 < 0.50), the medal test updated (a clean accept grades 2_sigma - derived, not requested). 166 tests total. All gates: pytest 166/166, ty 0, ruff clean, md_check.
+
+THE RUN (one flag fewer):
+  source .venv/bin/activate.fish
+  pkill -f llama-server; git pull
+  python3 full_benchmark.py --task all --force-rung f16 --dry-run
+  python3 full_benchmark.py --task all --force-rung f16

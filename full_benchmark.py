@@ -55,7 +55,6 @@ speed_cells = _state_store.speed_cells
 vt_cells = _state_store.vt_cells
 certify_cells = _state_store.certify_cells
 wilson_interval = _certify.wilson_interval
-CERTIFY_LEVELS = _certify.CERTIFY_LEVELS
 certify_rung = _certify.certify_rung
 certify_rung_combined = _certify.certify_rung_combined
 TASK_PASS_BARS = _certify.TASK_PASS_BARS
@@ -373,14 +372,6 @@ def build_parser() -> argparse.ArgumentParser:
         "(--force-rung f16 == --rung f16 --force-rung, addendum 33).",
     )
     ap.add_argument(
-        "--certify",
-        choices=CERTIFY_LEVELS,
-        default=None,
-        metavar="LEVEL",
-        help="the certification level: at_least_one, 1_sigma or 2_sigma "
-        "(the Wilson-lower-bound medal bars)",
-    )
-    ap.add_argument(
         "--rungs",
         type=str,
         default=None,
@@ -446,8 +437,6 @@ def main() -> None:
     if args.kv_quant_v:
         state["kv_quant_v"] = args.kv_quant_v
     resolve_families(args, state)
-    if not args.certify:
-        ap.error("--certify LEVEL is required (at_least_one, 1_sigma, 2_sigma)")
     if args.rungs:
         try:
             rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
@@ -461,7 +450,6 @@ def main() -> None:
         if args.task == "all":
             results = certify_rung_combined(
                 depth,
-                args.certify,
                 args.families,
                 args.models_dir,
                 state,
@@ -475,7 +463,6 @@ def main() -> None:
         else:
             results = certify_rung(
                 depth,
-                args.certify,
                 args.families,
                 args.models_dir,
                 state,
@@ -491,7 +478,7 @@ def main() -> None:
         save_state(args.state_file, state)
         print()
         print("=" * 60)
-        stamp(f"CERTIFY {args.certify} {depth:,} SUMMARY")
+        stamp(f"CERTIFY 2_sigma {depth:,} SUMMARY")
         for r in results:
             v = r.get("verdict", r.get("error", r.get("skipped", "?")))
             extra = f" w/s median {r['wps_median']}" if r.get("wps_median") else ""
