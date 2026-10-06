@@ -182,7 +182,7 @@ def certify_rung(
         elif task == "speed":
             cells = {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
         else:
-            cells = certify_cells(fst, depth, min_words, models_dir, fam, want, legacy)
+            cells = certify_cells(fst, depth, min_words, want, legacy)
         order.append((fam, fst, cells, spec))
 
     results: list[dict[str, Any]] = []

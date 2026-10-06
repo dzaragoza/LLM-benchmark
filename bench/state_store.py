@@ -20,7 +20,6 @@ import infra.llama_server as llama_server
 import ruler_gate
 from bench import cells as bench_cells
 from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT
-from bench.tournament_helpers import _climb_csv_partial
 
 COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
 ARC_CELL_K = 5  # questions per cell (the author's ruling: k=5, like VT's 5 names)
@@ -48,7 +47,7 @@ def _task_load(
         return {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
     if task == "arc":
         return {r: p >= ARC_CELL_K for r, p in arc_cells(fst, want, legacy).items()}
-    return certify_cells(fst, depth, min_words, models_dir, fam, want, legacy)
+    return certify_cells(fst, depth, min_words, want, legacy)
 
 
 def arc_cell_questions(run: int) -> list[dict[str, Any]]:
@@ -358,19 +357,12 @@ def certify_cells(
     fst: dict[str, Any],
     depth: int,
     min_words: int = 1,
-    models_dir: str | None = None,
-    fam: str | None = None,
     want: dict[str, Any] | None = None,
     legacy: dict[str, Any] | None = None,
 ) -> dict[int, bool]:
     """Session 37, addendum 8: the CELL model - a cell is (model, run
-    number, step) and is NEVER measured twice. The historical cells
-    come from the saved tournament_falls: climb s measured every
-    rung up to and including its fall (fall == first FAILING rung),
-    so cell (s, depth) PASSED iff the fall is None (topped out) or
-    deeper than the rung, FAILED iff the fall IS the rung, and is
-    UNMEASURED iff the climb stopped below it. The direct cells
-    (certify runs) live in fst["certify"][str(depth)] as {run: pass}
+    number, step) and is NEVER measured twice. The cells
+    live in fst["certify"][str(depth)] as {run: pass}
     (or {run: words_found} once cells record word counts).
     Returns {run: passed} for every MEASURED cell.
 
@@ -378,22 +370,11 @@ def certify_cells(
     stored an INTEGER word count is graded at >= min_words exactly;
     cells stored as booleans were graded under the old 1/3 rule and
     are dropped from the measured set at a stricter bar - they are
-    re-run, never silently trusted. Inherited tournament-fall cells
-    are re-graded from their committed climb CSV (the `partial`
-    word count) when models_dir/fam are given: the fall only says
-    pass/fail at 3/3, but the CSV holds the actual words found, so
-    the cell is MEASURED, not guessed."""
+    re-run, never silently trusted. Session 41, addendum 39: the
+    tournament inheritance is DELETED (the author: 'remove it, it
+    is obsolete') - bench/tournament_helpers.py and the falls
+    re-grading are gone; every cell is the certify run's own."""
     cells: dict[int, bool] = {}
-    for key, fall in (fst.get("tournament_falls") or {}).items():
-        if min_words > 1:
-            csv_words = _climb_csv_partial(models_dir, fam, int(key), depth)
-            if csv_words is not None:
-                cells[int(key)] = csv_words >= min_words
-            continue
-        if fall is None or fall > depth:
-            cells[int(key)] = True
-        elif fall == depth:
-            cells[int(key)] = False
     direct = _int_cells((fst.get("certify") or {}).get(str(depth)), want, legacy)
     for key, words in direct.items():
         cells[int(key)] = words >= min_words
