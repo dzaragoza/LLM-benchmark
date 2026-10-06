@@ -232,3 +232,50 @@ audit: no git/pkill/urllib-urlopen contact outside the bottom
 layers (the one hit is a package-name string in the requirements
 check). --no-verify only because the pre-commit runner fails under
 this sandbox's command wrapper (all hooks run manually green).
+
+## Addendum 6 - code_edit as the only editor: the protocol row + the two improvements that retire the raw tool (2026-10-06, the author's variant B)
+
+THE AUTHOR'S RULING (on the addendum-5 incident disclosure): the
+protocol row lands, with the variant that code_edit must handle
+EVERYTHING - where it can't yet, that is an improvement proposal, and
+the raw tool may be used meanwhile. "The goal is to make code_edit
+really good, so there's no reason to pick anything else."
+
+WHY I HAD PICKED THE RAW TOOL (the honest gap analysis): the
+session-5 refactor edits went through the SDK's raw search/replace,
+which has neither verify-before-write nor transactionality - the
+truncating edit that briefly mangled git_tail would have been
+refused by code_edit's gates. But the deeper cause: the edit that
+pushed me off code_edit was a replace whose target missed on
+FORMATTING DRIFT (ruff format had since reformatted a line my
+context was written against) - code_edit answered with a blind
+"target not found", and rather than re-read and re-aim I reached for
+the raw tool. Wrong call; the fix is to make re-aiming unnecessary.
+
+IMPROVEMENT 1 - THE WHITESPACE-FLEXIBLE REPLACE RESCUE: a replace
+target that misses exactly but matches EXACTLY ONE place
+whitespace-flexibly (whitespace runs matched as \s+) is rescued -
+the edit applies against the FILE's own text. Ambiguity stays a
+refusal (never a guess); exact matching still wins when it matches.
+This is the formatting-drift case: the target's semantics are
+unambiguous, only its whitespace is stale.
+
+IMPROVEMENT 2 - NOT-FOUND DIAGNOSTICS: a total miss now reports the
+wanted first line AND the file's own near lines (the lines carrying
+the target's signature), so the caller re-aims from the file's
+reality instead of guessing. Shared _find_replace_target helper;
+_apply and _verify_blocks both use it, so check/edit/preview/edit_many
+all rescue identically.
+
+THE PROTOCOL ROW ([P] "Vibe's editor"): Vibe owns code_edit.py and
+edits program files THROUGH it; the raw tool is not to be picked
+when code_edit can do the job; code_edit's goal is no-reason-to-pick-
+anything-else.
+
+TESTS: test_code_edit_replace_whitespace_flexible (rescue, exact
+unchanged, total miss refused with context, file untouched).
+
+VERIFIED: 167/167 pytest, ty 0 via the addendum-21 wrapper, ruff
+check + format clean, md_check (with the new protocol row), js_check
+pass. --no-verify only because the pre-commit runner fails under
+this sandbox's command wrapper (all hooks run manually green).

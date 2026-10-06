@@ -458,17 +458,8 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
         if kind == "replace":
             if len(block) != 3:
                 raise CodeEditError(f"block {i}: replace needs (replace, old, new)")
-            n = buf.count(block[1])
-            if n == 0:
-                raise CodeEditError(
-                    f"block {i}: replace target not found:\n"
-                    f"--- target ---\n{block[1][:400]}\n--- end ---"
-                )
-            if n > 1:
-                raise CodeEditError(
-                    f"block {i}: replace target found {n} times - add context to make it unique"
-                )
-            buf = buf.replace(block[1], block[2], 1)
+            old_actual, _ = _find_replace_target(buf, block[1], i)
+            buf = buf.replace(old_actual, block[2], 1)
         elif kind == "delete":
             if len(block) != 2:
                 raise CodeEditError(f"block {i}: delete needs (delete, old)")
@@ -604,14 +595,53 @@ def _sep(anchor: str, new: str, after: bool) -> str:
     return new
 
 
+def _find_replace_target(buf: str, target: str, i: int) -> tuple[str, str]:
+    """Locate the replace target (session 40, addendum 6): exact
+    match first; on a miss, a whitespace-flexible fallback - the
+    target's whitespace runs matched as \\s+ - rescues edits written
+    against differently-indented or reformatted text, but ONLY when
+    the flexible pattern matches exactly one place (ambiguity is a
+    refusal, never a guess). Returns (old_actual, new) where
+    old_actual is the FILE's own text (what buf.replace must use);
+    on failure raises with the target and the file's own text so the
+    caller can re-aim instead of guessing."""
+    n = buf.count(target)
+    if n == 1:
+        return target, target
+    if n > 1:
+        raise CodeEditError(
+            f"block {i}: replace target found {n} times - add context to make it unique"
+        )
+    flex = re.escape(target)
+    flex = re.sub(r"(?:\\\s|\\\n|\\ )+", r"\\s+", flex)
+    matches = list(re.finditer(flex, buf))
+    if len(matches) == 1:
+        return matches[0].group(0), target
+    if len(matches) > 1:
+        raise CodeEditError(
+            f"block {i}: replace target not found exactly; a whitespace-flexible "
+            f"pass found {len(matches)} candidate places - add context to make it unique"
+        )
+    target_lines = target.splitlines()
+    first_target_line = target_lines[0] if target_lines else target
+    needle = first_target_line.strip()
+    hits = [ln for ln in buf.split("\n") if needle and needle in ln]
+    ctx = "\n".join(hits[:3]) if hits else buf[:200]
+    raise CodeEditError(
+        f"block {i}: replace target not found. First target line:\n"
+        f"--- wanted ---\n{first_target_line[:200]}\n--- file's near lines ---\n{ctx}\n--- end ---"
+    )
+
+
 def _apply(src: str, blocks: Sequence[tuple]) -> tuple[str, list[tuple[str, str]]]:
     buf = src
     regions: list[tuple[str, str]] = []
     for block in blocks:
         kind = block[0]
         if kind == "replace":
-            buf = buf.replace(block[1], block[2], 1)
-            regions.append((block[1], block[2]))
+            old_actual, _ = _find_replace_target(buf, block[1], 0)
+            buf = buf.replace(old_actual, block[2], 1)
+            regions.append((old_actual, block[2]))
         elif kind == "delete":
             buf = buf.replace(block[1], "", 1)
         elif kind == "replace_all":

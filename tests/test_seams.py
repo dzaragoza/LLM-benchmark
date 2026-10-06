@@ -1437,3 +1437,36 @@ def test_code_edit_replace_regex_verify_literal(tmp_path):
     p2.write_text("int old_word;\n")
     code_edit.edit(str(p2), [("replace_regex", r"old_\w+", "/* \\g<0> */")])
     assert "/* old_word */" in p2.read_text()
+
+
+def test_code_edit_replace_whitespace_flexible(tmp_path):
+    """Session 40, addendum 6: a replace target that misses on exact
+    whitespace but matches exactly one place whitespace-flexibly is
+    rescued (the session's raw-tool incident: an edit written against
+    differently-indented text was a blind not-found); ambiguity is
+    still a refusal, and a total miss reports the file's own near
+    lines so the caller can re-aim."""
+    import code_edit
+
+    p = tmp_path / "t.py"
+    p.write_text("def f():\n    x = 1   # comment\n    return x\n")
+    code_edit.edit(
+        str(p), [("replace", "x = 1 # comment\n    return x", "x = 2  # changed\n    return x")]
+    )
+    assert "x = 2" in p.read_text()
+
+    p2 = tmp_path / "t2.py"
+    p2.write_text("a = 1\nb = 1\n")
+    code_edit.edit(str(p2), [("replace", "a = 1", "a = 2")])
+    assert p2.read_text() == "a = 2\nb = 1\n"
+
+    p3 = tmp_path / "t3.py"
+    p3.write_text("if a:\n    b()\nif c:\n    b()\n")
+    try:
+        code_edit.edit(str(p3), [("replace", "def missing():", "z")])
+        raised = False
+    except code_edit.CodeEditError as e:
+        raised = True
+        assert "wanted" in str(e) and "file's near lines" in str(e)
+    assert raised, "a total miss must be refused with the file's own text"
+    assert p3.read_text() == "if a:\n    b()\nif c:\n    b()\n"  # untouched
