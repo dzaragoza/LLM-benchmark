@@ -20933,3 +20933,59 @@ Repository Not Found for url: https://huggingface.co/api/models/f16/tree/main?re
 Please make sure you specified the correct `repo_id` and `repo_type`.
 If you are trying to access a private or gated repo, make sure you are authenticated and your token has the required permissions.
 For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+
+===== 2026-10-06T15:45:27 | full_benchmark.py --certify 2_sigma --task all --force-rung f16 --dry-run =====
+
+------------------------------------------------------------
+  f16 speed: 0/0 cells measured, 20 unmeasured
+  f16 fwe: 0/0 cells measured, 20 unmeasured
+  f16 vt: 0/0 cells measured, 20 unmeasured
+  f16 arc: 0/0 cells measured, 20 unmeasured
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_http.py", line 836, in hf_raise_for_status
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '404 Not Found' for url 'https://huggingface.co/api/models/f16/tree/main?recursive=true&expand=false'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 1392, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 827, in main
+    results = certify_rung_combined(
+        depth,
+    ...<9 lines>...
+        on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/certify.py", line 530, in certify_rung_combined
+    acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/certify.py", line 77, in _acquire_missing_model
+    model_files = list_repo_files(model_repo)
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_validators.py", line 91, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/hf_api.py", line 3965, in list_repo_files
+    for f in self.list_repo_tree(
+             ~~~~~~~~~~~~~~~~~~~^
+        repo_id=repo_id, recursive=True, revision=revision, repo_type=repo_type, token=token
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/hf_api.py", line 4100, in list_repo_tree
+    for path_info in paginate(path=tree_url, headers=headers, params={"recursive": recursive, "expand": expand}):
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_pagination.py", line 37, in paginate
+    hf_raise_for_status(r)
+    ~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_http.py", line 923, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response, repo_type=repo_type, repo_id=repo_id) from e
+huggingface_hub.errors.RepositoryNotFoundError: 404 Client Error. (Request ID: Root=1-6ac4fb77-26d74830612661896dd3888b;65e7fc24-429c-4a98-8dd7-aee623a0f856)
+
+Repository Not Found for url: https://huggingface.co/api/models/f16/tree/main?recursive=true&expand=false.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated and your token has the required permissions.
+For more details, see https://huggingface.co/docs/huggingface_hub/authentication
