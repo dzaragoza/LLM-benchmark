@@ -529,10 +529,10 @@ def test_arc_gate_grades_at_the_task_pass_bar():
     """
     from bench import state_store
 
-    fst = {"certify_arc": {str(r): 4 for r in range(1, 21)}}
+    fst = {"certify_arc": {str(r): 3 for r in range(1, 21)}}
     loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
     assert all(loaded.values()) and len(loaded) == 20
-    fst = {"certify_arc": {str(r): 3 for r in range(1, 21)}}
+    fst = {"certify_arc": {str(r): 2 for r in range(1, 21)}}
     loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
     assert loaded and not any(loaded.values())
 
@@ -563,7 +563,7 @@ def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
     monkeypatch.setattr(state_store.llama_server, "wait_healthy", lambda port, proc=None: True)
     monkeypatch.setattr(state_store.llama_server, "stop_server", lambda proc, port: None)
 
-    n_correct = len(questions) - 1  # 4/5 - one wrong
+    n_correct = len(questions) - 2  # 3/5 - two wrong
     calls = {"i": 0}
 
     def fake_post(port, path, payload, timeout=0):
@@ -590,7 +590,7 @@ def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
     monkeypatch.setattr(state_store.llama_server, "post_json", fake_post)
     ok, rec = state_store.arc_pass("m.gguf", 1, 8210)
     assert rec["correct"] == TASK_PASS_BARS["arc"]
-    assert ok is True  # 4/5 passes at the 4/5 gate - the 5/5 regression cannot return
+    assert ok is True  # 3/5 passes at the 3/5 gate - the 5/5 regression cannot return
 
 
 def test_vt_gate_grades_at_the_task_pass_bar():

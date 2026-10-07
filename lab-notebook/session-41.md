@@ -154,3 +154,13 @@ THE CONTEXT QUESTION ("something wrong with the context calculation"): checked -
 THE STATE: Qwen3.5-2B's two fresh 4,096 cells (speed PASS, fwe PASS, vt 4/5 FAIL, arc 5/5 PASS x2) are valid measurements - kept; its verdicts remain unstored, so the answered-rung skip correctly skips it on the next restart and it climbs. No migration needed.
 
 Test: test_terminal_rung_never_measures_below_the_rung updated to pin the three-way condition (phi-2 below, the trio terminal, Qwen3.5-2B climbs). 203 tests.
+
+### Addendum 68 - the arc bar recalibrated to 3/5 (2026-10-07, the author's ruling)
+
+THE RULING: "I think arc is too hard... Yes let's go 3/5. It's fair." The evidence: the stored f16 arc cells (324) graded 36% at the 4/5 bar - well below the author's >= 50% pass-rate floor (the difficulty basis, session 38). At 3/5 the same evidence grades 52%, on target. The distribution: 0/5 8%, 1/5 12%, 2/5 28%, 3/5 16%, 4/5 16%, 5/5 16% - the bar sits exactly at the distribution's middle.
+
+THE CHANGE: TASK_PASS_BARS["arc"] = 3 (bench/constants.py, R-03's single source). Protocol row updated. The three 4/5-encoded tests updated (the stored re-grade pair, the fresh-cell gate, the constants pin).
+
+THE MIGRATION (per the protocol's promise - records re-grade free): every stored arc-caused dead verdict re-derived against its stored arc cells at the new bar, using the certify math (2-sigma Wilson lower bound >= 0.50, floor 10). Result: granite-4.0-h-1b REVIVED at all four rungs (29/30 arc cells at 3/5, lower bound 0.829 - its arc deaths were an artifact of the too-hard bar; it now re-enters and climbs). The other arc-dead families stay dead on their own evidence (their cells cannot reach the bar even at 3/5: the granite 350ms 0/12, MiniCPM4 1/14, Qwen3.5-0.8B 11/28, Llama-3.2 6/16, MiniCPM-1B-sft 5/16). Families whose stored deads were vt/fwe/speed-caused are untouched - this migration touches only arc-caused verdicts.
+
+NOTE: rungs do not re-open wholesale - only granite-4.0-h-1b's verdicts cleared, so on the restart it measures at 4,096 (no stored verdict) while the answered-rung skip holds for everyone else. 203 tests.
