@@ -1202,3 +1202,43 @@ def test_main_startup_smoke(tmp_path, monkeypatch, capsys):
     assert specs == ["Qwen/Qwen3.5-0.8B", "google/gemma-3-1b-it"]
     assert rung == "f16"
     assert dry is True
+
+
+def test_accept_answers_the_rung_and_climbs(tmp_path, monkeypatch, capsys):
+    """Session 40, addendum 56 - the author's catch: "the benchmark
+    stopped at 4k, it never climbed." An accept ANSWERS its rung and the
+    ladder MOVES UP to the next depth (medalist and survivors climb);
+    the old break ended the whole run at the first medal."""
+    import full_benchmark as fb
+
+    monkeypatch.setattr(fb, "check_requirements", lambda: None)
+    monkeypatch.setattr(fb, "git_pull_head", lambda: None)
+    monkeypatch.setattr(fb, "kill_stale_server", lambda: None)
+    monkeypatch.setattr(fb, "check_tooling", lambda args: None)
+    monkeypatch.setattr(fb.tee_output, "install", lambda: None)
+    monkeypatch.setattr(fb.tee_output, "uninstall", lambda: None)
+    monkeypatch.setattr("etc.registry_data.params_sorted_roster", lambda: ["Qwen3.5-0.8B"])
+    asked = []
+
+    def fake_combined(depth, specs, models_dir, state, state_path, port, dry, **kw):
+        asked.append(depth)
+        # one family; accept at the first rung, dead after
+        if depth == 4096:
+            return [{"family": "Qwen3.5-0.8B", "verdict": "accept", "medal": "2_sigma"}]
+        return [{"family": "Qwen3.5-0.8B", "verdict": "dead"}]
+
+    monkeypatch.setattr(fb, "certify_rung_combined", fake_combined)
+    monkeypatch.setattr(fb, "load_state", lambda p: {"families": {"Qwen3.5-0.8B": {}}})
+    monkeypatch.setattr(fb, "save_state", lambda p, s: None)
+    monkeypatch.setattr(fb, "stamp_disk", lambda s, p: None)
+    monkeypatch.chdir(tmp_path)
+    argv = ["full_benchmark.py", "--task", "all", "--force-rung", "f16", "--rungs", "4096,8192"]
+    monkeypatch.setattr("sys.argv", argv)
+    fb.DRY_RUN_ACTIVE = False
+    try:
+        fb.main()
+    finally:
+        fb.DRY_RUN_ACTIVE = False
+    out = capsys.readouterr().out
+    assert asked == [4096, 8192], f"the ladder must climb 4096 -> 8192, asked {asked}"
+    assert "ANSWERED - the ladder moves up" in out
