@@ -176,3 +176,22 @@ THE AGREEMENT CHECK (current bars vs the rule):
 - speed: 0 stalls - not a k-of-k gate (a strict screen, the author's ruling), the rule does not apply.
 
 GOVERNANCE: the rule is the DEFAULT for any future gate or recalibration; departing from it (as vt currently does) requires its own evidence and addendum. No change made now - the author's call is to observe.
+
+## Addendum 70 - the exclusive gold
+
+The author's ruling: gold is EXCLUSIVE per rung. Among the families
+ACCEPTED (2-sigma) at a rung, only the one with the FEWEST parameters
+is gold; every other accept keeps its confidence tier (0.5/1/2 sigma)
+but is not the rung's gold. Parameter counts come from the registry
+store (addendum 29 - never guessed); an accepted family without a
+count can never win gold (the registry check flags it). No accepts ->
+no gold.
+
+`gold_per_rung(state, depth)` in bench/certify.py, with the
+addendum-63/66 alias class in the params lookup (`_registry_params`).
+Protocol R-13, pinned by
+test_gold_per_rung_is_the_fewest_parameter_accept. 204 tests.
+
+Effect on today's standings (live state): 4k gold moves from
+Qwen2.5-1.5B-Instruct (1.5B) to granite-4.0-h-1b (the 1.0B accept);
+8k/16k gold stays Qwen2.5-1.5B-Instruct (sole accept); 32k no gold.

@@ -980,3 +980,37 @@ def test_terminal_rung_never_measures_below_the_rung(monkeypatch):
     assert not (d <= 2048 < nxt)  # phi-2: below the rung
     assert d <= 4096 < nxt  # the trio: terminal at 4,096
     assert not (d <= 262144 < nxt)  # Qwen3.5-2B: climbs - never terminal here
+
+
+def test_gold_per_rung_is_the_fewest_parameter_accept(monkeypatch):
+    """R-13 (addendum 70 - the exclusive gold): among the accepted
+    families at a rung, only the fewest-parameter one is gold; the
+    other accept keeps its tier but not gold. No accepts -> None; an
+    accept without a registered param count can never win gold.
+
+    Pins: R-13
+    """
+    from bench.certify import gold_per_rung
+
+    state = {
+        "families": {
+            "qwen-big": {"verdicts": {"4096": "accept"}},
+            "granite-small": {"verdicts": {"4096": "accept"}},
+            "deadfam": {"verdicts": {"4096": "dead"}},
+            "climber": {"verdicts": {}},
+        }
+    }
+    # tie the params lookup: granite-small is the smaller accept
+    import bench.certify as bc
+
+    real = bc._registry_params
+
+    def fake(fam):
+        return {"qwen-big": 1.5, "granite-small": 1.0}.get(fam, real(fam))
+
+    monkeypatch.setattr(bc, "_registry_params", fake)
+    assert gold_per_rung(state, 4096) == "granite-small"
+    state["families"]["granite-small"]["verdicts"]["4096"] = "dead"
+    assert gold_per_rung(state, 4096) == "qwen-big"
+    state["families"]["qwen-big"]["verdicts"]["4096"] = "dead"
+    assert gold_per_rung(state, 4096) is None
