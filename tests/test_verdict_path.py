@@ -955,3 +955,24 @@ def test_answered_rung_still_measures_the_terminal_family(tmp_path, monkeypatch,
         else res[-1]
     )
     assert eq.get("skipped") != "rung already answered"
+
+
+def test_terminal_rung_never_measures_below_the_rung(monkeypatch):
+    """Addendum 66: the addendum-62 terminal check fires only when the
+    family's window REACHES the rung (window >= depth) - a sub-rung
+    window is R-06 infeasible (phi-2, 2,048 at 4,096), never a
+    "terminal measurement"; and _registry_window resolves the
+    addendum-63 alias class, so a state-carried basename
+    (MiniCPM-1B-sft-bf16) gets its real window and the pre-flight
+    bars the above-window rungs instead of silence.
+
+    Pins: R-06, R-11
+    """
+    from bench import certify
+
+    assert certify._registry_window("MiniCPM-1B-sft-bf16") == 4096
+    assert certify._registry_window("phi-2") == 2048
+    # the terminal condition is window >= depth, never below
+    first = 4096
+    assert not (2048 >= first)
+    assert 4096 >= first

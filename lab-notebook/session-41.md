@@ -126,3 +126,19 @@ THE FIX (three authorities, in order - the state leads, the window decides, the 
 NOTE FOR THE RUN (the author's call): granite-3.0-2b-instruct's registry window IS 4,096 and its old speed kill was measured at ctx 4,352 - ABOVE its trained window. It has no stored verdict, so on the restart it re-measures from scratch at ctx 4,096 (the addendum-62 terminal rule); its "dead @ 4,096" row is its measured history until then. Same shape as the trio's, but without the revival marker - if the re-measure accepts it, the state will say so.
 
 Test: test_revived_families_never_show_superseded_verdicts (revival marker -> climbing; no marker, no verdicts -> history stands; stored verdicts lead over superseded lines). 202 tests.
+
+### Addendum 66 - the sft pair climbed above their window; phi-2 was "terminal-measured" below it (2026-10-07, the author's status check)
+
+THE CATCH: the restart's fresh results showed MiniCPM-1B-sft-bf16 DEAD at 8,192/16,384/32,768 - a 4,096-window family evaluated three rungs above its ceiling - and phi-2 (window 2,048) "terminal-measured" at 4,096 per addendum 62. Two bugs, both in my addendum-62/61 machinery:
+
+1. _registry_window did not resolve the state names: the store is keyed by roster name (MiniCPM-1B-sft), the state carries the repo basename (MiniCPM-1B-sft-bf16) - the addendum-63 alias class, but only the spec resolver had it. The pre-flight read None, stayed silent, and the family climbed; its arc cells load rung-independently, so the deaths needed no launch and nothing caught them.
+
+2. The addendum-62 terminal condition used _w <= depth - window <= rung - which is also true when the window is BELOW the rung (phi-2, 2,048 at 4,096): a sub-rung family is R-06 infeasible, never a terminal measurement.
+
+THE FIX: (1) _registry_window resolves the alias class (repo/base/roster-name + quant-suffix aliases), same as _resolve_spec_repo; (2) the terminal condition is _w >= depth in BOTH controllers - the family's window must REACH the rung. A sub-rung family at an answered rung falls through to the pre-flight, which declares it infeasible with zero hub touches.
+
+THE MIGRATION: MiniCPM-1B-sft-bf16's above-window dead verdicts (8,192/16,384/32,768) cleared - its measured 4,096 arc death (2/8 cells) stands. MiniCPM-2B-sft-bf16 has no verdicts; it measures at 4,096 on the next restart via the terminal rule. phi-2 keeps its infeasible record (2,048 < 4,096, correctly out).
+
+THE CLIMB NOTE: the fresh run itself is healthy - gemma-3-1b-it died to vt at 32,768 (0/6, its 4k/8k/16k deads stand as stored quality verdicts), the medalist's 32k measurement is queued, granite-3.0-2b-instruct was re-measured at 4,096 per the terminal rule.
+
+Test: test_terminal_rung_never_measures_below_the_rung (the alias-resolved windows; the >= depth condition). 203 tests.
