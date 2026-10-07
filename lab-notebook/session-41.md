@@ -265,3 +265,12 @@ test_gold_per_rung_is_the_fewest_parameter_accept_docstring). The
 page's numbers today: 16k Qwen2.5-1.5B-Instruct 3.6 GiB / 24.3 GB/s
 (21.1 t/s), 8k Qwen2.5-1.5B-Instruct 3.4 GiB / 22.9 GB/s (22.4 t/s),
 4k granite-4.0-h-1b 4.2 GiB / 22.5 GB/s (22.8 t/s). 200 tests.
+
+## Addendum 75 - the page trims: integer RAM, no VRAM column
+
+The author's ruling: "Round RAM up to int. Remove the gpu vram column
+for the moment." The chooser table's Min RAM is now the measured
+whole-stack cost rounded UP to the next whole GiB (16k/8k
+Qwen2.5-1.5B-Instruct: 4 GiB; 4k granite-4.0-h-1b: 5 GiB) and the VRAM
+column is gone - the GPU note keeps only that VRAM capacity is the
+constraint; a GPU column returns when GPU-side measurements exist.
