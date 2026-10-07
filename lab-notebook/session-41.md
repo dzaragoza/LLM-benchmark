@@ -445,3 +445,16 @@ DDR5-3200 single, DDR3-1600 dual, DDR3-800 quad alongside the existing
 two. LPDDR deliberately excluded - same bandwidth as the DDR of the
 same MT/s, adds noise for the reader. 8k/4k unchanged (DDR4-2933
 single stands alone).
+
+## Addendum 88 - difficulty is always set by (f16, f16, f16)
+
+The author's ruling: any future difficulty adjustment is ALWAYS
+calibrated on the (f16, f16, f16) configurations - the uncompressed
+baseline. Rationale: f16x3 is unaffected by compression, so it gives
+the best results a model can produce. Difficulty may be matched, never
+lowered, by compressed configurations: if a (q8|q4, k, v) variant
+matches the difficulty set by f16x3, great - a cheaper option for
+practitioners, and the page may recommend it in place of f16x3. But a
+compressed model can never SET difficulty: that would be dumbing the
+benchmark down to accommodate compression. Difficulty anchors to
+f16x3; compression competes against that anchor.
