@@ -377,3 +377,15 @@ The author's ruling: state that ANY dedicated GPU meets the bandwidth
 requirement - the BW consideration is only for integrated GPUs. The
 blockquote gains the remark, and each section's row retitled
 "Memory bandwidth needed (iGPU only)".
+
+## Addendum 83 - the bandwidth recommendations, exact matches only
+
+The author's ruling: pick the LOWEST configuration that matches the
+requirement, and list only the other channel configurations that
+match that same bandwidth EXACTLY; if they don't match, don't list
+them. 16k (25 GB/s): lowest is DDR4-3200 single channel = 25.6 GB/s,
+and its only exact equal is DDR4-1600 dual (25.6); both listed, DDR5
+and faster dropped (they exceed, not match). 8k and 4k (23 GB/s):
+lowest is DDR4-2933 single channel = 23.5 GB/s, no other standard
+configuration matches it exactly - listed alone. The "or faster"
+wording and the generic channel-count list are gone.
