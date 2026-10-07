@@ -86,6 +86,24 @@ def _registry_window(fam: str) -> int | None:
         extract = entry.get("extract") or {}
         if extract.get("max_position_embeddings"):
             return int(extract["max_position_embeddings"])
+        # the addendum-63 alias class (addendum 66): the state carries
+        # repo basenames ("MiniCPM-1B-sft-bf16"), the store is keyed by
+        # roster name ("MiniCPM-1B-sft") - a None here silenced the
+        # pre-flight and the family climbed above its window
+        for rname, repo in registry_data.ROSTER.items():
+            base = repo.rpartition("/")[2]
+            aliases = {fam}
+            for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
+                if fam.endswith(suffix):
+                    aliases.add(fam[: -len(suffix)])
+            if fam in (repo, rname, base) or aliases & {rname, base}:
+                entry = store.get(rname) or {}
+                geo = entry.get("geometry") or {}
+                if geo.get("window"):
+                    return int(geo["window"])
+                extract = entry.get("extract") or {}
+                if extract.get("max_position_embeddings"):
+                    return int(extract["max_position_embeddings"])
     except Exception:
         return None
     return None
@@ -258,7 +276,7 @@ def certify_rung(
             _w = _registry_window(fam)
             _terminal = (
                 _w is not None
-                and _w <= depth
+                and _w >= depth
                 and not (fst.get("verdicts") or {}).get(str(depth))
                 and not any(
                     (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
@@ -651,7 +669,7 @@ def certify_rung_combined(
             _w = _registry_window(fam)
             _terminal = (
                 _w is not None
-                and _w <= depth
+                and _w >= depth
                 and not (fst.get("verdicts") or {}).get(str(depth))
                 and not any(
                     (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
