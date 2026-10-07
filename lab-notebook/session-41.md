@@ -542,3 +542,23 @@ shortcut). A git failure never stops the run - results stay local
 with the error printed. And the tail gained the per-gate per-cell
 wall-time table: fwe/vt seconds per rung plus the arc cell's seconds
 (the cost data the bandwidth fit and the v6 time budget need).
+
+## Addendum 95 - v6 joins the v5 state machinery
+
+The author's ruling: use the SAME state machinery as
+full_benchmark. v6_prototype.py restructured to the v5 state shape -
+families/<name>/{tournament_entry, verdicts-free runs, certify,
+certify_vt, certify_arc} - in its own file,
+state/v6-benchmark-state.json (v5's state untouched). The cell
+records carry v (graded) + t (wall seconds, the same key v5 uses) +
+timing (the prefill/decode split). Families run in the registry's
+param-ascending order, the FIRST 32 OF THE ROSTER, with weights
+acquired on demand via the certify controllers' own
+_acquire_missing_model path (phases 1 and 2: download +
+convert_quant.create). Per-family flow: acquire -> arc first (dead
+arc = dead by definition, upload, next family) -> climb all rungs
+(no stop on death) -> assign medals -> upload. assign_medals and
+family_verdict read the stored cells, so the verdicts are
+recomputable from state alone - the v6 state reads with the same
+tooling family. Verified: ruff, ty, 200 tests, dry-run plan, and a
+logic check on the medal/verdict helpers.
