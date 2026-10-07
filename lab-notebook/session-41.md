@@ -164,3 +164,15 @@ THE CHANGE: TASK_PASS_BARS["arc"] = 3 (bench/constants.py, R-03's single source)
 THE MIGRATION (per the protocol's promise - records re-grade free): every stored arc-caused dead verdict re-derived against its stored arc cells at the new bar, using the certify math (2-sigma Wilson lower bound >= 0.50, floor 10). Result: granite-4.0-h-1b REVIVED at all four rungs (29/30 arc cells at 3/5, lower bound 0.829 - its arc deaths were an artifact of the too-hard bar; it now re-enters and climbs). The other arc-dead families stay dead on their own evidence (their cells cannot reach the bar even at 3/5: the granite 350ms 0/12, MiniCPM4 1/14, Qwen3.5-0.8B 11/28, Llama-3.2 6/16, MiniCPM-1B-sft 5/16). Families whose stored deads were vt/fwe/speed-caused are untouched - this migration touches only arc-caused verdicts.
 
 NOTE: rungs do not re-open wholesale - only granite-4.0-h-1b's verdicts cleared, so on the restart it measures at 4,096 (no stored verdict) while the answered-rung skip holds for everyone else. 203 tests.
+
+### Addendum 69 - the majority bar: ceil(k/2)/k is the difficulty principle (2026-10-07, the author's ruling)
+
+THE RULING: "Ceiling(k/2)/k seems like a sweet spot for difficulty - let's see if the tests difficulty agrees going forward." The bar for a k-item gate is the SMALLEST MAJORITY: ceil(k/2) of k. A pass means "right more often than not" - the natural difficulty anchor for a binomial gate, and it sits at the distribution's center rather than its tail.
+
+THE AGREEMENT CHECK (current bars vs the rule):
+- fwe: 2/3 = ceil(3/2). AGREES - calibrated session 38.
+- arc: 3/5 = ceil(5/2). AGREES - addendum 68's recalibration landed exactly on the rule, empirically (36% -> 52%, on the >= 50% floor).
+- vt: 4/5 - ONE NOTCH ABOVE the rule (ceil(5/2) = 3). vt is also the most lethal quality gate (53% cell fail rate, the biggest near-miss pile: the 4/5 patterns). This is the one bar to watch going forward - if vt keeps concentrating the kills, the rule says 3/5 is its calibration.
+- speed: 0 stalls - not a k-of-k gate (a strict screen, the author's ruling), the rule does not apply.
+
+GOVERNANCE: the rule is the DEFAULT for any future gate or recalibration; departing from it (as vt currently does) requires its own evidence and addendum. No change made now - the author's call is to observe.
