@@ -516,8 +516,13 @@ def main() -> None:
             )
         verdicts = [r.get("verdict") for r in results if "verdict" in r]
         if "accept" in verdicts:
-            stamp(f"rung {depth:,} ANSWERED - the ladder stops here")
-            break
+            # session 40, addendum 56: a rung ANSWERED by an accept moves
+            # the ladder UP to the next depth - the author's v4 ruling ("one
+            # model is crowned or every model is dead -> go to next rung").
+            # The medalist climbs with the survivors; the old break ENDED the
+            # whole run at the first medal (the 4k stop the author caught).
+            stamp(f"rung {depth:,} ANSWERED - the ladder moves up (medalist and survivors climb)")
+            continue
         if verdicts and all(v in ("dead", "infeasible") for v in verdicts):
             stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
             continue
