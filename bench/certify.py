@@ -1021,3 +1021,51 @@ def combined_medal(fst: dict[str, Any], depth: int) -> str | None:
     if all(grades[t]["0.5_sigma"] for t in COMBINED_TASKS):
         return "0.5_sigma"
     return None
+
+
+def gold_per_rung(state: dict[str, Any], depth: int) -> str | None:
+    """The exclusive gold (session 41, addendum 70 - the author's
+    ruling): among the families ACCEPTED (2-sigma) at a rung, only the
+    one with the FEWEST parameters is gold; every other accept keeps
+    its confidence tier but is not the rung's gold. Parameter counts
+    come from the registry store (params_b, addendum 29 - never
+    guessed); an accepted family without a count can never win gold
+    (the registry check flags it). No accepts -> no gold."""
+    best_name: str | None = None
+    best_params: float | None = None
+    for name, fst in (state.get("families") or {}).items():
+        if (fst.get("verdicts") or {}).get(str(depth)) != "accept":
+            continue
+        pb = _registry_params(name)
+        if pb is None:
+            continue
+        if best_params is None or pb < best_params:
+            best_name, best_params = name, pb
+    return best_name
+
+
+def _registry_params(fam: str) -> float | None:
+    """The family's parameter count in billions from the registry
+    store (addendum 29: retrieved from HF, never guessed), with the
+    addendum-63/66 alias class - the state carries repo basenames,
+    the store is keyed by roster name."""
+    try:
+        from etc import registry_data
+
+        store = json.loads(registry_data.STORE.read_text())
+        names = {fam}
+        for rname, repo in registry_data.ROSTER.items():
+            base = repo.rpartition("/")[2]
+            aliases = {fam}
+            for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
+                if fam.endswith(suffix):
+                    aliases.add(fam[: -len(suffix)])
+            if fam in (repo, rname, base) or aliases & {rname, base}:
+                names.add(rname)
+        for n in names:
+            entry = store.get(n) or {}
+            if entry.get("params_b") is not None:
+                return float(entry["params_b"])
+    except Exception:
+        return None
+    return None
