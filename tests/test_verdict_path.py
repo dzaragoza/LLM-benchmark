@@ -810,3 +810,50 @@ def test_registered_constants_single_source():
     for mod in (bench.state_store, bench.certify, bench.cells):
         src = inspect.getsource(mod)
         assert not re.search(r"TASK_PASS_BARS\s*=\s*{", src), mod.__name__
+
+
+def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
+    """Addendum 60: every per-cell log (speed server log, arc cell log)
+    is written into the RESULTS tree, never next to the model - so
+    deleting models/<family> touches only regenerable data. The fwe
+    and vt cells already lived there; this pins the two that moved.
+
+    Pins: R-01
+    """
+    import bench.state_store as SS
+
+    model = tmp_path / "fam" / "fam-f16.gguf"
+    (tmp_path / "fam").mkdir()
+    model.write_bytes(b"x")
+    results = tmp_path / "tournament-results" / "fam"
+    written: list[str] = []
+
+    def fake_post(port, path, body, timeout=60):
+        return {
+            "choices": [{"text": "A", "logprobs": {"content": [{"token": " A", "logprob": -0.1}]}}]
+        }
+
+    def fake_start(model_, port, extra, server_bin=None, log_path=None, **kw):
+        written.append(str(log_path))
+        with open(str(log_path), "wb") as f:
+            f.write(b"server up")
+        return None, True
+
+    class FakeProc:
+        pass
+
+    monkeypatch.setattr(SS.llama_server, "start_server", fake_start)
+    monkeypatch.setattr(SS.llama_server, "post_json", fake_post)
+    monkeypatch.setattr(SS.llama_server, "wait_healthy", lambda port, proc=None: True)
+    monkeypatch.setattr(SS.llama_server, "stop_server", lambda proc, port: None)
+
+    questions = [{"q": "q", "choices": [("A", "a"), ("B", "b")], "ans": "A"}]
+    monkeypatch.setattr(SS, "arc_cell_questions", lambda run: questions)
+
+    ok, fv = SS.arc_pass(str(model), 3, 8080, str(results))
+    assert ok and fv.get("correct") == 1
+    assert written and all(str(results) in p for p in written), written
+    arc_log = results / "fam-f16.gguf.arc-cell3.log"
+    assert arc_log.is_file()
+    leftovers = list((tmp_path / "fam").glob("*.log"))
+    assert leftovers == [], leftovers
