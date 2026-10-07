@@ -292,3 +292,16 @@ runtime overhead is larger; the measurement stands and the page notes
 it. Structure: Qwen2.5-1.5B-Instruct first (deepest, 16k gold),
 granite-4.0-h-1b second (fewest params, 4k gold); the shared DDR table
 follows.
+
+## Addendum 77 - the UMA correction
+
+The author's correction: "there is no separate GPU pool to account
+for" is WRONG - the machine's system-RAM measurements show part of the
+serving footprint resides in the UMA region the BIOS reserves for the
+iGPU, memory the OS never allocates and MemAvailable never sees. The
+page's memory note now states the measured machine cost is a LOWER
+BOUND and the practitioner should budget the UMA carve-out (typically
+512 MiB-2 GiB in BIOS settings) on top. This also sharpens the standing
+question for the memory sidecar work: attribute the UMA-resident share
+(llama-server's Vulkan backend reports its allocations; a future
+sidecar can split the footprint into OS-visible vs UMA-resident).
