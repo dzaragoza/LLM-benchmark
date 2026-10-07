@@ -155,33 +155,6 @@ def peak_rss_gib(proc: Any) -> float | None:
     return None
 
 
-def system_memavailable_gib() -> float | None:
-    """System-wide MemAvailable in GiB (Linux /proc/meminfo). The
-    before/after difference across a server launch is the launch's
-    cost to the MACHINE - immune to the accounting quirks that make
-    per-process VmHWM undercount (mmap'd weights shared with page
-    cache, wrapper scripts, child processes)."""
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) / (1024 * 1024)
-    except Exception:
-        pass
-    return None
-
-
-def memory_cost_gib(before: float | None, after: float | None) -> float | None:
-    """The launch's memory cost from two system_memavailable_gib()
-    readings: before minus after. Positive = the launch consumed
-    MemAvailable. Guarded against interference (other processes
-    grabbing memory during the run read as a LARGER cost - the
-    honest direction for a 'can it run here' number)."""
-    if before is None or after is None:
-        return None
-    return before - after
-
-
 MEMORY_BREAKDOWN_ROW = re.compile(
     r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*\d+\s*\+\s*"
     r"\(\s*\d+\s*=\s*(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\)"

@@ -118,11 +118,6 @@ def speed_pass(
         json.dump(turns, f)
     verdict = speed_gate.analyze(model, no_thinking=True, dump_override=dump)
     verdict["window_cap"] = window_cap if (window_cap or 0) < rung else None
-    cost = next(
-        (m["mem_cost_gib"] for m in mem_reports if m.get("mem_cost_gib") is not None),
-        None,
-    )
-    verdict["mem_cost_gib"] = cost
     # session 41, addendum 37 (protocol v4.x): the speed verdict is
     # STRICTLY wps >= 5 - the stall-rate tolerance is obsolete (the
     # author's ruling); the stall rate stays recorded in the verdict
@@ -157,7 +152,6 @@ def fwe_pass(
     if os.path.exists(csv_path):
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
-    mem_before = llama_server.system_memavailable_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     # session 35, addendum 8: separate K/V (the combined flag is gone);
     # -fa takes a value on this build: "-fa on"
@@ -203,9 +197,6 @@ def fwe_pass(
                 f"compute {breakdown['compute_gib']:.2f} GiB"
                 f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)"
             )
-        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
-        if cost is not None:
-            row["mem_cost_gib"] = cost
     finally:
         llama_server.stop_server(proc, port)
     return row["acc"] == 1.0, row
@@ -293,7 +284,6 @@ def vt_pass(
     if os.path.exists(csv_path):
         os.remove(csv_path)
     log_path = os.path.join(results_dir, f"{label}-rung{rung}-vt-server.log")
-    mem_before = llama_server.system_memavailable_gib()
     extra_args = ["-c", str(rung), "--parallel", "1"]
     if kv_quant_k or kv_quant_v:
         extra_args += ["-fa", "on"]
@@ -336,9 +326,6 @@ def vt_pass(
                 f"compute {breakdown['compute_gib']:.2f} GiB"
                 f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)"
             )
-        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
-        if cost is not None:
-            row["mem_cost_gib"] = cost
     finally:
         llama_server.stop_server(proc, port)
     # addendum 54: the vt cell grades at the GATE bar 4/5 (row["acc"] is

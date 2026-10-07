@@ -320,3 +320,23 @@ delta's artifact (the UMA-resident share the OS counter cannot see),
 not a granite runtime overhead - the addendum-76 note is superseded.
 The UMA budgeting note stays (the carve-out rides on top of whatever
 the breakdown totals).
+
+## Addendum 79 - the device split from llama's own table; MemAvailable machinery finally deleted
+
+The author asked why MemAvailable was still in use ("we deprecated it
+many sessions ago") - honest answer: the deprecation was ruled but the
+machinery was never removed; bench/cells.py (4 sites) and speed_gate.py
+(2 sites) still took the reading and printed "machine cost ... GiB
+(MemAvailable delta)" on every cell, which is why the number was in
+front of me when the page was written. Now finished: every
+system_memavailable_gib/memory_cost_gib call site deleted, the two
+helpers removed from infra/llama_server.py, the "machine cost" log
+line gone. The memory authority is memory_breakdown_gib - and it
+already parses the per-DEVICE rows: the verbose log's
+`memory breakdown [MiB]` table lists Vulkan0 (the iGPU - on this APU,
+the UMA region: Qwen @16k 3.4 GiB = 2.88 w + 0.44 ctx + 0.07 comp;
+granite @4k 2.9 GiB = 2.72 w + 0.09 ctx + 0.05 comp) and Host (plain
+system RAM: 0.46 / 0.30 GiB). The page now shows the GPU(UMA) vs
+system-RAM split per model and states the real constraint: the UMA
+carve-out must be at least the Vulkan0 share or the model cannot
+launch.
