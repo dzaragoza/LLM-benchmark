@@ -52926,3 +52926,109 @@ For more details, see https://huggingface.co/docs/huggingface_hub/authentication
     [server] actual n_ctx = 32768 (requested 32768)
 [2026-10-07T11:27:06] SIGINT - shutting down cleanly (addendum 8)
 [2026-10-07T11:27:07] llama-server stopped
+
+===== 2026-10-07T11:31:19 | full_benchmark.py --task all --force-rung f16 =====
+  [0] no stale llama-server found
+
+------------------------------------------------------------
+  granite-4.0-h-350m speed: 6/6 cells measured, 14 unmeasured
+  granite-4.0-h-350m fwe: 0/6 cells measured, 14 unmeasured
+  granite-4.0-h-350m vt: 0/6 cells measured, 14 unmeasured
+  granite-4.0-h-350m arc: 0/6 cells measured, 14 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  granite-4.0-350m speed: 6/6 cells measured, 14 unmeasured
+  granite-4.0-350m fwe: 2/6 cells measured, 14 unmeasured
+  granite-4.0-350m vt: 1/6 cells measured, 14 unmeasured
+  granite-4.0-350m arc: 0/6 cells measured, 14 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  MiniCPM4-0.5B speed: 7/7 cells measured, 13 unmeasured
+  MiniCPM4-0.5B fwe: 6/7 cells measured, 13 unmeasured
+  MiniCPM4-0.5B vt: 5/7 cells measured, 13 unmeasured
+  MiniCPM4-0.5B arc: 1/7 cells measured, 13 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  Qwen3.5-0.8B speed: 14/14 cells measured, 6 unmeasured
+  Qwen3.5-0.8B fwe: 14/14 cells measured, 6 unmeasured
+  Qwen3.5-0.8B vt: 14/14 cells measured, 6 unmeasured
+  Qwen3.5-0.8B arc: 8/14 cells measured, 6 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  gemma-3-1b-it speed: 6/6 cells measured, 14 unmeasured
+  gemma-3-1b-it fwe: 5/6 cells measured, 14 unmeasured
+  gemma-3-1b-it vt: 0/6 cells measured, 14 unmeasured
+  gemma-3-1b-it arc: 2/6 cells measured, 14 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  MiniCPM5-1B speed: 6/6 cells measured, 14 unmeasured
+  MiniCPM5-1B fwe: 0/6 cells measured, 14 unmeasured
+  MiniCPM5-1B vt: 0/6 cells measured, 14 unmeasured
+  MiniCPM5-1B arc: 1/6 cells measured, 14 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  Llama-3.2-1B-Instruct speed: 8/8 cells measured, 12 unmeasured
+  Llama-3.2-1B-Instruct fwe: 6/8 cells measured, 12 unmeasured
+  Llama-3.2-1B-Instruct vt: 8/8 cells measured, 12 unmeasured
+  Llama-3.2-1B-Instruct arc: 2/8 cells measured, 12 unmeasured
+  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs
+
+------------------------------------------------------------
+  MiniCPM-1B-sft-bf16 speed: 0/0 cells measured, 20 unmeasured
+  MiniCPM-1B-sft-bf16 fwe: 0/0 cells measured, 20 unmeasured
+  MiniCPM-1B-sft-bf16 vt: 0/0 cells measured, 20 unmeasured
+  MiniCPM-1B-sft-bf16 arc: 0/0 cells measured, 20 unmeasured
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_http.py", line 836, in hf_raise_for_status
+    response.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '404 Not Found' for url 'https://huggingface.co/api/models/MiniCPM-1B-sft-bf16/tree/main?recursive=true&expand=false'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 561, in <module>
+    main()
+    ~~~~^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 499, in main
+    results = certify_rung_combined(
+        depth,
+    ...<8 lines>...
+        on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/certify.py", line 735, in certify_rung_combined
+    acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/certify.py", line 112, in _acquire_missing_model
+    model_files = list_repo_files(model_repo)
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_validators.py", line 91, in _inner_fn
+    return fn(*args, **kwargs)
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/hf_api.py", line 3965, in list_repo_files
+    for f in self.list_repo_tree(
+             ~~~~~~~~~~~~~~~~~~~^
+        repo_id=repo_id, recursive=True, revision=revision, repo_type=repo_type, token=token
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/hf_api.py", line 4100, in list_repo_tree
+    for path_info in paginate(path=tree_url, headers=headers, params={"recursive": recursive, "expand": expand}):
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_pagination.py", line 37, in paginate
+    hf_raise_for_status(r)
+    ~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/.venv/lib64/python3.13/site-packages/huggingface_hub/utils/_http.py", line 923, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response, repo_type=repo_type, repo_id=repo_id) from e
+huggingface_hub.errors.RepositoryNotFoundError: 404 Client Error. (Request ID: Root=1-6ac61168-5c536aa249cf859a524b744d;0bd60d0d-f13e-4dcb-a22b-e680bf25a4e0)
+
+Repository Not Found for url: https://huggingface.co/api/models/MiniCPM-1B-sft-bf16/tree/main?recursive=true&expand=false.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated and your token has the required permissions.
+For more details, see https://huggingface.co/docs/huggingface_hub/authentication
