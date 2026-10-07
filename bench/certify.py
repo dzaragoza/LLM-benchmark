@@ -25,6 +25,7 @@ from bench.constants import (
     RUNG_DEFAULT,
     TASK_PASS_BARS,
     TOURNAMENT_CLIMBS,
+    TOURNAMENT_DEPTHS,
 )
 from bench.state_store import (
     _task_load,
@@ -274,9 +275,18 @@ def certify_rung(
             # with window <= depth cannot climb: skipping it here
             # means never measuring it at all. It measures now.
             _w = _registry_window(fam)
+            # TERMINAL = can run THIS rung but cannot reach the NEXT
+            # one (addendum 67, correcting 66): depth <= window < the
+            # next rung's depth. window >= depth alone was wrong in
+            # the other direction - it made every climbing family
+            # "terminal" (Qwen3.5-2B, window 262,144, re-measured at
+            # the answered 4,096 rung); window <= depth was wrong in
+            # the first direction - it measured below-rung families.
+            _next = next((d for d in TOURNAMENT_DEPTHS if d > depth), None)
             _terminal = (
                 _w is not None
                 and _w >= depth
+                and (_next is None or _w < _next)
                 and not (fst.get("verdicts") or {}).get(str(depth))
                 and not any(
                     (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
@@ -667,9 +677,18 @@ def certify_rung_combined(
             # with window <= depth cannot climb: skipping it here
             # means never measuring it at all. It measures now.
             _w = _registry_window(fam)
+            # TERMINAL = can run THIS rung but cannot reach the NEXT
+            # one (addendum 67, correcting 66): depth <= window < the
+            # next rung's depth. window >= depth alone was wrong in
+            # the other direction - it made every climbing family
+            # "terminal" (Qwen3.5-2B, window 262,144, re-measured at
+            # the answered 4,096 rung); window <= depth was wrong in
+            # the first direction - it measured below-rung families.
+            _next = next((d for d in TOURNAMENT_DEPTHS if d > depth), None)
             _terminal = (
                 _w is not None
                 and _w >= depth
+                and (_next is None or _w < _next)
                 and not (fst.get("verdicts") or {}).get(str(depth))
                 and not any(
                     (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
