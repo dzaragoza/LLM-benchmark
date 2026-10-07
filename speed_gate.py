@@ -694,7 +694,6 @@ def bench_model(
         extra += ["--reasoning-format", "deepseek"]
     if no_thinking:
         extra += ["--chat-template-kwargs", '{"enable_thinking": false}']
-    mem_before = llama_server.system_memavailable_gib()
     proc, healthy = llama_server.start_server(model, port, extra, server_bin, log_path=log_path)
     try:
         if not healthy:
@@ -840,13 +839,11 @@ def bench_model(
 
     finally:
         breakdown = llama_server.memory_breakdown_gib(log_path)
-        cost = llama_server.memory_cost_gib(mem_before, llama_server.system_memavailable_gib())
         llama_server.stop_server(proc, port)
         if breakdown is not None:
             mem_reports.append(
                 {
                     "rep": 1,
-                    "mem_cost_gib": cost,
                     **breakdown,
                 }
             )
@@ -854,12 +851,7 @@ def bench_model(
                 f"    memory (llama): weights {breakdown['weights_gib']:.2f} GiB, "
                 f"context {breakdown['context_gib']:.2f} GiB, "
                 f"compute {breakdown['compute_gib']:.2f} GiB"
-                f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)"
-                + (
-                    f", machine cost {cost:.2f} GiB (MemAvailable delta)"
-                    if cost is not None
-                    else ""
-                ),
+                f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)",
                 flush=True,
             )
     wall_hits = sum(1 for t in all_turns if t.get("reader_wall_fail"))
