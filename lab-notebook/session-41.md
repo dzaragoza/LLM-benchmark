@@ -113,3 +113,16 @@ THE REQUIREMENTS: "from the failures today due to requirements, make sure there 
 - R-12: a name-only spec resolves to its roster repo before any hub access; unknown names never reach the hub. Pin: test_state_names_resolve_to_repos_before_the_hub.
 
 The addendum-61 window-tax fix needed no new requirement: R-06 already carries ctx = depth (re-worded in addendum 61). The traceability gate (requirements_check.py) enforces the new pins on every commit, as ruled.
+
+### Addendum 65 - live update: the page's history must never overrule the state (2026-10-07, the author's live update)
+
+THE CATCH: the live refresh showed the medalist as "out of the benchmark" and the revived trio as out or dead - wrong on both counts. The page's classification read results.txt's HISTORICAL verdict lines: the medalist's superseded 32k infeasible (cleared by addendum 61) and the trio's pre-61 DEAD/INFEASIBLE lines (measured at the inflated ctx, cleared by 61/61b) were the most recent lines, so they won.
+
+THE FIX (three authorities, in order - the state leads, the window decides, the marker revives):
+1. STORED VERDICTS LEAD: a family with state verdicts renders from the store (the medalist: "accept", its stored 4096/8192/16384 accepts; a superseded INFEASIBLE line can no longer overrule them).
+2. THE WINDOW DECIDES OUT-OF-BENCHMARK (R-06's own rule): disqualified_families checks every family against its trained window - state record's window_cap, else the registry store via the addendum-63 alias class, else the historical line - and disqualifies ONLY on window < first rung. The trio (4,096 == first rung) is in; phi-1, phi-2, RWKV7-Goose (2,048) stay out; the count went 8 -> 3.
+3. THE REVIVAL MARKER: the 61/61b migration left the trio an explicit "infeasible": null - the migration's fingerprint. A family carrying it renders "climbing" (history never classifies it); a pre-verdict-storage family (granite-3.0-2b-instruct) keeps its measured history.
+
+NOTE FOR THE RUN (the author's call): granite-3.0-2b-instruct's registry window IS 4,096 and its old speed kill was measured at ctx 4,352 - ABOVE its trained window. It has no stored verdict, so on the restart it re-measures from scratch at ctx 4,096 (the addendum-62 terminal rule); its "dead @ 4,096" row is its measured history until then. Same shape as the trio's, but without the revival marker - if the re-measure accepts it, the state will say so.
+
+Test: test_revived_families_never_show_superseded_verdicts (revival marker -> climbing; no marker, no verdicts -> history stands; stored verdicts lead over superseded lines). 202 tests.

@@ -174,3 +174,46 @@ def test_disqualified_row_shows_the_actual_total(tmp_path, monkeypatch):
 
     m = re.search(r"addendum 45\)</td><td>(\d+)</td>", page)
     assert m and m.group(1) == "1"
+
+
+def test_revived_families_never_show_superseded_verdicts(tmp_path, monkeypatch):
+    """Addendum 64: a family revived by the 61/61b migration carries an
+    explicit "infeasible": null marker; its superseded DEAD/INFEASIBLE
+    history lines (measured under the pre-61 inflated ctx) never
+    classify - it climbs again. The window authority (R-06) alone
+    decides out-of-benchmark; a pre-verdict-storage family keeps its
+    measured history. The state's stored verdicts lead over everything.
+
+    Pins: R-06, R-11
+    """
+    results = tmp_path / "results.txt"
+    results.write_text(
+        "===== 2026-10-07T08:00:00 | full_benchmark.py --task all --force-rung f16 =====\n"
+        "  DEAD - speed cannot reach the bar at 4,096 (0/6, best lower bound"
+        " 0.477 < 0.5); next candidate\n"
+        "[2026-10-06T18:15:02] verdict: revived-family DEAD at rung 4,096"
+        " - committing partial results\n"
+        "[2026-10-07T02:50:33] verdict: revived-family INFEASIBLE at rung 4,096"
+        " - out of the benchmark (addendum 45) - committing partial results\n"
+        "[2026-10-07T02:51:00] verdict: old-family DEAD at rung 4,096"
+        " - committing partial results\n"
+    )
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / "benchmark-state.json").write_text(
+        '{"families": {'
+        '"revived-family": {"infeasible": null},'
+        '"old-family": {},'
+        '"champion-family": {"verdicts": {"8192": "accept", "4096": "accept"}}'
+        "}}"
+    )
+    monkeypatch.setattr(run_status, "STATE", str(state / "benchmark-state.json"))
+    monkeypatch.setattr(run_status, "RESULTS", str(results))
+    rows = {r["name"]: r for r in run_status.family_rows()}
+    # the revival marker beats the superseded lines: climbing again
+    assert rows["revived-family"]["verdict"] == "climbing"
+    # a family with no marker and no stored verdicts keeps its history
+    assert rows["old-family"]["verdict"] == "DEAD"
+    # stored verdicts lead: the champion's superseded infeasible line
+    # cannot overrule the stored accepts
+    assert rows["champion-family"]["verdict"] == "ACCEPT"

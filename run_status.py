@@ -125,6 +125,64 @@ def infeasible_families(seg: str) -> dict[str, int]:
     return out
 
 
+def _family_window(name: str, fst: dict, hist_win: int | None) -> int | None:
+    """The family's trained window, whatever source knows it (addendum
+    64): the live state infeasible record first (window_cap), then the
+    registry store (geometry.window / max_position_embeddings, the
+    roster-alias class of addendum 63), then the historical line.
+    The page disqualifies on the WINDOW (R-06: strictly below the
+    first rung), never on a superseded verdict line - addendum 61/61b
+    revived the window==rung families and their old lines lie."""
+    rec = fst.get("infeasible") or {}
+    if rec.get("window_cap"):
+        return int(rec["window_cap"])
+    try:
+        import json
+
+        from etc import registry_data
+
+        store = json.loads(registry_data.STORE.read_text())
+        aliases = {name}
+        for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
+            if name.endswith(suffix):
+                aliases.add(name[: -len(suffix)])
+        for rname, repo in registry_data.ROSTER.items():
+            base = repo.rpartition("/")[2]
+            if name in (repo, rname, base) or aliases & {rname, base}:
+                entry = store.get(rname) or {}
+                geo = entry.get("geometry") or {}
+                if geo.get("window"):
+                    return int(geo["window"])
+                extract = entry.get("extract") or {}
+                if extract.get("max_position_embeddings"):
+                    return int(extract["max_position_embeddings"])
+    except Exception:
+        pass
+    return hist_win
+
+
+def disqualified_families(seg: str, state: dict) -> dict[str, int]:
+    """The families OUT of the benchmark: trained window strictly
+    below the first rung (R-06, addendum 64). Every family the pass
+    ever named is checked; the window comes from _family_window."""
+    import os
+    import sys
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from bench.constants import TOURNAMENT_DEPTHS
+
+    first = TOURNAMENT_DEPTHS[0]
+    hist = infeasible_families(seg)
+    out: dict[str, int] = {}
+    names = set(hist) | set(state.get("families") or {})
+    for name in names:
+        fst = (state.get("families") or {}).get(name) or {}
+        win = _family_window(name, fst, hist.get(name))
+        if win is not None and win < first:
+            out[name] = win
+    return out
+
+
 def _cut_infeasible_segments(seg: str) -> str:
     """Cut every infeasible family's OWN segment (from the previous
     verdict line - or the pass header - up to its own verdict line)
@@ -179,23 +237,60 @@ def gate_kill_rates() -> dict[str, dict[str, int]]:
     }
 
 
+def _state() -> dict:
+    with open(STATE, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def family_rows() -> list[dict]:
     """One row per family in the state file, enriched from results.txt."""
     with open(STATE, encoding="utf-8") as f:
         st = json.load(f)
     txt = open(RESULTS, encoding="utf-8", errors="replace").read()
 
+    disqualified = disqualified_families(txt, st)
     rows = []
     for name in st.get("families", {}):
+        fst = (st.get("families") or {}).get(name) or {}
         verdict = re.findall(rf"verdict: {re.escape(name)} (\w+) at rung ([\d,]+)", txt)
-        row = {
-            "name": name,
-            "verdict": verdict[-1][0] if verdict else "climbing",
-            "rung": verdict[-1][1] if verdict else "",
-            "kill": "",
-            "tally": "",
-        }
-        if name in infeasible_families(txt):
+        # the STATE leads (addendum 64): a stored verdict is the live
+        # record; the results lines are history and a superseded
+        # INFEASIBLE (addendum 61/61b revived the family) must not
+        # overrule the stored accepts
+        stored = (fst.get("verdicts") or {}) if fst else {}
+        if stored:
+            depths = sorted(stored, key=int)
+            row = {
+                "name": name,
+                "verdict": stored[depths[-1]].upper(),
+                "rung": depths[-1],
+                "kill": "",
+                "tally": "",
+            }
+        else:
+            # no stored verdicts: history classifies UNLESS the family
+            # carries the addendum-61/61b revival marker (an explicit
+            # "infeasible": null - the migration's fingerprint). The
+            # revived trio's DEAD/INFEASIBLE lines were measured under
+            # the pre-61 inflated ctx; they climb again. Pre-verdict-
+            # storage families keep their measured history.
+            if fst.get("infeasible") is None and "infeasible" in fst:
+                row = {
+                    "name": name,
+                    "verdict": "climbing",
+                    "rung": "",
+                    "kill": "",
+                    "tally": "",
+                }
+            else:
+                row = {
+                    "name": name,
+                    "verdict": verdict[-1][0] if verdict else "climbing",
+                    "rung": verdict[-1][1] if verdict else "",
+                    "kill": "",
+                    "tally": "",
+                }
+        if name in disqualified:
             # the family's own block shows the trained-window cap - no
             # cell was ever measurable (addendum 45): out of the benchmark
             row["verdict"] = "INFEASIBLE"
@@ -300,7 +395,7 @@ def render(rows: list[dict]) -> str:
     # the difficulty panel: kill rate per gate (this pass)
     kr = gate_kill_rates()
     total_kills = sum(v["kills"] for v in kr.values())
-    total_infeasible = len(infeasible_families(_pass_segment()))
+    total_infeasible = sum(1 for r in rows if r["verdict"] == "INFEASIBLE")
     out.append('<div class="panel">')
     out.append("<h2>Difficulty &mdash; the kill rate, this pass</h2>")
     out.append("<table>")
