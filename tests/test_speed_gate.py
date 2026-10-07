@@ -1276,3 +1276,41 @@ def test_state_names_resolve_to_repos_before_the_hub():
     # repos pass through unchanged; unknown names stay None (no guess)
     assert fb._resolve_spec_repo("openbmb/MiniCPM5-2B") == "openbmb/MiniCPM5-2B"
     assert fb._resolve_spec_repo("not-a-real-family") is None
+
+
+def test_picker_medals_panel(monkeypatch, tmp_path):
+    """R-15 (addendum 72 - the gold panel): the picker pages carry a
+    generated GOLD_MEDALS block - one row per tournament rung, the
+    exclusive gold winner (addendum 70) with its param count, empty
+    where no gold stands. The rewrite is idempotent and never breaks
+    the page's script (js_check guards the boot).
+
+    Pins: R-15
+    """
+    import picker_medals
+
+    state = {
+        "families": {
+            "qwen-big": {"verdicts": {"4096": "accept"}},
+            "granite-small": {"verdicts": {"4096": "accept"}},
+        }
+    }
+    import bench.certify as bc
+
+    monkeypatch.setattr(
+        bc, "_registry_params", lambda fam: {"qwen-big": 1.5, "granite-small": 1.0}.get(fam)
+    )
+    rows = picker_medals.gold_medals(state)
+    by_depth = {r["depth"]: r for r in rows}
+    assert by_depth["4k"]["model"] == "granite-small"
+    assert by_depth["4k"]["params"] == "1.00"
+    assert by_depth["32k"]["model"] is None
+    assert len(rows) == 7
+
+    page = tmp_path / "cpu-picker.html"
+    page.write_text("      var RUNGS = [4096];\n")
+    picker_medals.rewrite(str(page), rows)
+    first = page.read_text()
+    assert "GOLD_MEDALS" in first and "granite-small" in first
+    picker_medals.rewrite(str(page), rows)
+    assert page.read_text() == first
