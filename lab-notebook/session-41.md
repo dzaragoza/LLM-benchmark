@@ -195,3 +195,21 @@ test_gold_per_rung_is_the_fewest_parameter_accept. 204 tests.
 Effect on today's standings (live state): 4k gold moves from
 Qwen2.5-1.5B-Instruct (1.5B) to granite-4.0-h-1b (the 1.0B accept);
 8k/16k gold stays Qwen2.5-1.5B-Instruct (sole accept); 32k no gold.
+
+## Addendum 71 - the calibration window
+
+The author's rationale: evaluating beyond the gold medal is a
+consequence of the difficulty changes - under the correct difficulty
+the first gold IS the fewest-parameter model. Pass/kill calibration
+therefore counts only the cells of each rung UP TO the gold medal:
+families in param-ascending order, stopping after the gold winner (the
+fewest-parameter accept, addendum 70). Post-gold measurements
+(revivals, terminal-rung runs) never enter the stats. No gold at a
+rung -> every measured family counts. ARC is the special case
+(rung-independent, loaded at first launch): its cells count only up
+to the LARGEST-parameter family with any speed/fwe/vt cell - a family
+whose arc ran but that was never launched never enters.
+
+`kill_rate_cells(state, depth)` + `arc_kill_rate_cells(state)` in
+bench/certify.py. Protocol R-14, pinned by
+test_kill_rate_window_stops_at_gold. 205 tests.

@@ -1014,3 +1014,76 @@ def test_gold_per_rung_is_the_fewest_parameter_accept(monkeypatch):
     assert gold_per_rung(state, 4096) == "qwen-big"
     state["families"]["qwen-big"]["verdicts"]["4096"] = "dead"
     assert gold_per_rung(state, 4096) is None
+
+
+def test_kill_rate_window_stops_at_gold(monkeypatch):
+    """R-14 (addendum 71 - the calibration window): pass/kill stats
+    count each rung's cells in param-ascending order and stop after
+    the gold winner (the fewest-parameter accept). A larger revived
+    accept's cells never enter; a family measured after the gold never
+    enters. No accept -> every measured family counts. ARC counts only
+    up to the largest-parameter launched family.
+
+    Pins: R-14
+    """
+    import bench.certify as bc
+
+    def cells(v):
+        return {str(i): {"v": v, "rung": "f16"} for i in range(1, 6)}
+
+    state = {
+        "families": {
+            "small-dead": {
+                "verdicts": {"4096": "dead"},
+                "certify_speed": {"4096": cells(0)},
+                "certify": {"4096": cells(2)},
+                "certify_vt": {"4096": cells(5)},
+            },
+            "gold-winner": {
+                "verdicts": {"4096": "accept"},
+                "certify_speed": {"4096": cells(0)},
+                "certify": {"4096": cells(3)},
+                "certify_vt": {"4096": cells(5)},
+            },
+            "revived-big": {
+                "verdicts": {"4096": "accept"},
+                "certify_speed": {"4096": cells(0)},
+                "certify": {"4096": cells(3)},
+                "certify_vt": {"4096": cells(5)},
+            },
+        }
+    }
+    monkeypatch.setattr(
+        bc,
+        "_registry_params",
+        lambda fam: {"small-dead": 0.5, "gold-winner": 1.0, "revived-big": 1.5}.get(fam),
+    )
+    g = bc.kill_rate_cells(state, 4096)
+    assert g["speed"] == {"pass": 10, "kill": 0}
+    assert g["fwe"] == {"pass": 10, "kill": 0}
+    assert g["vt"] == {"pass": 10, "kill": 0}
+
+    state["families"]["gold-winner"]["verdicts"]["4096"] = "dead"
+    g = bc.kill_rate_cells(state, 4096)
+    assert g["speed"] == {"pass": 15, "kill": 0}
+
+    state["families"]["small-dead"]["certify"] = {"4096": cells(0)}
+    g = bc.kill_rate_cells(state, 4096)
+    assert g["fwe"] == {"pass": 10, "kill": 5}
+
+    arc_state = {
+        "families": {
+            "launched": {
+                "verdicts": {},
+                "certify_speed": {"4096": cells(0)},
+                "certify_arc": {"1": {"v": 3}, "2": {"v": 1}},
+            },
+            "never-launched-big": {"verdicts": {}, "certify_arc": {"1": {"v": 5}, "2": {"v": 5}}},
+        }
+    }
+    monkeypatch.setattr(
+        bc,
+        "_registry_params",
+        lambda fam: {"launched": 1.0, "never-launched-big": 3.0}.get(fam),
+    )
+    assert bc.arc_kill_rate_cells(arc_state) == {"pass": 1, "kill": 1}
