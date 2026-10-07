@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""v6.0 prototype (session 41, addendum 91) - the structure test.
+"""v6.0 prototype (session 41, addendum 91-93) - the structure test.
 
 The author's spec: strict k=1 tasks (fwe = 1 word, vt = 1 name,
-arc = 1 question), n=1 cell per gate per rung, NO speed gate (it is
-assumed to pass; the bandwidth law predicts where it would bite).
-One model climbs the rungs until the training window or a fwe/vt
-death. Every cell records its wall seconds; the server log's
-prefill/decode split is kept per rung so the bandwidth fit
-(1/t = B_eff / [weights + KV(R)]) can later predict the speed-gate
-rung. Reference v5 state is untouched: results go to
-v6-results/v6-state.json.
+arc = 1 question), n=1 cell per gate per rung, NO speed gate (the
+bandwidth law predicts where it would bite). ARC RUNS FIRST: if the
+arc cell dies, the model is dead by definition and no rung is
+measured. The ladder then climbs ALL rungs to 256k - a death at one
+rung does not stop the climb (each rung's result stands alone). Each
+rung's result is either gold (fwe & vt & arc all passed) or dead.
+Every cell records wall seconds plus the server log's prefill/decode
+split, feeding the bandwidth fit. Reference v5 state is untouched:
+results go to v6-results/v6-state.json.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -101,7 +103,7 @@ def fwe_cell_k1(port: int, depth: int, seed: int) -> tuple[bool, dict]:
     try:
         answer = ruler_gate.ask(port, prompt, max_tokens=ruler_gate.FWE_GEN_TOKENS)
     except ValueError as e:
-        return False, {"error": str(e), "s": time.time() - t0}
+        return False, {"error": str(e), "s": round(time.time() - t0, 1)}
     secs = time.time() - t0
     ok, partial = ruler_gate.score_fwe(answer, top_words, min_words=1)
     return ok, {
@@ -121,7 +123,7 @@ def vt_cell_k1(port: int, depth: int, seed: int) -> tuple[bool, dict]:
     try:
         answer = ruler_gate.ask(port, prompt, max_tokens=ruler_gate.VT_GEN_TOKENS)
     except ValueError as e:
-        return False, {"error": str(e), "s": time.time() - t0}
+        return False, {"error": str(e), "s": round(time.time() - t0, 1)}
     secs = time.time() - t0
     ok, found = ruler_gate.score_vt(answer, names)
     return ok, {
@@ -134,11 +136,63 @@ def vt_cell_k1(port: int, depth: int, seed: int) -> tuple[bool, dict]:
     }
 
 
+def arc_cell_k1(model: str, fam_dir: str, label: str, state: dict) -> dict:
+    """Strict k=1 arc, ONCE per benchmark, run FIRST (addendum 93): one
+    question from the deterministic shuffled pool, letter-logprob
+    protocol (arc_pass's, recovered). A dead arc cell means the model
+    is dead by definition - the caller must not measure any rung."""
+    print("\n=== arc (first, k=1) ===")
+    questions = hf_download.load_questions("ARC-Challenge", hf_download.ARC_NUM_DEFAULT)
+    rng = random.Random(20260923)
+    rng.shuffle(questions)
+    q = questions[0]
+    log_path = os.path.join(fam_dir, f"{label}-arc.log")
+    proc, healthy = llama_server.start_server(
+        model, PORT, ["-t", "8", "-c", "4096", "-ngl", "99"], log_path=log_path
+    )
+    try:
+        if not healthy or not llama_server.wait_healthy(PORT, proc=proc):
+            print("  arc server did not come up; log tail:")
+            print(log_tail(log_path))
+            state["arc"] = {"v": 0, "k": 1, "error": "server did not come up"}
+            return state["arc"]
+        prompt = f"Question: {q['q']}\n"
+        for lbl, text in q["choices"]:
+            prompt += f"{lbl}) {text}\n"
+        prompt += "\nThe answer is"
+        t0 = time.time()
+        r = llama_server.post_json(
+            PORT,
+            "/v1/completions",
+            {"prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20},
+            timeout=120,
+        )
+        secs = round(time.time() - t0, 2)
+        labels = {lb for lb, _ in q["choices"]}
+        logps: dict = {}
+        try:
+            top = r["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
+            for entry in top:
+                tok = entry["token"].strip().rstrip(").,")
+                if tok in labels:
+                    logps[tok] = max(logps.get(tok, -999), entry["logprob"])
+        except (KeyError, IndexError, TypeError):
+            pass
+        if logps:
+            ok = max(logps, key=lambda k: logps[k]) == q["ans"]
+        else:
+            gen = r["choices"][0]["text"].strip()
+            ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
+        state["arc"] = {"v": 1 if ok else 0, "k": 1, "s": secs, "answer": q["ans"]}
+        print(f"  arc: {'PASS' if ok else 'FAIL'} ({secs}s) ans={q['ans']}")
+        return state["arc"]
+    finally:
+        llama_server.stop_server(proc, PORT)
+
+
 def assign_medals(state: dict) -> dict:
     """v6 medal rule (addendum 92): gold at a rung iff fwe & vt & arc all
-    passed. Simple by design - the structure test's medal. Recomputed
-    from stored cells each call, so a late arc cell backfills medals
-    for rungs that passed while arc was still unmeasured."""
+    passed. Recomputed from stored cells each call - order-independent."""
     arc_ok = (state.get("arc") or {}).get("v") == 1
     for _key, rec in state.get("rungs", {}).items():
         cells = rec.get("cells") or {}
@@ -159,6 +213,7 @@ def main() -> int:
     depths = [int(d) for d in args.depths.split(",")]
     print(f"v6.0 prototype: {label}, rungs {depths}")
     print("  strict k=1 (fwe 1 word, vt 1 name, arc 1 question), n=1, no speed gate")
+    print("  arc first: dead arc = dead model; the ladder climbs ALL rungs, no stop")
     if args.dry:
         print("  (dry run: nothing measured)")
         return 0
@@ -169,8 +224,17 @@ def main() -> int:
     fam_dir = os.path.join(RESULTS_DIR, label)
     os.makedirs(fam_dir, exist_ok=True)
 
-    # arc once per benchmark, at the first rung's context (k=1)
-    arc_done = state.get("arc") is not None
+    # arc FIRST (addendum 93): dead arc = dead by definition, no rung measured
+    if state.get("arc") is None:
+        arc_cell_k1(args.model, fam_dir, label, state)
+        assign_medals(state)
+        save_state(state)
+    else:
+        print(f"\narc already measured: {'PASS' if state['arc']['v'] else 'FAIL'}")
+    if state.get("arc", {}).get("v") != 1:
+        print("  arc dead -> model dead by definition; no rung measured")
+        save_state(state)
+        return 0
 
     for depth in depths:
         key = str(depth)
@@ -196,7 +260,7 @@ def main() -> int:
                 rung_rec["window"] = window_from_log(log_path)
                 state["rungs"][key] = rung_rec
                 save_state(state)
-                break
+                continue
             window = window_from_log(log_path)
             state["window"] = window
             if window is not None and window < depth:
@@ -204,7 +268,7 @@ def main() -> int:
                 rung_rec["verdict"] = "window"
                 state["rungs"][key] = rung_rec
                 save_state(state)
-                break
+                continue
             print(f"  window: {window}")
 
             # fwe k=1
@@ -221,70 +285,13 @@ def main() -> int:
         finally:
             llama_server.stop_server(proc, PORT)
 
-        verdict = "pass" if (ok and ok2) else "dead"
+        verdict = "gold" if (ok and ok2) else "dead"
         rung_rec["verdict"] = verdict
         state["rungs"][key] = rung_rec
-        # v6 medal rule (addendum 92): fwe & vt & arc all pass = gold at
-        # the rung; arc runs once per benchmark, so the medal is assigned
-        # after the arc cell lands - re-decided over the stored rungs.
-        state = assign_medals(state)
+        assign_medals(state)
         save_state(state)
         print(f"  rung {depth} verdict: {verdict}")
-        if verdict != "pass":
-            break
-
-    # arc once (k=1), after the ladder - shallow context, any rung's server is fine
-    if not arc_done:
-        print("\n=== arc (once, k=1) ===")
-        q_ok = None
-        try:
-            questions = hf_download.load_questions("ARC-Challenge", hf_download.ARC_NUM_DEFAULT)
-            import random as _random
-
-            rng = _random.Random(20260923)
-            rng.shuffle(questions)
-            q = questions[0]
-            log_path = os.path.join(fam_dir, f"{label}-arc.log")
-            proc, healthy = llama_server.start_server(
-                args.model, PORT, ["-t", "8", "-c", "4096", "-ngl", "99"], log_path=log_path
-            )
-            try:
-                if healthy and llama_server.wait_healthy(PORT, proc=proc):
-                    prompt = f"Question: {q['q']}\n"
-                    for lbl, text in q["choices"]:
-                        prompt += f"{lbl}) {text}\n"
-                    prompt += "\nThe answer is"
-                    t0 = time.time()
-                    r = llama_server.post_json(
-                        PORT,
-                        "/v1/completions",
-                        {"prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20},
-                        timeout=120,
-                    )
-                    secs = round(time.time() - t0, 2)
-                    labels = {lb for lb, _ in q["choices"]}
-                    logps: dict = {}
-                    try:
-                        top = r["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
-                        for entry in top:
-                            tok = entry["token"].strip().rstrip(").,")
-                            if tok in labels:
-                                logps[tok] = max(logps.get(tok, -999), entry["logprob"])
-                    except (KeyError, IndexError, TypeError):
-                        pass
-                    if logps:
-                        q_ok = max(logps, key=lambda k: logps[k]) == q["ans"]
-                    else:
-                        gen = r["choices"][0]["text"].strip()
-                        q_ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
-                    state["arc"] = {"v": 1 if q_ok else 0, "k": 1, "s": secs, "answer": q["ans"]}
-                    assign_medals(state)
-                    save_state(state)
-                    print(f"  arc: {'PASS' if q_ok else 'FAIL'} ({secs}s) ans={q['ans']}")
-            finally:
-                llama_server.stop_server(proc, PORT)
-        except Exception as e:  # noqa: BLE001 - the prototype reports and continues
-            print(f"  arc failed: {e}")
+        # addendum 93: a death does NOT stop the climb - every rung is measured
 
     print("\n=== medals ===")
     golds = [
