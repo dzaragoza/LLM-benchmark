@@ -1278,16 +1278,16 @@ def test_state_names_resolve_to_repos_before_the_hub():
     assert fb._resolve_spec_repo("not-a-real-family") is None
 
 
-def test_picker_medals_panel(monkeypatch, tmp_path):
-    """R-15 (addendum 72 - the gold panel): the picker pages carry a
-    generated GOLD_MEDALS block - one row per tournament rung, the
-    exclusive gold winner (addendum 70) with its param count, empty
-    where no gold stands. The rewrite is idempotent and never breaks
-    the page's script (js_check guards the boot).
+def test_gold_per_rung_is_the_fewest_parameter_accept_docstring(monkeypatch):
+    """R-15 (addendum 74 - the static page): the practitioner page's
+    gold table derives from gold_per_rung - the fewest-parameter
+    2-sigma accept per rung; the page carries the winner, its RAM cost
+    and its minimum reader-line bandwidth, deepest-first. Pinned here
+    via the gold computation the page renders from.
 
     Pins: R-15
     """
-    import picker_medals
+    import bench.certify as bc
 
     state = {
         "families": {
@@ -1295,22 +1295,10 @@ def test_picker_medals_panel(monkeypatch, tmp_path):
             "granite-small": {"verdicts": {"4096": "accept"}},
         }
     }
-    import bench.certify as bc
-
     monkeypatch.setattr(
-        bc, "_registry_params", lambda fam: {"qwen-big": 1.5, "granite-small": 1.0}.get(fam)
+        bc,
+        "_registry_params",
+        lambda fam: {"qwen-big": 1.5, "granite-small": 1.0}.get(fam),
     )
-    rows = picker_medals.gold_medals(state)
-    by_depth = {r["depth"]: r for r in rows}
-    assert by_depth["4k"]["model"] == "granite-small"
-    assert by_depth["4k"]["params"] == "1.00"
-    assert by_depth["32k"]["model"] is None
-    assert len(rows) == 7
-
-    page = tmp_path / "cpu-picker.html"
-    page.write_text("      var RUNGS = [4096];\n")
-    picker_medals.rewrite(str(page), rows)
-    first = page.read_text()
-    assert "GOLD_MEDALS" in first and "granite-small" in first
-    picker_medals.rewrite(str(page), rows)
-    assert page.read_text() == first
+    assert bc.gold_per_rung(state, 4096) == "granite-small"
+    assert bc.gold_per_rung(state, 8192) is None

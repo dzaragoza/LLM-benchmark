@@ -248,3 +248,20 @@ slash - basename only). js_check boots both pages at their new paths.
 To publish: Settings -> Pages -> source main /docs - then
 dzaragoza.github.io/LLM-benchmark/ serves index.md as the homepage,
 the pickers at /cpu-picker and /gpu-picker.
+
+## Addendum 74 - the static practitioner page; the HTML pickers retire
+
+The author's ruling: "Remove the html. Let's make the page static in MD
+with minimal information needed to choose a model." docs/index.md is
+now the whole site: one table, deepest-first, with per gold rung the
+winner, its measured whole-stack RAM (the same number serves the
+CPU/iGPU and VRAM columns - the cost is the model's, not the host's),
+and the minimum bandwidth for the 5 w/s reader line (the linear law:
+102.4 x 5 / worst-turn t/s - 24.3 GB/s for the deepest winner), plus
+the common DDR configurations that clear that minimum. The HTML
+pickers, js_check.py, picker_medals.py and the js-check pre-commit
+hook are removed; R-15 rewritten for the static page (pinned by
+test_gold_per_rung_is_the_fewest_parameter_accept_docstring). The
+page's numbers today: 16k Qwen2.5-1.5B-Instruct 3.6 GiB / 24.3 GB/s
+(21.1 t/s), 8k Qwen2.5-1.5B-Instruct 3.4 GiB / 22.9 GB/s (22.4 t/s),
+4k granite-4.0-h-1b 4.2 GiB / 22.5 GB/s (22.8 t/s). 200 tests.
