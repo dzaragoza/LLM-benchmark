@@ -1069,3 +1069,77 @@ def _registry_params(fam: str) -> float | None:
     except Exception:
         return None
     return None
+
+
+def kill_rate_cells(state: dict[str, Any], depth: int) -> dict[str, dict[str, int]]:
+    """The calibration cell window (session 41, addendum 71 - the
+    author's rationale): the difficulty is tuned so the FIRST gold at
+    a rung is naturally the fewest-parameter accept; pass/kill stats
+    therefore count only the cells measured UP TO AND INCLUDING the
+    first accepted family, in param-ascending order - post-gold
+    measurements (terminal-rung revivals, re-climbs) never enter. ARC
+    is the special case (rung-independent, loaded at first launch):
+    its cells count only up to the LARGEST-parameter family that has
+    any speed/fwe/vt cell - an arc run of a family never launched
+    never enters the calibration."""
+    fams = state.get("families") or {}
+
+    def order(name: str) -> tuple[bool, float, str]:
+        pb = _registry_params(name)
+        return (pb is None, pb if pb is not None else 0.0, name)
+
+    gates: dict[str, dict[str, int]] = {}
+    for name in sorted(fams, key=order):
+        fst = fams[name]
+        cells_here = any(
+            (fst.get(ns) or {}).get(str(depth)) for ns in ("certify_speed", "certify", "certify_vt")
+        )
+        if not cells_here:
+            continue
+        for t, ns in (
+            ("speed", "certify_speed"),
+            ("fwe", "certify"),
+            ("vt", "certify_vt"),
+        ):
+            bar = TASK_PASS_BARS[t]
+            g = gates.setdefault(t, {"pass": 0, "kill": 0})
+            for c in ((fst.get(ns) or {}).get(str(depth)) or {}).values():
+                if not isinstance(c, dict) or "v" not in c:
+                    continue
+                if t == "speed":
+                    g["pass" if c["v"] == bar else "kill"] += 1
+                else:
+                    g["pass" if c["v"] >= bar else "kill"] += 1
+        if (fst.get("verdicts") or {}).get(str(depth)) == "accept":
+            break
+    return gates
+
+
+def arc_kill_rate_cells(state: dict[str, Any]) -> dict[str, int]:
+    """The ARC half of the addendum-71 rule: arc cells count only up
+    to the largest-parameter family with any speed/fwe/vt cell (a
+    family whose arc ran but that was never launched at a rung never
+    enters the calibration)."""
+    fams = state.get("families") or {}
+    launched = [
+        pb
+        for name, fst in fams.items()
+        if any(
+            (fst.get(ns) or {}).get(d)
+            for ns in ("certify_speed", "certify", "certify_vt")
+            for d in (fst.get(ns) or {})
+        )
+        for pb in [_registry_params(name)]
+        if pb is not None
+    ]
+    cutoff = max(launched) if launched else None
+    out = {"pass": 0, "kill": 0}
+    for name, fst in fams.items():
+        pb = _registry_params(name)
+        if cutoff is None or pb is None or pb > cutoff:
+            continue
+        for c in (fst.get("certify_arc") or {}).values():
+            if not isinstance(c, dict) or "v" not in c:
+                continue
+            out["pass" if c["v"] >= TASK_PASS_BARS["arc"] else "kill"] += 1
+    return out
