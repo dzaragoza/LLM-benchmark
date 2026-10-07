@@ -389,3 +389,16 @@ and faster dropped (they exceed, not match). 8k and 4k (23 GB/s):
 lowest is DDR4-2933 single channel = 23.5 GB/s, no other standard
 configuration matches it exactly - listed alone. The "or faster"
 wording and the generic channel-count list are gone.
+
+## Addendum 84 - the layout: model + configuration, pick-one GPU note
+
+The author's ruling: rename "Example" to "llama.cpp command line";
+each entry laid out as model, configuration, then a very visible
+"Pick ONE - you do not need both" block: the integrated-gpu entry
+(system bandwidth with the exact-match minimum, minimum RAM) and the
+dedicated-gpu entry (minimum VRAM, any GPU has high enough BW). The
+most common reader complaint will be "do I need both?" - the intro
+and every section state it: ONE, never both. Also caught while
+rewriting: the command lines carried comma-formatted -c values
+(16384, not 16,384) - fixed; and a first draft broke the nested
+markdown lists (md_check + inspection caught it).
