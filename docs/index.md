@@ -1,81 +1,38 @@
-# The certified models — what to run and what it takes
+# Pick your model
 
-The f16 context-depth tournament on a 102.4 GB/s system-RAM machine,
-certified to 2 sigma. One section per gold-medal model, deepest
-certified depth first: the optimum settings, the memory it needs, and
-the memory bandwidth your machine must have.
+Pick the **largest context size that fits your machine** from the list below. Bigger context means the model can work with longer documents — more pages, more code, longer conversations — without losing track of what was said at the beginning. A model certified at 16k handles a 16k-token document reliably; at smaller sizes everything fits more easily, so when in doubt, go bigger if your machine allows.
 
-## Qwen2.5-1.5B-Instruct
+Each section is one certified choice: the model, the configuration to run it with, and what your machine needs.
 
-**The deepest certified model in the study: gold at 16k context.**
+## 16k context
 
-- **Optimum settings**: f16 weights (the `Qwen2.5-1.5B-Instruct-f16`
-  GGUF), context = the depth you need, up to **16,384 tokens** — the
-  2-sigma certified ceiling at f16. It also holds gold at 8k and 4k.
-  Beyond 16k it died to the free-word-extraction gate (one hair under
-  the certification bar at 32k), so treat 16k as its proven limit.
-- **Quant**: f16 — the study's first pass measures every model at full
-  f16 precision to establish maximum quality and maximum size on the
-  102.4 GB/s machine class before any compression is considered. No
-  smaller quant of this model has been certified yet; when one is, it
-  appears here.
-- **Memory**: llama-server's own memory breakdown at 16k context —
-  **GPU (UMA): 3.4 GiB** (weights 2.88 GiB + KV context 0.44 GiB +
-  compute 0.07 GiB) and **system RAM (Host): 0.46 GiB** of CPU-side
-  buffers; **4 GiB** total, rounded up.
-- **Minimum bandwidth**: **24.3 GB/s** to stay above the 5 w/s reader
-  line at its worst measured turn (21.1 t/s at 102.4 GB/s; speed scales
-  linearly with bandwidth).
+- **Model**: Qwen2.5-1.5B-Instruct
+- **Configuration**: f16 GGUF (`Qwen2.5-1.5B-Instruct-f16`), context 16,384
+- **Memory bandwidth needed**: 25 GB/s
+  - single channel: DDR5-4800 or faster
+  - dual channel: DDR4-3200 or faster
+  - quad channel: any listed generation
+- **RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU)**: 4 GiB
 
-## granite-4.0-h-1b
+## 8k context
 
-**The fewest-parameter gold medalist: gold at 4k context.**
+- **Model**: Qwen2.5-1.5B-Instruct
+- **Configuration**: f16 GGUF (`Qwen2.5-1.5B-Instruct-f16`), context 8,192
+- **Memory bandwidth needed**: 23 GB/s
+  - single channel: DDR5-4800 or faster
+  - dual channel: DDR4-3200 or faster
+  - quad channel: any listed generation
+- **RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU)**: 4 GiB
 
-- **Optimum settings**: f16 weights, context = **4,096 tokens** — its
-  trained window is 4k, which makes 4k its terminal rung. It accepted
-  there under the 2-sigma bar and is the smallest certified model in
-  the study.
-- **Quant**: f16 — same ruling as above: full precision first, the
-  compression study comes later.
-- **Memory**: llama-server's own memory breakdown at 4k context —
-  **GPU (UMA): 2.9 GiB** (weights 2.72 GiB + KV context 0.09 GiB +
-  compute 0.05 GiB) and **system RAM (Host): 0.30 GiB**; **4 GiB**
-  total, rounded up. Smaller than Qwen at every depth, as its smaller
-  weights predict.
-- **Minimum bandwidth**: **22.5 GB/s** (worst measured turn 22.8 t/s at
-  102.4 GB/s).
+## 4k context
 
-## Bandwidth: what meets the minimum
-
-Both winners need ~24 GB/s. Speed scales linearly with memory bandwidth
-(validated at 102.4 GB/s): your machine's memory bandwidth must be at
-least min-BW × (5 ÷ measured t/s). Configurations that clear it:
-
-| Configuration | Bandwidth | Verdict |
-|---|---|---|
-| DDR5-6400 dual channel | 102.4 GB/s | far above the line |
-| DDR5-5600 dual channel | 89.6 GB/s | far above the line |
-| DDR5-4800 dual channel | 76.8 GB/s | far above the line |
-| DDR4-3200 dual channel | 51.2 GB/s | comfortably above |
-| DDR5-4800 single channel | 38.4 GB/s | comfortably above |
-| DDR4-2400 dual channel | 38.4 GB/s | comfortably above |
-| DDR4-3200 single channel | 25.6 GB/s | just above the line |
-| DDR4-2400 single channel | 19.2 GB/s | below — no certified depth guaranteed readable |
-
-## How the numbers are measured
-
-- **Memory**: llama-server's verbose `memory breakdown` table, split
-  per device: the Vulkan0 row is the iGPU's share — which on an APU
-  lives in the UMA region the BIOS reserves for the GPU — and the Host
-  row is plain system RAM. The numbers above are the sum; if your UMA
-  carve-out is smaller than the GPU share, the model cannot launch.
-  The per-device split comes straight from the runtime, not from OS
-  memory counters.
-- **Bandwidth**: the linear law — min bandwidth = 102.4 × 5 ÷ measured
-  worst-turn t/s.
-- **Gold medal**: exclusive per depth — among the models certified at
-  2 sigma (Wilson lower bound ≥ 0.50, ≥ 10 cells per gate), the one
-  with the fewest parameters.
-- Deeper rungs (32k–256k): no gold medal yet. This page updates with
-  every new gold.
-- The full protocol and evidence trail: [protocol.md](../md/protocol.md).
+- **Model**: granite-4.0-h-1b
+- **Configuration**: f16 GGUF (`granite-4.0-h-1b-f16`), context 4,096
+- **Memory bandwidth needed**: 23 GB/s
+  - single channel: DDR5-4800 or faster
+  - dual channel: DDR4-3200 or faster
+  - quad channel: any listed generation
+- **RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU)**: 4 GiB
