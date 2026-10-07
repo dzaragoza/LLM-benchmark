@@ -486,3 +486,24 @@ arc 2.2s. Also corrected this session: rungs with a gold are settled -
 new families measure the lowest goldless rung (64k) directly, no
 climbing; 14 alive families remain, est. ~39-64h to finish the rung.
 Session closed; next session when the benchmark stops.
+
+## Addendum 91 - v6.0 prototype: the structure test, strict k=1
+
+The author's spec, verbatim design: a fast prototype to try ideas.
+v6.0 = strict k=1 tasks (fwe = 1 word hidden, vt = 1 name via
+num_hops=0, arc = 1 question), n=1 cell per gate per rung, NO speed
+gate (assumed pass - the bandwidth law predicts where it would bite).
+One model, lowest params, climbs rungs until the training window or a
+fwe/vt death. Every cell records wall seconds plus the server log's
+prefill/decode tokens-per-second split, so the depth series feeds the
+bandwidth fit (1/t = B_eff / [weights + KV(R)]) - once enough rungs
+are collected the fit predicts the rung where the speed gate WOULD
+have killed the model, validated later against v5's stored speed
+cells. Implementation: v6_prototype.py - reuses ruler_gate's task
+builders with top_k=1 (fwe) and num_chains=1/num_hops=0 (vt), the
+arc_pass letter-logprob protocol for a single question, one server
+launch per rung shared by fwe+vt, state in v6-results/v6-state.json
+(v5 reference state untouched). Note for the reader of the fit: a
+k=1 cell is prefill-heavy, so its decode t/s is a proxy for the speed
+gate's pure-decode measure; the per-rung timing split keeps the two
+terms separable. Speed k=1 (one conversation) is never measured.
