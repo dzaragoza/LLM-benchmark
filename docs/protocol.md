@@ -93,6 +93,32 @@ study artifacts named lineage.json - the lineage STUDIES compared
 releases); the artifacts were already moved to state/ in addendum
 16 and need no further action.
 
+## Requirements (v5.0 - the test-linked contract)
+
+Protocol v5.0 (addendum 59): the study's rulings are first-class
+REQUIREMENTS, and every requirement is pinned by at least one test.
+A requirement is a testable statement of a ruling that lives
+somewhere better than memory - each row cites its provenance
+addendum, and each pinning test carries a `Pins: R-xx` docstring
+marker. `python3 requirements_check.py` (every commit, via the
+pre-commit hook) fails if a requirement has no pin, or a pin
+references a requirement that does not exist - the traceability
+that keeps the table from going stale. Adding or changing a
+requirement is a protocol change: it requires a notebook addendum,
+not a silent edit.
+
+| Req | The requirement (testable statement) | Provenance |
+|---|---|---|
+| R-01 | A cell measured by a controller is present in the state file after save; a fresh family's cells persist, and a second pass measures nothing. | addendum 55 (the orphaned-fst bug) |
+| R-02 | A verdict (accept / dead / infeasible) persists per (family, rung); a restart honors it - stored dead skips that family at that rung only, stored accept answers the rung. | addendum 57 |
+| R-03 | Every grading predicate grades at `TASK_PASS_BARS` (bench/constants.py, the single source); no predicate hardcodes a bar. | addenda 52-54 (the 5/5 gate regression) |
+| R-04 | An accept answers the rung and the ladder climbs: quality-dead families re-measure at deeper rungs; only infeasible and speed-dead are permanent outs. | addendum 56 ("everyone climbs") |
+| R-05 | ARC is rung-independent: measured once per (family, run) at `ARC_RUN_CTX` = 4,096, stored rung-independently, loaded (never re-measured) at every other depth. | the study's ARC design (session 38); verified 2026-10-07 |
+| R-06 | A family whose trained window is below the rung's ctx is infeasible before any download, conversion or launch, and is skipped at every rung (pre-flight + runtime catch agree on the state record). | addenda 45, 58 |
+| R-07 | Families evaluate in param-ascending order; the sort resolves both repo-carried and name-carried specs identically. | addendum 57 |
+| R-08 | A speed-gate death at rung k ends that family's climb at every deeper rung (the speed gate only hardens with depth). | addendum 13, session 40 |
+| R-09 | A study constant appears in exactly one place in the code; other files import it (the standing governance rule, now a requirement). | the registry's governance rule |
+
 ## [A] Author choices (ruled, on record)
 
 | Constant | Value | Where | Ruling / derivation |

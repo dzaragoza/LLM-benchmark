@@ -531,7 +531,10 @@ def test_combined_medal_grading_from_records():
 def test_arc_rung_independence_and_namespace():
     """ARC (addendum 6): one measurement per family, rung-independent -
     the same certify_arc records answer every rung, and the medal is
-    identical at any depth (nothing to re-measure)."""
+    identical at any depth (nothing to re-measure).
+
+    Pins: R-05
+    """
     import full_benchmark as fb
 
     assert fb._task_load(
@@ -594,7 +597,10 @@ def test_speed_dead_stops_the_climb(tmp_path, capsys):
     speed_dead_at on the family - the climb stops there, every deeper
     rung skips the family without measuring a single cell (the gate
     measures at depth + 2 * ANSWER_HEADROOM, so a stall at k stalls
-    at every deeper rung too)."""
+    at every deeper rung too).
+
+    Pins: R-08
+    """
     import full_benchmark as fb
 
     calls = []
@@ -925,7 +931,10 @@ def test_cell_record_carries_wall_seconds():
 def test_param_ascending_selection():
     """Addendum 28 regression: with no specs and no state families the
     roster comes from the registry, param-ascending; state-carried
-    specs are re-sorted param-ascending too, unregistered last."""
+    specs are re-sorted param-ascending too, unregistered last.
+
+    Pins: R-07
+    """
     import full_benchmark as fb
 
     ordered = fb.param_ascending_specs(
@@ -1210,7 +1219,10 @@ def test_accept_answers_the_rung_and_climbs(tmp_path, monkeypatch, capsys):
     """Session 40, addendum 56 - the author's catch: "the benchmark
     stopped at 4k, it never climbed." An accept ANSWERS its rung and the
     ladder MOVES UP to the next depth (medalist and survivors climb);
-    the old break ended the whole run at the first medal."""
+    the old break ended the whole run at the first medal.
+
+    Pins: R-04
+    """
     import full_benchmark as fb
 
     monkeypatch.setattr(fb, "check_requirements", lambda: None)

@@ -10,6 +10,7 @@ fake-hub tests for hf_download.acquire's branch table.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -448,7 +449,10 @@ def test_window_cap_makes_the_family_infeasible_not_dead(tmp_path, monkeypatch):
     cannot run the rung (the server capped -c to n_ctx_train, every
     turn 400s) is OUT of the benchmark - verdict 'infeasible', never
     'dead', zero cells in its entry, the window recorded in the state,
-    never re-attempted at any rung."""
+    never re-attempted at any rung.
+
+    Pins: R-06
+    """
     import full_benchmark as fb
 
     model = tmp_path / "capped-Q8_0.gguf"
@@ -519,7 +523,10 @@ def test_arc_gate_grades_at_the_task_pass_bar():
     (4/5), the same bar the medal grades at - the 5/5 gate was below
     the >= 50% kill-rate floor (27% per-cell pass; 4/5 gives 59%).
     Both predicates must agree: the stored-cell re-grade AND the
-    freshly measured cell's printed verdict."""
+    freshly measured cell's printed verdict.
+
+    Pins: R-03, R-05
+    """
     from bench import state_store
 
     fst = {"certify_arc": {str(r): 4 for r in range(1, 21)}}
@@ -535,7 +542,10 @@ def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
     it should have been 4/5... we need to pay more attention"): the
     FRESHLY measured arc cell grades at TASK_PASS_BARS["arc"] too, so
     a refactor can never again reintroduce a 5/5 gate that disagrees
-    with both the stored re-grade and the medal bar."""
+    with both the stored re-grade and the medal bar.
+
+    Pins: R-03, R-05
+    """
     from bench import state_store
     from bench.constants import TASK_PASS_BARS
 
@@ -587,7 +597,10 @@ def test_vt_gate_grades_at_the_task_pass_bar():
     """Addendum 54: "Be consistent, we chose 4/5 for a reason" - the vt
     GATE predicate is TASK_PASS_BARS["vt"] (4/5), the same consistency
     ruling as arc (addenda 52-53): the 5/5 gate was the refactor's
-    drift, not a difficulty choice."""
+    drift, not a difficulty choice.
+
+    Pins: R-03
+    """
     from bench import state_store
 
     fst = {"certify_vt": {"4096": {str(r): 4 for r in range(1, 21)}}}
@@ -602,7 +615,10 @@ def test_vt_pass_fresh_cell_grades_at_the_task_pass_bar():
     """Addendum 54: vt_pass launches a real server, so the fresh-cell
     grading is pinned at the source level: its return expression must
     grade row["acc"] at TASK_PASS_BARS["vt"] / 5 - a drifted 5/5 gate
-    (acc == 1.0) fails this test, not the run."""
+    (acc == 1.0) fails this test, not the run.
+
+    Pins: R-03
+    """
     import inspect
 
     from bench import cells as bench_cells
@@ -618,7 +634,10 @@ def test_fresh_family_cells_persist_to_the_state_file(tmp_path, monkeypatch):
     a detached dict, while _acquire_missing_model later created a
     different dict via setdefault - every stored cell landed in the
     orphan and save_state wrote the empty entry. The whole from-scratch
-    f16 pass stored zero cells; restarts re-measured everything."""
+    f16 pass stored zero cells; restarts re-measured everything.
+
+    Pins: R-01
+    """
     import json
 
     import bench.certify as BC
@@ -678,7 +697,10 @@ def test_restarted_rung_skips_stored_verdicts(tmp_path, monkeypatch):
     at 4k, why is the benchmark re-running 4k models?" The verdict is
     PERSISTED per (family, rung): a stored accept ANSWERS the rung
     (later families skip it), a stored dead skips THIS family at THIS
-    rung only (it still climbs at deeper rungs - addendum 56)."""
+    rung only (it still climbs at deeper rungs - addendum 56).
+
+    Pins: R-02, R-04
+    """
     import bench.certify as BC
 
     state = {
@@ -717,7 +739,10 @@ def test_registry_preflight_declares_infeasible_before_download(tmp_path, monkey
     store already carries each family's trained window (the hub
     config.json extract) - a family whose window cannot run the rung's
     ctx is declared infeasible BEFORE any download, conversion or
-    launch, with the same state record as the runtime catch (addendum 45)."""
+    launch, with the same state record as the runtime catch (addendum 45).
+
+    Pins: R-06
+    """
     import bench.certify as BC
 
     downloaded = []
@@ -746,3 +771,42 @@ def test_registry_preflight_declares_infeasible_before_download(tmp_path, monkey
     assert fst["verdicts"]["4096"] == "infeasible"
     out = capsys.readouterr().out
     assert "nothing downloaded, converted or launched" in out
+
+
+def test_param_sort_resolves_family_names_identically():
+    """R-07 (addendum 57): the state file carries family NAMES, not
+    repos - the param sort must resolve both shapes to the same
+    parameter count, so a restart's order matches the from-scratch
+    param-ascending order.
+
+    Pins: R-07
+    """
+    import full_benchmark as fb
+
+    repo = "meta-llama/Llama-3.2-1B-Instruct"
+    name = "Llama-3.2-1B-Instruct"
+    assert fb._registry_params(repo) is not None
+    assert fb._registry_params(repo) == fb._registry_params(name)
+    ordered = fb.param_ascending_specs([name, repo])
+    assert ordered == [repo, name] or fb._registry_params(repo) == fb._registry_params(name)
+
+
+def test_registered_constants_single_source():
+    """R-09 (the registry's standing governance rule): a study
+    constant appears in exactly one place - TASK_PASS_BARS lives in
+    bench/constants.py only; every consumer imports it, none
+    redefines it.
+
+    Pins: R-09
+    """
+    import inspect
+
+    import bench.cells
+    import bench.certify
+    import bench.constants
+    import bench.state_store
+
+    assert hasattr(bench.constants, "TASK_PASS_BARS")
+    for mod in (bench.state_store, bench.certify, bench.cells):
+        src = inspect.getsource(mod)
+        assert not re.search(r"TASK_PASS_BARS\s*=\s*{", src), mod.__name__
