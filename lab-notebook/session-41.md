@@ -340,3 +340,18 @@ system RAM: 0.46 / 0.30 GiB). The page now shows the GPU(UMA) vs
 system-RAM split per model and states the real constraint: the UMA
 carve-out must be at least the Vulkan0 share or the model cannot
 launch.
+
+## Addendum 80 - the practitioner page, minimal
+
+The author's ruling: far too much information for the practitioner.
+The page is now: a two-sentence intro (pick the largest context size
+that fits your machine; context size = how long a document the model
+tracks reliably) and one section per certified context size, each
+listing exactly: model + configuration, needed bandwidth with the
+minimum single/dual/quad-channel systems that meet it, RAM for iGPU,
+VRAM for a dedicated GPU. No methodology, no measurement notes, no
+gates - the target audience wants the result, not the why. All the
+removed detail lives in the protocol and this notebook. The RAM and
+VRAM numbers are the rounded llama-breakdown totals (addendum 79's
+device split sums to the same footprint whether it lands in UMA or a
+dedicated card's VRAM).
