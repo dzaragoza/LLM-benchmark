@@ -6,6 +6,7 @@ combined_medal (the confidence tiers). Extracted verbatim."""
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import sys
@@ -67,6 +68,28 @@ def wilson_interval(k: int, n: int, z: float = 1.0) -> tuple[float, float]:
 CERTIFY_Z = 2.0
 CERTIFY_BAR = 0.50
 CERTIFY_FLOOR = 10  # ceil(0.5 * 20): at least half the cells measured
+
+
+def _registry_window(fam: str) -> int | None:
+    """The family's trained window from the registry store (addendum
+    58): the hub config.json extract (max_position_embeddings),
+    already fetched and checked in - the addendum-45 lesson: a family
+    whose trained window cannot run the FIRST rung should never be
+    downloaded, converted or launched at all; the store already knew."""
+    try:
+        from etc import registry_data
+
+        store = json.loads(registry_data.STORE.read_text())
+        entry = store.get(fam) or {}
+        geo = entry.get("geometry") or {}
+        if geo.get("window"):
+            return int(geo["window"])
+        extract = entry.get("extract") or {}
+        if extract.get("max_position_embeddings"):
+            return int(extract["max_position_embeddings"])
+    except Exception:
+        return None
+    return None
 
 
 def _acquire_missing_model(
@@ -262,6 +285,34 @@ def certify_rung(
             or (fst.get("tournament_entry") or {}).get("file")
             or (local_rung(famdir, rung) if rung else None)
         )
+        # addendum 58: the registry KNEW - the trained window vs the
+        # rung's ctx (depth + answer headroom) is checked BEFORE any
+        # download, conversion or launch. The addendum-45 families
+        # (phi-1, MiniCPM sft, Phi-3-mini-4k) were downloaded, converted
+        # and launched to learn what the store already said. Unknown
+        # window (no extract): the gate stays silent, the launch banner
+        # remains the authority (addendum 45 catches it at runtime).
+        _reg_window = _registry_window(fam)
+        if _reg_window is not None and _reg_window < depth + 2 * ruler_gate.ANSWER_HEADROOM:
+            verdict = "infeasible"
+            entry["verdict"] = "infeasible"
+            entry["infeasible_reason"] = (
+                f"trained window {_reg_window:,} < the rung's ctx "
+                f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,} (registry pre-flight, addendum 58)"
+            )
+            entry["cells_measured"] = 0
+            entry["ran_now"] = 0
+            entry["passes"] = 0
+            fst["infeasible"] = {"window_cap": _reg_window, "depth": depth}
+            fst.setdefault("verdicts", {})[str(depth)] = "infeasible"
+            save_state(state_path, state)
+            print(
+                f"  INFEASIBLE (pre-flight) - trained window {_reg_window:,} "
+                f"cannot run the {depth:,} rung; {fam} is out - "
+                "nothing downloaded, converted or launched"
+            )
+            results.append(entry)
+            continue
         if (not model or not os.path.isfile(model)) and spec:
             acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
             if acquired:
@@ -616,6 +667,34 @@ def certify_rung_combined(
             or (fst.get("tournament_entry") or {}).get("file")
             or (local_rung(famdir, rung) if rung else None)
         )
+        # addendum 58: the registry KNEW - the trained window vs the
+        # rung's ctx (depth + answer headroom) is checked BEFORE any
+        # download, conversion or launch. The addendum-45 families
+        # (phi-1, MiniCPM sft, Phi-3-mini-4k) were downloaded, converted
+        # and launched to learn what the store already said. Unknown
+        # window (no extract): the gate stays silent, the launch banner
+        # remains the authority (addendum 45 catches it at runtime).
+        _reg_window = _registry_window(fam)
+        if _reg_window is not None and _reg_window < depth + 2 * ruler_gate.ANSWER_HEADROOM:
+            verdict = "infeasible"
+            entry["verdict"] = "infeasible"
+            entry["infeasible_reason"] = (
+                f"trained window {_reg_window:,} < the rung's ctx "
+                f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,} (registry pre-flight, addendum 58)"
+            )
+            entry["cells_measured"] = 0
+            entry["ran_now"] = 0
+            entry["passes"] = 0
+            fst["infeasible"] = {"window_cap": _reg_window, "depth": depth}
+            fst.setdefault("verdicts", {})[str(depth)] = "infeasible"
+            save_state(state_path, state)
+            print(
+                f"  INFEASIBLE (pre-flight) - trained window {_reg_window:,} "
+                f"cannot run the {depth:,} rung; {fam} is out - "
+                "nothing downloaded, converted or launched"
+            )
+            results.append(entry)
+            continue
         if (not model or not os.path.isfile(model)) and spec:
             acquired = _acquire_missing_model(spec, fam, famdir, rung, state, dry_run)
             if acquired:

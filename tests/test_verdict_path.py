@@ -709,3 +709,40 @@ def test_restarted_rung_skips_stored_verdicts(tmp_path, monkeypatch):
     assert by["deadfam"]["skipped"] == "dead at this rung (stored verdict)"
     # the medalist's accept ANSWERS the rung: the new family skips it too
     assert "rung already answered" in by["newfam"]["skipped"]
+
+
+def test_registry_preflight_declares_infeasible_before_download(tmp_path, monkeypatch, capsys):
+    """Addendum 58: "we measured and downloaded every model at 4k for
+    nothing. They should have never been even evaluated." The registry
+    store already carries each family's trained window (the hub
+    config.json extract) - a family whose window cannot run the rung's
+    ctx is declared infeasible BEFORE any download, conversion or
+    launch, with the same state record as the runtime catch (addendum 45)."""
+    import bench.certify as BC
+
+    downloaded = []
+    monkeypatch.setattr(BC.hf_download, "require_hub", lambda: downloaded.append("hub") or None)
+    monkeypatch.setattr(
+        BC, "_acquire_missing_model", lambda *a: downloaded.append("acquire") or None
+    )
+    monkeypatch.setattr(BC, "_registry_window", lambda fam: 2048 if fam == "tiny-win" else None)
+    state = {"families": {}}
+    res = BC.certify_rung_combined(
+        4096,
+        ["tiny-win"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        min_words=2,
+    )
+    assert downloaded == [], "the pre-flight must fire before any acquire"
+    r = res[0]
+    assert r["verdict"] == "infeasible"
+    assert "pre-flight" in r["infeasible_reason"]
+    fst = state["families"]["tiny-win"]
+    assert fst["infeasible"] == {"window_cap": 2048, "depth": 4096}
+    assert fst["verdicts"]["4096"] == "infeasible"
+    out = capsys.readouterr().out
+    assert "nothing downloaded, converted or launched" in out
