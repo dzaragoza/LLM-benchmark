@@ -21,7 +21,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-PAGES = ["cpu-picker.html", "gpu-picker.html"]
+PAGES = ["docs/cpu-picker.html", "docs/gpu-picker.html"]
 
 BOOT_STUB = """
 function $(id) { return __doc.getElementById(id); }
@@ -131,7 +131,7 @@ def main() -> None:
             continue
         js = extract_script(path.read_text())
         with tempfile.TemporaryDirectory() as td:
-            check_syntax(js, Path(td), page)
+            check_syntax(js, Path(td), Path(page).name)
         check_boot(js, page)
         print(f"js-check: {page} OK (syntax + boot)")
     if failed:

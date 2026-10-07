@@ -14,11 +14,11 @@ The study's deliverable is not the paper - it is the two static pages a practiti
 opens to answer "which Q8_0 model should I run on my machine?". Both run offline,
 no build step, no JavaScript dependencies:
 
-- **[cpu-picker.html](cpu-picker.html)** 🖥️ **Local LLM picker — CPU/iGPU** — serving from **system RAM**:
+- **[cpu-picker.html](docs/cpu-picker.html)** 🖥️ **Local LLM picker — CPU/iGPU** — serving from **system RAM**:
   pick your DDR generation, JEDEC speed and channel count (DDR to DDR5, single to
   octa), enter your RAM, get the highest-ARC measured model that fits and clears the
   300-wpm reader line at your bandwidth.
-- **[gpu-picker.html](gpu-picker.html)** 🖨️ **Local LLM picker — GPU** — serving from a **GPU**: enter your
+- **[gpu-picker.html](docs/gpu-picker.html)** 🖨️ **Local LLM picker — GPU** — serving from a **GPU**: enter your
   card's VRAM, get the same recommendation (bandwidth is never the constraint on
   current cards - the page shows the derivation).
 
@@ -137,7 +137,7 @@ Standalone instruments (outside the pipeline, one-shot experiments):
 ## Roster selection (pre-registered, transparent)
 
 The roster selection rules are fixed in advance and recorded in
-full in **[model-selection.md](docs/model-selection.md)** (ten rules).
+full in **[model-selection.md](md/model-selection.md)** (ten rules).
 The machine's RAM ceiling is measured FIRST (the gallop search on
 the champion config), then candidates screen by the registered
 ceiling predictor (rule 2): predicted machine cost at 262,144
@@ -145,7 +145,7 @@ tokens under the champion's ceiling (4.96 GiB), non-thinking mode
 required, speed-gate predictor, first-party weights, paper rule,
 v4.3 data hygiene, dry-run pre-flight, and verbatim commands. The
 study's practitioner goals are recorded in
-**[practitioner-goals.md](docs/practitioner-goals.md)**. The study-#1
+**[practitioner-goals.md](md/practitioner-goals.md)**. The study-#1
 popularity walk-down history lives in the lab notebook.
 
 ## Reproduction guide (Windows 10/11 and Linux)
@@ -500,7 +500,7 @@ license and log in with `hf auth login`).
 
 Every constant the study uses - author rulings, practical limits,
 derived/measured values, and inherited defaults - is registered with
-its provenance in [protocol.md](docs/protocol.md). Governance rule: a
+its provenance in [protocol.md](md/protocol.md). Governance rule: a
 constant is single-sourced in the code, and changing one is a
 protocol change requiring a notebook addendum.
 

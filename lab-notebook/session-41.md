@@ -228,3 +228,23 @@ own commit-and-push. live_status.html, run_status.py and
 tests/test_run_status.py are removed - live updates are conversational
 (addendum 67-era ruling). Protocol R-15, pinned by
 test_picker_medals_panel; js_check guards the pages' boot. 200 tests.
+
+## Addendum 73 - the site shape: md/ for the documents, docs/ for the web
+
+The author's ruling: "create a directory md and put every md file in
+there. Keep readme in the root. Then we use docs for the new picker."
+GitHub Pages only offers root or /docs as the publishing source, so
+the shape is now: md/ holds every study document (protocol.md, wow.md,
+models.md, model-selection.md, practitioner-goals.md, the legacy
+notebook.md and the conversation archives), README.md stays in the
+root, and docs/ is the PAGES SITE: index.md (the results dashboard -
+gold per rung, gate kill rates, verdict counts) plus the two picker
+pages. All path references moved with the files:
+requirements_check.py (md/protocol.md), etc/registry_data.py's models
+check (md/models.md), js_check/picker_medals page lists
+(docs/*.html), README links, .pre-commit-config.yaml's requirements
+hook scope, and js_check's temp-file name (page paths now carry a
+slash - basename only). js_check boots both pages at their new paths.
+To publish: Settings -> Pages -> source main /docs - then
+dzaragoza.github.io/LLM-benchmark/ serves index.md as the homepage,
+the pickers at /cpu-picker and /gpu-picker.

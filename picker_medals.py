@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-PAGES = ["cpu-picker.html", "gpu-picker.html"]
+PAGES = ["docs/cpu-picker.html", "docs/gpu-picker.html"]
 BEGIN = "      // BEGIN gold medals (generated - picker_medals.py)"
 END = "      // END gold medals"
 
