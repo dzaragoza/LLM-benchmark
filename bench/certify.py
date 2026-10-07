@@ -250,10 +250,30 @@ def certify_rung(
             results.append(entry)
             continue
         if answered:
-            entry["skipped"] = "rung already answered"
-            print("  SKIPPED - the rung is already answered")
-            results.append(entry)
-            continue
+            # addendum 62: the answered-rung skip must not swallow a
+            # family whose window makes THIS its terminal rung - a
+            # never-evaluated family (no stored verdict, no cells)
+            # with window <= depth cannot climb: skipping it here
+            # means never measuring it at all. It measures now.
+            _w = _registry_window(fam)
+            _terminal = (
+                _w is not None
+                and _w <= depth
+                and not (fst.get("verdicts") or {}).get(str(depth))
+                and not any(
+                    (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
+                )
+            )
+            if _terminal:
+                print(
+                    f"  rung answered, but {fam}'s window ({_w:,}) makes this "
+                    "its terminal rung - measuring it (addendum 62)"
+                )
+            else:
+                entry["skipped"] = "rung already answered"
+                print("  SKIPPED - the rung is already answered")
+                results.append(entry)
+                continue
         # addendum 57: the verdict is PERSISTED per rung - a restart must
         # not re-run a family at a depth it already answered. A stored
         # accept ANSWERS the rung (later families skip it); a stored dead
@@ -623,10 +643,30 @@ def certify_rung_combined(
             results.append(entry)
             continue
         if answered:
-            entry["skipped"] = "rung already answered"
-            print("  SKIPPED - the rung is already answered")
-            results.append(entry)
-            continue
+            # addendum 62: the answered-rung skip must not swallow a
+            # family whose window makes THIS its terminal rung - a
+            # never-evaluated family (no stored verdict, no cells)
+            # with window <= depth cannot climb: skipping it here
+            # means never measuring it at all. It measures now.
+            _w = _registry_window(fam)
+            _terminal = (
+                _w is not None
+                and _w <= depth
+                and not (fst.get("verdicts") or {}).get(str(depth))
+                and not any(
+                    (fst.get(ns) or {}) for ns in ("certify", "certify_speed", "certify_vt")
+                )
+            )
+            if _terminal:
+                print(
+                    f"  rung answered, but {fam}'s window ({_w:,}) makes this "
+                    "its terminal rung - measuring it (addendum 62)"
+                )
+            else:
+                entry["skipped"] = "rung already answered"
+                print("  SKIPPED - the rung is already answered")
+                results.append(entry)
+                continue
         # addendum 57: the verdict is PERSISTED per rung - a restart must
         # not re-run a family at a depth it already answered. A stored
         # accept ANSWERS the rung (later families skip it); a stored dead

@@ -895,3 +895,63 @@ def test_window_equal_to_rung_is_a_candidate(tmp_path, monkeypatch):
     assert fst.get("verdicts", {}).get("4096") != "infeasible"
     # the family proceeds to acquisition - the pre-flight stayed silent
     assert launched == ["acquire"]
+
+
+def test_answered_rung_still_measures_the_terminal_family(tmp_path, monkeypatch, capsys):
+    """Addendum 62: the answered-rung skip must not swallow a family
+    whose window makes THIS its terminal rung - never-evaluated (no
+    stored verdict, no cells), window <= depth: it cannot climb, so
+    skipping it at the answered rung means never measuring it at all.
+    The rung was answered first (a stored accept ahead of it in param
+    order), and the terminal family measures anyway.
+
+    Pins: R-04, R-06
+    """
+    import bench.certify as BC
+
+    model = tmp_path / "eq" / "eq-f16.gguf"
+    (tmp_path / "eq").mkdir()
+    model.write_bytes(b"x")
+    # champion: stored accept at 4,096, cells present - answers the rung
+    # terminal family: 4,096-window, never evaluated - must MEASURE
+    state: dict[str, Any] = {
+        "families": {
+            "champ": {
+                "verdicts": {"4096": "accept"},
+                "certify": {"4096": {"1": {"v": 3}}},
+                "certify_speed": {"4096": {"1": {"v": 0}}},
+                "certify_vt": {"4096": {"1": {"v": 5}}},
+                "tournament_entry": {"rung": "f16", "file": str(model)},
+            },
+            "eqfam": {"tournament_entry": {"rung": "f16", "file": str(model)}},
+        }
+    }
+    monkeypatch.setattr(BC, "_registry_window", lambda fam: 4096 if fam == "eqfam" else None)
+    measured = []
+
+    def fake_measure(task, *a, **kw):
+        measured.append(task)
+        return (task != "fwe", 5, "line", 1.0)
+
+    import bench.state_store as SS
+
+    monkeypatch.setattr(SS, "_task_measure", fake_measure)
+    res = BC.certify_rung_combined(
+        4096,
+        ["champ", "eqfam"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        min_words=2,
+    )
+    out = capsys.readouterr().out
+    assert "terminal rung - measuring it (addendum 62)" in out
+    assert measured, "the terminal family must be measured at the answered rung"
+    eq = (
+        next(r for r in res if r.get("family") == "eqfam")
+        if any(r.get("family") == "eqfam" for r in res)
+        else res[-1]
+    )
+    assert eq.get("skipped") != "rung already answered"
