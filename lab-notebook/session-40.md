@@ -1127,3 +1127,11 @@ THE CHANGES: every depth + 2*ANSWER_HEADROOM in the launch path becomes depth (b
 THE MIGRATION: the state's two window==rung casualties (Qwen2.5-1.5B-Instruct, gemma-3-1b-it) have their infeasible record and 32,768 verdict CLEARED - they get their 32,768 rung measured under the new rule; the medalist's final record (2sigma at 4k/8k/16k, ceiling 32k pending its own measurement) is decided by measurement, not by 256 tokens. The other infeasible families (window strictly below every rung) are untouched - their disqualification holds under both rules.
 
 Test: test_window_equal_to_rung_is_a_candidate (a 4,096-window family at the 4,096 rung is acquired and measured, never pre-declared infeasible; the pre-flight stays silent). R-06 re-worded: the requirement is window >= rung DEPTH, ctx = depth. 199 tests.
+
+### Addendum 61b - the 4k-window trio revived (2026-10-07, the author's ruling)
+
+THE RULING: "Can we revive the 4k window candidates the same way?" Yes - same disease, same cure. The 4,096-window trio (MiniCPM-1B-sft-bf16, MiniCPM-2B-sft-bf16, Phi-3-mini-4k-instruct) was disqualified at the FIRST rung by the old ctx = depth + 256 rule: 4,096 < 4,352. Under addendum 61 (window >= depth, ctx = depth) they are candidates at the 4,096 rung. All three state records cleared (infeasible = None, no stored verdicts - they went out before any cell was measured, so the re-entry is clean: nothing to re-derive, they measure from scratch).
+
+phi-1 STAYS OUT: trained window 2,048 is strictly below the first rung under both the old and the new rule - its disqualification is a measurement of the world, not of the rule. The roster's sub-4k-window class has no rung to run; that is the study's floor, unchanged.
+
+Migration class closed: every family whose infeasible record was window == depth is revived; the surviving infeasible set is exactly the strictly-below families (phi-1 alone at present). The addendum-45 machinery catches anything the registry missed at runtime, unchanged.
