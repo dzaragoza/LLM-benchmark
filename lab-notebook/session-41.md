@@ -518,3 +518,16 @@ retroactively for rungs that passed while arc was unmeasured - the
 same order-independence the v5 exclusive-gold rule taught us. The
 run's tail prints the medal line (gold@depth list). Verified with a
 logic check: fwe+vt+arc -> gold; vt fail or arc fail -> none.
+
+## Addendum 93 - v6 flow corrections: arc first, the climb never stops
+
+The author's three rulings: (1) ARC RUNS FIRST - if the arc cell
+dies, the model is dead by definition and NO rung is measured (the
+cheap hard kill, ~2s, before any ladder spend). (2) The ladder does
+NOT stop on death - it climbs all rungs to 256k; each rung's result
+stands alone, either gold (fwe & vt & arc all pass) or dead. (3) The
+rung verdict vocabulary is gold/dead directly (no separate
+pass/verdict + medal step). v6_prototype.py restructured: arc_cell_k1
+runs before the loop and short-circuits; the loop uses continue (not
+break) on death/infeasible/window; verdict = "gold" or "dead" per
+rung; medals print at the end. All checks pass (ruff, ty, 200 tests).
