@@ -45996,3 +45996,66 @@ For more details, see https://huggingface.co/docs/huggingface_hub/authentication
   Llama-3.2-1B-Instruct arc: 2/8 cells measured, 12 unmeasured
   DEAD - arc cannot reach the bar at 4,096 (2/8, best lower bound 0.477 < 0.5); next candidate
 [2026-10-07T08:09:59] verdict: Llama-3.2-1B-Instruct DEAD at rung 4,096 - committing partial results
+
+===== 2026-10-07T08:10:03 | full_benchmark.py --task all --force-rung f16 =====
+
+------------------------------------------------------------
+  phi-1 speed: 0/0 cells measured, 20 unmeasured
+  phi-1 fwe: 0/0 cells measured, 20 unmeasured
+  phi-1 vt: 0/0 cells measured, 20 unmeasured
+  phi-1 arc: 0/0 cells measured, 20 unmeasured
+
+=== phi-1-f16.gguf ===
+  starting server...
+    [server] 0.00.042.766 I llama_model_loader: - kv   7:                        phi2.context_length u32              = 2048
+    [server] 0.00.089.208 I print_info: n_ctx_train           = 2048
+    [server] 0.00.089.246 I print_info: n_ctx_orig_yarn       = 2048
+    [server] 0.00.094.912 I llama_context: constructing llama_context
+    [server] 0.00.094.924 I llama_context: n_seq_max             = 1
+    [server] 0.00.094.925 I llama_context: n_ctx                 = 4352
+    [server] 0.00.094.925 I llama_context: n_ctx_seq             = 4352
+    [server] 0.00.094.925 I llama_context: n_batch               = 2048
+    [server] 0.00.094.925 I llama_context: n_ubatch              = 512
+    [server] 0.00.094.925 I llama_context: causal_attn           = 1
+    [server] 0.00.094.927 I llama_context: flash_attn            = auto
+    [server] 0.00.094.927 I llama_context: kv_unified            = false
+    [server] 0.00.094.929 I llama_context: freq_base             = 10000.0
+    [server] 0.00.094.929 I llama_context: freq_scale            = 1
+    [server] 0.00.094.929 I llama_context: n_rs_seq              = 0
+    [server] 0.00.094.929 I llama_context: n_outputs_max         = 1
+    [server] 0.00.094.930 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.00.094.930 W llama_context: n_ctx_seq (4352) > n_ctx_train (2048) -- possible training context overflow
+    [server] 0.00.095.066 I llama_context: Vulkan_Host  output buffer size =     0.20 MiB
+    [server] 0.00.095.175 D llama_context: enumerating backends
+    [server] 0.00.095.182 D llama_context: backend_ptrs.size() = 2
+    [server] 0.00.101.370 I common_memory_breakdown_print: | memory breakdown [MiB]                     | total    free    self   model   context   compute    unaccounted |
+    [server] 0.00.112.165 I llama_model_loader: - kv   7:                        phi2.context_length u32              = 2048
+    [server] 0.00.151.651 I print_info: n_ctx_train           = 2048
+    [server] 0.00.151.675 I print_info: n_ctx_orig_yarn       = 2048
+    [server] 0.01.550.264 I llama_context: constructing llama_context
+    [server] 0.01.550.268 I llama_context: n_seq_max             = 1
+    [server] 0.01.550.268 I llama_context: n_ctx                 = 4352
+    [server] 0.01.550.269 I llama_context: n_ctx_seq             = 4352
+    [server] 0.01.550.269 I llama_context: n_batch               = 2048
+    [server] 0.01.550.269 I llama_context: n_ubatch              = 512
+    [server] 0.01.550.269 I llama_context: causal_attn           = 1
+    [server] 0.01.550.270 I llama_context: flash_attn            = auto
+    [server] 0.01.550.270 I llama_context: kv_unified            = false
+    [server] 0.01.550.274 I llama_context: freq_base             = 10000.0
+    [server] 0.01.550.274 I llama_context: freq_scale            = 1
+    [server] 0.01.550.275 I llama_context: n_rs_seq              = 0
+    [server] 0.01.550.275 I llama_context: n_outputs_max         = 1
+    [server] 0.01.550.275 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.01.550.275 W llama_context: n_ctx_seq (4352) > n_ctx_train (2048) -- possible training context overflow
+    [server] 0.01.550.444 I llama_context: Vulkan_Host  output buffer size =     0.20 MiB
+    [server] 0.01.712.923 D llama_context: enumerating backends
+    [server] 0.01.712.935 D llama_context: backend_ptrs.size() = 2
+    [server] 0.01.775.315 W srv    load_model: the slot context (4352) exceeds the training context of the model (2048) - capping
+    [server] 0.01.857.200 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 2048, kv_unified = 'false'
+    [server] 0.01.857.222 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 2048
+    [server] 0.01.857.267 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+    [server] actual n_ctx = 2048 (requested 4352)
+  ERROR: server accepted -c 4352 but runs n_ctx 2048 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/phi-1/phi-1-f16.gguf.server.log
+    memory (llama): weights 2.64 GiB, context 0.80 GiB, compute 0.06 GiB -> total 3.49 GiB (addendum 11), machine cost 2.84 GiB (MemAvailable delta)
+  INFEASIBLE at 4,096 - trained window 2,048 < the rung's ctx 4,352 - phi-1 is out of the benchmark; next candidate
+[2026-10-07T08:10:05] verdict: phi-1 INFEASIBLE at rung 4,096 - out of the benchmark (addendum 45) - committing partial results
