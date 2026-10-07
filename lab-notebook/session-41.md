@@ -413,3 +413,20 @@ RAM/VRAM (Vulkan0 6,941 MiB + Host 633 MiB = 7.4 GiB rounded up),
 command line at -c 32768. The update format gains a standing element:
 every update now reports the per-gate per-cell pass/kill percentages
 under the calibration window (addendum 71).
+
+## Addendum 86 - the no-gold rungs count their dead; my 64k miscount corrected
+
+The author's ruling: kills in a rung WITHOUT a gold medal count by
+models declared dead - the param-ascending order guarantees the gold
+will land on a HIGHER-parameter model (the R-14 window already encodes
+this: no accept -> every measured family counts). My previous update
+WRONGLY excluded the 64k cells ("they'll count once someone accepts")
+- Qwen3.5-0.8B's 64k cells were always in the window; my totals missed
+them. Corrected overall per-cell rates under the calibration window:
+speed 196 cells 96.4/3.6, fwe 196 61.7/38.3, vt 195 62.6/37.4, arc 171
+72.5/27.5 - the 64k cells were in fact included there (the helper
+walks all rungs); the per-rung breakdown now shows 64k explicitly:
+speed 6 cells 100% pass, fwe 6 83.3%, vt 6 83.3% - Qwen3.5-0.8B's
+speed/fwe cells PASSED at 64k; only vt killed it (0/6, all 4/5
+near-misses). Updates will report per-rung tables when a rung is
+settled, and the no-gold rungs' dead always count.
