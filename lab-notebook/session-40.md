@@ -1101,3 +1101,17 @@ THE DESIGN (all four pieces shipped):
 THE LIMIT, ON RECORD: RE prevents ruling-loss in refactors (the arc-gate and ladder-break class); it does not prevent novel code bugs (the wrong-model-first sort was caught by the author's eye). The arc question that opened this was the proof of value: 30 minutes of archaeology that a pin would have answered in seconds.
 
 197 tests. requirements_check: 9 requirements, all pinned.
+
+### Addendum 60 - every log lives in the results tree: models/<family> is weights-only (2026-10-07, the author's ruling)
+
+THE CATCH: deleting the infeasible families' model directories (the disk-recovery ruling) took the arc cell logs with them - the arc log was written next to the gguf (os.path.dirname(model)), so rm -rf models/<family> destroyed diagnostics. The author's ruling: "Put every log in tournament results, so deleting a directory in models affects only data that can be easily regenerated."
+
+THE FIX (three writers moved; the fwe/vt cells already lived in the results tree):
+1. speed_gate.bench_model gains log_dir (default: the model's own dir, so every existing caller keeps working); the server log becomes <log_dir>/<model>.server.log.
+2. bench/cells.speed_pass and speed_cell pass results_dir as log_dir, and their _banner_window reads move to the results-tree path - the window cap check rides the same log it always did, just in a different directory.
+3. bench/state_store.arc_pass gains results_dir (same default); _task_measure passes it through. The arc log becomes <results_dir>/<model>.arc-cell{run}.log.
+4. full_benchmark.git_tail's artifact globs: the tournament-results recursive glob (already present) picks up the new locations; the old models/*/ globs stay for the pre-60 logs already committed, and go stale naturally as model dirs get deleted.
+
+The layout after: models/<family>/ holds the gguf (and the pre-60 logs until their dirs are deleted); models/tournament-results/<family>/ holds EVERYTHING a cell run produces - per-turn dumps, csv, per-cell server logs, arc cell logs, mem sidecars. Deleting a models/<family> directory now touches only the weights; every verdict is in the state file and every log is in the results tree.
+
+Test: test_cell_logs_live_in_the_results_tree (a faked launch per task writes its log under tournament-results, nothing lands next to the model). 198 tests.

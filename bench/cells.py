@@ -88,13 +88,13 @@ def speed_pass(
         n_conversations=1,
         kv_quant_k=kv_quant_k,
         kv_quant_v=kv_quant_v,
+        log_dir=results_dir,
     )
     # the launch's banner: when the server capped the -c DOWN to the
     # trained window, bench_model's banner guard refused to bench (no
-    # turns) - the window rides in the verdict either way (addendum 19)
-    server_log = os.path.join(
-        os.path.dirname(model) or ".", os.path.basename(model) + ".server.log"
-    )
+    # turns) - the window rides in the verdict either way (addendum 19);
+    # addendum 60: the log lives in the results tree, not the model dir
+    server_log = os.path.join(results_dir, os.path.basename(model) + ".server.log")
     window_cap = _banner_window(server_log)
     floor_hit = next((t for t in turns if t.get("error") == "rung below conversation floor"), None)
     if floor_hit is not None:
@@ -243,13 +243,12 @@ def speed_cell(
         conversation_start=run - 1,
         kv_quant_k=kv_quant_k,
         kv_quant_v=kv_quant_v,
+        log_dir=results_dir,
     )
     dump = os.path.join(results_dir, f"{label}-rung{rung}-speed-cell{run}.json")
     with open(dump, "w") as f:
         json.dump(turns, f)
-    server_log = os.path.join(
-        os.path.dirname(model) or ".", os.path.basename(model) + ".server.log"
-    )
+    server_log = os.path.join(results_dir, os.path.basename(model) + ".server.log")
     window_cap = _banner_window(server_log)
     floor_hit = next((t for t in turns if t.get("error") == "rung below conversation floor"), None)
     if floor_hit is not None:

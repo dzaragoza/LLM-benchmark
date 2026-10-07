@@ -648,6 +648,7 @@ def bench_model(
     conversation_start: int = 0,
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
+    log_dir: str | None = None,
 ) -> tuple[list[dict[str, Any]], tuple[str, float, float] | None, list[dict[str, Any]]]:
     """Live-bench one model end to end (server launch included).
     Protocol v2: per-conversation depth prefill to the reference
@@ -670,7 +671,11 @@ def bench_model(
     all_turns = []
     noise_records = []
     mem_reports = []
-    log_path = os.path.join(os.path.dirname(model) or ".", os.path.basename(model) + ".server.log")
+    # addendum 60: the server log lives in log_dir (the results tree)
+    # when given - deleting a models/<family> directory then touches
+    # only regenerable data; the model dir stays weights-only.
+    log_dir = log_dir or (os.path.dirname(model) or ".")
+    log_path = os.path.join(log_dir, os.path.basename(model) + ".server.log")
     print("  starting server...", flush=True)
     extra = ["-ngl", "99", "-c", str(ctx), "--parallel", "1"]
     # session 35, addendum 8: K and V quantize SEPARATELY (the

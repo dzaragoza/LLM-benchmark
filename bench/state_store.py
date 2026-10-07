@@ -168,6 +168,7 @@ def arc_pass(
     model: str,
     run: int,
     port: int,
+    results_dir: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """One ARC cell (session 38, addendum 6): k=5 deterministic
     questions, one server launch at ARC_RUN_CTX (rung-independent),
@@ -176,9 +177,12 @@ def arc_pass(
     recovered). Returns (passed_at_gold, record)."""
     questions = arc_cell_questions(run)
     ctx = ARC_RUN_CTX
-    log_path = os.path.join(
-        os.path.dirname(model) or ".", os.path.basename(model) + f".arc-cell{run}.log"
-    )
+    # addendum 60: the arc cell log lives in the results tree (given),
+    # so deleting models/<family> loses only regenerable data; the
+    # model dir stays weights-only.
+    log_dir = results_dir or (os.path.dirname(model) or ".")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, os.path.basename(model) + f".arc-cell{run}.log")
     proc, healthy = llama_server.start_server(
         model, port, ["-t", "8", "-c", str(ctx), "-ngl", "99"], log_path=log_path
     )
@@ -337,7 +341,7 @@ def _task_measure(
             time.time() - t0,
         )
     if task == "arc":
-        ok, fv = arc_pass(model, run, port)
+        ok, fv = arc_pass(model, run, port, results_dir)
         correct = int(fv.get("correct") or 0)
         k_q = int(fv.get("k") or ARC_CELL_K)
         return (

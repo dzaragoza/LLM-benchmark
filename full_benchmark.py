@@ -270,6 +270,9 @@ def git_tail(args: argparse.Namespace) -> None:
         + glob.glob("models/*/*-server.log")
         + glob.glob("models/*/*window-probe.log")
     )
+    # addendum 60: the cell/server logs moved into the results tree -
+    # the tournament-results glob below picks them up; the model-dir
+    # globs stay for the pre-addendum-60 logs already committed.
     paths += glob.glob("models/tournament-results/**/*", recursive=True)
     paths += (
         glob.glob("models/*/ladder-results/*")
