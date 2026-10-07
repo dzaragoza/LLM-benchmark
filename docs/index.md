@@ -4,6 +4,26 @@ Pick the **largest context size that fits your machine** from the list below. Bi
 
 **You need ONE of the two options in each section — never both.** An integrated GPU (iGPU) uses your system RAM; a dedicated GPU uses its own VRAM. If your machine has only an iGPU (most laptops), read the iGPU lines. If it has a dedicated graphics card, read the VRAM line and ignore the bandwidth requirement.
 
+## 32k context
+
+- **Model**: Qwen3-1.7B
+- **Configuration**: `Qwen3-1.7B-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 32,768
+
+**Pick ONE — you do not need both:**
+
+- **Integrated GPU (iGPU)** — the model runs from system RAM:
+  - System bandwidth needed: 55 GB/s. Minimum that matches:
+    - DDR5-7200 single channel (57.6 GB/s)
+  - Minimum system RAM: 8 GiB
+- **Dedicated GPU** — the model runs from the card's VRAM:
+  - Minimum VRAM: 8 GiB. Any dedicated GPU has high enough bandwidth.
+
+**llama.cpp command line:**
+
+```bash
+llama-server -m Qwen3-1.7B-f16.gguf -c 32768 --cache-type-k f16 --cache-type-v f16 -fa on --parallel 1
+```
+
 ## 16k context
 
 - **Model**: Qwen2.5-1.5B-Instruct
