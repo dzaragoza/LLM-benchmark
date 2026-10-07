@@ -14,6 +14,7 @@ Pick the **largest context size that fits your machine** from the list below. Bi
 - **Integrated GPU (iGPU)** — the model runs from system RAM:
   - System bandwidth needed: 55 GB/s. Minimum that matches:
     - DDR5-7200 single channel (57.6 GB/s)
+    - DDR5-3600 dual channel (57.6 GB/s)
   - Minimum system RAM: 8 GiB
 - **Dedicated GPU** — the model runs from the card's VRAM:
   - Minimum VRAM: 8 GiB. Any dedicated GPU has high enough bandwidth.
@@ -35,6 +36,9 @@ llama-server -m Qwen3-1.7B-f16.gguf -c 32768 --cache-type-k f16 --cache-type-v f
   - System bandwidth needed: 25 GB/s. Minimum that matches:
     - DDR4-3200 single channel (25.6 GB/s)
     - DDR4-1600 dual channel (25.6 GB/s)
+    - DDR5-3200 single channel (25.6 GB/s)
+    - DDR3-1600 dual channel (25.6 GB/s)
+    - DDR3-800 quad channel (25.6 GB/s)
   - Minimum system RAM: 4 GiB
 - **Dedicated GPU** — the model runs from the card's VRAM:
   - Minimum VRAM: 4 GiB. Any dedicated GPU has high enough bandwidth.
