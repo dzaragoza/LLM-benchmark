@@ -213,3 +213,18 @@ whose arc ran but that was never launched never enters.
 `kill_rate_cells(state, depth)` + `arc_kill_rate_cells(state)` in
 bench/certify.py. Protocol R-14, pinned by
 test_kill_rate_window_stops_at_gold. 205 tests.
+
+## Addendum 72 - the gold panel on the picker pages; the live page retires
+
+The author's ruling: "every time a new gold medal is achieved, update
+the picker web pages. Remove the live status page." The pickers now
+carry a GOLD MEDALS section - one row per tournament rung with the
+exclusive gold winner (addendum 70) and its param count, "-" where no
+gold stands. picker_medals.py rewrites the delimited GOLD_MEDALS block
+in cpu-picker.html and gpu-picker.html (idempotent; the pages stay
+hand-authored except that one generated block); verdict_commit runs it
+on every accept, so a new gold lands on the pages with the verdict's
+own commit-and-push. live_status.html, run_status.py and
+tests/test_run_status.py are removed - live updates are conversational
+(addendum 67-era ruling). Protocol R-15, pinned by
+test_picker_medals_panel; js_check guards the pages' boot. 200 tests.

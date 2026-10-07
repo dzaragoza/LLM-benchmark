@@ -219,6 +219,14 @@
       nothing hidden.
     </p>
     <div id="runsTable"></div>
+    <h2>Gold medals &mdash; the certified champions per context depth</h2>
+    <p style="font-size: 0.9rem">
+      The tournament's gold medal is exclusive per context depth (rung):
+      among the models certified at 2 sigma at a rung, only the one with
+      the fewest parameters holds gold. Updated automatically every time
+      a new gold medal is achieved.
+    </p>
+    <div id="goldMedals"></div>
 
     <div class="foot">
       <p>
@@ -497,6 +505,17 @@
         { name: "MiniCPM5-2B",    passes: [3, 0, 0, 0, 0, 0, 0] },
         { name: "MiniCPM5-1B",    passes: [0, 0, 0, 0, 0, 0, 0] },
       ];
+      // BEGIN gold medals (generated - picker_medals.py)
+      var GOLD_MEDALS = [
+        { depth: "4k", model: "granite-4.0-h-1b", params: "1.46" },
+        { depth: "8k", model: "Qwen2.5-1.5B-Instruct", params: "1.54" },
+        { depth: "16k", model: "Qwen2.5-1.5B-Instruct", params: "1.54" },
+        { depth: "32k", model: "", params: "" },
+        { depth: "64k", model: "", params: "" },
+        { depth: "128k", model: "", params: "" },
+        { depth: "256k", model: "", params: "" },
+      ];
+      // END gold medals
       var RUNGS = [4096, 8192, 16384, 32768, 65536, 131072, 262144];
       // The FWE medal map (the author's ruling, 2026-10-04): every medal
       // is the highest 2-sigma certification at the PERFECT-RETRIEVAL
@@ -543,6 +562,23 @@ var CERTIFIED = {
       }
 
       $("runsTable").innerHTML = renderRunsTable();
+      var gm = $("goldMedals");
+      if (gm && typeof GOLD_MEDALS !== "undefined") {
+        gm.innerHTML =
+          '<table><thead><tr><th>context depth</th><th>gold medal model</th></tr></thead><tbody>' +
+          GOLD_MEDALS
+            .map(function (r) {
+              return (
+                "<tr><td>" +
+                r.depth +
+                "</td><td>" +
+                (r.model ? r.model + " (" + r.params + "B params)" : "&mdash; no gold yet") +
+                "</td></tr>"
+              );
+            })
+            .join("") +
+          "</tbody></table>";
+      }
       $("mincost").textContent = MIN_COST.toFixed(2);
       chooseVram(selKey);
     </script>
