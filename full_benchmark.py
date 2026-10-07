@@ -518,10 +518,15 @@ def main() -> None:
         if "accept" in verdicts:
             # session 40, addendum 56: a rung ANSWERED by an accept moves
             # the ladder UP to the next depth - the author's v4 ruling ("one
-            # model is crowned or every model is dead -> go to next rung").
-            # The medalist climbs with the survivors; the old break ENDED the
-            # whole run at the first medal (the 4k stop the author caught).
-            stamp(f"rung {depth:,} ANSWERED - the ladder moves up (medalist and survivors climb)")
+            # model is crowned or every model is dead -> go to next rung"),
+            # and EVERYONE climbs: the only permanent outs are the two
+            # ruled-out categories (infeasible - addendum 45; speed-dead -
+            # addendum 13, the gate only hardens with depth). The old break
+            # ENDED the whole run at the first medal (the 4k stop).
+            stamp(
+                f"rung {depth:,} ANSWERED - the ladder moves up "
+                f"(everyone climbs; infeasible and speed-dead stay out)"
+            )
             continue
         if verdicts and all(v in ("dead", "infeasible") for v in verdicts):
             stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
