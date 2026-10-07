@@ -63763,3 +63763,66 @@ For more details, see https://huggingface.co/docs/huggingface_hub/authentication
   cell 6 (rung 65,536) vt: 4/5 names -> FAIL [112s] -> vt 0/6 (1s lower bound 0.000)
   DEAD - vt cannot reach the bar at 65,536 (0/6, best lower bound 0.477 < 0.5); next candidate
 [2026-10-07T17:37:20] verdict: Qwen3.5-0.8B DEAD at rung 65,536 - committing partial results
+
+===== 2026-10-07T17:37:25 | full_benchmark.py --task all --force-rung f16 =====
+
+------------------------------------------------------------
+  gemma-3-1b-it speed: 0/0 cells measured, 20 unmeasured
+  gemma-3-1b-it fwe: 0/0 cells measured, 20 unmeasured
+  gemma-3-1b-it vt: 0/0 cells measured, 20 unmeasured
+  gemma-3-1b-it arc: 2/6 cells measured, 14 unmeasured
+
+=== gemma-3-1b-it-f16.gguf ===
+  starting server...
+    [server] 0.00.056.328 I llama_model_loader: - kv   7:                      gemma3.context_length u32              = 32768
+    [server] 0.00.294.722 I print_info: n_ctx_train           = 32768
+    [server] 0.00.294.761 I print_info: n_ctx_orig_yarn       = 32768
+    [server] 0.00.304.938 I llama_context: constructing llama_context
+    [server] 0.00.304.959 I llama_context: n_seq_max             = 1
+    [server] 0.00.304.960 I llama_context: n_ctx                 = 65536
+    [server] 0.00.304.960 I llama_context: n_ctx_seq             = 65536
+    [server] 0.00.304.960 I llama_context: n_batch               = 2048
+    [server] 0.00.304.960 I llama_context: n_ubatch              = 512
+    [server] 0.00.304.961 I llama_context: causal_attn           = 1
+    [server] 0.00.304.964 I llama_context: flash_attn            = auto
+    [server] 0.00.304.964 I llama_context: kv_unified            = false
+    [server] 0.00.304.966 I llama_context: freq_base             = 1000000.0
+    [server] 0.00.304.966 I llama_context: freq_scale            = 1
+    [server] 0.00.304.967 I llama_context: n_rs_seq              = 0
+    [server] 0.00.304.967 I llama_context: n_outputs_max         = 1
+    [server] 0.00.304.967 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.00.304.967 W llama_context: n_ctx_seq (65536) > n_ctx_train (32768) -- possible training context overflow
+    [server] 0.00.305.400 I llama_context: Vulkan_Host  output buffer size =     1.00 MiB
+    [server] 0.00.306.265 D llama_context: enumerating backends
+    [server] 0.00.306.273 D llama_context: backend_ptrs.size() = 2
+    [server] 0.00.315.481 I common_memory_breakdown_print: | memory breakdown [MiB]                     | total    free    self   model   context   compute    unaccounted |
+    [server] 0.00.350.505 I llama_model_loader: - kv   7:                      gemma3.context_length u32              = 32768
+    [server] 0.00.575.951 I print_info: n_ctx_train           = 32768
+    [server] 0.00.575.978 I print_info: n_ctx_orig_yarn       = 32768
+    [server] 0.01.331.533 I llama_context: constructing llama_context
+    [server] 0.01.331.536 I llama_context: n_seq_max             = 1
+    [server] 0.01.331.537 I llama_context: n_ctx                 = 65536
+    [server] 0.01.331.537 I llama_context: n_ctx_seq             = 65536
+    [server] 0.01.331.537 I llama_context: n_batch               = 2048
+    [server] 0.01.331.537 I llama_context: n_ubatch              = 512
+    [server] 0.01.331.538 I llama_context: causal_attn           = 1
+    [server] 0.01.331.538 I llama_context: flash_attn            = auto
+    [server] 0.01.331.539 I llama_context: kv_unified            = false
+    [server] 0.01.331.541 I llama_context: freq_base             = 1000000.0
+    [server] 0.01.331.542 I llama_context: freq_scale            = 1
+    [server] 0.01.331.542 I llama_context: n_rs_seq              = 0
+    [server] 0.01.331.542 I llama_context: n_outputs_max         = 1
+    [server] 0.01.331.542 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.01.331.543 W llama_context: n_ctx_seq (65536) > n_ctx_train (32768) -- possible training context overflow
+    [server] 0.01.331.791 I llama_context: Vulkan_Host  output buffer size =     1.00 MiB
+    [server] 0.01.366.430 D llama_context: enumerating backends
+    [server] 0.01.366.432 D llama_context: backend_ptrs.size() = 2
+    [server] 0.01.426.069 W srv    load_model: the slot context (65536) exceeds the training context of the model (32768) - capping
+    [server] 0.01.466.621 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] 0.01.466.643 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 32768
+    [server] 0.01.466.685 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+    [server] actual n_ctx = 32768 (requested 65536)
+  ERROR: server accepted -c 65536 but runs n_ctx 32768 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/tournament-results/gemma-3-1b-it/gemma-3-1b-it-f16.gguf.server.log
+    memory (llama): weights 2.42 GiB, context 0.27 GiB, compute 0.18 GiB -> total 2.87 GiB (addendum 11), machine cost 2.57 GiB (MemAvailable delta)
+  INFEASIBLE at 65,536 - trained window 32,768 < the rung's ctx 65,536 - gemma-3-1b-it is out of the benchmark; next candidate
+[2026-10-07T17:37:27] verdict: gemma-3-1b-it INFEASIBLE at rung 65,536 - out of the benchmark (addendum 45) - committing partial results
