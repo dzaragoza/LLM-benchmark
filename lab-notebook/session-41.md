@@ -458,3 +458,14 @@ practitioners, and the page may recommend it in place of f16x3. But a
 compressed model can never SET difficulty: that would be dumbing the
 benchmark down to accommodate compression. Difficulty anchors to
 f16x3; compression competes against that anchor.
+
+## Addendum 89 - the practitioner's contract: certified quality, smallest footprint
+
+The author's articulation of the page's goal: give practitioners the
+SMALLEST model quant that still gets the gold medal. Practitioners want
+smaller models so they run on more machines - less bandwidth, less
+VRAM. But the guarantee of a good model comes from certifying at the
+highest standard: difficulty is anchored to uncompressed (f16, f16,
+f16) (addendum 88), so a compressed variant only reaches the page if
+it matches the same bar. Gold certifies quality; quants deliver
+accessibility; neither lowers the bar.
