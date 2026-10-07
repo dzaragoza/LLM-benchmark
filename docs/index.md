@@ -4,35 +4,58 @@ Pick the **largest context size that fits your machine** from the list below. Bi
 
 Each section is one certified choice: the model, the configuration to run it with, and what your machine needs.
 
+> **Two kinds of machine — check yours before reading the numbers:**
+>
+> **System RAM + iGPU** (integrated graphics: AMD Radeon 780M, Intel Arc iGPU, Apple M-series, most laptops): the model runs from your **system RAM** — use the *RAM needed* number.
+>
+> **VRAM + dedicated GPU** (a separate graphics card: RTX 4060, RX 7600, ...): the model runs from the card's **VRAM** — use the *VRAM needed* number.
+>
+> A dedicated GPU is **optional**. Both winners run perfectly well from system RAM on an iGPU.
+
 ## 16k context
 
 - **Model**: Qwen2.5-1.5B-Instruct
-- **Configuration**: f16 GGUF (`Qwen2.5-1.5B-Instruct-f16`), context 16,384
+- **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 16,384
 - **Memory bandwidth needed**: 25 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation
-- **RAM needed (iGPU)**: 4 GiB
-- **VRAM needed (dedicated GPU)**: 4 GiB
+- **System RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU, optional)**: 4 GiB
+- **Example**:
+
+```bash
+llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 16384 --cache-type-k f16 --cache-type-v f16 -fa on --parallel 1
+```
 
 ## 8k context
 
 - **Model**: Qwen2.5-1.5B-Instruct
-- **Configuration**: f16 GGUF (`Qwen2.5-1.5B-Instruct-f16`), context 8,192
+- **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 8,192
 - **Memory bandwidth needed**: 23 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation
-- **RAM needed (iGPU)**: 4 GiB
-- **VRAM needed (dedicated GPU)**: 4 GiB
+- **System RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU, optional)**: 4 GiB
+- **Example**:
+
+```bash
+llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 8192 --cache-type-k f16 --cache-type-v f16 -fa on --parallel 1
+```
 
 ## 4k context
 
 - **Model**: granite-4.0-h-1b
-- **Configuration**: f16 GGUF (`granite-4.0-h-1b-f16`), context 4,096
+- **Configuration**: `granite-4.0-h-1b-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 4,096
 - **Memory bandwidth needed**: 23 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation
-- **RAM needed (iGPU)**: 4 GiB
-- **VRAM needed (dedicated GPU)**: 4 GiB
+- **System RAM needed (iGPU)**: 4 GiB
+- **VRAM needed (dedicated GPU, optional)**: 4 GiB
+- **Example**:
+
+```bash
+llama-server -m granite-4.0-h-1b-f16.gguf -c 4096 --cache-type-k f16 --cache-type-v f16 -fa on --parallel 1
+```

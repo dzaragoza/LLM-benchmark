@@ -355,3 +355,18 @@ removed detail lives in the protocol and this notebook. The RAM and
 VRAM numbers are the rounded llama-breakdown totals (addendum 79's
 device split sums to the same footprint whether it lands in UMA or a
 dedicated card's VRAM).
+
+## Addendum 81 - the page: the iGPU/dGPU split made visible, K/V quants, example commands
+
+The author's rulings: (1) the GPU must read as OPTIONAL, very
+visible - a blockquote at the top splits the two machine kinds:
+system RAM + iGPU (use the RAM number) vs VRAM + dedicated GPU (use
+the VRAM number), with "a dedicated GPU is optional" stated plainly;
+each section's rows now read "System RAM needed (iGPU)" and "VRAM
+needed (dedicated GPU, optional)". (2) The configuration line details
+the K and V cache quants (f16 K, f16 V - the tournament's (f16,f16,f16)
+variant, weights/K/V). (3) Each section carries an example llama-server
+command line matching the exact configuration the benchmark measured:
+-m <gguf> -c <depth> --cache-type-k f16 --cache-type-v f16 -fa on
+--parallel 1 (the -fa/--parallel flags mirror the benchmark's own
+launch flags for the f16 K/V variant).
