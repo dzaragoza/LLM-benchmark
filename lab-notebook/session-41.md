@@ -430,3 +430,18 @@ speed 6 cells 100% pass, fwe 6 83.3%, vt 6 83.3% - Qwen3.5-0.8B's
 speed/fwe cells PASSED at 64k; only vt killed it (0/6, all 4/5
 near-misses). Updates will report per-rung tables when a rung is
 settled, and the no-gold rungs' dead always count.
+
+## Addendum 87 - the exact-match bandwidth pool, multi-channel entries included
+
+The author challenged the page's minimum-BW selections: valid
+configurations closer to the target were being ignored. Re-derived the
+selections using the old cpu-picker's machine table (DDR3-800..2133
+single/dual/quad; DDR4-1600..3200 and DDR5-3200..6400
+single/dual/quad/octa; per-channel GB/s = MT/s x 8 / 1000). No closer
+match exists at any rung - 57.6 (32k), 25.6 (16k), 23.5 (8k/4k) remain
+the tightest fits - but the exact-equal sets were incomplete. Page now
+lists every exact equal: 32k adds DDR5-3600 dual channel; 16k adds
+DDR5-3200 single, DDR3-1600 dual, DDR3-800 quad alongside the existing
+two. LPDDR deliberately excluded - same bandwidth as the DDR of the
+same MT/s, adds noise for the reader. 8k/4k unchanged (DDR4-2933
+single stands alone).
