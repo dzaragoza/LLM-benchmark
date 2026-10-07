@@ -539,7 +539,7 @@ def main() -> None:
             f"port {args.port} answers with an HTTP error but SOMETHING is there - "
             "a stale server. pkill -f llama-server, or pass --port."
         )
-    wanted_ctx = max(args.depths) + 2 * ANSWER_HEADROOM
+    wanted_ctx = max(args.depths)  # addendum 61: ctx = depth; the headroom is paid in the budget
     log_path = os.path.join(args.results_dir, f"{label}-server.log")
     extra_args = [
         "-c",
@@ -569,7 +569,7 @@ def main() -> None:
             "uncertain and the gate refuses to bench blind. Paste the "
             "server log so the parser learns this build's banner format."
         )
-    if actual_ctx < max(args.depths) + ANSWER_HEADROOM:
+    if actual_ctx < max(args.depths):
         llama_server.stop_server(proc, args.port)
         sys.exit(
             f"server accepted -c {wanted_ctx} but runs n_ctx {actual_ctx} - "

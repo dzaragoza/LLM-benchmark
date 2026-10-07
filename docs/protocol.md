@@ -114,7 +114,7 @@ not a silent edit.
 | R-03 | Every grading predicate grades at `TASK_PASS_BARS` (bench/constants.py, the single source); no predicate hardcodes a bar. | addenda 52-54 (the 5/5 gate regression) |
 | R-04 | An accept answers the rung and the ladder climbs: quality-dead families re-measure at deeper rungs; only infeasible and speed-dead are permanent outs. | addendum 56 ("everyone climbs") |
 | R-05 | ARC is rung-independent: measured once per (family, run) at `ARC_RUN_CTX` = 4,096, stored rung-independently, loaded (never re-measured) at every other depth. | the study's ARC design (session 38); verified 2026-10-07 |
-| R-06 | A family whose trained window is below the rung's ctx is infeasible before any download, conversion or launch, and is skipped at every rung (pre-flight + runtime catch agree on the state record). | addenda 45, 58 |
+| R-06 | A family whose trained window is below the rung's DEPTH is infeasible before any download, conversion or launch, and is skipped at every rung (pre-flight + runtime catch agree on the state record). The rung launches at ctx = depth - the answer headroom is paid from the measured content, not from the model's window (addendum 61) - so a window == rung model IS a candidate at its own rung. | addenda 45, 58, 61 |
 | R-07 | Families evaluate in param-ascending order; the sort resolves both repo-carried and name-carried specs identically. | addendum 57 |
 | R-08 | A speed-gate death at rung k ends that family's climb at every deeper rung (the speed gate only hardens with depth). | addendum 13, session 40 |
 | R-09 | A study constant appears in exactly one place in the code; other files import it (the standing governance rule, now a requirement). | the registry's governance rule |

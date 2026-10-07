@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.convert_quant as convert_quant
 import infra.hf_download as hf_download
-import ruler_gate
 from bench import cells as bench_cells
 from bench import state_store as bench_state_store
 from bench.constants import (
@@ -293,12 +292,12 @@ def certify_rung(
         # window (no extract): the gate stays silent, the launch banner
         # remains the authority (addendum 45 catches it at runtime).
         _reg_window = _registry_window(fam)
-        if _reg_window is not None and _reg_window < depth + 2 * ruler_gate.ANSWER_HEADROOM:
+        if _reg_window is not None and _reg_window < depth:
             verdict = "infeasible"
             entry["verdict"] = "infeasible"
             entry["infeasible_reason"] = (
-                f"trained window {_reg_window:,} < the rung's ctx "
-                f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,} (registry pre-flight, addendum 58)"
+                f"trained window {_reg_window:,} < the rung's depth "
+                f"{depth:,} (registry pre-flight, addendum 58; ctx = depth, addendum 61)"
             )
             entry["cells_measured"] = 0
             entry["ran_now"] = 0
@@ -389,7 +388,7 @@ def certify_rung(
                 t0 = time.time()
                 ok, fv = bench_cells.speed_cell(
                     model,
-                    depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                    depth,
                     CORPUS_DEFAULT,
                     results_dir,
                     next_run,
@@ -401,8 +400,7 @@ def certify_rung(
                 if fv.get("error") == "capped to the window":
                     verdict = "infeasible"
                     entry["infeasible_reason"] = (
-                        f"trained window {fv.get('window_cap'):,} < the rung's ctx "
-                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                        f"trained window {fv.get('window_cap'):,} < the rung's ctx {depth:,}"
                     )
                     fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
                     save_state(state_path, state)
@@ -428,7 +426,7 @@ def certify_rung(
                 t0 = time.time()
                 ok, fv = bench_cells.vt_pass(
                     model,
-                    depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                    depth,
                     results_dir,
                     seed=next_run,
                     port=port,
@@ -439,8 +437,7 @@ def certify_rung(
                 if fv.get("error") == "capped to the window":
                     verdict = "infeasible"
                     entry["infeasible_reason"] = (
-                        f"trained window {fv.get('window_cap'):,} < the rung's ctx "
-                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                        f"trained window {fv.get('window_cap'):,} < the rung's ctx {depth:,}"
                     )
                     fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
                     save_state(state_path, state)
@@ -464,7 +461,7 @@ def certify_rung(
             t0 = time.time()
             ok, fv = bench_cells.fwe_pass(
                 model,
-                depth + 2 * ruler_gate.ANSWER_HEADROOM,
+                depth,
                 results_dir,
                 seed=next_run,
                 port=port,
@@ -476,8 +473,7 @@ def certify_rung(
             if fv.get("error") == "capped to the window":
                 verdict = "infeasible"
                 entry["infeasible_reason"] = (
-                    f"trained window {fv.get('window_cap'):,} < the rung's ctx "
-                    f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                    f"trained window {fv.get('window_cap'):,} < the rung's ctx {depth:,}"
                 )
                 fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
                 save_state(state_path, state)
@@ -675,12 +671,12 @@ def certify_rung_combined(
         # window (no extract): the gate stays silent, the launch banner
         # remains the authority (addendum 45 catches it at runtime).
         _reg_window = _registry_window(fam)
-        if _reg_window is not None and _reg_window < depth + 2 * ruler_gate.ANSWER_HEADROOM:
+        if _reg_window is not None and _reg_window < depth:
             verdict = "infeasible"
             entry["verdict"] = "infeasible"
             entry["infeasible_reason"] = (
-                f"trained window {_reg_window:,} < the rung's ctx "
-                f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,} (registry pre-flight, addendum 58)"
+                f"trained window {_reg_window:,} < the rung's depth "
+                f"{depth:,} (registry pre-flight, addendum 58; ctx = depth, addendum 61)"
             )
             entry["cells_measured"] = 0
             entry["ran_now"] = 0
@@ -780,8 +776,7 @@ def certify_rung_combined(
                     # ruling); no cell of it enters any statistic.
                     verdict = "infeasible"
                     entry["infeasible_reason"] = (
-                        f"trained window {e.window_cap:,} < the rung's ctx "
-                        f"{depth + 2 * ruler_gate.ANSWER_HEADROOM:,}"
+                        f"trained window {e.window_cap:,} < the rung's ctx {depth:,}"
                     )
                     fst["infeasible"] = {"window_cap": e.window_cap, "depth": depth}
                     save_state(state_path, state)
