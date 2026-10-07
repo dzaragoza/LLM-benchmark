@@ -507,3 +507,14 @@ launch per rung shared by fwe+vt, state in v6-results/v6-state.json
 k=1 cell is prefill-heavy, so its decode t/s is a proxy for the speed
 gate's pure-decode measure; the per-rung timing split keeps the two
 terms separable. Speed k=1 (one conversation) is never measured.
+
+## Addendum 92 - v6 medals: fwe & vt & arc = gold at the rung
+
+The author's ruling, very simple: a rung earns gold iff its fwe
+cell, vt cell AND the (once-per-benchmark) arc cell all passed.
+assign_medals() recomputes every rung's medal from stored cells on
+each call, so the arc cell landing after the ladder backfills gold
+retroactively for rungs that passed while arc was unmeasured - the
+same order-independence the v5 exclusive-gold rule taught us. The
+run's tail prints the medal line (gold@depth list). Verified with a
+logic check: fwe+vt+arc -> gold; vt fail or arc fail -> none.

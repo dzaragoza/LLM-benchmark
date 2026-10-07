@@ -134,6 +134,20 @@ def vt_cell_k1(port: int, depth: int, seed: int) -> tuple[bool, dict]:
     }
 
 
+def assign_medals(state: dict) -> dict:
+    """v6 medal rule (addendum 92): gold at a rung iff fwe & vt & arc all
+    passed. Simple by design - the structure test's medal. Recomputed
+    from stored cells each call, so a late arc cell backfills medals
+    for rungs that passed while arc was still unmeasured."""
+    arc_ok = (state.get("arc") or {}).get("v") == 1
+    for _key, rec in state.get("rungs", {}).items():
+        cells = rec.get("cells") or {}
+        fwe_pass = cells.get("fwe", {}).get("v") == 1
+        vt_pass = cells.get("vt", {}).get("v") == 1
+        rec["medal"] = "gold" if (fwe_pass and vt_pass and arc_ok) else None
+    return state
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", required=True, help="path to the f16 gguf")
@@ -210,6 +224,10 @@ def main() -> int:
         verdict = "pass" if (ok and ok2) else "dead"
         rung_rec["verdict"] = verdict
         state["rungs"][key] = rung_rec
+        # v6 medal rule (addendum 92): fwe & vt & arc all pass = gold at
+        # the rung; arc runs once per benchmark, so the medal is assigned
+        # after the arc cell lands - re-decided over the stored rungs.
+        state = assign_medals(state)
         save_state(state)
         print(f"  rung {depth} verdict: {verdict}")
         if verdict != "pass":
@@ -260,12 +278,21 @@ def main() -> int:
                         gen = r["choices"][0]["text"].strip()
                         q_ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
                     state["arc"] = {"v": 1 if q_ok else 0, "k": 1, "s": secs, "answer": q["ans"]}
+                    assign_medals(state)
                     save_state(state)
                     print(f"  arc: {'PASS' if q_ok else 'FAIL'} ({secs}s) ans={q['ans']}")
             finally:
                 llama_server.stop_server(proc, PORT)
         except Exception as e:  # noqa: BLE001 - the prototype reports and continues
             print(f"  arc failed: {e}")
+
+    print("\n=== medals ===")
+    golds = [
+        k
+        for k, r in sorted(state.get("rungs", {}).items(), key=lambda kv: int(kv[0]))
+        if r.get("medal") == "gold"
+    ]
+    print("  " + (", ".join(f"gold@{k}" for k in golds) if golds else "none"))
 
     # the bandwidth summary: per-rung decode t/s from the cells' timing splits
     print("\n=== bandwidth series (decode t/s per rung) ===")
