@@ -18,10 +18,9 @@ Each section is one certified choice: the model, the configuration to run it wit
 
 - **Model**: Qwen2.5-1.5B-Instruct
 - **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 16,384
-- **Memory bandwidth needed (iGPU only)**: 25 GB/s
-  - single channel: DDR5-4800 or faster
-  - dual channel: DDR4-3200 or faster
-  - quad channel: any listed generation
+- **Memory bandwidth needed (iGPU only)**: 25 GB/s — minimum configurations that meet it:
+  - DDR4-3200 single channel (25.6 GB/s)
+  - DDR4-1600 dual channel (25.6 GB/s)
 - **System RAM needed (iGPU)**: 4 GiB
 - **VRAM needed (dedicated GPU, optional)**: 4 GiB
 - **Example**:
@@ -34,10 +33,8 @@ llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 16384 --cache-type-k f16 --cac
 
 - **Model**: Qwen2.5-1.5B-Instruct
 - **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 8,192
-- **Memory bandwidth needed (iGPU only)**: 23 GB/s
-  - single channel: DDR5-4800 or faster
-  - dual channel: DDR4-3200 or faster
-  - quad channel: any listed generation
+- **Memory bandwidth needed (iGPU only)**: 23 GB/s — minimum configuration that meets it:
+  - DDR4-2933 single channel (23.5 GB/s)
 - **System RAM needed (iGPU)**: 4 GiB
 - **VRAM needed (dedicated GPU, optional)**: 4 GiB
 - **Example**:
@@ -50,10 +47,8 @@ llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 8192 --cache-type-k f16 --cach
 
 - **Model**: granite-4.0-h-1b
 - **Configuration**: `granite-4.0-h-1b-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 4,096
-- **Memory bandwidth needed (iGPU only)**: 23 GB/s
-  - single channel: DDR5-4800 or faster
-  - dual channel: DDR4-3200 or faster
-  - quad channel: any listed generation
+- **Memory bandwidth needed (iGPU only)**: 23 GB/s — minimum configuration that meets it:
+  - DDR4-2933 single channel (23.5 GB/s)
 - **System RAM needed (iGPU)**: 4 GiB
 - **VRAM needed (dedicated GPU, optional)**: 4 GiB
 - **Example**:
