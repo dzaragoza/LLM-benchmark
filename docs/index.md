@@ -65,9 +65,12 @@ least min-BW × (5 ÷ measured t/s). Configurations that clear it:
 
 - **Memory**: the measured whole-stack machine cost (system-RAM
   MemAvailable delta while the model serves at its certified depth).
-  On the iGPU, weights, KV cache and compute buffers all live in system
-  RAM — the GPU shares the machine's memory, so there is no separate
-  GPU pool to account for.
+  On the iGPU the model lives in system RAM, but part of the footprint
+  resides in the UMA region the BIOS reserves for the GPU — memory the
+  OS never hands out, so the MemAvailable delta does not see it. The
+  measured cost is therefore a lower bound: budget the UMA carve-out
+  (typically 512 MiB–2 GiB in BIOS settings) on top of the number
+  above.
 - **Bandwidth**: the linear law — min bandwidth = 102.4 × 5 ÷ measured
   worst-turn t/s.
 - **Gold medal**: exclusive per depth — among the models certified at
