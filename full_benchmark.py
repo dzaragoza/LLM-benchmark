@@ -220,13 +220,38 @@ def param_ascending_specs(specs: list[str]) -> list[str]:
     )
 
 
+def _resolve_spec_repo(spec: str) -> str | None:
+    """A name-only spec (a state-carried family name, no stored spec)
+    resolves to its roster REPO before it ever reaches the hub
+    (addendum 63): 'MiniCPM-1B-sft-bf16' is a family name, not a repo -
+    the hub 404s on it and the run crashes. Matches the repo string,
+    its basename, or the roster name; suffix-quant aliases resolve too
+    (the addendum-62 alias class).
+    """
+    try:
+        from etc import registry_data
+
+        key = spec.partition("=")[0].rstrip("/")
+        aliases = {key}
+        for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
+            if key.endswith(suffix):
+                aliases.add(key[: -len(suffix)])
+        for name, r in registry_data.ROSTER.items():
+            base = r.rpartition("/")[2]
+            if key in (r, name, base) or aliases & {name, base}:
+                return r if "=" not in spec else spec
+    except Exception:
+        return None
+    return None
+
+
 def resolve_families(args: argparse.Namespace, state: dict[str, Any]) -> None:
     """With no positional specs: the state file's families (param-
     ascending), or a fresh state's full registered roster."""
     if args.families:
         return
     saved = [(fst or {}).get("spec") or fam for fam, fst in (state.get("families") or {}).items()]
-    args.families = param_ascending_specs([s for s in saved if s])
+    args.families = param_ascending_specs([_resolve_spec_repo(s) or s for s in saved if s])
     if args.families:
         return
     try:

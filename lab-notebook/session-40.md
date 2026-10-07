@@ -1153,3 +1153,13 @@ THE FIX (two parts):
 2. _registry_params resolves the repo BASENAME too (and strips the -bf16/-f16/-f32/-instruct suffix aliases): "MiniCPM-1B-sft-bf16" now resolves to 1.3603B via the repo openbmb/MiniCPM-1B-sft-bf16, and the sft pair sorts param-ascending with everyone else. The parked registry/state name-mismatch issue (addendum 57's note) is closed for the suffix class.
 
 Tests: test_answered_rung_still_measures_the_terminal_family (a stored-accept champion answers the rung; a never-evaluated 4,096-window family measures anyway, the skip line never fires for it). 200 tests.
+
+### Addendum 63 - a state-carried family name is not a hub repo (2026-10-07, the author's crash report)
+
+THE CATCH: "crash." The restart with addendum 62 went down in flames: `huggingface_hub.errors.RepositoryNotFoundError: 404 ... https://huggingface.co/api/models/MiniCPM-1B-sft-bf16/tree/main` - the traceback runs through certify_rung_combined -> _acquire_missing_model(spec, ...) -> list_repo_files(model_repo). The state carries the family NAME "MiniCPM-1B-sft-bf16" (no stored spec - the family predates spec storage), and resolve_families used `(fst or {}).get("spec") or fam`, so the NAME went to the hub as a repo and the hub 404'd. The addendum-62 fix resolved names for the param SORT; the spec itself still went out raw.
+
+THE FIX: `_resolve_spec_repo(spec)` in full_benchmark.py - a name-only spec resolves to its roster REPO before it ever reaches the hub. It matches the repo string, its basename, or the roster name; the addendum-62 suffix alias class (-bf16/-f16/-f32/-instruct) applies to specs too. Repos with a variant ("=" present) pass through unchanged; unknown names return None (no guess - same stance as the param sort). resolve_families maps every saved spec through it: `[_resolve_spec_repo(s) or s for s in saved if s]`.
+
+Verified: "MiniCPM-1B-sft-bf16" -> openbmb/MiniCPM-1B-sft-bf16, "MiniCPM-2B-sft-bf16" -> openbmb/MiniCPM-2B-sft-bf16, and the parked mismatch "RWKV7-World-2.9B" -> RWKV/RWKV7-Goose-World3-2.9B-HF. The remaining unresolved names should be none - a None here means a genuinely unknown family.
+
+Test: test_state_names_resolve_to_repos_before_the_hub (the trio names, the RWKV mismatch, repo passthrough, unknown -> None). 201 tests.

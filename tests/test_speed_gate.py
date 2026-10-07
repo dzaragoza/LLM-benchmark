@@ -1256,3 +1256,21 @@ def test_accept_answers_the_rung_and_climbs(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert asked == [4096, 8192], f"the ladder must climb 4096 -> 8192, asked {asked}"
     assert "ANSWERED - the ladder moves up (everyone climbs" in out
+
+
+def test_state_names_resolve_to_repos_before_the_hub():
+    """Addendum 63: a state-carried family name is not a hub repo -
+    'MiniCPM-1B-sft-bf16' 404s and crashed the run. Every name-only
+    spec resolves to its roster repo before the acquire ever touches
+    the hub (the addendum-62 alias class, applied to specs).
+
+    Pins: R-07
+    """
+    import full_benchmark as fb
+
+    assert fb._resolve_spec_repo("MiniCPM-1B-sft-bf16") == "openbmb/MiniCPM-1B-sft-bf16"
+    assert fb._resolve_spec_repo("MiniCPM-2B-sft-bf16") == "openbmb/MiniCPM-2B-sft-bf16"
+    assert fb._resolve_spec_repo("RWKV7-World-2.9B") == "RWKV/RWKV7-Goose-World3-2.9B-HF"
+    # repos pass through unchanged; unknown names stay None (no guess)
+    assert fb._resolve_spec_repo("openbmb/MiniCPM5-2B") == "openbmb/MiniCPM5-2B"
+    assert fb._resolve_spec_repo("not-a-real-family") is None
