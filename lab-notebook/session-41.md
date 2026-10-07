@@ -402,3 +402,14 @@ and every section state it: ONE, never both. Also caught while
 rewriting: the command lines carried comma-formatted -c values
 (16384, not 16,384) - fixed; and a first draft broke the nested
 markdown lists (md_check + inspection caught it).
+
+## Addendum 85 - the 32k section; kill rates join the update format
+
+Qwen3-1.7B's 32k gold lands on the page: model + config, iGPU
+bandwidth 55 GB/s (worst turn 9.4 t/s at 102.4; the lowest exact match
+DDR5-7200 single channel, 57.6 GB/s - nothing slower meets it, the
+linear law is now biting: deep context needs fast memory), 8 GiB
+RAM/VRAM (Vulkan0 6,941 MiB + Host 633 MiB = 7.4 GiB rounded up),
+command line at -c 32768. The update format gains a standing element:
+every update now reports the per-gate per-cell pass/kill percentages
+under the calibration window (addendum 71).
