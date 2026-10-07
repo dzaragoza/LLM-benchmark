@@ -26,7 +26,7 @@ PIN_RE = re.compile(r"Pins:\s*(R-\d+(?:\s*,\s*R-\d+)*)")
 
 def main() -> int:
     root = Path(__file__).resolve().parent
-    protocol = root / "docs" / "protocol.md"
+    protocol = root / "md" / "protocol.md"
     table = protocol.read_text(encoding="utf-8")
     reqs = sorted(set(REQ_RE.findall(table)))
     if not reqs:
