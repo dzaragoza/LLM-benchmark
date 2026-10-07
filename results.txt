@@ -50502,3 +50502,66 @@ For more details, see https://huggingface.co/docs/huggingface_hub/authentication
   granite-4.0-h-1b arc: 9/15 cells measured, 5 unmeasured
   DEAD - arc cannot reach the bar at 32,768 (9/15, best lower bound 0.477 < 0.5); next candidate
 [2026-10-07T09:34:54] verdict: granite-4.0-h-1b DEAD at rung 32,768 - committing partial results
+
+===== 2026-10-07T09:34:59 | full_benchmark.py --task all --force-rung f16 =====
+
+------------------------------------------------------------
+  Qwen2.5-1.5B-Instruct speed: 0/0 cells measured, 20 unmeasured
+  Qwen2.5-1.5B-Instruct fwe: 0/0 cells measured, 20 unmeasured
+  Qwen2.5-1.5B-Instruct vt: 0/0 cells measured, 20 unmeasured
+  Qwen2.5-1.5B-Instruct arc: 11/14 cells measured, 6 unmeasured
+
+=== Qwen2.5-1.5B-Instruct-f16.gguf ===
+  starting server...
+    [server] 0.00.052.836 I llama_model_loader: - kv   9:                       qwen2.context_length u32              = 32768
+    [server] 0.00.189.978 I print_info: n_ctx_train           = 32768
+    [server] 0.00.190.016 I print_info: n_ctx_orig_yarn       = 32768
+    [server] 0.00.198.302 I llama_context: constructing llama_context
+    [server] 0.00.198.313 I llama_context: n_seq_max             = 1
+    [server] 0.00.198.314 I llama_context: n_ctx                 = 33024
+    [server] 0.00.198.314 I llama_context: n_ctx_seq             = 33024
+    [server] 0.00.198.314 I llama_context: n_batch               = 2048
+    [server] 0.00.198.314 I llama_context: n_ubatch              = 512
+    [server] 0.00.198.314 I llama_context: causal_attn           = 1
+    [server] 0.00.198.316 I llama_context: flash_attn            = auto
+    [server] 0.00.198.316 I llama_context: kv_unified            = false
+    [server] 0.00.198.317 I llama_context: freq_base             = 1000000.0
+    [server] 0.00.198.318 I llama_context: freq_scale            = 1
+    [server] 0.00.198.318 I llama_context: n_rs_seq              = 0
+    [server] 0.00.198.318 I llama_context: n_outputs_max         = 1
+    [server] 0.00.198.318 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.00.198.318 W llama_context: n_ctx_seq (33024) > n_ctx_train (32768) -- possible training context overflow
+    [server] 0.00.198.484 I llama_context: Vulkan_Host  output buffer size =     0.58 MiB
+    [server] 0.00.198.649 D llama_context: enumerating backends
+    [server] 0.00.198.656 D llama_context: backend_ptrs.size() = 2
+    [server] 0.00.205.487 I common_memory_breakdown_print: | memory breakdown [MiB]                     | total    free    self   model   context   compute    unaccounted |
+    [server] 0.00.237.556 I llama_model_loader: - kv   9:                       qwen2.context_length u32              = 32768
+    [server] 0.00.351.754 I print_info: n_ctx_train           = 32768
+    [server] 0.00.351.779 I print_info: n_ctx_orig_yarn       = 32768
+    [server] 0.00.877.577 I llama_context: constructing llama_context
+    [server] 0.00.877.580 I llama_context: n_seq_max             = 1
+    [server] 0.00.877.581 I llama_context: n_ctx                 = 33024
+    [server] 0.00.877.581 I llama_context: n_ctx_seq             = 33024
+    [server] 0.00.877.581 I llama_context: n_batch               = 2048
+    [server] 0.00.877.581 I llama_context: n_ubatch              = 512
+    [server] 0.00.877.582 I llama_context: causal_attn           = 1
+    [server] 0.00.877.582 I llama_context: flash_attn            = auto
+    [server] 0.00.877.583 I llama_context: kv_unified            = false
+    [server] 0.00.877.585 I llama_context: freq_base             = 1000000.0
+    [server] 0.00.877.585 I llama_context: freq_scale            = 1
+    [server] 0.00.877.586 I llama_context: n_rs_seq              = 0
+    [server] 0.00.877.586 I llama_context: n_outputs_max         = 1
+    [server] 0.00.877.586 I llama_context: n_outputs_max_per_seq = 1
+    [server] 0.00.877.586 W llama_context: n_ctx_seq (33024) > n_ctx_train (32768) -- possible training context overflow
+    [server] 0.00.877.792 I llama_context: Vulkan_Host  output buffer size =     0.58 MiB
+    [server] 0.01.037.518 D llama_context: enumerating backends
+    [server] 0.01.037.527 D llama_context: backend_ptrs.size() = 2
+    [server] 0.01.115.371 W srv    load_model: the slot context (33024) exceeds the training context of the model (32768) - capping
+    [server] 0.01.184.265 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 32768, kv_unified = 'false'
+    [server] 0.01.184.290 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 32768
+    [server] 0.01.184.338 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+    [server] actual n_ctx = 32768 (requested 33024)
+  ERROR: server accepted -c 33024 but runs n_ctx 32768 (slots/cap silently reduced it, addendum 130e/130f) - the depth budget would overflow and every deep turn would 400; see ./models/Qwen2.5-1.5B-Instruct/Qwen2.5-1.5B-Instruct-f16.gguf.server.log
+    memory (llama): weights 3.31 GiB, context 0.88 GiB, compute 0.12 GiB -> total 4.32 GiB (addendum 11), machine cost 4.23 GiB (MemAvailable delta)
+  INFEASIBLE at 32,768 - trained window 32,768 < the rung's ctx 33,024 - Qwen2.5-1.5B-Instruct is out of the benchmark; next candidate
+[2026-10-07T09:35:01] verdict: Qwen2.5-1.5B-Instruct INFEASIBLE at rung 32,768 - out of the benchmark (addendum 45) - committing partial results
