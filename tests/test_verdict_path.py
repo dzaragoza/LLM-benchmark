@@ -972,7 +972,11 @@ def test_terminal_rung_never_measures_below_the_rung(monkeypatch):
 
     assert certify._registry_window("MiniCPM-1B-sft-bf16") == 4096
     assert certify._registry_window("phi-2") == 2048
-    # the terminal condition is window >= depth, never below
-    first = 4096
-    assert not (2048 >= first)
-    assert 4096 >= first
+    # TERMINAL = can run THIS rung but cannot reach the NEXT one
+    # (addendum 67): depth <= window < next depth. Below the rung is
+    # R-06 infeasible; above the next rung it can climb, so the
+    # answered rung skips it
+    d, nxt = 4096, 8192
+    assert not (d <= 2048 < nxt)  # phi-2: below the rung
+    assert d <= 4096 < nxt  # the trio: terminal at 4,096
+    assert not (d <= 262144 < nxt)  # Qwen3.5-2B: climbs - never terminal here

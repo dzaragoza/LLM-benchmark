@@ -142,3 +142,15 @@ THE MIGRATION: MiniCPM-1B-sft-bf16's above-window dead verdicts (8,192/16,384/32
 THE CLIMB NOTE: the fresh run itself is healthy - gemma-3-1b-it died to vt at 32,768 (0/6, its 4k/8k/16k deads stand as stored quality verdicts), the medalist's 32k measurement is queued, granite-3.0-2b-instruct was re-measured at 4,096 per the terminal rule.
 
 Test: test_terminal_rung_never_measures_below_the_rung (the alias-resolved windows; the >= depth condition). 203 tests.
+
+### Addendum 67 - the terminal condition was inverted: climbing families re-measured at answered rungs (2026-10-07, the author's restart catch)
+
+THE CATCH: "I restarted with the latest version and it is re-measuring Qwen instead of the revived family." The fresh run "terminal-measured" Qwen3.5-2B (window 262,144!) at the answered 4,096 rung - my addendum-66 correction overrotated: _w <= depth (below-rung families measured) became _w >= depth (EVERY family that can run the rung measured, climbers included). Qwen3.5-2B can climb, so the answered rung must skip it; MiniCPM-2B-sft-bf16 (the actually-terminal family, window 4,096) never got its turn.
+
+THE FIX: TERMINAL = can run THIS rung but cannot reach the NEXT one: depth <= window < next TOURNAMENT_DEPTHS entry. Below the rung: R-06 infeasible (pre-flight). Window >= the next rung: it climbs, the answered rung skips it. The both-controllers blocks now compute _next from TOURNAMENT_DEPTHS and use the three-way condition.
+
+THE CONTEXT QUESTION ("something wrong with the context calculation"): checked - CORRECT, and it is addendum 61 visible at the 4k rung for the first time. The old first-pass 4k cells launched at ctx 4,352 (depth + 256); the fresh ones launch at exactly 4,096 (ctx = depth), so the speed blob shrank 2,825 -> 2,575 tokens. The budget math checks exactly: 4,096 - 64 (DEPTH_HEADROOM) - 224 (noise reserve) - 1,233 (conversation side: 4 user turns + 4x299 answer cap) = 2,575. The deepest turn still lands at the 4,096 reference depth - the headroom is paid from the content, per the ruling.
+
+THE STATE: Qwen3.5-2B's two fresh 4,096 cells (speed PASS, fwe PASS, vt 4/5 FAIL, arc 5/5 PASS x2) are valid measurements - kept; its verdicts remain unstored, so the answered-rung skip correctly skips it on the next restart and it climbs. No migration needed.
+
+Test: test_terminal_rung_never_measures_below_the_rung updated to pin the three-way condition (phi-2 below, the trio terminal, Qwen3.5-2B climbs). 203 tests.
