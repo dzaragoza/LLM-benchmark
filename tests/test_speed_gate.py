@@ -1241,4 +1241,4 @@ def test_accept_answers_the_rung_and_climbs(tmp_path, monkeypatch, capsys):
         fb.DRY_RUN_ACTIVE = False
     out = capsys.readouterr().out
     assert asked == [4096, 8192], f"the ladder must climb 4096 -> 8192, asked {asked}"
-    assert "ANSWERED - the ladder moves up" in out
+    assert "ANSWERED - the ladder moves up (everyone climbs" in out
