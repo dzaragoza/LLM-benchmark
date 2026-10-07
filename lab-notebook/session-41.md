@@ -531,3 +531,14 @@ pass/verdict + medal step). v6_prototype.py restructured: arc_cell_k1
 runs before the loop and short-circuits; the loop uses continue (not
 break) on death/infeasible/window; verdict = "gold" or "dead" per
 rung; medals print at the end. All checks pass (ruff, ty, 200 tests).
+
+## Addendum 94 - v6 uploads on finish; per-gate per-cell time in the tail
+
+The author's rulings: the results should have been uploaded - the
+prototype now commits and pushes at the end (git_push.
+push_working_tree, the same API-based push full_benchmark's verdict
+commits use), on BOTH exit paths (the full ladder and the arc-dead
+shortcut). A git failure never stops the run - results stay local
+with the error printed. And the tail gained the per-gate per-cell
+wall-time table: fwe/vt seconds per rung plus the arc cell's seconds
+(the cost data the bandwidth fit and the v6 time budget need).

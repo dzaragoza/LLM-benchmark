@@ -234,6 +234,16 @@ def main() -> int:
     if state.get("arc", {}).get("v") != 1:
         print("  arc dead -> model dead by definition; no rung measured")
         save_state(state)
+        try:
+            import git_push
+
+            sha = git_push.push_working_tree(
+                f"v6 prototype artifacts {time.strftime('%Y-%m-%d %H:%M')}: "
+                f"{label} arc-dead shortcut"
+            )
+            print(f"  pushed -> {sha}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  upload failed (results stay local): {e}")
         return 0
 
     for depth in depths:
@@ -309,6 +319,34 @@ def main() -> int:
             cell = rec.get("cells", {}).get(gate)
             if cell and cell.get("timing") and cell["timing"].get("gen_tokens_per_s"):
                 print(f"  {key} {gate}: {cell['timing']['gen_tokens_per_s']:.1f} t/s decode")
+
+    # per-gate per-cell wall time (addendum 94): the cost table
+    print("\n=== cell time per gate (wall s per cell) ===")
+    for gate in ("fwe", "vt"):
+        ts = [
+            (int(k), r["cells"][gate]["s"])
+            for k, r in sorted(state["rungs"].items(), key=lambda kv: int(kv[0]))
+            if r.get("cells", {}).get(gate, {}).get("s") is not None
+        ]
+        if ts:
+            line = ", ".join(f"{d // 1024}k={s:.0f}s" for d, s in ts)
+            print(f"  {gate}: {line}")
+    arc = state.get("arc") or {}
+    if arc.get("s") is not None:
+        print(f"  arc: {arc['s']:.1f}s")
+
+    # upload the results (addendum 94): git commit + push, never fatal
+    print("\n=== upload ===")
+    try:
+        import git_push
+
+        sha = git_push.push_working_tree(
+            f"v6 prototype artifacts {time.strftime('%Y-%m-%d %H:%M')}: "
+            f"{label} state, rungs, medals, cell times"
+        )
+        print(f"  pushed -> {sha}")
+    except Exception as e:  # noqa: BLE001 - the upload never stops the prototype
+        print(f"  upload failed (results stay local): {e}")
     print("\nstate:", STATE_PATH)
     return 0
 
