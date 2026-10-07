@@ -469,3 +469,20 @@ highest standard: difficulty is anchored to uncompressed (f16, f16,
 f16) (addendum 88), so a compressed variant only reaches the page if
 it matches the same bar. Gold certifies quality; quants deliver
 accessibility; neither lowers the bar.
+
+## Addendum 90 - the difficulty analysis; session close
+
+The pass% table (standing update format): speed 96.5%, fwe 59.9%,
+vt 60.7%, arc 72.5% - arc confirmed as the easy outlier. Theoretical
+bar search (binomial extrapolation of stored cells, Laplace-smoothed
+per-cell p, k<=10): tightest >50% bars are fwe 6/10 (50.6%), vt 6/8
+(50.7%), arc 7/10 (50.2%); at k=20 arc's bar is x=13 (54.3%), with
+x=12 (61.5%) as the gate-parity option. Author's rulings: difficulty
+tuning waits until all models are dead; the three retrieval gates stay
+close to each other in pass rate; arc is the cheap gate to grow
+(2.2s/cell, ~18s/family, rung-independent) - k=20 fits a 60s/family
+budget. Gate cost at the 32k gold: speed 287s/cell, fwe 165s, vt 153s,
+arc 2.2s. Also corrected this session: rungs with a gold are settled -
+new families measure the lowest goldless rung (64k) directly, no
+climbing; 14 alive families remain, est. ~39-64h to finish the rung.
+Session closed; next session when the benchmark stops.
