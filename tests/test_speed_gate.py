@@ -1264,7 +1264,7 @@ def test_state_names_resolve_to_repos_before_the_hub():
     spec resolves to its roster repo before the acquire ever touches
     the hub (the addendum-62 alias class, applied to specs).
 
-    Pins: R-07
+    Pins: R-07, R-12
     """
     import full_benchmark as fb
 

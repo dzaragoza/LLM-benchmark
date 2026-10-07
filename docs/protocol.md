@@ -118,6 +118,9 @@ not a silent edit.
 | R-07 | Families evaluate in param-ascending order; the sort resolves both repo-carried and name-carried specs identically. | addendum 57 |
 | R-08 | A speed-gate death at rung k ends that family's climb at every deeper rung (the speed gate only hardens with depth). | addendum 13, session 40 |
 | R-09 | A study constant appears in exactly one place in the code; other files import it (the standing governance rule, now a requirement). | the registry's governance rule |
+| R-10 | Every cell artifact (dumps, csv, server and arc cell logs, mem sidecars) lives in the results tree; `models/<family>/` is weights-only, so deleting a model directory loses only regenerable data. | addendum 60 (the deleted arc logs) |
+| R-11 | An answered rung still measures a never-evaluated family whose trained window makes that rung its terminal one (no stored verdict at the depth, no cells anywhere, window <= depth) - the answered-rung skip never becomes a permanent bar. | addendum 62 (the revival that did not bite) |
+| R-12 | A name-only spec (a state-carried family name with no stored spec) resolves to its roster repo before any hub access; an unknown name is never sent to the hub. | addendum 63 (the 404 crash) |
 
 ## [A] Author choices (ruled, on record)
 
