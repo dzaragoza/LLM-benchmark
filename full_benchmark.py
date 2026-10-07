@@ -187,8 +187,19 @@ def _registry_params(spec: str) -> float | None:
         from etc import registry_data
 
         key = spec.partition("=")[0].rstrip("/")
+        # addendum 62: the state carries acquisition-era names that may
+        # differ from the roster key by a quant suffix (MiniCPM-1B-sft-bf16
+        # vs roster MiniCPM-1B-sft) - strip the common suffixes so both
+        # shapes resolve and the param sort never degenerates to
+        # "unknowns last".
+        aliases = {key}
+        for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
+            if key.endswith(suffix):
+                aliases.add(key[: -len(suffix)])
         for name, r in registry_data.ROSTER.items():
-            if key in (r, name) and registry_data.params_b(name) is not None:
+            if (
+                key in (r, name, r.rpartition("/")[2]) or aliases & {name, r.rpartition("/")[2]}
+            ) and (registry_data.params_b(name) is not None):
                 return registry_data.params_b(name)
     except ImportError:
         return None
