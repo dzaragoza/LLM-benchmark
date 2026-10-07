@@ -215,11 +215,28 @@ def certify_rung(
         print()
         print("-" * 60)
         print(f"  {fam}: {k}/{measured} cells measured, {n_total - measured} unmeasured")
+        stored = (fst.get("verdicts") or {}).get(str(depth))
+        if stored == "dead":
+            entry["skipped"] = "dead at this rung (stored verdict)"
+            print("  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs")
+            results.append(entry)
+            continue
+        if stored == "accept":
+            answered = True
+            entry["skipped"] = "rung already answered (stored verdict)"
+            print("  SKIPPED - the rung is already answered (stored verdict)")
+            results.append(entry)
+            continue
         if answered:
             entry["skipped"] = "rung already answered"
             print("  SKIPPED - the rung is already answered")
             results.append(entry)
             continue
+        # addendum 57: the verdict is PERSISTED per rung - a restart must
+        # not re-run a family at a depth it already answered. A stored
+        # accept ANSWERS the rung (later families skip it); a stored dead
+        # skips THIS rung only (the family still climbs at deeper rungs -
+        # the addendum-56 "everyone climbs" semantics).
         infeasible = fst.get("infeasible")
         if infeasible is not None:
             entry["skipped"] = (
@@ -433,6 +450,16 @@ def certify_rung(
         entry["ran_now"] = ran
         if verdict == "accept":
             entry["verdict"] = "accept"
+
+            # addendum 57: the verdict is persisted per rung - a restart must
+
+            # not re-run this family at this depth (accept answers the rung;
+
+            # dead skips it here and climbs at the deeper rungs)
+
+            fst.setdefault("verdicts", {})[str(depth)] = "accept"
+
+            save_state(state_path, state)
             lo = wilson_interval(k, measured, z)[0]
             print(
                 f"  ACCEPT at {k}/{measured} - 2 sigma "
@@ -450,6 +477,16 @@ def certify_rung(
             )
         elif verdict == "dead":
             entry["verdict"] = "dead"
+
+            # addendum 57: the verdict is persisted per rung - a restart must
+
+            # not re-run this family at this depth (accept answers the rung;
+
+            # dead skips it here and climbs at the deeper rungs)
+
+            fst.setdefault("verdicts", {})[str(depth)] = "dead"
+
+            save_state(state_path, state)
             print(
                 f"  DEAD - even {best_k}/{n_total} cannot reach the bar "
                 f"(best {int(z)}s lower bound {best_lo:.3f} < {bar_lo}); next candidate"
@@ -526,11 +563,28 @@ def certify_rung_combined(
                 f"{entry[f'{t}_historical_cells']} cells measured, "
                 f"{n_total - entry[f'{t}_historical_cells']} unmeasured"
             )
+        stored = (fst.get("verdicts") or {}).get(str(depth))
+        if stored == "dead":
+            entry["skipped"] = "dead at this rung (stored verdict)"
+            print("  SKIPPED - dead at this rung (stored verdict); it climbs at the deeper rungs")
+            results.append(entry)
+            continue
+        if stored == "accept":
+            answered = True
+            entry["skipped"] = "rung already answered (stored verdict)"
+            print("  SKIPPED - the rung is already answered (stored verdict)")
+            results.append(entry)
+            continue
         if answered:
             entry["skipped"] = "rung already answered"
             print("  SKIPPED - the rung is already answered")
             results.append(entry)
             continue
+        # addendum 57: the verdict is PERSISTED per rung - a restart must
+        # not re-run a family at a depth it already answered. A stored
+        # accept ANSWERS the rung (later families skip it); a stored dead
+        # skips THIS rung only (the family still climbs at deeper rungs -
+        # the addendum-56 "everyone climbs" semantics).
         infeasible = fst.get("infeasible")
         if infeasible is not None:
             entry["skipped"] = (
@@ -677,6 +731,16 @@ def certify_rung_combined(
         )
         if verdict == "accept":
             entry["verdict"] = "accept"
+
+            # addendum 57: the verdict is persisted per rung - a restart must
+
+            # not re-run this family at this depth (accept answers the rung;
+
+            # dead skips it here and climbs at the deeper rungs)
+
+            fst.setdefault("verdicts", {})[str(depth)] = "accept"
+
+            save_state(state_path, state)
             print(
                 f"  ACCEPT at {depth:,} - all three tasks clear "
                 f"({tally_line}) "
@@ -700,6 +764,16 @@ def certify_rung_combined(
             )
         elif verdict == "dead":
             entry["verdict"] = "dead"
+
+            # addendum 57: the verdict is persisted per rung - a restart must
+
+            # not re-run this family at this depth (accept answers the rung;
+
+            # dead skips it here and climbs at the deeper rungs)
+
+            fst.setdefault("verdicts", {})[str(depth)] = "dead"
+
+            save_state(state_path, state)
             if dead_task == "speed":
                 prev = fst.get("speed_dead_at")
                 if prev is None or depth < prev:

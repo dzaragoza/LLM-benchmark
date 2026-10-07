@@ -423,7 +423,9 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
             min_words=3,
         )
         assert calls == []
-        assert res[0]["verdict"] == "accept"
+        # addendum 57: the stored verdict skips the rung - a restart never
+        # re-runs an answered family/depth
+        assert res[0]["skipped"] == "rung already answered (stored verdict)"
     finally:
         monkeypatch.undo()
 
