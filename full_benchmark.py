@@ -360,14 +360,6 @@ def verdict_commit(
     else:
         what = f"{fam} DEAD at rung {depth:,}"
     stamp(f"verdict: {what} - committing partial results")
-    if verdict == "accept":
-        try:
-            import picker_medals
-
-            picker_medals.main()
-            stamp("picker gold-medal panels updated (addendum 72)")
-        except Exception as e:
-            stamp(f"picker medals update failed (ignored): {e}")
     tee_output.uninstall()
     try:
         git_tail(args)

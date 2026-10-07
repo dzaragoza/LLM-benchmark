@@ -8,22 +8,17 @@ integrated GPUs, with the llama.cpp Vulkan backend.
 
 ---
 
-## 🌐 The practitioner pages 🖼️ the study's main artifact
+## The practitioner page - the study's main artifact
 
-The study's deliverable is not the paper - it is the two static pages a practitioner
-opens to answer "which Q8_0 model should I run on my machine?". Both run offline,
-no build step, no JavaScript dependencies:
+The study's deliverable is not the paper - it is the page a practitioner opens
+to answer "which model should I run on my machine?" - the gold medal per
+context depth, with the minimum RAM (CPU/iGPU), VRAM (GPU) and memory
+bandwidth each winner needs. Published on GitHub Pages:
+**[docs/index.md](docs/index.md)** - static Markdown, no build step, no
+JavaScript. Every recommendation is backed by a v5.x-protocol measurement
+(2-sigma certification at f16) - the page only lists models the study
+actually ran.
 
-- **[cpu-picker.html](docs/cpu-picker.html)** 🖥️ **Local LLM picker — CPU/iGPU** — serving from **system RAM**:
-  pick your DDR generation, JEDEC speed and channel count (DDR to DDR5, single to
-  octa), enter your RAM, get the highest-ARC measured model that fits and clears the
-  300-wpm reader line at your bandwidth.
-- **[gpu-picker.html](docs/gpu-picker.html)** 🖨️ **Local LLM picker — GPU** — serving from a **GPU**: enter your
-  card's VRAM, get the same recommendation (bandwidth is never the constraint on
-  current cards - the page shows the derivation).
-
-Every recommendation is backed by a v3.1-protocol measurement (reader-wall stall rate,
-ARC-Challenge) - the pages only recommend models the study actually ran.
 **🆔 ORCID:** [0009-0003-8529-2638](https://orcid.org/0009-0003-8529-2638)
 
 ---
@@ -111,7 +106,7 @@ Dev tools (own CLIs, tested like everything else):
 |---|---|
 | `code_edit.py` | the verified transactional editor (Vibe's editor, protocol [P]) |
 | `code_search.py` | AST-based code search: defs/refs/calls with import-alias resolution |
-| `ty_check.py`, `md_check.py`, `js_check.py` | the gate wrappers (ty env, markdown tables, picker pages) |
+| `ty_check.py`, `md_check.py` | the gate wrappers (ty env, markdown tables) |
 | `git_push.py` | the sandbox's REST-API push workaround |
 | `sandbox_check.py` | the bench machine's pre-flight environment check |
 
