@@ -177,12 +177,18 @@ def check_tooling(args: argparse.Namespace) -> None:
 # =========================================================== roster
 
 
-def _registry_params(repo: str) -> float | None:
+def _registry_params(spec: str) -> float | None:
+    """The spec's registry parameter count. The spec may be a REPO
+    ("Qwen/Qwen2.5-1.5B-Instruct") or a family NAME (the state file
+    stores names - addendum 57: the name-only lookup silently sorted
+    every state-carried family as uncounted, so restarts ran in
+    alphabetical order instead of param-ascending)."""
     try:
         from etc import registry_data
 
+        key = spec.partition("=")[0].rstrip("/")
         for name, r in registry_data.ROSTER.items():
-            if r == repo and registry_data.params_b(name) is not None:
+            if key in (r, name) and registry_data.params_b(name) is not None:
                 return registry_data.params_b(name)
     except ImportError:
         return None

@@ -668,4 +668,44 @@ def test_fresh_family_cells_persist_to_the_state_file(tmp_path, monkeypatch):
         False,
         min_words=2,
     )
-    assert res2[0]["ran_now"] == 0
+    assert res2[0].get("ran_now", 0) == 0
+    # addendum 57: the verdict is persisted per rung
+    assert saved["families"]["newfam"]["verdicts"]["4096"] == "accept"
+
+
+def test_restarted_rung_skips_stored_verdicts(tmp_path, monkeypatch):
+    """Addendum 57: the author's catch - "if there's already a champion
+    at 4k, why is the benchmark re-running 4k models?" The verdict is
+    PERSISTED per (family, rung): a stored accept ANSWERS the rung
+    (later families skip it), a stored dead skips THIS family at THIS
+    rung only (it still climbs at deeper rungs - addendum 56)."""
+    import bench.certify as BC
+
+    state = {
+        "families": {
+            "medalist": {"verdicts": {"4096": "accept"}},
+            "deadfam": {"verdicts": {"4096": "dead"}},
+            "newfam": {},
+        }
+    }
+    measured = []
+    monkeypatch.setattr(
+        BC.bench_state_store,
+        "_task_measure",
+        lambda *a: measured.append(a) or (True, 4, "ok", 1.0),
+    )
+    res = BC.certify_rung_combined(
+        4096,
+        ["medalist", "deadfam", "newfam"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        min_words=2,
+    )
+    by = {r["family"]: r for r in res}
+    assert by["medalist"]["skipped"] == "rung already answered (stored verdict)"
+    assert by["deadfam"]["skipped"] == "dead at this rung (stored verdict)"
+    # the medalist's accept ANSWERS the rung: the new family skips it too
+    assert "rung already answered" in by["newfam"]["skipped"]
