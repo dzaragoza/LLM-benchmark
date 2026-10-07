@@ -305,3 +305,18 @@ BOUND and the practitioner should budget the UMA carve-out (typically
 question for the memory sidecar work: attribute the UMA-resident share
 (llama-server's Vulkan backend reports its allocations; a future
 sidecar can split the footprint into OS-visible vs UMA-resident).
+
+## Addendum 78 - the memory authority is llama's own breakdown
+
+The author's correction: the page's memory numbers come from
+llama-server's MEMORY (llama) breakdown (weights + context + compute),
+NOT the MemAvailable-delta machine cost. Rewritten accordingly - and
+this resolves the addendum-76 granite paradox: under the llama
+breakdown granite-4.0-h-1b @4k is weights 3.01 + context 0.09 +
+compute 0.06 = 3.15 GiB (4 GiB rounded), SMALLER than Qwen
+(3.85 GiB @16k, 4 GiB rounded) exactly as its smaller weights predict.
+The ~0.8 GiB gap in the machine-cost numbers was the MemAvailable
+delta's artifact (the UMA-resident share the OS counter cannot see),
+not a granite runtime overhead - the addendum-76 note is superseded.
+The UMA budgeting note stays (the carve-out rides on top of whatever
+the breakdown totals).
