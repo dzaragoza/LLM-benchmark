@@ -1,56 +1,78 @@
-# Which model should I run? — gold medal winners per context depth
+# The certified models — what to run and what it takes
 
 The f16 context-depth tournament on a 102.4 GB/s system-RAM machine,
-certified to 2 sigma. For each context depth that has a gold medal: the
-winner (the certified model with the fewest parameters), the minimum RAM
-you need to serve it from system memory, and the minimum memory bandwidth to stay above the 5 words/second
-reader line — with the memory configurations that meet it.
+certified to 2 sigma. One section per gold-medal model, deepest
+certified depth first: the optimum settings, the memory it needs, and
+the memory bandwidth your machine must have.
 
-Sorted deepest-first: if your machine clears the 16k row, that is the
-deepest certified context in the study.
+## Qwen2.5-1.5B-Instruct
 
-| Context depth | Gold medal model | Min RAM | Min bandwidth | Measured speed @102.4 GB/s |
-|---|---|---|---|---|
-| **16k** | Qwen2.5-1.5B-Instruct | 4 GiB | 24.3 GB/s | 21.1 t/s |
-| **8k** | Qwen2.5-1.5B-Instruct | 4 GiB | 22.9 GB/s | 22.4 t/s |
-| **4k** | granite-4.0-h-1b | 5 GiB | 22.5 GB/s | 22.8 t/s |
+**The deepest certified model in the study: gold at 16k context.**
 
-Deeper rungs (32k–256k): no gold medal yet — 32,768 is measured but
-unconquered; the deepest challenger died one hair under the certification
-bar. This page updates with every new gold medal.
+- **Optimum settings**: f16 weights (the `Qwen2.5-1.5B-Instruct-f16`
+  GGUF), context = the depth you need, up to **16,384 tokens** — the
+  2-sigma certified ceiling at f16. It also holds gold at 8k and 4k.
+  Beyond 16k it died to the free-word-extraction gate (one hair under
+  the certification bar at 32k), so treat 16k as its proven limit.
+- **Quant**: f16 — the study's first pass measures every model at full
+  f16 precision to establish maximum quality and maximum size on the
+  102.4 GB/s machine class before any compression is considered. No
+  smaller quant of this model has been certified yet; when one is, it
+  appears here.
+- **Memory**: **4 GiB** of system RAM at 16k context (measured whole-stack
+  machine cost — weights 3.31 GiB + KV context 0.44 GiB + compute
+  buffers 0.12 GiB + runtime overhead — rounded up).
+- **Minimum bandwidth**: **24.3 GB/s** to stay above the 5 w/s reader
+  line at its worst measured turn (21.1 t/s at 102.4 GB/s; speed scales
+  linearly with bandwidth).
 
-## Memory configurations that clear the bandwidth minimum
+## granite-4.0-h-1b
 
-Speed scales linearly with memory bandwidth (measured at 102.4 GB/s):
-your machine needs at least **24.3 GB/s** to run the deepest winner above
-the reader line. These common configurations clear it:
+**The fewest-parameter gold medalist: gold at 4k context.**
 
-| Configuration | Bandwidth | Runs |
+- **Optimum settings**: f16 weights, context = **4,096 tokens** — its
+  trained window is 4k, which makes 4k its terminal rung. It accepted
+  there under the 2-sigma bar and is the smallest certified model in
+  the study.
+- **Quant**: f16 — same ruling as above: full precision first, the
+  compression study comes later.
+- **Memory**: **5 GiB** of system RAM at 4k context (measured whole-stack
+  machine cost: weights 3.01 GiB + KV context 0.12 GiB + compute
+  0.07 GiB + runtime overhead — rounded up. Note: its measured machine
+  cost runs ~0.8 GiB higher than Qwen's despite smaller weights — the
+  hybrid-attention runtime carries a larger serving overhead).
+- **Minimum bandwidth**: **22.5 GB/s** (worst measured turn 22.8 t/s at
+  102.4 GB/s).
+
+## Bandwidth: what meets the minimum
+
+Both winners need ~24 GB/s. Speed scales linearly with memory bandwidth
+(validated at 102.4 GB/s): your machine's memory bandwidth must be at
+least min-BW × (5 ÷ measured t/s). Configurations that clear it:
+
+| Configuration | Bandwidth | Verdict |
 |---|---|---|
-| DDR5-6400 dual channel | 102.4 GB/s | all depths, far above the line |
-| DDR5-5600 dual channel | 89.6 GB/s | all depths, far above the line |
-| DDR5-4800 dual channel | 76.8 GB/s | all depths, far above the line |
-| DDR4-3200 dual channel | 51.2 GB/s | all depths, comfortably |
-| DDR5-4800 single channel | 38.4 GB/s | all depths, comfortably |
-| DDR5-5600 single channel | 44.8 GB/s | all depths, comfortably |
-| DDR5-6400 single channel | 51.2 GB/s | all depths, comfortably |
-| DDR4-3200 single channel | 25.6 GB/s | all depths, just above the line |
-| DDR4-2400 dual channel | 38.4 GB/s | all depths, comfortably |
-
-Below 24.3 GB/s (e.g. DDR4-2400 single channel, 19.2 GB/s): no certified
-depth is guaranteed readable; expect the reader line to be crossed.
-
-GPU note: every current GPU clears the bandwidth minimum by a wide
-margin — VRAM capacity is the only constraint on the GPU side.
+| DDR5-6400 dual channel | 102.4 GB/s | far above the line |
+| DDR5-5600 dual channel | 89.6 GB/s | far above the line |
+| DDR5-4800 dual channel | 76.8 GB/s | far above the line |
+| DDR4-3200 dual channel | 51.2 GB/s | comfortably above |
+| DDR5-4800 single channel | 38.4 GB/s | comfortably above |
+| DDR4-2400 dual channel | 38.4 GB/s | comfortably above |
+| DDR4-3200 single channel | 25.6 GB/s | just above the line |
+| DDR4-2400 single channel | 19.2 GB/s | below — no certified depth guaranteed readable |
 
 ## How the numbers are measured
 
-- **RAM**: the measured whole-stack machine cost (MemAvailable delta,
-  rounded up to the next whole GiB) at the model's certified depth,
-  f16 weights; treat the fit boundary as soft.
-- **Bandwidth**: the linear law validated on the 102.4 GB/s class —
-  min bandwidth = 102.4 × 5 ÷ measured worst-turn t/s.
+- **Memory**: the measured whole-stack machine cost (system-RAM
+  MemAvailable delta while the model serves at its certified depth).
+  On the iGPU, weights, KV cache and compute buffers all live in system
+  RAM — the GPU shares the machine's memory, so there is no separate
+  GPU pool to account for.
+- **Bandwidth**: the linear law — min bandwidth = 102.4 × 5 ÷ measured
+  worst-turn t/s.
 - **Gold medal**: exclusive per depth — among the models certified at
   2 sigma (Wilson lower bound ≥ 0.50, ≥ 10 cells per gate), the one
   with the fewest parameters.
+- Deeper rungs (32k–256k): no gold medal yet. This page updates with
+  every new gold.
 - The full protocol and evidence trail: [protocol.md](../md/protocol.md).

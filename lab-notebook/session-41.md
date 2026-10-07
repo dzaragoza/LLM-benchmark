@@ -274,3 +274,21 @@ whole-stack cost rounded UP to the next whole GiB (16k/8k
 Qwen2.5-1.5B-Instruct: 4 GiB; 4k granite-4.0-h-1b: 5 GiB) and the VRAM
 column is gone - the GPU note keeps only that VRAM capacity is the
 constraint; a GPU column returns when GPU-side measurements exist.
+
+## Addendum 76 - the page goes per-model; the granite memory question
+
+The author's rulings: one section per model (optimum settings, the
+quant explained, the bandwidth configurations that clear the minimum),
+drop the CPU reference (the study serves from the iGPU - system RAM),
+and two questions. (1) Which parts of the llama memory report are GPU:
+on the iGPU ALL of them - weights, KV context and compute buffers live
+in system RAM (the GPU shares machine memory), which is exactly why
+the MemAvailable-delta machine cost IS the right serving number; the
+page now says so. (2) Is granite's memory correct? Yes - verified:
+granite-4.0-h-1b f16 weighs 3.01 GiB vs Qwen's 3.31 GiB, but its
+MEASURED machine cost runs ~0.8 GiB higher (4.2-4.4 vs 3.4-3.6 GiB)
+across every rung - the weights are smaller, the hybrid-attention
+runtime overhead is larger; the measurement stands and the page notes
+it. Structure: Qwen2.5-1.5B-Instruct first (deepest, 16k gold),
+granite-4.0-h-1b second (fewest params, 4k gold); the shared DDR table
+follows.
