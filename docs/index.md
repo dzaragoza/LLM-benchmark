@@ -19,9 +19,9 @@ the memory bandwidth your machine must have.
   102.4 GB/s machine class before any compression is considered. No
   smaller quant of this model has been certified yet; when one is, it
   appears here.
-- **Memory**: **4 GiB** of system RAM at 16k context (measured whole-stack
-  machine cost — weights 3.31 GiB + KV context 0.44 GiB + compute
-  buffers 0.12 GiB + runtime overhead — rounded up).
+- **Memory**: **4 GiB** of system RAM at 16k context — llama-server's
+  own memory breakdown at that depth: weights 3.31 GiB + KV context
+  0.44 GiB + compute buffers 0.09 GiB = 3.85 GiB total, rounded up.
 - **Minimum bandwidth**: **24.3 GB/s** to stay above the 5 w/s reader
   line at its worst measured turn (21.1 t/s at 102.4 GB/s; speed scales
   linearly with bandwidth).
@@ -36,11 +36,10 @@ the memory bandwidth your machine must have.
   the study.
 - **Quant**: f16 — same ruling as above: full precision first, the
   compression study comes later.
-- **Memory**: **5 GiB** of system RAM at 4k context (measured whole-stack
-  machine cost: weights 3.01 GiB + KV context 0.12 GiB + compute
-  0.07 GiB + runtime overhead — rounded up. Note: its measured machine
-  cost runs ~0.8 GiB higher than Qwen's despite smaller weights — the
-  hybrid-attention runtime carries a larger serving overhead).
+- **Memory**: **4 GiB** of system RAM at 4k context — llama-server's
+  own memory breakdown: weights 3.01 GiB + KV context 0.09 GiB +
+  compute buffers 0.06 GiB = 3.15 GiB total, rounded up. Smaller than
+  Qwen at every depth, as its smaller weights predict.
 - **Minimum bandwidth**: **22.5 GB/s** (worst measured turn 22.8 t/s at
   102.4 GB/s).
 
@@ -63,12 +62,11 @@ least min-BW × (5 ÷ measured t/s). Configurations that clear it:
 
 ## How the numbers are measured
 
-- **Memory**: the measured whole-stack machine cost (system-RAM
-  MemAvailable delta while the model serves at its certified depth).
-  On the iGPU the model lives in system RAM, but part of the footprint
-  resides in the UMA region the BIOS reserves for the GPU — memory the
-  OS never hands out, so the MemAvailable delta does not see it. The
-  measured cost is therefore a lower bound: budget the UMA carve-out
+- **Memory**: llama-server's own memory breakdown at the model's
+  certified depth — weights + KV context + compute buffers, the
+  serving footprint as the runtime itself accounts it. On the iGPU all
+  of it lives in system RAM, but part may reside in the UMA region the
+  BIOS reserves for the GPU — budget your machine's UMA carve-out
   (typically 512 MiB–2 GiB in BIOS settings) on top of the number
   above.
 - **Bandwidth**: the linear law — min bandwidth = 102.4 × 5 ÷ measured
