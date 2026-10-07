@@ -1135,3 +1135,11 @@ THE RULING: "Can we revive the 4k window candidates the same way?" Yes - same di
 phi-1 STAYS OUT: trained window 2,048 is strictly below the first rung under both the old and the new rule - its disqualification is a measurement of the world, not of the rule. The roster's sub-4k-window class has no rung to run; that is the study's floor, unchanged.
 
 Migration class closed: every family whose infeasible record was window == depth is revived; the surviving infeasible set is exactly the strictly-below families (phi-1 alone at present). The addendum-45 machinery catches anything the registry missed at runtime, unchanged.
+
+### Addendum 61c - the 4,096 rung re-opened (2026-10-07, the author's ruling)
+
+THE RULING: "Yes. Then I will update the benchmark and restart." The rung's answered state derives entirely from the stored verdicts (addendum 57: a stored accept ANSWERS its rung) - so reviving the 4,096-window trio (61b) required re-opening the 4,096 rung, else the trio would be skipped there ("rung already answered") and, their window being 4k, go infeasible at the very next rung - never measured at all.
+
+THE MIGRATION: Qwen2.5-1.5B-Instruct's stored 4096 accept verdict is REMOVED (the 8,192 and 16,384 accepts stand). The medal is untouched - it is computed from the stored cells (14 at 4,096 across speed/fwe/vt + 14 arc), which remain; only the rung-answering verdict is gone. On the restart the 4,096 rung measures: the revived trio (from scratch - they have no cells), every quality-dead family whose stored 4096 verdict was "dead" STILL SKIPS (their kills were measured - addendum 57's stored-dead skip is per family, not per rung), and the medalist itself re-derives its 4,096 accept free from the store (cells load, verdict re-stamps - the never-re-measure promise holds).
+
+Note the asymmetry, on record: re-opening a rung costs nothing for stored-dead families (their skip is their own verdict, not the rung's) and nothing for accept families (their cells re-answer); it only re-admits families with NO stored verdict at that depth - exactly the revived trio.
