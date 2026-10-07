@@ -818,7 +818,7 @@ def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
     deleting models/<family> touches only regenerable data. The fwe
     and vt cells already lived there; this pins the two that moved.
 
-    Pins: R-01
+    Pins: R-01, R-10
     """
     import bench.state_store as SS
 
@@ -905,7 +905,7 @@ def test_answered_rung_still_measures_the_terminal_family(tmp_path, monkeypatch,
     The rung was answered first (a stored accept ahead of it in param
     order), and the terminal family measures anyway.
 
-    Pins: R-04, R-06
+    Pins: R-04, R-06, R-11
     """
     import bench.certify as BC
 
