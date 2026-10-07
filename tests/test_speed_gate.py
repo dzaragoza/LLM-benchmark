@@ -566,7 +566,9 @@ def test_sigint_shutdown_sequence(tmp_path, capsys):
 
     import full_benchmark as fb
 
-    assert fb.TASK_PASS_BARS["arc"] == 4  # addendum 8: the 4/5 calibration
+    assert (
+        fb.TASK_PASS_BARS["arc"] == 3
+    )  # addendum 68: the 3/5 recalibration (4/5 was 36% - below the 50% floor)
     assert fb.TASK_PASS_BARS["vt"] == 4  # addendum 12: the 4/5 calibration
     assert fb.TASK_PASS_BARS["fwe"] == 2  # addendum 13: the 2/3 calibration
     args = argparse.Namespace(no_git=True, dry_run=False)
