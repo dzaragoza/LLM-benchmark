@@ -11,12 +11,14 @@ Each section is one certified choice: the model, the configuration to run it wit
 > **VRAM + dedicated GPU** (a separate graphics card: RTX 4060, RX 7600, ...): the model runs from the card's **VRAM** — use the *VRAM needed* number.
 >
 > A dedicated GPU is **optional**. Both winners run perfectly well from system RAM on an iGPU.
+>
+> **The bandwidth requirement is only for iGPU systems.** Any dedicated GPU on the market meets it by a wide margin - memory bandwidth only becomes a constraint when the model is served from system RAM.
 
 ## 16k context
 
 - **Model**: Qwen2.5-1.5B-Instruct
 - **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 16,384
-- **Memory bandwidth needed**: 25 GB/s
+- **Memory bandwidth needed (iGPU only)**: 25 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation
@@ -32,7 +34,7 @@ llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 16384 --cache-type-k f16 --cac
 
 - **Model**: Qwen2.5-1.5B-Instruct
 - **Configuration**: `Qwen2.5-1.5B-Instruct-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 8,192
-- **Memory bandwidth needed**: 23 GB/s
+- **Memory bandwidth needed (iGPU only)**: 23 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation
@@ -48,7 +50,7 @@ llama-server -m Qwen2.5-1.5B-Instruct-f16.gguf -c 8192 --cache-type-k f16 --cach
 
 - **Model**: granite-4.0-h-1b
 - **Configuration**: `granite-4.0-h-1b-f16.gguf` — f16 weights, f16 K cache, f16 V cache, context 4,096
-- **Memory bandwidth needed**: 23 GB/s
+- **Memory bandwidth needed (iGPU only)**: 23 GB/s
   - single channel: DDR5-4800 or faster
   - dual channel: DDR4-3200 or faster
   - quad channel: any listed generation

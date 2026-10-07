@@ -370,3 +370,10 @@ command line matching the exact configuration the benchmark measured:
 -m <gguf> -c <depth> --cache-type-k f16 --cache-type-v f16 -fa on
 --parallel 1 (the -fa/--parallel flags mirror the benchmark's own
 launch flags for the f16 K/V variant).
+
+## Addendum 82 - the bandwidth remark
+
+The author's ruling: state that ANY dedicated GPU meets the bandwidth
+requirement - the BW consideration is only for integrated GPUs. The
+blockquote gains the remark, and each section's row retitled
+"Memory bandwidth needed (iGPU only)".
