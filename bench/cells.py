@@ -151,7 +151,7 @@ def fwe_pass(
     (refinement 1.5) launch no speed server, so this is where a window
     between midpoints is caught."""
     label = os.path.splitext(os.path.basename(model))[0]
-    depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
+    depth = rung  # addendum 61: ctx = depth; the headroom is paid inside ruler_gate's budget
     os.makedirs(results_dir, exist_ok=True)
     csv_path = os.path.join(results_dir, f"{label}-{depth}-fwe.csv")
     if os.path.exists(csv_path):
@@ -287,7 +287,7 @@ def vt_pass(
     the graded diagnostic stored per cell (the VT analogue of the
     FWE x/3 word count)."""
     label = os.path.splitext(os.path.basename(model))[0]
-    depth = rung - 2 * ruler_gate.ANSWER_HEADROOM
+    depth = rung  # addendum 61: ctx = depth; the headroom is paid inside ruler_gate's budget
     os.makedirs(results_dir, exist_ok=True)
     csv_path = os.path.join(results_dir, f"{label}-{depth}-vt.csv")
     if os.path.exists(csv_path):

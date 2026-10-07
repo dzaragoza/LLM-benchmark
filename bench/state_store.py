@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
-import ruler_gate
 from bench import cells as bench_cells
 from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT, TASK_PASS_BARS
 
@@ -322,7 +321,7 @@ def _task_measure(
     if task == "speed":
         ok, fv = bench_cells.speed_cell(
             model,
-            depth + 2 * ruler_gate.ANSWER_HEADROOM,
+            depth,
             CORPUS_DEFAULT,
             results_dir,
             run,
@@ -353,7 +352,7 @@ def _task_measure(
     if task == "vt":
         ok, fv = bench_cells.vt_pass(
             model,
-            depth + 2 * ruler_gate.ANSWER_HEADROOM,
+            depth,
             results_dir,
             seed=run,
             port=port,
@@ -371,7 +370,7 @@ def _task_measure(
         )
     ok, fv = bench_cells.fwe_pass(
         model,
-        depth + 2 * ruler_gate.ANSWER_HEADROOM,
+        depth,
         results_dir,
         seed=run,
         port=port,

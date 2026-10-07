@@ -857,3 +857,41 @@ def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
     assert arc_log.is_file()
     leftovers = list((tmp_path / "fam").glob("*.log"))
     assert leftovers == [], leftovers
+
+
+def test_window_equal_to_rung_is_a_candidate(tmp_path, monkeypatch):
+    """Addendum 61 (the author's ruling, option A): the rung at depth D
+    launches at ctx = D - the answer headroom is paid from the MEASURED
+    CONTENT, not from the model's window. A family whose trained window
+    equals the rung depth (the power-of-two coincidence that killed the
+    medalist at 32,768 under the old ctx = D + 256 rule) is a CANDIDATE
+    at its own rung: the pre-flight stays silent and the family is
+    measured, never pre-declared infeasible.
+
+    Pins: R-06
+    """
+    import bench.certify as BC
+
+    launched = []
+    monkeypatch.setattr(BC, "_acquire_missing_model", lambda *a: launched.append("acquire"))
+    # a 4,096-window family at the 4,096 rung: EQUAL, not below
+    monkeypatch.setattr(BC, "_registry_window", lambda fam: 4096)
+    state: dict[str, Any] = {"families": {}}
+    res = BC.certify_rung_combined(
+        4096,
+        ["eq-win"],
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        min_words=2,
+    )
+    r = res[0]
+    assert r.get("verdict") != "infeasible", r.get("infeasible_reason")
+    assert r.get("infeasible_reason") is None
+    fst = state["families"]["eq-win"]
+    assert fst.get("infeasible") is None
+    assert fst.get("verdicts", {}).get("4096") != "infeasible"
+    # the family proceeds to acquisition - the pre-flight stayed silent
+    assert launched == ["acquire"]
