@@ -47,3 +47,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 126: no heredocs even for driving code_edit - CLI gains --blocks-file and --write
 - [session-44](session-44.md) - addendum 127: R-27 - check the latest completed push-regression verdict on every pull
 - [session-44](session-44.md) - addendum 129: --clean replaces --force - wipe all v7 cells and logs up front, never mixed results
+- [session-44](session-44.md) - addendum 130: R-28 - a scoring system never offers a cell whose max score is 0

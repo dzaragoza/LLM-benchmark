@@ -474,3 +474,24 @@ session (below).
 Pinned by the rewritten test in test_v7_partial_credit.py: the
 wipe completes before any measuring (greedy_allocations is a
 boom), every family's block is gone, non-v7 keys survive.
+
+## Addendum 130 - R-28: never a max score of 0
+
+The author: "add requirement: A scoring system shall never
+create situations where the maximum possible score is 0."
+
+Registered as R-28, born from the addendum-128 lesson: dropping
+the 2k span made every ctx=4096 cell structurally 0/0 - an empty
+answers file, wall 0.0s, a lying row in the table. The rule: every
+offered cell must be able to reach at least one (span, hops)
+grade, or the rung is not offered at all; grid changes get
+checked against the reachability arithmetic before shipping.
+
+Pinned by tests/test_no_zero_max.py: every ctx rung reaches a
+grade; the real allocation plan has no zero-max cells; R-28 is
+in the protocol table.
+
+Also this session: the rebase over the live run's artifact
+commits resurrected the wiped v7 blocks in state (the conflict
+resolution picked the wrong side first) - wiped again, and the
+commit is rebased and pushed.
