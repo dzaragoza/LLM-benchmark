@@ -95,3 +95,30 @@ family (no reachable grades); the first grade that can fire is
 span=2048 at ctx>=2368... in practice ctx=4096. The ctx=2048 rung
 of the grid is structurally inert - worth remembering when reading
 the argmax (a 0/0 cell is excluded from ranking, not a zero score).
+
+## Addendum 112 - preventing estimate-vs-server drift (the author: "do all")
+
+Three layers, from measurement to proof:
+
+1. PREFLIGHT (bench/v7.py): preflight_reachable_grades tokenizes
+   the smallest and largest reachable grade's rendered prompt on
+   the LIVE server per cell and raises PreflightError on overflow -
+   reported per cell, never a crash. Both live crashes would have
+   been caught before any question was asked.
+2. PROPERTIES + CONTRACTS: hypothesis pins soundness (reachable =>
+   the whole request fits) and monotone-in-window; crosshair proves
+   monotonicity and BOUNDARY TIGHTNESS (minimal accepted window is
+   exactly span+overhead+gen; one less is unreachable) - the exact
+   spot the old span<=window rule was wrong. A first soundness
+   contract draft was a tautology; crosshair flagged it (false at
+   (1,0,1,0,128)) and it was replaced - the verifier auditing the
+   contract author.
+3. BOUNDARY INTEGRATION (tests/test_v7_run_cell.py): a
+   FakeWindowServer with the real 400 semantics must agree with
+   grade_reachable at every (window, grade) pair - run_cell never
+   emits a request the server would reject. The old rule fails this
+   at span==window, the exact live crash.
+
+The process lesson, registered: never assert a token budget that
+has not been MEASURED against the live server - arithmetic estimates
+are for choosing what to ask, /tokenize is for verifying it fits.

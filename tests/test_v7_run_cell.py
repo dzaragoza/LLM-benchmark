@@ -284,3 +284,86 @@ def test_argmax_excludes_empty_cells():
     assert v7.grade_reachable(2048, 2, 2048) is False
     # the summary-side guard lives in full_benchmark's _run; the
     # exclusion rule itself is what the argmax consults
+
+
+# ---- layer 3: the boundary integration test - a fake server with the ----
+# ---- real 400 semantics must agree with grade_reachable at EVERY pair ----
+
+
+class FakeWindowServer:
+    """The simulated llama-server: tokenizes (1 token/4 chars, like the
+    corpus fixtures) and 400s any request whose prompt + max_tokens
+    exceed the window - the exact semantics that produced the
+    session-44 crash."""
+
+    def __init__(self, window):
+        self.window = window
+        self.rejected = []
+
+    def tokenize(self, port, content, timeout=300):
+        return [0] * (len(content) // 4)
+
+    def ask(self, port, prompt, max_tokens=64, no_thinking=True):
+
+        toks = len(self.tokenize(port, prompt))
+        if toks + max_tokens > self.window:
+            self.rejected.append((toks, max_tokens))
+            raise ValueError(
+                f"HTTP 400 from the server: request ({toks} tokens) exceeds "
+                f"the available context size ({self.window} tokens)"
+            )
+        return ""
+
+
+def test_run_cell_never_sends_an_overwide_request(monkeypatch, small_corpus):
+    """THE session-44 lesson, end to end: for every (window, grade) pair
+    on the fixture grid, run_cell must never emit a request the server
+    would 400 - reachability and the server's accounting agree. The
+    old span<=window rule fails this at span==window (the exact live
+    crash); the honest rule passes at every pair."""
+    from bench import v7 as v7m
+
+    for window in (1024, 2048, 4096, 8192):
+        server = FakeWindowServer(window)
+        monkeypatch.setattr(v7m.ruler_gate, "ask", server.ask, raising=False)
+        # keep the corpus fixture's tokenize active for any preflight
+        rec = v7m.run_cell(0, small_corpus, window=window)
+        assert server.rejected == [], (
+            f"window {window}: server 400'd {server.rejected} - "
+            f"reachability disagrees with the server"
+        )
+        # the asked grades are exactly the reachable ones
+        reachable = {
+            f"{q['span']}x{q['hops']}"
+            for q in small_corpus["questions"]
+            if v7m.grade_reachable(q["span"], q["hops"], window)
+        }
+        assert set(rec["per_grade"]) == reachable
+
+
+def test_preflight_catches_estimate_drift(monkeypatch, small_corpus):
+    """Layer 1's own regression: when the arithmetic says a grade fits
+    but the measured prompt does not (the constants drifted from the
+    tokenizer), preflight_reachable_grades raises PreflightError
+    naming the grade - BEFORE any question is asked."""
+    from bench import v7 as v7m
+
+    window = 4096  # the arithmetic says span 2048 fits comfortably
+
+    # a hostile tokenizer: 10 tokens per char - massive drift
+    def hostile_tokenize(port, content, timeout=300):
+        return [0] * (len(content) * 10)
+
+    monkeypatch.setattr(v7m.llama_server, "tokenize", hostile_tokenize)
+    with pytest.raises(v7m.PreflightError) as e:
+        v7m.preflight_reachable_grades(0, small_corpus, window)
+    assert "2048x" in str(e.value) or "1024x" in str(e.value)
+
+
+def test_preflight_passes_when_honest(monkeypatch, small_corpus):
+    from bench import v7 as v7m
+
+    monkeypatch.setattr(v7m.llama_server, "tokenize", _fake_tokenize_factory(None))
+    window = 8192
+    got = v7m.preflight_reachable_grades(0, small_corpus, window)
+    assert got and all(t > 0 for t in got.values())

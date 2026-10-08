@@ -250,6 +250,12 @@ def question_prompt(corpus: dict, q: dict) -> str:
     return ruler_gate.VT_TEMPLATE.format(context=context, query=q["value"], num_v=q["hops"] + 1)
 
 
+class PreflightError(Exception):
+    """The measured prompt does not fit the window the arithmetic said
+    it would (session 44, addendum 112) - the estimate-vs-server drift
+    both live crashes shared. Reported per cell, never a crash."""
+
+
 PROMPT_OVERHEAD_TOKENS = 128
 GEN_HEADROOM_TOKENS = 192
 
@@ -264,6 +270,39 @@ def grade_reachable(span: int, hops: int, window: int) -> bool:
     template is ~90 tokens, generation is at most VT_GEN_TOKENS."""
     gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 12)
     return span + PROMPT_OVERHEAD_TOKENS + max(GEN_HEADROOM_TOKENS, gen) <= window
+
+
+def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str, int] | None:
+    """The measured-reality check (session 44, addendum 112): tokenize
+    the SMALLEST and LARGEST reachable grade's actual rendered prompt
+    and verify the whole request fits the window. The estimate in
+    grade_reachable is arithmetic; this is measurement - both live
+    crashes (357k prompt vs 2k; 2237 vs 2048) were estimate-vs-server
+    drift that a preflight would have caught before any question was
+    asked. Returns {grade_key: measured_prompt_tokens} on pass, or
+    raises PreflightError naming the overflow."""
+    probes = sorted(
+        {
+            (q["span"], q["hops"])
+            for q in corpus["questions"]
+            if grade_reachable(q["span"], q["hops"], window)
+        }
+    )
+    if not probes:
+        return {}
+    seen: dict[tuple[int, int], int] = {}
+    for span, hops in (probes[0], probes[-1]):
+        q = next(x for x in corpus["questions"] if x["span"] == span and x["hops"] == hops)
+        toks = len(llama_server.tokenize(port, question_prompt(corpus, q)))
+        seen[(span, hops)] = toks
+        gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 12)
+        if toks + gen > window:
+            raise PreflightError(
+                f"grade {span}x{hops}: rendered prompt is {toks} tokens + {gen} gen "
+                f"= {toks + gen} > window {window} - the reachability estimate "
+                f"drifted from this server's tokenizer"
+            )
+    return {f"{s}x{h}": t for (s, h), t in seen.items()}
 
 
 def run_cell(port: int, corpus: dict, window: int) -> dict:
@@ -398,7 +437,14 @@ def certify_v7(
             if corpus is None:
                 corpus = corpus_from_artifact(port)
             try:
+                probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
+                if probe_toks:
+                    print(f"  preflight: {probe_toks}")
                 rec = run_cell(port, corpus, cell["ctx"])
+            except PreflightError as e:
+                entry["error"] = f"preflight: {e}"
+                results.append(entry)
+                continue
             except Exception as e:
                 entry["error"] = f"run_cell failed: {e}"
                 results.append(entry)
