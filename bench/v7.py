@@ -14,6 +14,37 @@ world: the allocation ladders, the greedy climb, the corpus builder,
 the graded scorer, and the per-cell controller (acquire via the
 certify phase-1/2 path, launch in the bench.cells shape, state in
 the families/<name> tree of full_benchmark's state file).
+READING A SCORE (session 44, addendum 131 - the author kept the
+scoring; it needs explanation because it is counter-intuitive):
+
+  credit   found / (h+1) per question - how far down the chain
+           the answer got; 1.0 = the full chain. A grade's rate is
+           its mean credit (K=1: the question's credit).
+  score    SUM of grade credits over the REACHABLE grades. Each
+           reachable grade contributes at most 1.0, so
+           max_score (the grade count) is the natural ceiling.
+  max_score  how many (span, hops) grades fit the window - the
+           reachable breadth. Reach is monotone: a bigger ctx
+           window contains every grade a smaller one has, plus more.
+
+Consequences (all intended, none a bug):
+
+  - raw score never decreases with ctx: extra context can only
+    ADD grades, never remove them. Comparing raw sums across ctx
+    ranks reachable breadth, not quality.
+  - score / max_score is the per-grade completion RATE - the
+    quality view. It can fall as ctx grows: the added grades are
+    harder spans and dilute the average (MiniCPM4-0.5B live:
+    0.098 -> 0.064 -> 0.043 across 8k/16k/32k while the raw sum
+    rose 0.488 -> 0.638 -> 0.638 - the added grades earned ~0).
+  - the same grade key at different ctx rungs is the same question
+    on the same config: identical credits expected; drift = noise.
+  - the argmax rides the raw score (R-19): it favors the biggest
+    reachable ctx, ties by quality. The memory-price of a rung is
+    read from the DELTA the added grades earned.
+
+The deliverable's one-line answer: the argmax cell; the ranking is
+trustworthy only in the normalized + per-grade views above.
 """
 
 from __future__ import annotations
