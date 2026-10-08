@@ -51,7 +51,7 @@ K = 1  # questions per (span, hops) grade; pass = all h+1 names
 
 
 BUDGET_GIB = 4.0
-CTX_GRID = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
+CTX_GRID = [8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
 
 # weight-quant bytes per parameter; the dict's order is the climb
@@ -459,7 +459,7 @@ def certify_v7(
     budget_gib: float = BUDGET_GIB,
     roster_limit: int = PILOT_FAMILIES,
     on_cell_commit: Any = None,
-    force: bool = False,
+    clean: bool = False,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -467,6 +467,26 @@ def certify_v7(
     corpus on the reachable grid, persist per cell under
     families/<name>/v7/<ctx>. An interrupted run resumes; measured
     cells are never re-measured."""
+    if clean:
+        # addendum 129: --clean wipes ALL v7 cells and answer logs
+        # UP FRONT, before any measuring - per-cell cleaning (the
+        # addendum-125 --force shape) left mixed-era records for
+        # families not yet reached when a mid-flight run was stopped;
+        # the author's rule is never leave mixed results in a table
+        wiped = 0
+        for fam in sorted(state.get("families", {})):
+            fst = state["families"][fam]
+            if fst.pop("v7", None) is not None:
+                wiped += 1
+            for f_ in (
+                os.listdir(os.path.join(models_dir, "tournament-results", fam))
+                if os.path.isdir(os.path.join(models_dir, "tournament-results", fam))
+                else []
+            ):
+                if f_.endswith("-v7-answers.jsonl"):
+                    os.remove(os.path.join(models_dir, "tournament-results", fam, f_))
+        print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
+        save_state(state_path, state)
     cells = greedy_allocations(budget_gib, roster_limit)
     results: list[dict[str, Any]] = []
     corpus = None
@@ -475,16 +495,6 @@ def certify_v7(
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
         v7 = fst.setdefault("v7", {})
-        if force:
-            # addendum 125: --force cleans before measuring - stale
-            # cells (old scoring rule, old grid) and the append-mode
-            # answer logs alike; a mixed-era jsonl is un-analyzable
-            v7.pop(key, None)
-            apath = os.path.join(
-                models_dir, "tournament-results", fam, f"{fam}-ctx{cell['ctx']}-v7-answers.jsonl"
-            )
-            if os.path.exists(apath):
-                os.remove(apath)
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
         if done.get("score") is not None:

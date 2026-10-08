@@ -453,3 +453,24 @@ into a check-on-pull discipline.
 
 Pinned by tests/test_ci_on_pull.py (R-27 present in protocol;
 this file carries the pin tag).
+
+## Addendum 129 - --clean replaces --force; wipe ALL cells up front
+
+The author: "Chang force to clean. Immediately clean all the
+cells. Don't ever leave mixed results in a table, that's a recipe
+for disaster."
+
+The addendum-125 --force cleaned per-cell as the run reached it -
+a mid-flight stop left strict-era records for the families not
+yet visited, mixed with credit-era records in the same state
+table. The author's rule is absolute: never mixed results.
+
+--clean (renamed from --force): certify_v7 wipes EVERY family's
+v7 block and every *-v7-answers.jsonl UP FRONT, saves state, and
+only then starts measuring. Non-v7 state and artifacts survive.
+The immediate manual clean of the live state also happened this
+session (below).
+
+Pinned by the rewritten test in test_v7_partial_credit.py: the
+wipe completes before any measuring (greedy_allocations is a
+boom), every family's block is gone, non-v7 keys survive.

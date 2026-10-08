@@ -107,7 +107,7 @@ def test_recurrent_family_is_kvless():
     pt = v7_pilot.kv_per_token_f16("RWKV7-World-2.9B", None)
     assert pt == 0.0
     assert v7_pilot.family_window("RWKV7-World-2.9B") == 2048
-    assert min(v7_pilot.CTX_GRID) == 4096, "addendum 123: the 2k rung is dropped"
+    assert min(v7_pilot.CTX_GRID) == 8192, "addenda 123/128: the 2k and 4k rungs are dropped"
     rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
     rwkv = [r for r in rows if r["family"] == "RWKV7-World-2.9B"]
     assert not rwkv, "window 2048 < smallest ctx rung: no cell is reachable"
