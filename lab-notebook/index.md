@@ -30,3 +30,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [Session 43 — 2026-10-08 (v7 merged into full_benchmark; the greedy allocation; ARC/FWE retired; the crash rail; the corpus artifact; R-16..R-19)](session-43.md)
 - [session-44](session-44.md) - the no-backward-compatibility ruling: R-21; v6 prototype deleted, HOME fallback and FWE readers removed
 - [session-44](session-44.md) - addendum 110: R-22 state schema, one guarded loader
+- [session-44](session-44.md) - addendum 111: reachability honesty fix (span-2048 at ctx-2048 crash)
