@@ -229,3 +229,25 @@ The R-20/R-25 pin asserts all six hook ids, the marker selection in
 the hook entry, and the full-suite weekly step - properties can
 neither silently re-enter the commit gate nor silently lose their
 scheduled home.
+
+
+## Addendum 118 - R-26: all agent edits through code_edit
+
+The author: "make it a requirement, this cannot continue, we
+developed a tool explicitly for the purpose of saving time, and
+we're not using it :("
+
+Registered as R-26. Every agent edit to repo files goes through
+AI_tools/code_edit.py (edit, write, edit_many, safe_append,
+replace_verified). Hand-rolled string replacement (heredocs, sed,
+python -c open/replace/write) is prohibited: it is not a
+transaction, and session 44 paid real debugging time for it (the
+R-25 half-applied config edit - a mid-script assert skipped the
+later steps silently; also the mystery rolled-back commits, whose
+failure output tail hid the hook's rollback message). The session
+notebook's chronological append is the one soft exception.
+
+This addendum itself was written through code_edit (the insert and
+this append) - eating the dog food from here on. Pinned by
+tests/test_code_edit_required.py (transaction all-or-nothing;
+atomic verified edit; the tool surface importable).
