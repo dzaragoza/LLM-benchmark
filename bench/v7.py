@@ -139,12 +139,25 @@ def kv_per_token_f16(name: str, geom: dict | None) -> float | None:
     """f16 KV bytes per token, or None when unknowable. Recurrent
     families return 0.0 (weights-only); the geometry column wins;
     MHA configs with null kv_heads fall back to hidden_size//heads.
+
+    Addendum 133: hybrid-attention families divide by
+    full_attention_interval - only every Nth layer keeps a
+    full-window cache (the rest are linear/sliding, a small fixed
+    cost the census attributes to compute). The addendum-132 run
+    over-estimated Qwen3.5-0.8B 4x at 262144 (3.2 GiB predicted vs
+    0.86 measured) because all 24 layers were charged at full
+    window; with the interval the anchors fit within 5% at every
+    ctx >= 32k. The greedy climb climbs HIGHER without it - wrong
+    quants hurt scores, and wrong VRAM numbers hurt the
+    recommendation, so the estimator calibrates against every
+    census anchor (wow.md rule 1).
     """
     if is_recurrent(name):
         return 0.0
-    if geom and geom.get("kv_bytes_per_token_f16"):
-        return float(geom["kv_bytes_per_token_f16"])
     ex = (_store().get(name) or {}).get("extract") or {}
+    interval = (geom or {}).get("full_attention_interval") or ex.get("full_attention_interval") or 1
+    if geom and geom.get("kv_bytes_per_token_f16"):
+        return float(geom["kv_bytes_per_token_f16"]) / interval
     layers = ex.get("num_hidden_layers")
     heads = ex.get("num_attention_heads")
     kvh = ex.get("num_key_value_heads") or heads
@@ -153,7 +166,7 @@ def kv_per_token_f16(name: str, geom: dict | None) -> float | None:
         hd = ex["hidden_size"] // heads
     if not (layers and kvh and hd):
         return None
-    return layers * 2 * kvh * hd * 2
+    return layers * 2 * kvh * hd * 2 / interval
 
 
 def _alloc_total(

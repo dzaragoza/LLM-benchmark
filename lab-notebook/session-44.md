@@ -520,3 +520,71 @@ Two rulings from the crash review of the live run:
    ones - the batch must carry the whole family picture) and
    fires on_model_commit at the family boundary; R-24 reworded
    accordingly.
+## Addendum 133 - KV estimator calibrated (hybrid attention); phase balance measured; granite malfunction recorded
+
+Three rulings from the addendum-132 results review:
+
+1. **The KV estimator ignored hybrid attention.** Qwen3.5-0.8B
+   keeps a full-window KV cache in only every 4th layer
+   (`full_attention_interval: 4` - the registry already recorded
+   it; the estimator charged all 24 layers at full window).
+   Consequences at 262144: est 3.96 GiB vs measured 2.13 - the
+   greedy climb starved the weights down to Q5_K to fund a
+   4x-overpriced cache (hurting scores), and any VRAM
+   recommendation built on est_gib would be wrong. Fix:
+   `kv_per_token_f16` divides by the interval. Anchors: with the
+   fix the predicted context_gib matches the measured census
+   within 5% at every ctx >= 32k (262144: pred 0.844 vs 0.862).
+   The small-ctx anchors run ~5-16% low because the census folds
+   the compute-buffer floor into "context" - noted, accepted.
+   New Qwen plan at 4 GiB: f16 cache everywhere, F16 weights to
+   131072 (est 3.13), Q8_0 at 262144 (est 3.86). The addendum-132
+   Qwen scores were measured on over-quantized configs - they are
+   a LOWER bound; the cells re-measure under --clean.
+   Pinned by tests/test_kv_estimator.py (interval arithmetic,
+   census anchors, climb height).
+
+2. **Phase balance at 256k (T14s, per-task timing, no
+   double-count).** Qwen3.5-0.8B ctx=262144, 30 questions:
+   prompt eval 435.8 s (151,584 tokens incl. the shared-prefix
+   big prefills; rate degrades 1169 -> 461 tok/s as the prefix
+   deepens), generation 101.3 s (5,299 tokens, ~3.4 s per
+   question). Prefill:generation is ~4.3:1 - the k=1 design
+   front-loads one deep prefill and the questions ride the
+   cached prefix. To make the two phases roughly equal at 256k
+   (the author's target - question count is the knob):
+   ~4x the questions, i.e. ~120 questions per cell, brings
+   generation time up to the prefill floor; below that the cell
+   is prefill-bound no matter what. Registered as the
+   working figure for the question-count knob; refined per-model
+   by the same measurement.
+
+3. **granite-4.0-h-350m: model malfunction, good result.** All
+   45 answers across ctx 8192/16384/32768 are well-formed and
+   parseable but answer the VALUE instead of the VARIABLE names
+   (asked "which variables hold 39260", answers "39260").
+   found=0 everywhere; the extractor works. Recorded as a
+   negative result (wow.md rule 1): the hybrid granite cannot
+   perform the VT lookup at any context. It closes the question
+   for this roster rung.
+
+## Addendum 133 pre-registration - difficulty calibration (the next run)
+
+- **Hypothesis**: at the current difficulty (chains h=2-4) the
+  pilot separates Qwen but saturates the rest (best fractions:
+  0.19 / 0.06 / 0.04 / 0.00); scores are too low to rank the
+  bottom of the roster.
+- **Change (one knob)**: question count per cell - 30 -> ~120 at
+  the deep end, scaled per ctx so generation roughly matches the
+  prefill floor (item 2). Chains stay h=2-4; corpus unchanged.
+- **Predictions (quantitative)**:
+  1. Qwen3.5-0.8B at 262144 (new config Q8_0/f16): fraction
+     stays in [0.10, 0.30] (more questions, same reach).
+  2. MiniCPM4-0.5B best fraction rises from 0.06 to >= 0.08.
+  3. granite-4.0-350m rises from 0.04 to >= 0.05.
+  4. granite-4.0-h-350m stays 0.00 (malfunction, addendum 132).
+  5. Ranking unchanged: Qwen > MiniCPM4 > granite-4.0 > -h.
+- **Grading**: run under --clean (never mixed eras - addendum
+  129); grade fractions against the stored addendum-132 values.
+  If the RANKING flips, the knob is measuring something other
+  than reach: revert the count, register the anomaly.
