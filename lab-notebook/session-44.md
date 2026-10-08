@@ -436,3 +436,20 @@ agent edit is now: compose spec with the file tool, run
 
 Pinned by tests/test_code_edit_cli.py (blocks-file edit applies;
 --write creates; --check refuses without touching).
+
+## Addendum 127 - R-27: check CI on pull; the shell out of the text path
+
+The author: "Good decision the shell should not be in the path of
+text, it is too easy to break the text via escaping. Add the
+requirement to check the latest completed ci results from github
+when you pull."
+
+R-27: on every pull, the agent checks the latest COMPLETED
+push-regression verdict (gh run list). A red run blocks the next
+delivery until fixed. In-flight runs are never waited for -
+saving time was the point of the earlier ruling; the previous
+completed verdict governs. This refines R-25's check-before-push
+into a check-on-pull discipline.
+
+Pinned by tests/test_ci_on_pull.py (R-27 present in protocol;
+this file carries the pin tag).
