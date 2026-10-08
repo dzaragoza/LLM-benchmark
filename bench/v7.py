@@ -33,7 +33,7 @@ from bench.state_store import save_state
 from etc import registry_data
 
 S_MAX = 262144
-SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
+SPANS = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
 K = 20  # questions per (span, hops) grade; pass = all h+1 names (upstream)
 BUDGET_GIB = 4.0
