@@ -367,3 +367,47 @@ def test_preflight_passes_when_honest(monkeypatch, small_corpus):
     window = 8192
     got = v7m.preflight_reachable_grades(0, small_corpus, window)
     assert got and all(t > 0 for t in got.values())
+
+
+def test_every_answer_is_logged(tmp_path, monkeypatch, small_corpus):
+    """Pins: R-23. EVERY answer is logged, one JSON line per question -
+    answers are always important for debugging. The file carries the
+    grade, the expected names, the found count, and the RAW answer;
+    the line count equals the asked questions; the ok flags agree
+    with the scorer."""
+    import json as _json
+
+    from bench import v7 as v7m
+
+    calls = {"n": 0}
+
+    def fake_ask(port, prompt, max_tokens=64, no_thinking=True):
+        calls["n"] += 1
+        return "AAAAA BBBBB" if calls["n"] % 3 else ""
+
+    monkeypatch.setattr(v7m.ruler_gate, "ask", fake_ask)
+    path = tmp_path / "answers.jsonl"
+    rec = v7m.run_cell(0, small_corpus, window=4096, answers_path=str(path))
+    lines = path.read_text().splitlines()
+    assert len(lines) == sum(g["asked"] for g in rec["per_grade"].values()) == calls["n"]
+    for ln in lines:
+        row = _json.loads(ln)
+        assert {"window", "grade", "expected", "value", "found", "ok", "answer"} <= set(row)
+    oks = [_json.loads(ln)["ok"] for ln in lines]
+    passes = sum(1 for g in rec["per_grade"].values() for _ in range(g["pass"]))
+    assert sum(oks) == passes
+
+
+def test_answers_log_is_append_per_cell(tmp_path, monkeypatch, small_corpus):
+    """Pins: R-23. A re-run of the same cell APPENDS - reruns never
+    destroy the previous evidence (the resumable-store principle
+    applied to answers)."""
+
+    from bench import v7 as v7m
+
+    monkeypatch.setattr(v7m.ruler_gate, "ask", lambda *a, **k: "")
+    path = tmp_path / "answers.jsonl"
+    v7m.run_cell(0, small_corpus, window=4096, answers_path=str(path))
+    first = len(path.read_text().splitlines())
+    v7m.run_cell(0, small_corpus, window=4096, answers_path=str(path))
+    assert len(path.read_text().splitlines()) == 2 * first

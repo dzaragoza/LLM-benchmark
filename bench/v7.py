@@ -305,39 +305,69 @@ def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str
     return {f"{s}x{h}": t for (s, h), t in seen.items()}
 
 
-def run_cell(port: int, corpus: dict, window: int) -> dict:
+def run_cell(
+    port: int,
+    corpus: dict,
+    window: int,
+    answers_path: str | None = None,
+) -> dict:
     """Score one allocation: pass mass over the reachable (span, hops)
     grid. Questions with span > window are EXCLUDED (structurally
-    unreachable), not failed. Pass = all h+1 names (upstream's rule)."""
+    unreachable), not failed. Pass = all h+1 names (upstream's rule).
+
+    answers_path (R-23): EVERY answer is logged, one JSON line per
+    question - grade, expected, found count, the raw answer. Answers
+    are always important for debugging; the file is append-per-cell
+    and lands in the family's results dir next to the server log."""
     per_grade: dict[tuple[int, int], dict] = {}
     samples: list[dict] = []
-    for q in corpus["questions"]:
-        if not grade_reachable(q["span"], q["hops"], window):
-            continue
-        key = (q["span"], q["hops"])
-        g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
-        prompt = question_prompt(corpus, q)
-        max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
-        answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
-        ok, found = ruler_gate.score_vt(answer, q["names"])
-        g["asked"] += 1
-        g["pass"] += 1 if ok else 0
-        g["found"] += found
-        # session 44, addendum 113: three sample answers per grade -
-        # the diagnostic that separates "found some names" (the model
-        # is close) from "answered debris" (the prompt or the thinking
-        # mode is wrong). One pass sample and up to two fails.
-        sample = {
-            "grade": f"{q['span']}x{q['hops']}",
-            "ok": ok,
-            "found": found,
-            "names": q["names"],
-            "answer": (answer or "")[:200],
-        }
-        passes = sum(1 for x in samples if x["grade"] == sample["grade"] and x["ok"])
-        fails = sum(1 for x in samples if x["grade"] == sample["grade"] and not x["ok"])
-        if (ok and passes < 1) or (not ok and fails < 2):
-            samples.append(sample)
+    answers_fh = open(answers_path, "a", encoding="utf-8") if answers_path else None
+    try:
+        for q in corpus["questions"]:
+            if not grade_reachable(q["span"], q["hops"], window):
+                continue
+            key = (q["span"], q["hops"])
+            g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
+            prompt = question_prompt(corpus, q)
+            max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
+            answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
+            ok, found = ruler_gate.score_vt(answer, q["names"])
+            g["asked"] += 1
+            g["pass"] += 1 if ok else 0
+            g["found"] += found
+            if answers_fh is not None:
+                answers_fh.write(
+                    json.dumps(
+                        {
+                            "window": window,
+                            "grade": f"{q['span']}x{q['hops']}",
+                            "expected": q["names"],
+                            "value": q["value"],
+                            "found": found,
+                            "ok": ok,
+                            "answer": answer,
+                        },
+                        ensure_ascii=True,
+                    )
+                    + "\n"
+                )
+                answers_fh.flush()
+            # addendum 113: three sample answers per grade (one pass,
+            # up to two fails) land in the cell record for quick reads.
+            sample = {
+                "grade": f"{q['span']}x{q['hops']}",
+                "ok": ok,
+                "found": found,
+                "names": q["names"],
+                "answer": (answer or "")[:200],
+            }
+            passes = sum(1 for x in samples if x["grade"] == sample["grade"] and x["ok"])
+            fails = sum(1 for x in samples if x["grade"] == sample["grade"] and not x["ok"])
+            if (ok and passes < 1) or (not ok and fails < 2):
+                samples.append(sample)
+    finally:
+        if answers_fh is not None:
+            answers_fh.close()
     score = 0.0
     asked_grades = 0
     for _key, g in sorted(per_grade.items()):
@@ -458,7 +488,8 @@ def certify_v7(
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
                 if probe_toks:
                     print(f"  preflight: {probe_toks}")
-                rec = run_cell(port, corpus, cell["ctx"])
+                answers_path = os.path.join(results_dir, f"{fam}-ctx{cell['ctx']}-v7-answers.jsonl")
+                rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
             except PreflightError as e:
                 entry["error"] = f"preflight: {e}"
                 results.append(entry)
