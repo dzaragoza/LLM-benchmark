@@ -198,3 +198,20 @@ cell result, tee off, git_tail (state + answers JSONL + server log
 + results), tee back on. Failures are caught and printed, never
 fatal - a git outage costs watchability, not the run. Skipped
 (already-measured) cells do not fire; --no-git/dry-run disable it.
+
+## Addendum 116 - R-25: the 5s hook
+
+The author: "remove the [pytest] hook and move it to the weekly. We
+can check properties by hand from time to time. Let's keep git
+commit to <= 5s."
+
+Measured: pytest --all-files is 28.2s of the ~36s hook (hypothesis
+properties dominating); ruff/ruff-format/ty/md/requirements are
+1.1-2.9s each. The pytest hook is REMOVED from .pre-commit-config;
+the weekly workflow runs the full suite explicitly plus via
+coverage. The remaining hook suite measures ~8s cold / ~4s warm
+(ruff first-run installs its venv). R-20's intent is unchanged -
+the hooks that remain are never bypassed; R-25 registers the speed
+budget. Also: the agent stops pre-running `pre-commit run
+--all-files` manually before committing (double effort) - commit
+directly, git runs the hook once; investigate only on failure.
