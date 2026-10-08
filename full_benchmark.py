@@ -492,10 +492,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="v7: the first N families param-ascending (default 4, the pilot)",
     )
     ap.add_argument(
-        "--force",
+        "--clean",
         action="store_true",
-        help="v7: clean stored cells and answer logs, then re-measure "
-        "(addendum 125; the resume rule never re-measures otherwise)",
+        help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
+        "measure - never leave mixed-era results in the table (addendum 129)",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
@@ -601,7 +601,7 @@ def _run(args: argparse.Namespace) -> None:
             args.v7_budget_gib or BUDGET_GIB,
             args.v7_families or PILOT_FAMILIES,
             on_cell_commit=None if (args.no_git or args.dry_run) else partial(v7_cell_commit, args),
-            force=args.force,
+            clean=args.clean,
         )
         state["v7"] = results
         save_state(args.state_file, state)

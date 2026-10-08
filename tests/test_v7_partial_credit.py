@@ -45,51 +45,49 @@ def test_full_pass_still_scores_one(monkeypatch):
     assert rec["score"] == 1.0
 
 
-def test_force_cleans_stored_cells_and_logs(tmp_path, monkeypatch):
-    """--force (addendum 125): stored v7 cells and the append-mode
-    answer jsonl are removed before measuring - a mixed-era log is
-    un-analyzable, and the resume rule never re-measures otherwise."""
-    import os
+def test_clean_wipes_all_cells_and_logs_up_front(tmp_path, monkeypatch):
+    """Pins: R-25 (session 44, addendum 129). --clean wipes EVERY
+    family's v7 block and every answer log BEFORE any measuring -
+    per-cell cleaning left mixed-era records for families not yet
+    reached; the author's rule is never leave mixed results."""
 
-    state = {"families": {"Fam": {"v7": {"4096": {"score": 0.5}}}}}
-    apath = tmp_path / "tournament-results" / "Fam" / "Fam-ctx4096-v7-answers.jsonl"
-    apath.parent.mkdir(parents=True)
-    apath.write_text("{}\n")
-    monkeypatch.setattr(v7, "CTX_GRID", [4096])
-    monkeypatch.setattr(v7, "PILOT_FAMILIES", 1)
-    cells = [
-        {
-            "family": "Fam",
-            "params_b": 1.0,
-            "ctx": 4096,
-            "wq": "F16",
-            "kq": "f16",
-            "vq": "f16",
-            "est_gib": 1.0,
+    state = {
+        "families": {
+            "FamA": {"v7": {"8192": {"score": 0.5}}},
+            "FamB": {"v7": {"16384": {"score": 0.1}}, "other": "keep"},
         }
-    ]
-    monkeypatch.setattr(v7, "greedy_allocations", lambda *a, **k: cells)
+    }
+    for fam in ("FamA", "FamB"):
+        d = tmp_path / "tournament-results" / fam
+        d.mkdir(parents=True)
+        (d / f"{fam}-ctx8192-v7-answers.jsonl").write_text("{}\n")
+        (d / f"{fam}-other.csv").write_text("keep\n")
+    spath = tmp_path / "state.json"
 
-    def fake_certify(
-        models_dir, st, state_path, port, dry_run, budget_gib, roster_limit, on_cell_commit, force
-    ):
-        assert force is True
-        fst = st["families"]["Fam"]
-        assert "4096" not in fst.get("v7", {}), "force must clean stored cells"
-        assert not os.path.exists(apath) or True  # cleaned by caller contract
-        return []
+    def boom(*a, **k):
+        raise AssertionError("clean must finish before any measuring")
 
-    # direct: the force block in certify_v7 runs before resume check
-    # - simulate by calling the real certify_v7 with dry_run to see skip logic
-    v7.certify_v7(
-        str(tmp_path),
-        state,
-        str(tmp_path / "state.json"),
-        0,
-        dry_run=True,
-        budget_gib=4.0,
-        roster_limit=1,
-        on_cell_commit=None,
-        force=True,
-    )
-    assert "4096" not in state["families"]["Fam"].get("v7", {}), "stored cell cleaned"
+    monkeypatch.setattr(v7, "greedy_allocations", boom)
+    try:
+        v7.certify_v7(
+            str(tmp_path),
+            state,
+            str(spath),
+            0,
+            dry_run=True,
+            budget_gib=4.0,
+            roster_limit=1,
+            on_cell_commit=None,
+            clean=True,
+        )
+    except AssertionError as e:
+        assert "before any measuring" in str(e), "the boom must be the measuring gate"
+    else:
+        raise AssertionError("greedy_allocations must still be called (post-clean)")
+    assert "v7" not in state["families"]["FamA"]
+    assert "v7" not in state["families"]["FamB"]
+    assert state["families"]["FamB"]["other"] == "keep", "non-v7 state survives"
+    for fam in ("FamA", "FamB"):
+        d = tmp_path / "tournament-results" / fam
+        assert not list(d.glob("*v7-answers.jsonl")), "answer logs wiped"
+        assert (d / f"{fam}-other.csv").exists(), "non-v7 artifacts survive"
