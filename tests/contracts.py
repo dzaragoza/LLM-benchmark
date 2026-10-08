@@ -270,3 +270,32 @@ def alloc_kv_monotone_in_rung_ref(per_token: float, ctx: int, ki: int) -> bool:
     f_lo = v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki]]
     f_hi = v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki + 1]]
     return (per_token / 2.0) * f_lo * ctx <= (per_token / 2.0) * f_hi * ctx
+
+
+def grade_reachable_monotone_in_window_ref(span: int, hops: int, w1: int, w2: int) -> bool:
+    """Monotonicity: widening the window never un-reaches a grade.
+
+    pre: span > 0 and hops >= 0 and w1 > 0 and w2 >= w1
+    post: __return__
+    """
+    import bench.v7 as v7m
+
+    return not (v7m.grade_reachable(span, hops, w1) and not v7m.grade_reachable(span, hops, w2))
+
+
+def grade_reachable_boundary_tight_ref(span: int, hops: int) -> bool:
+    """Boundary tightness (session 44, addendum 112): the minimal
+    window the rule accepts is exactly span + overhead + gen - one
+    token less is unreachable, one more is reachable. The old buggy
+    rule (span <= window) failed exactly here.
+
+    pre: span > 0 and hops >= 0
+    post: __return__
+    """
+    import bench.v7 as v7m
+
+    gen = max(v7m.GEN_HEADROOM_TOKENS, (hops + 1) * 12)
+    minimal = span + v7m.PROMPT_OVERHEAD_TOKENS + gen
+    return v7m.grade_reachable(span, hops, minimal) and not v7m.grade_reachable(
+        span, hops, minimal - 1
+    )

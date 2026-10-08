@@ -31,3 +31,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - the no-backward-compatibility ruling: R-21; v6 prototype deleted, HOME fallback and FWE readers removed
 - [session-44](session-44.md) - addendum 110: R-22 state schema, one guarded loader
 - [session-44](session-44.md) - addendum 111: reachability honesty fix (span-2048 at ctx-2048 crash)
+- [session-44](session-44.md) - addendum 112: preflight + contracts + boundary tests against estimate-vs-server drift
