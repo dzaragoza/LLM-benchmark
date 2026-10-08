@@ -268,3 +268,94 @@ def test_combined_medal_monotone_in_evidence(n_pass, others_gold):
     if n_pass < 20:
         improved = fst_with(n_pass + 1)
         assert rank(improved) >= rank(base)
+
+
+# ================================================== session 43, R-18/R-19:
+# the v7 allocation arithmetic and the scorer's bounds
+
+from bench.v7 import (  # noqa: E402
+    KV_QUANT_FACTOR,
+    KV_QUANT_LADDER,
+    W_LADDER,
+    W_QUANT_BPB,
+    weights_gib,
+)
+
+
+@settings(max_examples=100)
+@given(
+    params_b=st.floats(0.01, 50.0),
+    wq=st.sampled_from(W_LADDER),
+    kq=st.sampled_from(KV_QUANT_LADDER),
+    vq=st.sampled_from(KV_QUANT_LADDER),
+    ctx=st.integers(2048, 262144),
+    per_token=st.floats(0.0, 4096.0),
+)
+def test_alloc_total_monotone_in_quant(params_b, wq, kq, vq, ctx, per_token):
+    """The memory estimate is monotone in every ladder axis: a higher
+    weight rung, a higher cache rung, or a deeper ctx never SHRINKS
+    the estimate (the greedy climb's budget discipline rests on it)."""
+
+    w_i = W_LADDER.index(wq)
+    k_i = KV_QUANT_LADDER.index(kq)
+    v_i = KV_QUANT_LADDER.index(vq)
+    base = _alloc_total_at(params_b, per_token, wq, kq, vq, ctx)
+    if w_i + 1 < len(W_LADDER):
+        up = _alloc_total_at(params_b, per_token, W_LADDER[w_i + 1], kq, vq, ctx)
+        assert up >= base
+    if k_i + 1 < len(KV_QUANT_LADDER):
+        up = _alloc_total_at(params_b, per_token, wq, KV_QUANT_LADDER[k_i + 1], vq, ctx)
+        assert up >= base
+    if v_i + 1 < len(KV_QUANT_LADDER):
+        up = _alloc_total_at(params_b, per_token, wq, kq, KV_QUANT_LADDER[v_i + 1], ctx)
+        assert up >= base
+    assert _alloc_total_at(params_b, per_token, wq, kq, vq, ctx * 2) >= base
+
+
+def _alloc_total_at(params_b, per_token, wq, kq, vq, ctx):
+    """_alloc_total with the KV-per-token term injected (no registry)."""
+    kv = (per_token / 2.0) * (KV_QUANT_FACTOR[kq] + KV_QUANT_FACTOR[vq]) * ctx
+    return weights_gib(params_b, wq) + kv / (1 << 30)
+
+
+@settings(max_examples=100)
+@given(
+    params_b=st.floats(0.01, 50.0),
+    wq=st.sampled_from(W_LADDER),
+)
+def test_weights_gib_matches_ladder_order(params_b, wq):
+    """The weight ladders are ordered by bits-per-byte: a higher rung
+    never weighs LESS (the climb's single-axis budget accounting)."""
+    i = W_LADDER.index(wq)
+    if i > 0:
+        assert W_QUANT_BPB[W_LADDER[i]] >= W_QUANT_BPB[W_LADDER[i - 1]]
+    assert weights_gib(params_b, wq) > 0.0
+
+
+@given(k_v=st.integers(0, 5), n_v=st.integers(1, 5))
+def test_score_vt_partial_never_passes(k_v, n_v):
+    """The pass is ALL names (upstream's rule): fewer found names than
+    expected is never a pass, however many were found."""
+    import ruler_gate
+
+    expected = [chr(ord("A") + i) * 5 for i in range(n_v)]
+    answer = " ".join(expected[:k_v])
+    ok, found = ruler_gate.score_vt(answer, expected)
+    assert ok == (found == n_v)
+    assert found == min(k_v, n_v)
+
+
+@given(names=st.lists(st.text(min_size=5, max_size=5, alphabet="ABCDE"), min_size=1, max_size=6))
+def test_score_vt_order_and_noise_tolerant(names):
+    """Names found in ANY order (with debris) still pass - the score
+    reads a natural-language answer, not a formatted one."""
+    import random as _random
+
+    import ruler_gate
+
+    unique = list(dict.fromkeys(names))
+    shuffled = unique[:]
+    _random.Random(0).shuffle(shuffled)
+    answer = "Sure! They are: " + ", ".join(shuffled) + " (end)"
+    ok, found = ruler_gate.score_vt(answer, unique)
+    assert ok and found == len(unique)

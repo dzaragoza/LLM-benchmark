@@ -116,3 +116,48 @@ runs green in this environment, and the addendum-21 ruling ("no
 - The bypass is REMOVED from the machinery: infra/git_ops.py's
   pull_rebase drops its no_verify parameter; full_benchmark's
   git_pull_head pulls WITH hooks.
+
+## Addendum 108 - the test-strategy and formal-verification audit
+
+The author's ask: "Check our test strategy for weaknesses and improve.
+Same for formal verification." The audit (coverage map + crosshair
+run + a read of every test file):
+
+WEAKNESSES FOUND (tests):
+1. run_cell - the v7 SCORER, the number the whole benchmark argues
+   from - had ZERO direct tests. The suite tested the planner, never
+   the score.
+2. build_corpus untested: determinism, chain-inside-prefix, cut
+   monotonicity all unpinned.
+3. corpus_from_artifact's mismatch-rebuild path untested.
+
+WEAKNESSES FOUND (formal verification):
+4. contracts.py covered only pre-v7 functions; the quant-ladder
+   arithmetic (the budget discipline) was proved nowhere.
+
+BUGS THE NEW TESTS CAUGHT IMMEDIATELY (the audit paid for itself):
+- corpus_from_artifact checked the grid at the TOP level of the
+  artifact JSON while the writer nests it under art["grid"] - the
+  artifact NEVER loaded; every run silently rebuilt the corpus,
+  violating R-16's citable-bytes promise.
+- once loading worked, JSON's str-int key coercion broke the cuts
+  map: question_prompt KeyErrored on every artifact-loaded run.
+  Fixed by normalizing cut keys on load.
+
+LANDED:
+- tests/test_v7_run_cell.py (12 tests): corpus determinism and
+  structure, chains-embedded-before-cut, cut monotonicity, prompt
+  rendering, exclusion-not-failure, score-is-mean-pass-mass,
+  all-pass-earns-max, score-bounded, window reported, artifact
+  mismatch-rebuild and matching-load (the load path now actually
+  exercised - it never was).
+- tests/test_properties.py +5: alloc monotone in every ladder axis
+  and ctx, weights ladder ordered, score_vt partial-never-passes,
+  score_vt order/debris-tolerant.
+- tests/contracts.py +7 proved contracts (crosshair exit 0):
+  weights positive/linear, both ladders strictly ordered, alloc
+  total positive, KV monotone in ctx and in rung. score_vt stays in
+  the hypothesis layer - crosshair cannot prove string membership
+  through symbolic list elements (a tool limit, registered).
+- v7.py coverage 65% -> 74%; the remainder is the live-server
+  launch loop (needs the GPU binary, the author's machine owns it).

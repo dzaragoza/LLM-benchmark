@@ -302,8 +302,15 @@ def corpus_from_artifact(port: int) -> dict:
     if os.path.exists(CORPUS_ARTIFACT):
         with open(CORPUS_ARTIFACT, encoding="utf-8") as f:
             art = json.load(f)
-        if all(art.get(k_) == v for k_, v in grid.items()) and art.get("corpus"):
-            return art["corpus"]
+        stored = art.get("grid") or {}
+        if all(stored.get(k_) == v for k_, v in grid.items()) and art.get("corpus"):
+            corpus = art["corpus"]
+            # JSON stringifies the int cut keys - restore them, or
+            # question_prompt's corpus["cuts"][span] KeyErrors on every
+            # artifact-loaded run (found by the roundtrip test once the
+            # load path actually worked - session 43)
+            corpus["cuts"] = {int(k_): v for k_, v in (corpus.get("cuts") or {}).items()}
+            return corpus
     corpus = build_corpus(port)
     os.makedirs(os.path.dirname(CORPUS_ARTIFACT), exist_ok=True)
     with open(CORPUS_ARTIFACT, "w", encoding="utf-8") as f:
