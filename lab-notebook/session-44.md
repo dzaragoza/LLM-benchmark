@@ -415,3 +415,24 @@ cells: run with --force when re-measuring.
 
 Pinned by tests/test_v7_partial_credit.py (1-of-3 names scores
 1/3; full pass still 1.0; force cleans the stored cell).
+
+## Addendum 126 - no heredocs even for driving code_edit; CLI grows --blocks-file and --write
+
+The author: "Stop using heredoc! Use code edit!"
+
+R-26 banned hand-rolled replacement, but the agent was driving
+code_edit with heredoc-written wrapper scripts - the same failure
+mode R-26 exists to prevent, and it bit three times this session
+(shell-escaping mangled JSON blocks; a stray no-op block; a
+truncated spec).
+
+The fix is in the tool: code_edit.py's CLI now takes the JSON spec
+from --blocks-file (composed with the agent's file tool, zero
+shell quoting) and gains --write (create/overwrite with
+spec[content] through the same atomic write surface). Every
+agent edit is now: compose spec with the file tool, run
+`python3 AI_tools/code_edit.py <path> --blocks-file <spec>` (or
+--write). Heredocs are gone entirely - including the driving kind.
+
+Pinned by tests/test_code_edit_cli.py (blocks-file edit applies;
+--write creates; --check refuses without touching).

@@ -44,3 +44,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 123: 2k span dropped, K=1 flat, 35-question cell; 2048-window families (phi-1, phi-2, RWKV7) earn no cell
 - [session-44](session-44.md) - addendum 124: wall-clock ceiling removed; question count is the runtime knob
 - [session-44](session-44.md) - addendum 125: partial credit (found/(h+1)) + --force cleans results
+- [session-44](session-44.md) - addendum 126: no heredocs even for driving code_edit - CLI gains --blocks-file and --write

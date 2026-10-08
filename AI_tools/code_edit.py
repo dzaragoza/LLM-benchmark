@@ -1012,12 +1012,30 @@ if __name__ == "__main__":
         action="store_true",
         help="print the unified diff edit() would produce - no write",
     )
+    ap.add_argument(
+        "--blocks-file",
+        dest="blocks_file",
+        default=None,
+        help="read the JSON spec from this file instead of stdin",
+    )
+    ap.add_argument(
+        "--write",
+        action="store_true",
+        help="create/overwrite path with spec[content] - the write() surface",
+    )
     args = ap.parse_args()
     import json
     import sys
 
-    spec = json.load(sys.stdin)
-    if args.check:
+    if args.blocks_file:
+        with open(args.blocks_file, encoding="utf-8") as f:
+            spec = json.load(f)
+    else:
+        spec = json.load(sys.stdin)
+    if args.write:
+        write(args.path, spec["content"])
+        print(f"OK - wrote {args.path} ({len(spec['content'])} chars)")
+    elif args.check:
         with open(args.path, encoding="utf-8") as f:
             _verify_blocks(f.read(), [tuple(b) for b in spec["blocks"]])
         print("OK - all blocks verify")
