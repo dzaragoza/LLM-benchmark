@@ -15,6 +15,7 @@ the graded scorer, and the per-cell controller (acquire via the
 certify phase-1/2 path, launch in the bench.cells shape, state in
 the families/<name> tree of full_benchmark's state file).
 """
+
 from __future__ import annotations
 
 import json
@@ -246,9 +247,7 @@ def question_prompt(corpus: dict, q: dict) -> str:
     plus the query tail. ~s tokens of prefill, chain included."""
     cut = corpus["cuts"][q["span"]]
     context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
-    return ruler_gate.VT_TEMPLATE.format(
-        context=context, query=q["value"], num_v=q["hops"] + 1
-    )
+    return ruler_gate.VT_TEMPLATE.format(context=context, query=q["value"], num_v=q["hops"] + 1)
 
 
 def run_cell(port: int, corpus: dict, window: int) -> dict:
@@ -354,9 +353,7 @@ def certify_v7(
             continue
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        log_path = os.path.join(
-            results_dir, f"{fam}-ctx{cell['ctx']}-v7-server.log"
-        )
+        log_path = os.path.join(results_dir, f"{fam}-ctx{cell['ctx']}-v7-server.log")
         extra = ["-c", str(cell["ctx"]), "--parallel", "1"]
         if cell["kq"] != "f16" or cell["vq"] != "f16":
             extra += ["-fa", "on", "--cache-type-k", cell["kq"], "--cache-type-v", cell["vq"]]

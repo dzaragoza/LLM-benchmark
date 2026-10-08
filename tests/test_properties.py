@@ -15,7 +15,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from bench.certify import wilson_interval
-from bench.state_store import _int_cells, arc_cells, speed_cells
+from bench.state_store import _int_cells, speed_cells
 from infra.hf_download import RUNG_BITS, estimate_rung_gib, find_rung_file, has_safetensors
 from law_fit import kv_gib, law_worst
 
@@ -107,12 +107,6 @@ cell_namespaces = st.dictionaries(
     min_size=0,
     max_size=8,
 )
-
-
-@given(fst=st.fixed_dictionaries({"certify_arc": cell_namespaces}))
-def test_arc_cells_roundtrip(fst):
-    """Stored str-keys come back as the same int-keyed map."""
-    assert arc_cells(fst) == {int(r): p for r, p in fst["certify_arc"].items()}
 
 
 @given(
@@ -209,7 +203,7 @@ def test_estimate_none_or_positive(files, sizes):
 
 @settings(max_examples=50)
 @given(
-    task=st.sampled_from(["vt", "speed", "arc", "fwe"]),
+    task=st.sampled_from(["vt", "speed"]),
     depth=st.integers(4096, 262144),
     run=st.integers(1, 21),
     value=st.integers(0, 5),
@@ -224,8 +218,8 @@ def test_task_store_roundtrip(task, depth, run, value, secs):
     variant = {"rung": "Q8_0", "kv_k": None, "kv_v": None}
     fst: dict = {}
     state_store._task_store(fst, depth, task, run, value, variant, secs)
-    ns = {"vt": "certify_vt", "speed": "certify_speed", "arc": "certify_arc"}.get(task, "certify")
-    box = fst[ns][str(run)] if task == "arc" else fst[ns][str(depth)][str(run)]
+    ns = {"vt": "certify_vt", "speed": "certify_speed"}[task]
+    box = fst[ns][str(depth)][str(run)]
     assert box["v"] == value
     assert box["t"] == round(secs, 1)
     assert (box["rung"], box["kv_k"], box["kv_v"]) == ("Q8_0", None, None)
@@ -234,15 +228,8 @@ def test_task_store_roundtrip(task, depth, run, value, secs):
     legacy = dict(variant)
     if task == "vt":
         loaded = state_store.vt_cells(fst, depth, want, legacy)
-    elif task == "speed":
-        loaded = state_store.speed_cells(fst, depth, want, legacy)
-    elif task == "arc":
-        loaded = state_store.arc_cells(fst, want, legacy)
     else:
-        # the FWE loader grades at the bar: {run: passed}, not raw
-        loaded = state_store.certify_cells(fst, depth, 1, want=want, legacy=legacy)
-        assert loaded.get(run) == (value >= 1)
-        return
+        loaded = state_store.speed_cells(fst, depth, want, legacy)
     assert loaded.get(run) == value
 
 

@@ -1,8 +1,7 @@
 """code_search tests (session 40, addendum 8)."""
 
-import pytest
-
 import code_search
+import pytest
 
 
 def test_defs_finds_all_three_sites():

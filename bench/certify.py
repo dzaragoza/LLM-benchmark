@@ -235,9 +235,7 @@ def certify_rung(
         elif task == "speed":
             cells = {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
         else:
-            raise ValueError(
-                f"task {task!r} is retired or unknown (session 43: speed and vt only)"
-            )
+            raise ValueError(f"task {task!r} is retired or unknown (session 43: speed and vt only)")
         order.append((fam, fst, cells, spec))
 
     results: list[dict[str, Any]] = []
@@ -381,9 +379,7 @@ def certify_rung(
         )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(
-            task, "certify"
-        )
+        ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(task, "certify")
         direct = dict((fst.get(ns) or {}).get(str(depth)) or {})
         ran = 0
         verdict = None
@@ -472,8 +468,7 @@ def certify_rung(
                 continue
             if task not in ("speed", "vt"):
                 raise ValueError(
-                    f"task {task!r} is retired or unknown "
-                    "(session 43: speed and vt only)"
+                    f"task {task!r} is retired or unknown (session 43: speed and vt only)"
                 )
             if task == "vt":
                 t0 = time.time()
@@ -511,9 +506,7 @@ def certify_rung(
                     f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
                 )
                 continue
-            raise ValueError(
-                f"task {task!r} is retired or unknown (session 43: speed and vt only)"
-            )
+            raise ValueError(f"task {task!r} is retired or unknown (session 43: speed and vt only)")
         entry["cells_measured"] = measured
         entry["passes"] = k
         entry["ran_now"] = ran
@@ -1064,4 +1057,3 @@ def kill_rate_cells(state: dict[str, Any], depth: int) -> dict[str, dict[str, in
         if (fst.get("verdicts") or {}).get(str(depth)) == "accept":
             break
     return gates
-

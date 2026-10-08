@@ -168,13 +168,3 @@ def vt_cells_ref(fst: dict[str, dict[str, int]], depth: int) -> dict:
     from bench.state_store import vt_cells
 
     return vt_cells(fst, depth)
-
-
-def arc_cells_ref(fst: dict[str, dict[str, int]]) -> dict:
-    """The ARC loader returns exactly the stored runs.
-
-    post: set(__return__) == set(fst.get('certify_arc') or {})
-    """
-    from bench.state_store import arc_cells
-
-    return arc_cells(fst)

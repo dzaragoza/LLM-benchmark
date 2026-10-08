@@ -43,6 +43,7 @@ from bench.constants import (
     RUNG_DEFAULT,
     TOURNAMENT_DEPTHS,
 )
+from bench.v7 import certify_v7
 
 # re-exports: the tests patch these seams
 vt_pass = _cells.vt_pass
@@ -58,7 +59,6 @@ certify_cells = _state_store.certify_cells
 wilson_interval = _certify.wilson_interval
 certify_rung = _certify.certify_rung
 certify_rung_combined = _certify.certify_rung_combined
-from bench.v7 import certify_v7
 
 TASK_PASS_BARS = _certify.TASK_PASS_BARS
 combined_medal = _certify.combined_medal
@@ -536,7 +536,7 @@ def main() -> None:
 def _run(args: argparse.Namespace) -> None:
     if isinstance(args.rung_forced, str):
         if "/" in args.rung_forced or "=" in args.rung_forced:
-            ap.error(
+            raise SystemExit(
                 f"--force-rung takes a RUNG (e.g. f16, Q8_0), not a family - "
                 f"families are positional: {args.rung_forced!r}"
             )
@@ -561,10 +561,10 @@ def _run(args: argparse.Namespace) -> None:
     if args.rungs:
         try:
             rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
-        except ValueError:
-            ap.error(f"--rungs must be comma-separated integers, got {args.rungs!r}")
+        except ValueError as e:
+            raise SystemExit(f"--rungs must be comma-separated integers, got {args.rungs!r}") from e
         if not rung_list:
-            ap.error("--rungs needs at least one depth")
+            raise SystemExit("--rungs needs at least one depth")
     else:
         rung_list = list(TOURNAMENT_DEPTHS)
     if args.task == "v7":
@@ -589,9 +589,7 @@ def _run(args: argparse.Namespace) -> None:
             if r.get("score") is None:
                 print(f"  {r['family']} ctx={r['ctx']}: {r.get('skipped', r.get('error', '?'))}")
                 continue
-            print(
-                f"  {r['family']} ctx={r['ctx']}: score {r['score']}/{r['max_score']}"
-            )
+            print(f"  {r['family']} ctx={r['ctx']}: score {r['score']}/{r['max_score']}")
             if best is None or r["score"] > best["score"]:
                 best = r
         if best:
