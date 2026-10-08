@@ -9,8 +9,10 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    # addendum 120: K 20 -> 2 (the 10x-easier ruling); grid stays 8x5
-    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 80
+    # addendum 120/122: K 20 -> 2 at the smallest span, then scaled
+    # inversely with prefill cost - 45 questions per full cell
+    total = sum(v7_pilot.questions_for_span(s) for s in v7_pilot.SPANS) * len(v7_pilot.HOPS)
+    assert total == 45
 
 
 def test_smallest_ctx_is_measurable():

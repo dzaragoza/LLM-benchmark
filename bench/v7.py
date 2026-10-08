@@ -37,12 +37,24 @@ from etc import registry_data
 S_MAX = 262144
 SPANS = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 2  # questions per (span, hops) grade; pass = all h+1 names (upstream).
-# Session 44, addendum 120: the author's make-it-10x-easier ruling -
-# K 20 -> 2 cuts a cell from 800 questions (~hours) to 80 (~minutes).
-# Statistical cost: a grade pass-rate is now 0/0.5/1 in 0.5 steps;
-# the ranking favors big samples again only if K goes back up.
+K = 2  # questions per (span, hops) grade at the SMALLEST span; pass =
+# all h+1 names (upstream). Session 44, addendum 120: the author's
+# make-it-10x-easier ruling - K 20 -> 2.
 CELL_BUDGET_SECONDS = 300  # addendum 121: the author's 5-min ceiling per cell
+
+
+def questions_for_span(span: int) -> int:
+    """Addendum 122: the author's make-questions-match-prefill-time
+    ruling. Prefill cost grows linearly with the span (~s tokens at
+    ~618 tok/s on the T14s), so the question count shrinks inversely:
+    k(s) = max(1, round(K * SPANS[0] / s)). Every grade then costs
+    roughly the same prefill time - span 2048 earns K questions,
+    span 4096 half, anything >= 4x the smallest span floors at 1.
+    The floor keeps every grade measured; k-major ordering keeps
+    the grid covered under a budget stop."""
+    return max(1, round(K * SPANS[0] / span))
+
+
 BUDGET_GIB = 4.0
 CTX_GRID = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
@@ -215,9 +227,12 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
     sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
     questions: list[dict] = []
     # addendum 121: k-major order - a budget-stopped cell still
-    # covers every (span, hops) grade with at least one question
+    # covers every (span, hops) grade with at least one question;
+    # addendum 122: per-span counts follow the prefill-time rule
     for k_i in range(K):
         for s in SPANS:
+            if k_i >= questions_for_span(s):
+                continue
             for h in HOPS:
                 questions.append({"span": s, "hops": h, "k_i": k_i})
     cuts: dict[int, int] = {s: 0 for s in SPANS}
@@ -417,10 +432,13 @@ def corpus_from_artifact(port: int) -> dict:
     the corpus citable and byte-stable across machines - every
     contender runs on the exact same chains, and a rebuild is
     verifiable against the committed file."""
+    # JSON stringifies int dict keys, so the artifact's k_per_span
+    # comes back with str keys - compare on str or every load misses
     grid = {
         "spans": SPANS,
         "hops": HOPS,
         "k": K,
+        "k_per_span": {str(s): questions_for_span(s) for s in SPANS},
         "s_max": S_MAX,
     }
     if os.path.exists(CORPUS_ARTIFACT):

@@ -11,9 +11,9 @@ import bench.v7 as v7
 
 
 def test_k_is_two():
-    assert v7.K == 2, "addendum 120: K=2 keeps a cell at ~80 questions (10x easier)"
+    assert v7.K == 2, "addendum 120: K=2 at the smallest span (10x easier)"
 
 
 def test_cell_question_count_is_ten_times_smaller():
     worst = len(v7.SPANS) * len(v7.HOPS) * v7.K
-    assert worst == 80, "8 spans x 5 hops x K=2 = 80 questions per full cell"
+    assert worst == 80, "pre-addendum-122 shape; the prefill-matched cell is pinned in test_v7.py"
