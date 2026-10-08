@@ -100,12 +100,15 @@ W_QUANT_BPB = {
 }
 W_LADDER = list(W_QUANT_BPB)
 # kv-quant factor vs f16 bytes; K and V caches carry the same
-# geometry. Below q8_0 the K-encoding is the ruling; top is f16.
-KV_QUANT_LADDER = ["q2_K", "q4_K", "q8_0", "f16"]
+# geometry. Addendum 132: the ladder is ONLY llama-server-supported
+# --cache-type-k/v values (q2_K/q4_K crashed the live run at the
+# 131072/262144 cells - "Unsupported cache type"); the set matches
+# full_benchmark's _KV_CHOICES. Top is f16.
+KV_QUANT_LADDER = ["q4_0", "q5_0", "q8_0", "f16"]
 KV_QUANT_FACTOR = {
-    "q2_K": 0.16,
-    "q4_K": 0.28125,
-    "q8_0": 0.8125,
+    "q4_0": 0.28125,
+    "q5_0": 0.34375,
+    "q8_0": 0.53125,
     "f16": 1.0,
 }
 
@@ -489,7 +492,7 @@ def certify_v7(
     dry_run: bool = False,
     budget_gib: float = BUDGET_GIB,
     roster_limit: int = PILOT_FAMILIES,
-    on_cell_commit: Any = None,
+    on_model_commit: Any = None,
     clean: bool = False,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
@@ -521,8 +524,25 @@ def certify_v7(
     cells = greedy_allocations(budget_gib, roster_limit)
     results: list[dict[str, Any]] = []
     corpus = None
+    # addendum 132: the commit hook fires once per family, after its
+    # LAST cell - not per cell. Cells are ordered family-major (the
+    # greedy output is param-ascending, ctx-ascending per family).
+    pending: list[dict[str, Any]] = []
+    pending_fam = None
+
+    def _flush_model_commit() -> None:
+        if on_model_commit is not None and pending:
+            try:
+                on_model_commit(list(pending))
+            except Exception as e:
+                print(f"  model-commit failed (ignored): {e}")
+
     for cell in cells:
         fam = cell["family"]
+        if pending_fam is not None and fam != pending_fam:
+            _flush_model_commit()
+            pending.clear()
+        pending_fam = fam
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
         v7 = fst.setdefault("v7", {})
@@ -531,6 +551,7 @@ def certify_v7(
         if done.get("score") is not None:
             entry["skipped"] = f"already measured (score {done['score']})"
             results.append(entry)
+            pending.append(entry)
             continue
         if dry_run:
             results.append(entry)
@@ -594,9 +615,6 @@ def certify_v7(
             llama_server.stop_server(proc, port)
             save_state(state_path, state)
         results.append(entry)
-        if on_cell_commit is not None:
-            try:
-                on_cell_commit(entry)
-            except Exception as e:
-                print(f"  cell-commit failed (ignored): {e}")
+        pending.append(entry)
+    _flush_model_commit()
     return results

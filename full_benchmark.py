@@ -46,6 +46,10 @@ from bench.constants import (
 )
 from bench.v7 import certify_v7
 
+# addendum 132: the llama-server-supported --cache-type-k/v values
+# (the KV_QUANT_LADDER rungs must come from this set)
+_KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
+
 vt_pass = _cells.vt_pass
 speed_pass = _cells.speed_pass
 speed_cell = _cells.speed_cell
@@ -344,19 +348,14 @@ def git_tail(args: argparse.Namespace) -> None:
         stamp("pushed")
 
 
-def v7_cell_commit(args: argparse.Namespace, entry: dict[str, Any]) -> None:
-    """Session 44, addendum 115: every evaluated (family, ctx) cell
-    commits and pushes IMMEDIATELY - the author reads results through
-    the git rail while the run goes (the verdict_commit pattern,
-    applied per v7 cell). A git failure never stops the run; the cell
-    commit is skipped under --no-git/dry-run."""
-    score = entry.get("score")
-    what = (
-        f"{entry.get('family')} ctx={entry.get('ctx')} score {score}/{entry.get('max_score')}"
-        if score is not None
-        else f"{entry.get('family')} ctx={entry.get('ctx')} {entry.get('error', 'no score')}"
-    )
-    stamp(f"v7 cell done: {what} - committing artifacts")
+def v7_model_commit(args: argparse.Namespace, entries: list[dict[str, Any]]) -> None:
+    """Session 44, addendum 132: the commit fires once per MODEL,
+    after all its ctx cells are scored (was per cell, addendum 115 -
+    too frequent). A git failure never stops the run; the commit is
+    skipped under --no-git/dry-run."""
+    fam = entries[0].get("family")
+    scored = sum(1 for e in entries if e.get("score") is not None)
+    stamp(f"v7 model done: {fam} ({scored}/{len(entries)} cells scored) - committing artifacts")
     tee_output.uninstall()
     try:
         git_tail(args)
@@ -497,7 +496,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
         "measure - never leave mixed-era results in the table (addendum 129)",
     )
-    _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
     ap.add_argument("--kv-quant-v", default=None, choices=_KV_CHOICES)
     ap.add_argument(
@@ -600,7 +598,9 @@ def _run(args: argparse.Namespace) -> None:
             args.dry_run,
             args.v7_budget_gib or BUDGET_GIB,
             args.v7_families or PILOT_FAMILIES,
-            on_cell_commit=None if (args.no_git or args.dry_run) else partial(v7_cell_commit, args),
+            on_model_commit=None
+            if (args.no_git or args.dry_run)
+            else partial(v7_model_commit, args),
             clean=args.clean,
         )
         state["v7"] = results

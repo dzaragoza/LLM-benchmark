@@ -77,7 +77,7 @@ def test_clean_wipes_all_cells_and_logs_up_front(tmp_path, monkeypatch):
             dry_run=True,
             budget_gib=4.0,
             roster_limit=1,
-            on_cell_commit=None,
+            on_model_commit=None,
             clean=True,
         )
     except AssertionError as e:
