@@ -390,3 +390,28 @@ prices a slow cell at 300s and hides the rest; the question count
 runtime knob. wall_seconds stays in the record and elapsed_s per
 question stays in the answers JSONL - the calibration data for any
 future count adjustment.
+
+
+## Addendum 125 - partial credit; --force cleans results
+
+The author: "Partial credit it is. As the benchmark goes we can
+adjust k or h as needed. Also add a force option that cleans
+results."
+
+Scoring: a question earns found/(h+1) (the strict all-names
+`pass` flag stays in the record); a grade's rate is its mean
+credit; the cell score is the sum over asked grades. Re-scoring
+the pilot's logged answers shows what was hiding under the zeros:
+Qwen3.5-0.8B ctx=32768 goes 0.0/15 (strict) -> 0.140/20 (partial),
+best grades at span 16384 - a real spread to rank on.
+
+--force (full_benchmark.py): before measuring, the stored v7 cell
+is dropped from state and the family's append-mode answers jsonl
+is deleted - the resume rule never re-measures otherwise, and a
+mixed-era log (strict-era and credit-era lines) is un-analyzable.
+
+Old strict-era cells in state are not comparable with credit-era
+cells: run with --force when re-measuring.
+
+Pinned by tests/test_v7_partial_credit.py (1-of-3 names scores
+1/3; full pass still 1.0; force cleans the stored cell).

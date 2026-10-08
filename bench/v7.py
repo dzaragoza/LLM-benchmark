@@ -341,7 +341,7 @@ def run_cell(
             if not grade_reachable(q["span"], q["hops"], window):
                 continue
             key = (q["span"], q["hops"])
-            g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
+            g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0})
             prompt = question_prompt(corpus, q)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
             t0 = time.monotonic()
@@ -351,6 +351,11 @@ def run_cell(
             g["asked"] += 1
             g["pass"] += 1 if ok else 0
             g["found"] += found
+            # addendum 125: partial credit - found/(h+1) per question.
+            # The strict all-names rule left every pilot cell at 0 while
+            # models traced parts of the chain (44/400 answers had >=1
+            # name, 0/400 had all); credit prices the partial trace.
+            g["credit"] += found / len(q["names"])
             if answers_fh is not None:
                 answers_fh.write(
                     json.dumps(
@@ -389,7 +394,7 @@ def run_cell(
     asked_grades = 0
     for _key, g in sorted(per_grade.items()):
         if g["asked"]:
-            score += g["pass"] / g["asked"]
+            score += g["credit"] / g["asked"]
             asked_grades += 1
     return {
         "window": window,
@@ -398,7 +403,11 @@ def run_cell(
         "wall_seconds": round(time.monotonic() - started, 1),
         "samples": samples,
         "per_grade": {
-            f"{s}x{h}": {"pass": g["pass"], "asked": g["asked"]}
+            f"{s}x{h}": {
+                "pass": g["pass"],
+                "asked": g["asked"],
+                "credit": round(g["credit"], 3),
+            }
             for (s, h), g in sorted(per_grade.items())
         },
     }
@@ -450,6 +459,7 @@ def certify_v7(
     budget_gib: float = BUDGET_GIB,
     roster_limit: int = PILOT_FAMILIES,
     on_cell_commit: Any = None,
+    force: bool = False,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -465,6 +475,16 @@ def certify_v7(
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
         v7 = fst.setdefault("v7", {})
+        if force:
+            # addendum 125: --force cleans before measuring - stale
+            # cells (old scoring rule, old grid) and the append-mode
+            # answer logs alike; a mixed-era jsonl is un-analyzable
+            v7.pop(key, None)
+            apath = os.path.join(
+                models_dir, "tournament-results", fam, f"{fam}-ctx{cell['ctx']}-v7-answers.jsonl"
+            )
+            if os.path.exists(apath):
+                os.remove(apath)
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
         if done.get("score") is not None:
