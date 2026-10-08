@@ -164,14 +164,17 @@ def run_cell(port: int, corpus: dict, window: int) -> dict:
     }
 
 
+PILOT_FAMILIES = 4  # the pilot scope: the first 4 families, param-ascending
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="v7 pilot corpus generation")
     ap.add_argument("--plan", action="store_true", help="print the allocation plan only")
     ap.add_argument("--budget-gib", type=float, default=BUDGET_GIB)
-    ap.add_argument("--roster-limit", type=int, default=12)
+    ap.add_argument("--roster-limit", type=int, default=PILOT_FAMILIES)
     args = ap.parse_args(argv)
     if args.plan:
-        print(json.dumps(plan_allocations(args.budget_gib, args.roster_limit), indent=1))
+        print(json.dumps(greedy_allocations(args.budget_gib, args.roster_limit), indent=1))
         return 0
     return 0
 
