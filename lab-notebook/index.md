@@ -50,3 +50,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 130: R-28 - a scoring system never offers a cell whose max score is 0
 - [session-44](session-44.md) - addendum 132: KV ladder = server-supported cache types only (q4_0/q5_0/q8_0/f16); the v7 commit fires once per model, not per cell
 - [session-44](session-44.md) - addendum 133: KV estimator honors hybrid attention (interval 4, calibrated to census anchors); prefill:gen 4.3:1 at 256k -> ~120 questions to balance; granite-4.0-h malfunction recorded; difficulty pre-registration
+- [session-44](session-44.md) - addendum 134: config-aware resume - a stored cell re-measures when its (wq,kq,vq) drifts from the plan (protects the addendum-133 rerun)

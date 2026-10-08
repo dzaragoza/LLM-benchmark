@@ -68,3 +68,58 @@ def test_allocations_climb_higher_after_fix():
     w_ladder = v7.W_LADDER
     assert w_ladder.index(top[0]["wq"]) >= w_ladder.index("Q5_K")
     assert top[0]["est_gib"] <= 4.0
+
+
+def test_config_drift_remeasures(tmp_path, monkeypatch):
+    """Addendum 134: a stored cell whose (wq, kq, vq) no longer
+    matches the plan is RE-MEASURED, not skipped - the addendum-133
+    estimator fix changed Qwen's plan; resuming without this check
+    would silently keep the old-config scores."""
+    import bench.v7 as v7m
+
+    def fake_alloc(budget, limit=4):
+        return [
+            {
+                "family": "famA",
+                "params_b": 0.3,
+                "ctx": 4096,
+                "wq": "Q8_0",
+                "kq": "f16",
+                "vq": "f16",
+                "est_gib": 1.0,
+            }
+        ]
+
+    monkeypatch.setattr(v7m, "greedy_allocations", fake_alloc)
+    monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
+    monkeypatch.setattr(
+        v7m, "corpus_from_artifact", lambda port: {"questions": [], "cuts": {}, "sentences": []}
+    )
+    monkeypatch.setattr(v7m.llama_server, "start_server", lambda *a, **k: (object(), True))
+    monkeypatch.setattr(v7m.llama_server, "wait_healthy", lambda *a, **k: True)
+    monkeypatch.setattr(v7m.llama_server, "stop_server", lambda *a, **k: None)
+    monkeypatch.setattr(v7m, "preflight_reachable_grades", lambda port, c, w: {})
+    monkeypatch.setattr(
+        v7m,
+        "run_cell",
+        lambda port, corpus, window, answers_path=None: {"score": 0.5, "max_score": 3},
+    )
+    monkeypatch.setattr(v7m, "save_state", lambda *a: None)
+
+    # stored cell: measured, but under the OLD config (F16 weights)
+    state = {
+        "families": {
+            "famA": {"v7": {"4096": {"score": 0.9, "wq": "F16", "kq": "f16", "vq": "f16"}}}
+        }
+    }
+    res = v7m.certify_v7(
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        on_model_commit=None,
+    )
+    assert "skipped" not in res[0], "drifted cell must re-measure"
+    assert res[0]["score"] == 0.5, "the re-measured score replaces the stale one"
+    assert state["families"]["famA"]["v7"]["4096"]["wq"] == "Q8_0"
