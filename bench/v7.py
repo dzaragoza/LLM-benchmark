@@ -43,7 +43,11 @@ K = 1  # questions per (span, hops) grade; pass = all h+1 names
 # then the 2k span dropped: with K=1 flat, the ladder was
 # vestigial, so the span grid starts at 4096 and every grade asks
 # exactly K questions. A cell is 7 spans x 5 hops x 1 = 35 questions.
-CELL_BUDGET_SECONDS = 300  # addendum 121: the 5-min ceiling per cell
+# Addendum 124: no wall-clock ceiling - the question count is the
+# correct fix for runtime, and a budget stop would hide slow cells
+# instead of pricing them honestly (wall_seconds records the price;
+# the per-question elapsed_s in the answers JSONL keeps the
+# calibration data).
 
 
 BUDGET_GIB = 4.0
@@ -332,19 +336,12 @@ def run_cell(
     samples: list[dict] = []
     answers_fh = open(answers_path, "a", encoding="utf-8") if answers_path else None
     started = time.monotonic()
-    budget_hit = False
     try:
         for q in corpus["questions"]:
             if not grade_reachable(q["span"], q["hops"], window):
                 continue
             key = (q["span"], q["hops"])
             g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
-            if time.monotonic() - started > CELL_BUDGET_SECONDS:
-                # addendum 121: the 5-min ceiling - stop asking, score
-                # what landed. k-major order guarantees the grid is
-                # covered; the record reports the truncation honestly.
-                budget_hit = True
-                break
             prompt = question_prompt(corpus, q)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
             t0 = time.monotonic()
@@ -398,7 +395,6 @@ def run_cell(
         "window": window,
         "score": round(score, 3),
         "max_score": asked_grades,
-        "budget_hit": budget_hit,
         "wall_seconds": round(time.monotonic() - started, 1),
         "samples": samples,
         "per_grade": {
