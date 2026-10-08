@@ -10,15 +10,15 @@ anchors measured in the addendum-132 run.
 
 import bench.v7 as v7
 
-# (ctx, kv factor, measured context_gib from the census) - the
-# addendum-132 run's Qwen3.5-0.8B anchors, family interval 4
+# (ctx, kv factor, measured GPU context_gib from the census) -
+# the addendum-134 run's Qwen3.5-0.8B anchors, family interval 4
 QWEN_ANCHORS = [
-    (8192, 1.0, 0.112),
-    (16384, 1.0, 0.206),
-    (32768, 1.0, 0.394),
-    (65536, 1.0, 0.769),
-    (131072, 0.53125, 0.815),
-    (262144, 0.28125, 0.862),
+    (8192, 1.0, 0.11),
+    (16384, 1.0, 0.21),
+    (32768, 1.0, 0.39),
+    (65536, 1.0, 0.77),
+    (131072, 1.0, 1.52),
+    (262144, 1.0, 3.02),
 ]
 
 

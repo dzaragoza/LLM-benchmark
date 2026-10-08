@@ -68,7 +68,7 @@ from etc import registry_data
 S_MAX = 262144
 SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 1  # questions per (span, hops) grade; pass = all h+1 names
+K = 3  # questions per (span, hops) grade; pass = all h+1 names
 # (upstream). Session 44 addenda 120/122/123: the author's rulings -
 # 10x easier (K 20 -> 2), prefill-matched counts (k inverse in span),
 # then the 2k span dropped: with K=1 flat, the ladder was
@@ -113,21 +113,23 @@ KV_QUANT_FACTOR = {
 }
 
 
-# addendum 135: llama.cpp's model buffer runs ~15-29% over
-# params x bits-per-byte (the census anchors: 1.153 Qwen, 1.173
-# MiniCPM4, 1.292 granite-4.0, 1.227 granite-4.0-h). The estimator
-# charges the worst observed so a recommendation never under-
-# quotes the real footprint.
-W_OVERHEAD = 1.30
-# the compute buffer: a floor plus ~2 KiB/token of attention
-# scratch, uniform across the pilot families (census: slope
-# ~1.9e-6 GiB/token, intercept 0.02-0.04 GiB)
-COMPUTE_FLOOR_GIB = 0.05
-COMPUTE_KIB_PER_TOKEN = 2.0
+# addendum 136 (the author's scope ruling): the estimator prices
+# the GPU FOOTPRINT ONLY - what lands on the accelerator. Host/
+# system RAM (llama.cpp always parks a fixed chunk there) is out
+# of scope. GPU census anchors: weights land at ~1.00x
+# params x bpB (MiniCPM4 1.000, granite-4.0 0.999, granite-h
+# 1.000; Qwen 0.86 - part of the embedding stays host-side, a
+# small UNDER-count we accept rather than model per-family
+# offload splits), so NO weights overhead on GPU.
+# GPU compute buffer: floor + ~1 KiB/token (census slope
+# 9.6e-7 GiB/token across the pilot families; the old 2 KiB
+# figure was the system-wide one).
+COMPUTE_FLOOR_GIB = 0.03
+COMPUTE_KIB_PER_TOKEN = 1.0
 
 
 def weights_gib(params_b: float, wq: str) -> float:
-    return params_b * 1e9 * W_QUANT_BPB[wq] / (1 << 30) * W_OVERHEAD
+    return params_b * 1e9 * W_QUANT_BPB[wq] / (1 << 30)
 
 
 def _store() -> dict[str, Any]:
