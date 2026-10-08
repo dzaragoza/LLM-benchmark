@@ -9,7 +9,18 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 700
+    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 800
+
+
+def test_smallest_ctx_is_measurable():
+    """The 2k rung must reach at least one span grade (the first live
+    run's bug: SPANS started at 4096, so 2048-window cells asked zero
+    questions and scored 0/0)."""
+    smallest_ctx = min(v7_pilot.CTX_GRID)
+    assert any(s <= smallest_ctx for s in v7_pilot.SPANS)
+    for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
+        reach = [s for s in v7_pilot.SPANS if s <= cell["ctx"]]
+        assert reach, f"ctx {cell['ctx']} cannot reach any span grade"
 
 
 def test_allocation_plan_frontier():
