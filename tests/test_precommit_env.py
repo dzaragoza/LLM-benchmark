@@ -73,14 +73,20 @@ def test_no_verify_is_not_used_in_history():
 
 
 def test_precommit_config_hooks_present():
-    """Pins: R-20. The hook suite stays complete: ruff, ruff-format, ty,
-    pytest, the markdown check and the requirements check - removing a
-    hook silently is the other way to 'omit the commit hook'."""
+    """Pins: R-20, R-25. The hook suite is complete AND fast (<=5s):
+    ruff, ruff-format, ty, markdown check, requirements check. pytest
+    deliberately does NOT run per commit (28s; R-25) - it must be
+    present in the weekly workflow instead, or the regression suite
+    has no scheduled home. Removing a hook silently is the other way
+    to 'omit the commit hook'."""
     import yaml  # noqa: F401 - presence is the point, parsing is stdlib-free
 
     cfg = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-    for hook_id in ("ruff", "ruff-format", "ty", "pytest", "md-tables", "requirements-check"):
+    for hook_id in ("ruff", "ruff-format", "ty", "md-tables", "requirements-check"):
         assert f"id: {hook_id}" in cfg, f"hook {hook_id} missing from .pre-commit-config.yaml"
+    assert "id: pytest" not in cfg, "pytest is R-25-removed from the commit hook; weekly CI owns it"
+    weekly = (ROOT / ".github" / "workflows" / "weekly-quality.yml").read_text(encoding="utf-8")
+    assert "pytest tests" in weekly, "the weekly workflow must run the full pytest suite"
 
 
 def test_no_backward_compatibility_shims():
