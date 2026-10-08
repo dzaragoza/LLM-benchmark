@@ -122,3 +122,33 @@ Three layers, from measurement to proof:
 The process lesson, registered: never assert a token budget that
 has not been MEASURED against the live server - arithmetic estimates
 are for choosing what to ask, /tokenize is for verifying it fits.
+
+## Addendum 113 - the zero-score diagnosis
+
+The author: "not a single model has scored a single point - dumb
+models, too hard, or broken?"
+
+Machinery ruled out (the test was NOT broken): scorer sanity-checked
+against a known-good answer; prompt structure verified (chains
+embedded before the cut, template renders); and the historical
+certify_vt for the same families shows the pipeline produces real
+signal (granite-4.0-350m depth 4096: [0, 0, 4, 0, 0, 0]).
+
+The reading: mostly #1. The two measured families are 350M models
+whose historical vt verdicts are all "dead" - they failed the EASIER
+old task (5 names at shallow depth). v7's pass rule is ALL h+1
+names; a model that historically found 0-4 of 5 scores 0 under
+all-or-nothing. Also #2 in the sense that the pilot's only-measured
+cells so far are the dumbest half; MiniCPM4-0.5B and Qwen3.5-0.8B
+are unmeasured.
+
+Open suspect: run_cell uses ask()'s default no_thinking=True;
+granite-4.0-h is a hybrid reasoning model - suppressed thinking may
+cripple it specifically. History cannot arbitrate (old runs also
+suppressed). Registered for the next run's reading.
+
+Instrumented (run_cell): per-grade FOUND tallies (g["found"] - the
+partial-credit sum that was being discarded) and three sample
+answers per grade (one pass, up to two fails, answer capped at 200
+chars). The next run's state separates "found some names" from
+"answered debris" from "answered nothing" - evidence, not vibes.

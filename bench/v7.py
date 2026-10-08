@@ -310,17 +310,34 @@ def run_cell(port: int, corpus: dict, window: int) -> dict:
     grid. Questions with span > window are EXCLUDED (structurally
     unreachable), not failed. Pass = all h+1 names (upstream's rule)."""
     per_grade: dict[tuple[int, int], dict] = {}
+    samples: list[dict] = []
     for q in corpus["questions"]:
         if not grade_reachable(q["span"], q["hops"], window):
             continue
         key = (q["span"], q["hops"])
-        g = per_grade.setdefault(key, {"pass": 0, "asked": 0})
+        g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
         prompt = question_prompt(corpus, q)
         max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
         answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
-        ok, _found = ruler_gate.score_vt(answer, q["names"])
+        ok, found = ruler_gate.score_vt(answer, q["names"])
         g["asked"] += 1
         g["pass"] += 1 if ok else 0
+        g["found"] += found
+        # session 44, addendum 113: three sample answers per grade -
+        # the diagnostic that separates "found some names" (the model
+        # is close) from "answered debris" (the prompt or the thinking
+        # mode is wrong). One pass sample and up to two fails.
+        sample = {
+            "grade": f"{q['span']}x{q['hops']}",
+            "ok": ok,
+            "found": found,
+            "names": q["names"],
+            "answer": (answer or "")[:200],
+        }
+        passes = sum(1 for x in samples if x["grade"] == sample["grade"] and x["ok"])
+        fails = sum(1 for x in samples if x["grade"] == sample["grade"] and not x["ok"])
+        if (ok and passes < 1) or (not ok and fails < 2):
+            samples.append(sample)
     score = 0.0
     asked_grades = 0
     for _key, g in sorted(per_grade.items()):
@@ -331,6 +348,7 @@ def run_cell(port: int, corpus: dict, window: int) -> dict:
         "window": window,
         "score": round(score, 3),
         "max_score": asked_grades,
+        "samples": samples,
         "per_grade": {
             f"{s}x{h}": {"pass": g["pass"], "asked": g["asked"]}
             for (s, h), g in sorted(per_grade.items())
