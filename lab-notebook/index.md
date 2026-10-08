@@ -41,3 +41,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 120: v7 10x easier - K 20 -> 2, 80 questions per cell
 - [session-44](session-44.md) - addendum 121: 5-minute cell ceiling (budget stop + k-major ordering)
 - [session-44](session-44.md) - addendum 122: questions match prefill time (k inverse in span, 45-question cell)
+- [session-44](session-44.md) - addendum 123: 2k span dropped, K=1 flat, 35-question cell; 2048-window families (phi-1, phi-2, RWKV7) earn no cell

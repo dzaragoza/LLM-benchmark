@@ -44,7 +44,7 @@ def small_corpus(monkeypatch):
     monkeypatch.setattr(v7, "S_MAX", 2000, raising=False)
     monkeypatch.setattr(v7, "SPANS", [1024, 2048], raising=False)
     monkeypatch.setattr(v7, "HOPS", [2, 4], raising=False)
-    monkeypatch.setattr(v7, "K", 2, raising=False)
+    monkeypatch.setattr(v7, "K", 1, raising=False)  # addendum 123: flat K=1
     # build_corpus reads the module-level constants through its
     # defaults; call it with the small grid explicitly instead
     return v7.build_corpus(0, s_max=2000)
@@ -128,7 +128,7 @@ def test_run_cell_excludes_unreachable_spans(monkeypatch, small_corpus):
     grades = {k for k in rec["per_grade"]}
     assert all(k.startswith("1024x") for k in grades)
     assert rec["max_score"] == 2  # the two 1024 grades (hops 2, 4)
-    assert len(asked) == 4  # K=2 chains x 2 hop grades
+    assert len(asked) == 2  # addendum 123: K=1 x 2 hop grades
 
 
 def test_run_cell_score_is_mean_pass_mass(monkeypatch, small_corpus):
@@ -170,12 +170,9 @@ def test_run_cell_score_is_mean_pass_mass(monkeypatch, small_corpus):
 
     rec = v7.run_cell(0, c, window=4096)
     assert rec["max_score"] == 4  # both spans, both hop grades
-    # addendum 122: asked follows questions_for_span - span 1024 (the
-    # smallest) gets K=2, span 2048 gets K*1024/2048 = 1; alternating
-    # passes -> the 1024 grades land 1/2
-    for gname, g in rec["per_grade"].items():
-        span = int(gname.split("x")[0])
-        assert g["asked"] == v7.questions_for_span(span)
+    # addendum 123: K=1 flat - every asked grade is asked exactly once
+    for g in rec["per_grade"].values():
+        assert g["asked"] == 1
     assert 0.0 <= rec["score"] <= float(rec["max_score"])
 
 
@@ -252,13 +249,7 @@ def test_artifact_matching_grid_loads(monkeypatch, tmp_path):
 
     monkeypatch.setattr(v7, "CORPUS_ARTIFACT", str(art))
     monkeypatch.setattr(v7, "build_corpus", boom)
-    grid = {
-        "spans": v7.SPANS,
-        "hops": v7.HOPS,
-        "k": v7.K,
-        "k_per_span": {s: v7.questions_for_span(s) for s in v7.SPANS},
-        "s_max": v7.S_MAX,
-    }
+    grid = {"spans": v7.SPANS, "hops": v7.HOPS, "k": v7.K, "s_max": v7.S_MAX}
     art.write_text(json.dumps({"grid": grid, "corpus": corpus}), encoding="utf-8")
     assert v7.corpus_from_artifact(0) == corpus
 
