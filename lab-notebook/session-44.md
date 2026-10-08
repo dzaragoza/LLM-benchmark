@@ -709,3 +709,24 @@ The 90 figure matches the addendum-135 phase measurement: gen
 - Note: the corpus rebuilds (k in the grid block changes), so
   run under --clean (addendum 129) - config drift alone does
   not cover a corpus change.
+
+## Addendum 138 - the greedy allocation is intentionally NOT optimized
+
+The author, on the addendum-135 flag (the greedy picking Q2_K
+weights + f16 cache at 262144): "That's on purpose. I don't want
+to optimize anything until we get all the results. Then we can
+see in the evidence the impact of quants at q, k, v. Let's not
+pre optimize. The greedy algorithm is an easy way to get a
+result close to the limit, we can discuss options when we have
+data."
+
+Registered: the greedy climb (closest-to-budget single-axis
+steps) is the DELIBERATE allocation policy for this phase. It
+fills the budget without a quality model, and that is fine -
+the benchmark's job right now is to measure reach at a
+config near the limit, not to pick the best config. The
+q/k/v quant-impact question stays OPEN until the full-roster
+results are in; any allocator improvement (quality-weighted
+climb, min-quant floors, q/k/v trade-off search) waits for
+that evidence. Do not "fix" the Q2_K-at-256k outcome without
+a new ruling.

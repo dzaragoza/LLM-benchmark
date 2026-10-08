@@ -54,3 +54,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 135: rerun graded (predictions 1,4,5 pass; 2,3 fail -> difficulty knob next); estimator calibrated (layer_types, weights overhead 1.30, compute buffer) - +2..11% error; 262k cell was over budget (4.558) - flagged; prefill:gen 3.21:1
 - [session-44](session-44.md) - addendum 136: GPU-scope ruling - estimator prices the accelerator only (weights overhead deleted, compute 1 KiB/token; -1.6..+12.6% vs GPU census)
 - [session-44](session-44.md) - addendum 137: K=3 ruled - 90 questions at 256k, phase-balanced (~423s gen ~ 450s prefill); predictions pre-registered
+- [session-44](session-44.md) - addendum 138: the greedy allocation is intentionally unoptimized - no allocator changes until the full-roster data shows the q/k/v quant impact
