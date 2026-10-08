@@ -29,7 +29,6 @@ from bench.constants import (
 )
 from bench.state_store import (
     _task_load,
-    certify_cells,
     save_state,
     speed_cells,
     vt_cells,

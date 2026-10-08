@@ -10,15 +10,12 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import sys
 import time
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import infra.hf_download as hf_download
-import infra.llama_server as llama_server
 from bench import cells as bench_cells
 from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT, TASK_PASS_BARS
 
