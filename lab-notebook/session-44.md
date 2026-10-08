@@ -215,3 +215,17 @@ the hooks that remain are never bypassed; R-25 registers the speed
 budget. Also: the agent stops pre-running `pre-commit run
 --all-files` manually before committing (double effort) - commit
 directly, git runs the hook once; investigate only on failure.
+
+## Addendum 117 - R-25 compromise: hypothesis weekly, deterministic pytest in the hook
+
+The author: "in the hook run pytest but not hypothesis. hypothesis
+in the weekly."
+
+tests/test_properties.py carries pytestmark = hypothesis_props; the
+hook runs pytest -m "not hypothesis_props" (233 deterministic tests,
+~20s - the honest number: the suite's cost is 234 small tests plus
+import overhead, not just hypothesis); the weekly runs the full 255.
+The R-20/R-25 pin asserts all six hook ids, the marker selection in
+the hook entry, and the full-suite weekly step - properties can
+neither silently re-enter the commit gate nor silently lose their
+scheduled home.
