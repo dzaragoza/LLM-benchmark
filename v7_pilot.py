@@ -60,6 +60,7 @@ W_QUANT_BPB = {
     "Q5_K": 0.72,
     "Q6_K": 0.82,
     "Q8_0": 1.06,
+    "F16": 2.0,
 }
 W_LADDER = list(W_QUANT_BPB)
 # kv-quant factor vs f16 bytes (the KV axes q4_0..f16; K and V
