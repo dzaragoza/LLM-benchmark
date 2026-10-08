@@ -176,14 +176,96 @@ def run_cell(port: int, corpus: dict, window: int) -> dict:
 PILOT_FAMILIES = 4  # the pilot scope: the first 4 families, param-ascending
 
 
+def _acquire_quant(name: str, repo: str, wq: str, state: dict) -> str | None:
+    """Ensure the family's wq-quant gguf exists (the certify phase-1/2
+    path), and return its local path."""
+    from bench.certify import _acquire_missing_model
+
+    famdir = os.path.join("models", name)
+    os.makedirs(famdir, exist_ok=True)
+    return _acquire_missing_model(repo, name, famdir, wq, state, False)
+
+
+def run_pilot(budget_gib: float, roster_limit: int) -> dict:
+    """The pilot run: per greedy cell, acquire the quant, launch the
+    server at the cell's ctx with its K/V cache types, score the
+    fixed corpus on the reachable grid, teardown, next. State
+    persists per cell (v7-pilot-state.json) so an interrupted run
+    resumes without re-measuring finished cells."""
+    state = {"families": {}}
+    if os.path.exists(STATE_PATH):
+        with open(STATE_PATH, encoding="utf-8") as f:
+            state = json.load(f)
+    cells = greedy_allocations(budget_gib, roster_limit)
+    corpus = None
+    for cell in cells:
+        fam = cell["family"]
+        fst = state["families"].setdefault(fam, {})
+        key = str(cell["ctx"])
+        done = fst.get(key) or {}
+        if done.get("score") is not None:
+            print(f"  {fam} ctx={cell['ctx']}: already measured (score {done['score']})")
+            continue
+        repo = registry_data.ROSTER.get(fam, fam)
+        print(f"=== {fam} ctx={cell['ctx']} wq={cell['wq']} k={cell['kq']} v={cell['vq']}")
+        gguf = _acquire_quant(fam, repo, cell["wq"], state)
+        if not gguf:
+            print("  could not acquire the quant - skipping cell")
+            continue
+        extra = ["-c", str(cell["ctx"]), "--parallel", "1"]
+        if cell["kq"] != "f16" or cell["vq"] != "f16":
+            extra += ["-fa", "on"]
+            extra += ["--cache-type-k", cell["kq"]]
+            extra += ["--cache-type-v", cell["vq"]]
+        log_path = f"v7-results/{fam}-ctx{cell['ctx']}-server.log"
+        os.makedirs("v7-results", exist_ok=True)
+        proc, healthy = llama_server.start_server(
+            gguf, PORT, extra_args=extra, log_path=log_path
+        )
+        try:
+            if not healthy or not llama_server.wait_healthy(PORT, proc=proc):
+                print("  server did not come up; log tail:")
+                try:
+                    with open(log_path, encoding="utf-8", errors="replace") as f:
+                        for ln in f.read().splitlines()[-15:]:
+                            print(f"    [server] {ln}")
+                except OSError:
+                    pass
+                continue
+            breakdown = llama_server.memory_breakdown_gib(log_path)
+            if corpus is None:
+                corpus = build_corpus(PORT)
+            rec = run_cell(PORT, corpus, cell["ctx"])
+            if breakdown is not None:
+                rec["mem_census"] = breakdown
+                print(
+                    f"  census: weights {breakdown['weights_gib']:.2f} GiB, "
+                    f"context {breakdown['context_gib']:.2f} GiB "
+                    f"-> total {breakdown['total_gib']:.2f} GiB (est {cell['est_gib']})"
+                )
+            print(f"  score {rec['score']} / {rec['max_score']}")
+            fst[key] = {**cell, **rec}
+        finally:
+            llama_server.stop_server(proc, PORT)
+            tmp = STATE_PATH + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=1, sort_keys=True)
+            os.replace(tmp, STATE_PATH)
+    return state
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="v7 pilot corpus generation")
     ap.add_argument("--plan", action="store_true", help="print the allocation plan only")
+    ap.add_argument("--run", action="store_true", help="run the pilot (needs llama-server + weights)")
     ap.add_argument("--budget-gib", type=float, default=BUDGET_GIB)
     ap.add_argument("--roster-limit", type=int, default=PILOT_FAMILIES)
     args = ap.parse_args(argv)
     if args.plan:
         print(json.dumps(greedy_allocations(args.budget_gib, args.roster_limit), indent=1))
+        return 0
+    if args.run:
+        run_pilot(args.budget_gib, args.roster_limit)
         return 0
     return 0
 
