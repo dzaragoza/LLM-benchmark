@@ -131,3 +131,92 @@ def test_question_prompt_is_prefix_cut():
     q_big = {"span": 262144, "hops": 4, "names": ["AAAAA", "BBBBB"], "value": "12345"}
     p_big = v7_pilot.question_prompt(corpus, q_big)
     assert "sentence 999." in p_big
+
+
+def test_corpus_artifact_roundtrip(tmp_path):
+    """Pins: R-16. The corpus is a repo artifact: build once, persist
+    to state/v7-corpus.json, load back byte-identical on the next
+    run - citable and machine-independent."""
+    import json
+    import bench.v7 as v7m
+
+    class Fake:
+        @staticmethod
+        def tokenize(port, content):
+            return [0] * 40
+
+    import unittest.mock as m
+
+    with m.patch.object(v7m.llama_server, "tokenize", Fake.tokenize):
+        with m.patch.object(v7m, "CORPUS_ARTIFACT", str(tmp_path / "corpus.json")):
+            c1 = v7m.corpus_from_artifact(0)
+            art = json.loads((tmp_path / "corpus.json").read_text())
+            assert art["grid"]["k"] == v7m.K
+            c2 = v7m.corpus_from_artifact(0)
+            assert c1 == c2
+
+
+def test_crash_tail_always_runs(tmp_path, monkeypatch):
+    """Pins: R-17. The git tail runs on a crash: main() catches any
+    exception, stamps the traceback into results.txt, runs git_tail
+    (unless --no-git), and re-raises."""
+    import argparse
+    import full_benchmark as fb
+    import unittest.mock as m
+
+    calls = []
+
+    def fake_git_tail(args):
+        calls.append("git_tail")
+
+    def fake_run(args):
+        raise RuntimeError("boom")
+
+    args = argparse.Namespace(no_git=False)
+    for attr, default in vars(fb.build_parser().parse_args([])).items():
+        setattr(args, attr, default) if not hasattr(args, attr) else None
+    crash_log = tmp_path / "results.txt"
+    with (
+        m.patch.object(fb, "_run", fake_run),
+        m.patch.object(fb, "git_tail", fake_git_tail),
+        m.patch.object(fb.llama_server, "kill_stale_server", lambda: False),
+        m.patch.object(fb.tee_output, "uninstall", lambda: None),
+        m.patch.object(fb.tee_output, "install", lambda: None),
+        m.patch.object(fb.sys, "argv", ["full_benchmark.py"]),
+    ):
+        monkeypatch.chdir(tmp_path)
+        try:
+            fb.main()
+        except RuntimeError:
+            pass
+    assert "git_tail" in calls
+    assert "RuntimeError: boom" in crash_log.read_text()
+
+
+def test_greedy_ruling_shape():
+    """Pins: R-18, R-19. The climb starts at (Q2_K, q2_K, q2_K),
+    uses K-encoding below q8, tops at 16 bits, and every pilot cell
+    reaches at least one span grade (exclusion, not failure)."""
+    assert v7_pilot.W_LADDER[0] == "Q2_K" and v7_pilot.W_LADDER[-1] == "F16"
+    assert v7_pilot.KV_QUANT_LADDER[0] == "q2_K" and v7_pilot.KV_QUANT_LADDER[-1] == "f16"
+    for w in v7_pilot.W_LADDER[:-1]:
+        assert w.endswith("_K") or w.endswith("_0")
+    assert all(q in ("q2_K", "q4_K", "q8_0", "f16") for q in v7_pilot.KV_QUANT_LADDER)
+    for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
+        assert any(s <= cell["ctx"] for s in v7_pilot.SPANS)
+
+
+def test_prefix_and_exclusion_ruling():
+    """Pins: R-19 (with R-18's grid): the span-s question presents the
+    prefix cut; run_cell excludes spans beyond the window."""
+    corpus = {
+        "sentences": [f"noise {i}." for i in range(200)],
+        "questions": [
+            {"span": 2048, "hops": 2, "names": ["AAAAA", "BBBBB", "CCCCC"], "value": "11111"},
+            {"span": 65536, "hops": 2, "names": ["DDDDD", "EEEEE", "FFFFF"], "value": "22222"},
+        ],
+        "cuts": {2048: 50, 65536: 200},
+        "s_max": 65536,
+    }
+    p = v7_pilot.question_prompt(corpus, corpus["questions"][0])
+    assert "noise 49." in p and "noise 50." not in p

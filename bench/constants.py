@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import speed_gate
 
-COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
-ARC_CELL_K = 5  # questions per cell (the author's ruling: k=5, like VT's 5 names)
-ARC_RUN_CTX = 4096  # ARC ignores context depth - one measurement, verdict applies to every rung
-TASK_PASS_BARS = {"speed": 0, "fwe": 2, "vt": 4, "arc": 3}
+# session 43: ARC and FWE are retired - v7 sharpened the focus to
+# reach vs reasoning; the fixed corpus carries both axes.
+# The v6/v5 arcs remain in state history; no new arc/fwe cells.
+COMBINED_TASKS = ("speed", "vt")
+TASK_PASS_BARS = {"speed": 0, "vt": 4}
 TOURNAMENT_DEPTHS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 TOURNAMENT_CLIMBS = 20
 READER_WPS_DEFAULT = speed_gate.READER_WPS_DEFAULT

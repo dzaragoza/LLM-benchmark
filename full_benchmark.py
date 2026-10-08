@@ -5,8 +5,9 @@ rescore, diagnose and size-table modes are cut, their code in git history).
 
 One command: acquire each family's rung file on demand (the registry's
 param-ascending order, smallest model first - no hidden selection), then
-run the certify controllers (the medal ladder: speed, fwe, vt, arc per
-cell, never re-measuring a stored cell).
+run the certify controllers (speed + vt per cell, never re-measuring
+a stored cell; arc/fwe retired session 43, or --task v7: the
+fixed-budget reach benchmark).
 
   families  the registry roster (param-ascending) or the specs given.
   rung      default Q8_0; --force-rung f16 is the full-capacity pass.
@@ -44,7 +45,6 @@ from bench.constants import (
 )
 
 # re-exports: the tests patch these seams
-fwe_pass = _cells.fwe_pass
 vt_pass = _cells.vt_pass
 speed_pass = _cells.speed_pass
 speed_cell = _cells.speed_cell
@@ -303,7 +303,6 @@ def git_tail(args: argparse.Namespace) -> None:
         glob.glob("models/*/*.live-dump*.json")
         + glob.glob("models/*/*.sentinel*.json")
         + glob.glob("models/*/*.mem.json")
-        + glob.glob("models/*/*.arc-cell*.log")
         + glob.glob("models/*/*-server.log")
         + glob.glob("models/*/*window-probe.log")
     )
@@ -454,12 +453,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--task",
-        default="fwe",
-        choices=["fwe", "vt", "speed", "all", "v7"],
-        help="the certify task; 'all' is the combined controller - each "
-        "cell carries speed, fwe, vt and arc, measured only if missing; "
-        "'v7' is the fixed-budget reach benchmark (session 42/43: "
-        "greedy (q,k,v) cells, one fixed 256k corpus, graded (span, hops))",
+        default="vt",
+        choices=["vt", "speed", "all", "v7"],
+        help="the certify task; 'all' is the combined controller "
+        "(speed + vt per cell, measured only if missing); 'v7' is the "
+        "fixed-budget reach benchmark (session 42/43: greedy (q,k,v) "
+        "cells, one fixed 256k corpus, graded (span, hops)). ARC and "
+        "FWE are retired (session 43: v7 sharpened the focus to reach "
+        "vs reasoning; the corpus carries both axes)",
     )
     ap.add_argument(
         "--v7-budget-gib",
@@ -472,14 +473,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="v7: the first N families param-ascending (default 4, the pilot)",
-    )
-    ap.add_argument(
-        "--fwe-min-words",
-        type=int,
-        default=1,
-        metavar="N",
-        help="the FWE pass bar: a cell passes when >= N of the 3 hidden "
-        "words are found (default 1)",
     )
     _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
     ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
@@ -499,8 +492,47 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """The crash-safe entry: the git tail ALWAYS runs - on a clean
+    finish, on any exception (the traceback is stamped into
+    results.txt and committed as a CRASH artifact), and on SIGINT
+    (the existing handler). A crashed run must still upload its
+    state and results - the author's session-43 ruling: the git
+    rail runs always, and the crash is REPORTED, not dropped on
+    the console of a machine you are not sitting at."""
     ap = build_parser()
     args = ap.parse_args()
+    try:
+        _run(args)
+    except SystemExit:
+        raise
+    except BaseException:
+        import traceback
+
+        tb = traceback.format_exc()
+        try:
+            print(tb)
+            stamp("CRASH DETECTED - committing artifacts before exit")
+            try:
+                llama_server.kill_stale_server()
+            except Exception as e:
+                stamp(f"stale-server kill failed (ignored): {e}")
+            try:
+                tee_output.uninstall()
+            except Exception as e:
+                stamp(f"results logging stop failed (ignored): {e}")
+            with open("results.txt", "a", encoding="utf-8") as f:
+                f.write(f"\n===== CRASH {time.strftime('%Y-%m-%dT%H:%M:%S')} =====\n{tb}\n")
+            if not args.no_git:
+                try:
+                    git_tail(args)
+                except Exception as e:
+                    stamp(f"git tail after crash failed (ignored): {e}")
+        finally:
+            sys.stdout.flush()
+        raise
+
+
+def _run(args: argparse.Namespace) -> None:
     if isinstance(args.rung_forced, str):
         if "/" in args.rung_forced or "=" in args.rung_forced:
             ap.error(
@@ -583,7 +615,6 @@ def main() -> None:
                 args.state_file,
                 state.get("ladder_port", 8210),
                 args.dry_run,
-                min_words=args.fwe_min_words,
                 rung_override=args.rung if args.rung_forced else None,
                 on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
             )
@@ -596,7 +627,6 @@ def main() -> None:
                 args.state_file,
                 state.get("ladder_port", 8210),
                 args.dry_run,
-                min_words=args.fwe_min_words,
                 task=args.task,
                 rung_override=args.rung if args.rung_forced else None,
                 on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),

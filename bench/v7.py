@@ -284,6 +284,34 @@ def run_cell(port: int, corpus: dict, window: int) -> dict:
     }
 
 
+CORPUS_ARTIFACT = "state/v7-corpus.json"
+
+
+def corpus_from_artifact(port: int) -> dict:
+    """The corpus as a repo artifact (the author's session-43 ruling):
+    load state/v7-corpus.json when it matches the current grid
+    constants; otherwise build once and write it. The artifact makes
+    the corpus citable and byte-stable across machines - every
+    contender runs on the exact same chains, and a rebuild is
+    verifiable against the committed file."""
+    grid = {
+        "spans": SPANS,
+        "hops": HOPS,
+        "k": K,
+        "s_max": S_MAX,
+    }
+    if os.path.exists(CORPUS_ARTIFACT):
+        with open(CORPUS_ARTIFACT, encoding="utf-8") as f:
+            art = json.load(f)
+        if all(art.get(k_) == v for k_, v in grid.items()) and art.get("corpus"):
+            return art["corpus"]
+    corpus = build_corpus(port)
+    os.makedirs(os.path.dirname(CORPUS_ARTIFACT), exist_ok=True)
+    with open(CORPUS_ARTIFACT, "w", encoding="utf-8") as f:
+        json.dump({"grid": grid, "corpus": corpus}, f)
+    return corpus
+
+
 def certify_v7(
     models_dir: str,
     state: dict[str, Any],
@@ -348,7 +376,7 @@ def certify_v7(
                 continue
             breakdown = llama_server.memory_breakdown_gib(log_path)
             if corpus is None:
-                corpus = build_corpus(port)
+                corpus = corpus_from_artifact(port)
             rec = run_cell(port, corpus, cell["ctx"])
             if breakdown is not None:
                 rec["mem_census"] = breakdown

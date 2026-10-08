@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 REQ_RE = re.compile(r"^\| (R-\d+) \|", re.MULTILINE)
+RETIRED_RE = re.compile(r"^\| (R-\d+) \| RETIRED", re.MULTILINE)
 PIN_RE = re.compile(r"Pins:\s*(R-\d+(?:\s*,\s*R-\d+)*)")
 
 
@@ -32,7 +33,8 @@ def main() -> int:
     if not reqs:
         print("requirements_check: no requirements found in docs/protocol.md")
         return 1
-    pins: dict[str, list[str]] = {r: [] for r in reqs}
+    retired = set(RETIRED_RE.findall(table))
+    pins: dict[str, list[str]] = {r: [] for r in reqs if r not in retired}
     bad: list[str] = []
     for py in sorted((root / "tests").glob("*.py")):
         text = py.read_text(encoding="utf-8")
@@ -42,7 +44,7 @@ def main() -> int:
                     pins[r].append(py.name)
                 else:
                     bad.append(f"{py.name}: pins {r}, not in docs/protocol.md")
-    missing = [r for r in reqs if not pins[r]]
+    missing = [r for r in pins if not pins[r]]
     for r in missing:
         print(f"requirements_check: {r} has no pinning test (add `Pins: {r}` to a test docstring)")
     for b in bad:

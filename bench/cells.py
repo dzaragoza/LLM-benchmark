@@ -129,79 +129,6 @@ def speed_pass(
     return True, verdict
 
 
-def fwe_pass(
-    model: str,
-    rung: int,
-    results_dir: str,
-    seed: int,
-    port: int,
-    kv_quant_k: str | None = None,
-    kv_quant_v: str | None = None,
-    min_words: int = 1,
-) -> tuple[bool, dict[str, Any]]:
-    """One FWE cell at depth=rung-2x headroom, n=1, on its own server
-    launch at exactly the rung's ctx (ruler_gate's launch shape: one
-    slot, banner guard). Session 34 (addendum 19): the launch's banner
-    is read for the window cap too - the ladder's fwe-only midpoints
-    (refinement 1.5) launch no speed server, so this is where a window
-    between midpoints is caught."""
-    label = os.path.splitext(os.path.basename(model))[0]
-    depth = rung  # addendum 61: ctx = depth; the headroom is paid inside ruler_gate's budget
-    os.makedirs(results_dir, exist_ok=True)
-    csv_path = os.path.join(results_dir, f"{label}-{depth}-fwe.csv")
-    if os.path.exists(csv_path):
-        os.remove(csv_path)
-    log_path = os.path.join(results_dir, f"{label}-rung{rung}-fwe-server.log")
-    extra_args = ["-c", str(rung), "--parallel", "1"]
-    # session 35, addendum 8: separate K/V (the combined flag is gone);
-    # -fa takes a value on this build: "-fa on"
-    if kv_quant_k or kv_quant_v:
-        extra_args += ["-fa", "on"]
-        if kv_quant_k:
-            extra_args += ["--cache-type-k", kv_quant_k]
-        if kv_quant_v:
-            extra_args += ["--cache-type-v", kv_quant_v]
-    proc, healthy = llama_server.start_server(
-        model,
-        port=port,
-        extra_args=extra_args,
-        log_path=log_path,
-    )
-    try:
-        if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            print("    ERROR: fwe server did not come up; log tail:")
-            try:
-                with open(log_path, encoding="utf-8", errors="replace") as f:
-                    for ln in f.read().splitlines()[-15:]:
-                        print(f"    [server] {ln}")
-            except OSError:
-                pass
-            return False, {"error": "fwe server did not come up", "depth": depth}
-        row = ruler_gate.run_fwe_depth(
-            port,
-            label,
-            depth,
-            1,
-            csv_path,
-            seed0=seed,
-            no_thinking=True,
-            min_words=min_words,
-        )
-        row["window_cap"] = _banner_window(log_path)
-        breakdown = llama_server.memory_breakdown_gib(log_path)
-        if breakdown is not None:
-            row["mem_census"] = breakdown
-            print(
-                f"    fwe census (llama): weights {breakdown['weights_gib']:.2f} GiB, "
-                f"context {breakdown['context_gib']:.2f} GiB, "
-                f"compute {breakdown['compute_gib']:.2f} GiB"
-                f" -> total {breakdown['total_gib']:.2f} GiB (addendum 11)"
-            )
-    finally:
-        llama_server.stop_server(proc, port)
-    return row["acc"] == 1.0, row
-
-
 def speed_cell(
     model: str,
     rung: int,
@@ -271,7 +198,7 @@ def vt_pass(
     kv_quant_k: str | None = None,
     kv_quant_v: str | None = None,
 ) -> tuple[bool, dict[str, Any]]:
-    """One VT cell - the same launch shape as fwe_pass (own server at
+    """One VT cell (own server at
     exactly the rung's ctx, banner guard, memory census), the task
     swapped: one variable-tracking chain (RULER's 1 chain x 4 hops,
     5 five-letter names), pass = ALL 5 names, the 0..5 partial is

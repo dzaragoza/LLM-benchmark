@@ -1,6 +1,8 @@
 """bench.state_store -- the never-re-measure store (session 38,
 addendum 15: the full_benchmark.py refactor). The four task
-namespaces (certify = fwe, certify_vt, certify_speed, certify_arc)
+namespaces (certify_vt, certify_speed; the historical certify = fwe
+and certify_arc cells remain readable history - session 43 retired
+the fwe/arc tasks)
 and their loaders; a cell is stored once and only once. Extracted
 verbatim -- addendum citations stay."""
 
@@ -20,9 +22,10 @@ import infra.llama_server as llama_server
 from bench import cells as bench_cells
 from bench.constants import CORPUS_DEFAULT, RUNG_DEFAULT, TASK_PASS_BARS
 
-COMBINED_TASKS = ("speed", "fwe", "vt", "arc")
-ARC_CELL_K = 5  # questions per cell (the author's ruling: k=5, like VT's 5 names)
-ARC_RUN_CTX = 4096  # ARC ignores context depth - one measurement, verdict applies to every rung
+# session 43: ARC and FWE are retired (R-05 RETIRED) - v7 owns the
+# reach axis; stored certify/certify_arc cells remain readable history
+# but no new arc/fwe cell is measured.
+COMBINED_TASKS = ("speed", "vt")
 
 
 def _task_load(
@@ -47,25 +50,7 @@ def _task_load(
         return {r: p >= TASK_PASS_BARS["vt"] for r, p in vt_cells(fst, depth, want, legacy).items()}
     if task == "speed":
         return {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
-    if task == "arc":
-        # addendum 52: the gate bar is TASK_PASS_BARS["arc"] (4/5), not
-        # the cell's k - the addendum-43/44 kill-rate recalibration: the
-        # 5/5 gate was below the >= 50% floor (27% per-cell pass)
-        return {r: p >= TASK_PASS_BARS["arc"] for r, p in arc_cells(fst, want, legacy).items()}
-    return certify_cells(fst, depth, min_words, want, legacy)
-
-
-def arc_cell_questions(run: int) -> list[dict[str, Any]]:
-    """Cell `run`'s k=5 ARC questions, deterministic: the full ARC-
-    Challenge test split is shuffled with the fixed study seed, then
-    cell r takes questions 5*(r-1)..5*r - the rung-independent
-    analogue of FWE/VT's seed=run (ARC questions are a fixed pool;
-    there is nothing to seed per rung)."""
-    questions = hf_download.load_questions("ARC-Challenge", hf_download.ARC_NUM_DEFAULT)
-    rng = random.Random(20260923)  # the study seed (author ruling 2026-09-23)
-    rng.shuffle(questions)
-    start = (run - 1) * ARC_CELL_K
-    return questions[start : start + ARC_CELL_K]
+    raise ValueError(f"task {task!r} is retired or unknown (session 43: speed and vt only)")
 
 
 def variant_of(
@@ -151,82 +136,6 @@ def _int_cells(
     return cells
 
 
-def arc_cells(
-    fst: dict[str, Any],
-    want: dict[str, Any] | None = None,
-    legacy: dict[str, Any] | None = None,
-) -> dict[int, int]:
-    """The ARC cell model: a cell is (family, run) with a 0..k graded
-    record (correct answers of 5), stored in certify_arc ONCE per
-    family - rung-independent (ARC ignores context depth). Pass at
-    gold = 5/5."""
-    return _int_cells(fst.get("certify_arc"), want, legacy)
-
-
-def arc_pass(
-    model: str,
-    run: int,
-    port: int,
-    results_dir: str | None = None,
-) -> tuple[bool, dict[str, Any]]:
-    """One ARC cell (session 38, addendum 6): k=5 deterministic
-    questions, one server launch at ARC_RUN_CTX (rung-independent),
-    strict-ARC protocol (logprob letter scoring, raw completions,
-    max_tokens=1, temperature=0 - the retired arc_eval.py protocol,
-    recovered). Returns (passed_at_gold, record)."""
-    questions = arc_cell_questions(run)
-    ctx = ARC_RUN_CTX
-    # addendum 60: the arc cell log lives in the results tree (given),
-    # so deleting models/<family> loses only regenerable data; the
-    # model dir stays weights-only.
-    log_dir = results_dir or (os.path.dirname(model) or ".")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, os.path.basename(model) + f".arc-cell{run}.log")
-    proc, healthy = llama_server.start_server(
-        model, port, ["-t", "8", "-c", str(ctx), "-ngl", "99"], log_path=log_path
-    )
-    try:
-        if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            return False, {"error": "arc server did not come up"}
-        correct = 0
-        for q in questions:
-            prompt = f"Question: {q['q']}\n"
-            for lbl, text in q["choices"]:
-                prompt += f"{lbl}) {text}\n"
-            prompt += "\nThe answer is"
-            r = llama_server.post_json(
-                port,
-                "/v1/completions",
-                {"prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20},
-                timeout=120,
-            )
-            labels = {lb for lb, _ in q["choices"]}
-            logps = {}
-            try:
-                top = r["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
-                for entry in top:
-                    tok = entry["token"].strip().rstrip(").,")
-                    if tok in labels:
-                        logps[tok] = max(logps.get(tok, -999), entry["logprob"])
-            except (KeyError, IndexError, TypeError):
-                pass
-            if logps:
-                ok = max(logps, key=lambda k: logps[k]) == q["ans"]
-            else:
-                gen = r["choices"][0]["text"].strip()
-                ok = len(gen) > 0 and gen[0] in labels and gen[0] == q["ans"]
-            correct += 1 if ok else 0
-        # addendum 52: the PASS/FAIL a cell prints is graded at the
-        # GATE bar (4/5) - same predicate as _task_load, so the run's
-        # printed verdicts and the stored re-grade agree
-        return (
-            correct >= min(TASK_PASS_BARS["arc"], len(questions)),
-            {"correct": correct, "k": len(questions)},
-        )
-    finally:
-        llama_server.stop_server(proc, port)
-
-
 def cell_record(
     value: int,
     variant: dict[str, Any] | None = None,
@@ -268,7 +177,6 @@ def _task_store(
     ns = {
         "vt": "certify_vt",
         "speed": "certify_speed",
-        "arc": "certify_arc",
     }.get(task, "certify")
     record: Any = value
     if variant is not None:
@@ -279,9 +187,6 @@ def _task_store(
             "kv_v": variant.get("kv_v"),
             "t": round(seconds, 1) if seconds is not None else None,
         }
-    if task == "arc":
-        fst.setdefault(ns, {})[str(run)] = record
-        return
     fst.setdefault(ns, {}).setdefault(str(depth), {})[str(run)] = record
 
 
@@ -339,16 +244,6 @@ def _task_measure(
             (f"speed: {stalls} stall(s) in {n_turns} turns -> {'PASS' if ok else 'FAIL'}"),
             time.time() - t0,
         )
-    if task == "arc":
-        ok, fv = arc_pass(model, run, port, results_dir)
-        correct = int(fv.get("correct") or 0)
-        k_q = int(fv.get("k") or ARC_CELL_K)
-        return (
-            ok,
-            correct,
-            f"arc: {correct}/{k_q} answers -> {'PASS' if ok else 'FAIL'}",
-            time.time() - t0,
-        )
     if task == "vt":
         ok, fv = bench_cells.vt_pass(
             model,
@@ -368,26 +263,7 @@ def _task_measure(
             f"vt: {partial}/5 names -> {'PASS' if ok else 'FAIL'}",
             time.time() - t0,
         )
-    ok, fv = bench_cells.fwe_pass(
-        model,
-        depth,
-        results_dir,
-        seed=run,
-        port=port,
-        kv_quant_k=kv_k,
-        kv_quant_v=kv_v,
-        min_words=min_words,
-    )
-    if fv.get("error") == "capped to the window":
-        raise WindowCap(fv.get("window_cap"))
-    words = fv.get("words_found") or []
-    count = words[0] if words else int(ok)
-    return (
-        ok,
-        count,
-        f"fwe: {count}/{max(1, min_words)} word(s) -> {'PASS' if ok else 'FAIL'}",
-        time.time() - t0,
-    )
+    raise ValueError(f"task {task!r} is retired or unknown (session 43: speed and vt only)")
 
 
 def certify_cells(
