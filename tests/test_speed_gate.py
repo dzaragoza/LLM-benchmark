@@ -86,7 +86,9 @@ def test_git_pull_before_tee():
 
     import full_benchmark as fb
 
-    body = inspect.getsource(fb.main)
+    # session 43: main() is the crash-safe wrapper; the run body lives
+    # in _run(args) - the pull-before-tee ordering is pinned there
+    body = inspect.getsource(fb._run)
     assert body.index("git_pull_head()") < body.index("tee_output.install()")
     src = inspect.getsource(fb.git_pull_head)
     assert "pull_rebase(no_verify=True)" in src
@@ -123,18 +125,12 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
 
     ran = []
 
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
+    def fake_vt_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
         ran.append(seed)
-        return True, {"correct": 1, "depth": rung}
-
-    def fake_speed_pass(model, rung, corpus, port, results_dir, kv_quant_k=None, kv_quant_v=None):
-        return True, {"worst": 30.0}
+        return True, {"words_found": [5], "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
-    monkeypatch.setattr(bench_cells, "speed_pass", fake_speed_pass)
+    monkeypatch.setattr(bench_cells, "vt_pass", fake_vt_pass)
     try:
         model = tmp_path / "good-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -146,7 +142,7 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
                 "good": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "certify": {"8192": {str(r): 3 for r in range(1, 9)}},
+                    "certify_vt": {"8192": {str(r): 5 for r in range(1, 9)}},
                 },
                 "other": {
                     "selected": "Q8_0",
@@ -174,13 +170,13 @@ def test_certify_rung_accepts_and_skips(tmp_path, capsys):
         assert other.get("skipped") == "rung already answered"
         # direct cells persisted
         good: dict[str, Any] = state["families"]["good"]
-        direct = good["certify"]["8192"]
+        direct = good["certify_vt"]["8192"]
         # the 8 seeded legacy cells stay plain ints; the 2 fresh
         # cells carry the full record (value, variant, {t})
         fresh = {r: rec for r, rec in direct.items() if isinstance(rec, dict)}
         assert sorted(fresh, key=int) == ["9", "10"]
         for rec in fresh.values():
-            assert rec["v"] == 1 and rec["rung"] == "Q8_0"
+            assert rec["v"] == 5 and rec["rung"] == "Q8_0"
             assert rec["kv_k"] is None and rec["kv_v"] is None
             assert rec["t"] is not None and rec["t"] >= 0.0
     finally:
@@ -194,14 +190,12 @@ def test_certify_rung_dead(tmp_path, capsys):
 
     ran = []
 
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
+    def fake_vt_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
         ran.append(seed)
-        return True, {"correct": 1, "depth": rung}
+        return True, {"words_found": [5], "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "vt_pass", fake_vt_pass)
     try:
         model = tmp_path / "dead-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -213,7 +207,7 @@ def test_certify_rung_dead(tmp_path, capsys):
                 "dead": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "certify": {"8192": stored},
+                    "certify_vt": {"8192": stored},
                 }
             }
         }
@@ -236,14 +230,12 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
 
     ran = []
 
-    def fake_fwe_pass(
-        model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None, min_words=1
-    ):
+    def fake_vt_pass(model, rung, results_dir, seed, port, kv_quant_k=None, kv_quant_v=None):
         ran.append(seed)
-        return True, {"correct": 1, "depth": rung}
+        return True, {"words_found": [5], "depth": rung}
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(bench_cells, "fwe_pass", fake_fwe_pass)
+    monkeypatch.setattr(bench_cells, "vt_pass", fake_vt_pass)
     try:
         model = tmp_path / "s2-Q8_0.gguf"
         model.write_bytes(b"x")
@@ -253,7 +245,7 @@ def test_certify_rung_2_sigma_dead(tmp_path, capsys):
                 "s2": {
                     "selected": "Q8_0",
                     "runs": {"Q8_0": {"file": str(model)}},
-                    "certify": {"8192": stored},
+                    "certify_vt": {"8192": stored},
                 }
             }
         }
@@ -381,7 +373,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
 
     def fake_measure(task, model, depth, results_dir, run, port, kv_k, kv_v, min_words):
         calls.append((task, run))
-        return True, {"speed": 0, "fwe": 3, "vt": 5, "arc": 5}[task], f"{task} ok", 12.3
+        return True, {"speed": 0, "vt": 5}[task], f"{task} ok", 12.3
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
@@ -408,8 +400,7 @@ def test_combined_rung_accept_and_medal(tmp_path, capsys):
         # 20/20 accept grades 2_sigma; the lower tiers are consequences
         assert r["medal"] == "2_sigma"
         ns: dict[str, Any] = state["families"]["fam"]
-        assert ns["certify"]["8192"] and ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
-        assert ns["certify_arc"]  # rung-independent, stored once
+        assert ns["certify_vt"]["8192"] and ns["certify_speed"]["8192"]
         # resume: every cell-task stored, nothing re-measured
         calls.clear()
         res = fb.certify_rung_combined(
@@ -441,7 +432,7 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
         calls.append((task, run))
         if task == "vt":
             return False, 0, "vt 0/5", 4.5
-        return True, {"speed": 0, "fwe": 3, "arc": 5}[task], f"{task} ok", 12.3
+        return True, {"speed": 0}[task], f"{task} ok", 12.3
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
@@ -466,8 +457,8 @@ def test_combined_rung_dead_when_one_task_dies(tmp_path, capsys):
         assert r["verdict"] == "dead"
         assert r["vt_verdict"] == "dead"
         assert r["vt_passes"] == 0
-        # gold bars: fwe (>=3) and speed (0 stalls) held everywhere measured
-        assert r["fwe_verdict"] is None or r["fwe_verdict"] == "accept"
+        # gold bar: speed (0 stalls) held everywhere measured
+        assert r["speed_verdict"] is None or r["speed_verdict"] == "accept"
         assert r["medal"] is None
     finally:
         monkeypatch.undo()
@@ -482,81 +473,25 @@ def test_combined_medal_grading_from_records():
     Re-graded from stored records alone."""
     import full_benchmark as fb
 
-    def recs(n):
-        return {str(r): 3 for r in range(1, n + 1)}
+    def vt_recs(k):
+        return {"8192": {str(r): 5 if r <= k else 0 for r in range(1, 21)}}
 
-    gold = {
-        "certify": {"8192": recs(20)},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_arc": {str(r): 5 for r in range(1, 21)},
-    }
+    def speed_recs():
+        return {"8192": {str(r): 0 for r in range(1, 21)}}
+
+    gold = {"certify_vt": vt_recs(20), "certify_speed": speed_recs()}
     assert fb.combined_medal(gold, 8192) == "2_sigma"
-
-    silver = {
-        "certify": {"8192": {str(r): 3 if r <= 10 else 0 for r in range(1, 21)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_arc": {str(r): 5 for r in range(1, 21)},
-    }
+    silver = {"certify_vt": vt_recs(10), "certify_speed": speed_recs()}
     assert fb.combined_medal(silver, 8192) == "1_sigma"
-
-    bronze = {
-        "certify": {"8192": {str(r): 3 if r <= 5 else 0 for r in range(1, 21)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_arc": {str(r): 5 for r in range(1, 21)},
-    }
+    bronze = {"certify_vt": vt_recs(5), "certify_speed": speed_recs()}
     assert fb.combined_medal(bronze, 8192) == "0.5_sigma"
-
-    weak_bronze = {
-        "certify": {"8192": {str(r): 3 if r <= 4 else 0 for r in range(1, 21)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_arc": {str(r): 5 for r in range(1, 21)},
-    }
+    weak_bronze = {"certify_vt": vt_recs(4), "certify_speed": speed_recs()}
     assert fb.combined_medal(weak_bronze, 8192) is None
-
-    no_pass = {
-        "certify": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 21)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 21)}},
-        "certify_arc": {str(r): 5 for r in range(1, 21)},
-    }
+    no_pass = {"certify_vt": vt_recs(0), "certify_speed": speed_recs()}
     assert fb.combined_medal(no_pass, 8192) is None
     empty = {}
     assert fb.combined_medal(empty, 8192) is None
 
-
-def test_arc_rung_independence_and_namespace():
-    """ARC (addendum 6): one measurement per family, rung-independent -
-    the same certify_arc records answer every rung, and the medal is
-    identical at any depth (nothing to re-measure).
-
-    Pins: R-05
-    """
-    import full_benchmark as fb
-
-    assert fb._task_load(
-        {"certify_arc": {str(r): 5 for r in range(1, 12)}}, 8192, "arc", 3, "", "f"
-    ) == {r: True for r in range(1, 12)}
-    assert fb._task_load({"certify_arc": {"1": 5}}, 262144, "arc", 3, "", "f") == {1: True}
-
-    fst = {}
-    fb._task_store(fst, 8192, "arc", 3, 5)
-    fb._task_store(fst, 262144, "fwe", 3, 3)
-    assert fst["certify_arc"] == {"3": 5}
-    assert fst["certify"] == {"262144": {"3": 3}}
-
-    arc_gold = {
-        "certify": {"8192": {str(r): 3 for r in range(1, 12)}},
-        "certify_vt": {"8192": {str(r): 5 for r in range(1, 12)}},
-        "certify_speed": {"8192": {str(r): 0 for r in range(1, 12)}},
-        "certify_arc": {str(r): 5 for r in range(1, 12)},
-    }
-    assert fb.combined_medal(arc_gold, 8192) == "2_sigma"
-    no_arc = {k: v for k, v in arc_gold.items() if k != "certify_arc"}
-    assert fb.combined_medal(no_arc, 8192) is None
 
 
 def test_sigint_shutdown_sequence(tmp_path, capsys):
@@ -566,11 +501,7 @@ def test_sigint_shutdown_sequence(tmp_path, capsys):
 
     import full_benchmark as fb
 
-    assert (
-        fb.TASK_PASS_BARS["arc"] == 3
-    )  # addendum 68: the 3/5 recalibration (4/5 was 36% - below the 50% floor)
     assert fb.TASK_PASS_BARS["vt"] == 4  # addendum 12: the 4/5 calibration
-    assert fb.TASK_PASS_BARS["fwe"] == 2  # addendum 13: the 2/3 calibration
     args = argparse.Namespace(no_git=True, dry_run=False)
     import contextlib
     import io
@@ -926,8 +857,8 @@ def test_cell_record_carries_wall_seconds():
     fst: dict[str, Any] = {}
     bench_state_store._task_store(fst, 8192, "vt", 1, 5, v, 3.25)
     assert fst["certify_vt"]["8192"]["1"]["t"] == 3.2
-    bench_state_store._task_store(fst, 4096, "arc", 1, 5, v, 9.0)
-    assert fst["certify_arc"]["1"]["t"] == 9.0
+    bench_state_store._task_store(fst, 4096, "speed", 1, 0, v, 9.0)
+    assert fst["certify_speed"]["4096"]["1"]["t"] == 9.0
 
 
 def test_param_ascending_selection():
@@ -1115,12 +1046,12 @@ def test_evaluation_order_is_the_callers(tmp_path):
         log.append((task_, run))
         return False, 0, "faked cell (always fail)", 3.1
 
-    for task in ("fwe", "all"):
+    for task in ("vt", "all"):
         monkeypatch = pytest.MonkeyPatch()
         monkeypatch.setattr(bench_state_store, "_task_measure", fake_measure)
         monkeypatch.setattr(
             bench_cells,
-            "fwe_pass",
+            "vt_pass",
             lambda *a, **k: (False, {"words_found": [0]}),
         )
         monkeypatch.setattr(
@@ -1164,7 +1095,7 @@ def test_evaluation_order_is_the_callers(tmp_path):
                     str(tmp_path / "st.json"),
                     8210,
                     False,
-                    task="fwe",
+                    task="vt",
                 )
             assert [r["family"] for r in res] == ["small-new", "big-history"]
         finally:

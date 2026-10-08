@@ -518,81 +518,6 @@ def test_f16_conversion_refuses_on_low_disk(tmp_path, monkeypatch):
     assert not (famdir / "fam-f16.gguf").exists()
 
 
-def test_arc_gate_grades_at_the_task_pass_bar():
-    """Addendum 52: the arc GATE predicate is TASK_PASS_BARS["arc"]
-    (4/5), the same bar the medal grades at - the 5/5 gate was below
-    the >= 50% kill-rate floor (27% per-cell pass; 4/5 gives 59%).
-    Both predicates must agree: the stored-cell re-grade AND the
-    freshly measured cell's printed verdict.
-
-    Pins: R-03, R-05
-    """
-    from bench import state_store
-
-    fst = {"certify_arc": {str(r): 3 for r in range(1, 21)}}
-    loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
-    assert all(loaded.values()) and len(loaded) == 20
-    fst = {"certify_arc": {str(r): 2 for r in range(1, 21)}}
-    loaded = state_store._task_load(fst, 4096, "arc", 2, "models", "fam")
-    assert loaded and not any(loaded.values())
-
-
-def test_arc_pass_fresh_cell_grades_at_the_task_pass_bar(monkeypatch):
-    """Addendum 52, the author's follow-up ("the ARC gate was wrong -
-    it should have been 4/5... we need to pay more attention"): the
-    FRESHLY measured arc cell grades at TASK_PASS_BARS["arc"] too, so
-    a refactor can never again reintroduce a 5/5 gate that disagrees
-    with both the stored re-grade and the medal bar.
-
-    Pins: R-03, R-05
-    """
-    from bench import state_store
-    from bench.constants import TASK_PASS_BARS
-
-    questions = [{"q": f"q{i}", "choices": [("A", "a"), ("B", "b")], "ans": "A"} for i in range(5)]
-    monkeypatch.setattr(state_store, "arc_cell_questions", lambda run: questions)
-
-    class FakeProc:
-        pass
-
-    monkeypatch.setattr(
-        state_store.llama_server,
-        "start_server",
-        lambda model, port, extra, log_path="": (FakeProc(), True),
-    )
-    monkeypatch.setattr(state_store.llama_server, "wait_healthy", lambda port, proc=None: True)
-    monkeypatch.setattr(state_store.llama_server, "stop_server", lambda proc, port: None)
-
-    n_correct = len(questions) - 2  # 3/5 - two wrong
-    calls = {"i": 0}
-
-    def fake_post(port, path, payload, timeout=0):
-        letter = "A" if calls["i"] < n_correct else "B"
-        calls["i"] += 1
-        return {
-            "choices": [
-                {
-                    "text": f" {letter}",
-                    "logprobs": {
-                        "content": [
-                            {
-                                "top_logprobs": [
-                                    {"token": " A", "logprob": -0.1 if letter == "A" else -9.9},
-                                    {"token": " B", "logprob": -9.9 if letter == "A" else -0.1},
-                                ]
-                            }
-                        ]
-                    },
-                }
-            ]
-        }
-
-    monkeypatch.setattr(state_store.llama_server, "post_json", fake_post)
-    ok, rec = state_store.arc_pass("m.gguf", 1, 8210)
-    assert rec["correct"] == TASK_PASS_BARS["arc"]
-    assert ok is True  # 3/5 passes at the 3/5 gate - the 5/5 regression cannot return
-
-
 def test_vt_gate_grades_at_the_task_pass_bar():
     """Addendum 54: "Be consistent, we chose 4/5 for a reason" - the vt
     GATE predicate is TASK_PASS_BARS["vt"] (4/5), the same consistency
@@ -651,7 +576,7 @@ def test_fresh_family_cells_persist_to_the_state_file(tmp_path, monkeypatch):
 
     class HD:
         require_hub = staticmethod(lambda: None)
-        acquire = staticmethod(lambda *a, **k: ("./models/newfam/newfam-f16.gguf", "plan"))
+        acquire = staticmethod(lambda *a, **k: (str(models / "newfam-f16.gguf"), "plan"))
         list_repo_files = staticmethod(lambda repo: [])
 
     monkeypatch.setattr(BC, "hf_download", HD())
@@ -813,14 +738,15 @@ def test_registered_constants_single_source():
 
 
 def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
-    """Addendum 60: every per-cell log (speed server log, arc cell log)
+    """Addendum 60: every per-cell log (speed server log, vt cell log)
     is written into the RESULTS tree, never next to the model - so
-    deleting models/<family> touches only regenerable data. The fwe
-    and vt cells already lived there; this pins the two that moved.
+    deleting models/<family> touches only regenerable data. (Session 43:
+    the arc cell log moved with arc's retirement - vt and speed remain
+    the live cell logs.)
 
     Pins: R-01, R-10
     """
-    import bench.state_store as SS
+    import bench.cells as bench_cells
 
     model = tmp_path / "fam" / "fam-f16.gguf"
     (tmp_path / "fam").mkdir()
@@ -828,33 +754,26 @@ def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
     results = tmp_path / "tournament-results" / "fam"
     written: list[str] = []
 
-    def fake_post(port, path, body, timeout=60):
-        return {
-            "choices": [{"text": "A", "logprobs": {"content": [{"token": " A", "logprob": -0.1}]}}]
-        }
-
-    def fake_start(model_, port, extra, server_bin=None, log_path=None, **kw):
+    def fake_start(model_, port, extra=None, server_bin=None, log_path=None, **kw):
         written.append(str(log_path))
         with open(str(log_path), "wb") as f:
             f.write(b"server up")
         return None, True
 
-    class FakeProc:
-        pass
+    monkeypatch.setattr(bench_cells.llama_server, "start_server", fake_start)
+    def fake_post(port, path, body, timeout=60):
+        if path == "/tokenize":
+            return {"tokens": []}
+        return {"choices": [{"message": {"content": ""}}]}
 
-    monkeypatch.setattr(SS.llama_server, "start_server", fake_start)
-    monkeypatch.setattr(SS.llama_server, "post_json", fake_post)
-    monkeypatch.setattr(SS.llama_server, "wait_healthy", lambda port, proc=None: True)
-    monkeypatch.setattr(SS.llama_server, "stop_server", lambda proc, port: None)
+    monkeypatch.setattr(bench_cells.llama_server, "post_json", fake_post)
+    monkeypatch.setattr(
+        bench_cells.llama_server, "wait_healthy", lambda port, proc=None: True
+    )
+    monkeypatch.setattr(bench_cells.llama_server, "stop_server", lambda proc, port: None)
 
-    questions = [{"q": "q", "choices": [("A", "a"), ("B", "b")], "ans": "A"}]
-    monkeypatch.setattr(SS, "arc_cell_questions", lambda run: questions)
-
-    ok, fv = SS.arc_pass(str(model), 3, 8080, str(results))
-    assert ok and fv.get("correct") == 1
+    ok, fv = bench_cells.vt_pass(str(model), 2048, str(results), seed=3, port=8080)
     assert written and all(str(results) in p for p in written), written
-    arc_log = results / "fam-f16.gguf.arc-cell3.log"
-    assert arc_log.is_file()
     leftovers = list((tmp_path / "fam").glob("*.log"))
     assert leftovers == [], leftovers
 
@@ -1060,30 +979,14 @@ def test_kill_rate_window_stops_at_gold(monkeypatch):
     )
     g = bc.kill_rate_cells(state, 4096)
     assert g["speed"] == {"pass": 10, "kill": 0}
-    assert g["fwe"] == {"pass": 10, "kill": 0}
     assert g["vt"] == {"pass": 10, "kill": 0}
 
     state["families"]["gold-winner"]["verdicts"]["4096"] = "dead"
     g = bc.kill_rate_cells(state, 4096)
     assert g["speed"] == {"pass": 15, "kill": 0}
 
-    state["families"]["small-dead"]["certify"] = {"4096": cells(0)}
+    state["families"]["small-dead"]["certify_vt"] = {"4096": cells(0)}
     g = bc.kill_rate_cells(state, 4096)
-    assert g["fwe"] == {"pass": 10, "kill": 5}
+    assert g["vt"] == {"pass": 10, "kill": 5}
 
-    arc_state = {
-        "families": {
-            "launched": {
-                "verdicts": {},
-                "certify_speed": {"4096": cells(0)},
-                "certify_arc": {"1": {"v": 3}, "2": {"v": 1}},
-            },
-            "never-launched-big": {"verdicts": {}, "certify_arc": {"1": {"v": 5}, "2": {"v": 5}}},
-        }
-    }
-    monkeypatch.setattr(
-        bc,
-        "_registry_params",
-        lambda fam: {"launched": 1.0, "never-launched-big": 3.0}.get(fam),
-    )
-    assert bc.arc_kill_rate_cells(arc_state) == {"pass": 1, "kill": 1}
+

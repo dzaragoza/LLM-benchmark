@@ -29,7 +29,6 @@ from bench.constants import (
 )
 from bench.state_store import (
     _task_load,
-    arc_cells,
     certify_cells,
     save_state,
     speed_cells,
@@ -179,7 +178,7 @@ def certify_rung(
     port: int,
     dry_run: bool,
     min_words: int = 1,
-    task: str = "fwe",
+    task: str = "vt",
     rung_override: str | None = None,
     on_verdict: Any = None,
 ) -> list[dict[str, Any]]:
@@ -237,7 +236,9 @@ def certify_rung(
         elif task == "speed":
             cells = {r: p == 0 for r, p in speed_cells(fst, depth, want, legacy).items()}
         else:
-            cells = certify_cells(fst, depth, min_words, want, legacy)
+            raise ValueError(
+                f"task {task!r} is retired or unknown (session 43: speed and vt only)"
+            )
         order.append((fam, fst, cells, spec))
 
     results: list[dict[str, Any]] = []
@@ -381,7 +382,7 @@ def certify_rung(
         )
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        ns = {"vt": "certify_vt", "speed": "certify_speed", "arc": "certify_arc"}.get(
+        ns = {"vt": "certify_vt", "speed": "certify_speed"}.get(
             task, "certify"
         )
         direct = dict((fst.get(ns) or {}).get(str(depth)) or {})
@@ -470,6 +471,11 @@ def certify_rung(
                     f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
                 )
                 continue
+            if task not in ("speed", "vt"):
+                raise ValueError(
+                    f"task {task!r} is retired or unknown "
+                    "(session 43: speed and vt only)"
+                )
             if task == "vt":
                 t0 = time.time()
                 ok, fv = bench_cells.vt_pass(
@@ -506,39 +512,8 @@ def certify_rung(
                     f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
                 )
                 continue
-            t0 = time.time()
-            ok, fv = bench_cells.fwe_pass(
-                model,
-                depth,
-                results_dir,
-                seed=next_run,
-                port=port,
-                kv_quant_k=kv_k,
-                kv_quant_v=kv_v,
-                min_words=min_words,
-            )
-            ran += 1
-            if fv.get("error") == "capped to the window":
-                verdict = "infeasible"
-                entry["infeasible_reason"] = (
-                    f"trained window {fv.get('window_cap'):,} < the rung's ctx {depth:,}"
-                )
-                fst["infeasible"] = {"window_cap": fv.get("window_cap"), "depth": depth}
-                save_state(state_path, state)
-                break
-            cells[next_run] = ok
-            words = fv.get("words_found") or []
-            direct[str(next_run)] = bench_state_store.cell_record(
-                words[0] if words else int(ok), want, time.time() - t0
-            )
-            measured += 1
-            k += 1 if ok else 0
-            fst.setdefault("certify", {})[str(depth)] = direct
-            save_state(state_path, state)
-            print(
-                f"  cell (run {next_run}, {depth:,} tok): "
-                f"{'PASS' if ok else 'FAIL'} -> {k}/{measured} "
-                f"(1s lower bound {wilson_interval(k, measured)[0]:.3f})"
+            raise ValueError(
+                f"task {task!r} is retired or unknown (session 43: speed and vt only)"
             )
         entry["cells_measured"] = measured
         entry["passes"] = k
@@ -970,29 +945,8 @@ def combined_medal(fst: dict[str, Any], depth: int) -> str | None:
     grades: dict[str, dict[str, bool]] = {}
     legacy = bench_state_store.stored_variant(fst)
     for t in COMBINED_TASKS:
-        if t == "fwe":
-            raw = (fst.get("certify") or {}).get(str(depth)) or {}
-            records = {}
-            for r, p in raw.items():
-                try:
-                    if isinstance(p, dict):
-                        if (
-                            p.get("rung"),
-                            p.get("kv_k"),
-                            p.get("kv_v"),
-                        ) != bench_state_store._variant_key(legacy):
-                            continue
-                        records[int(r)] = int(p.get("v"))
-                    elif isinstance(p, bool):
-                        records[int(r)] = 3 if p else 0
-                    else:
-                        records[int(r)] = int(p)
-                except (TypeError, ValueError):
-                    continue
-        elif t == "vt":
+        if t == "vt":
             records = vt_cells(fst, depth, legacy, legacy)
-        elif t == "arc":
-            records = arc_cells(fst, legacy, legacy)
         else:
             records = speed_cells(fst, depth, legacy, legacy)
         if not records:
@@ -1077,11 +1031,10 @@ def kill_rate_cells(state: dict[str, Any], depth: int) -> dict[str, dict[str, in
     a rung is naturally the fewest-parameter accept; pass/kill stats
     therefore count only the cells measured UP TO AND INCLUDING the
     first accepted family, in param-ascending order - post-gold
-    measurements (terminal-rung revivals, re-climbs) never enter. ARC
-    is the special case (rung-independent, loaded at first launch):
-    its cells count only up to the LARGEST-parameter family that has
-    any speed/fwe/vt cell - an arc run of a family never launched
-    never enters the calibration."""
+    measurements (terminal-rung revivals, re-climbs) never enter.
+    Session 43: ARC and FWE are retired - the gates cover speed and
+    vt only; the historical certify/certify_arc cells stay in the
+    state file as history."""
     fams = state.get("families") or {}
 
     def order(name: str) -> tuple[bool, float, str]:
@@ -1092,13 +1045,12 @@ def kill_rate_cells(state: dict[str, Any], depth: int) -> dict[str, dict[str, in
     for name in sorted(fams, key=order):
         fst = fams[name]
         cells_here = any(
-            (fst.get(ns) or {}).get(str(depth)) for ns in ("certify_speed", "certify", "certify_vt")
+            (fst.get(ns) or {}).get(str(depth)) for ns in ("certify_speed", "certify_vt")
         )
         if not cells_here:
             continue
         for t, ns in (
             ("speed", "certify_speed"),
-            ("fwe", "certify"),
             ("vt", "certify_vt"),
         ):
             bar = TASK_PASS_BARS[t]
@@ -1114,32 +1066,3 @@ def kill_rate_cells(state: dict[str, Any], depth: int) -> dict[str, dict[str, in
             break
     return gates
 
-
-def arc_kill_rate_cells(state: dict[str, Any]) -> dict[str, int]:
-    """The ARC half of the addendum-71 rule: arc cells count only up
-    to the largest-parameter family with any speed/fwe/vt cell (a
-    family whose arc ran but that was never launched at a rung never
-    enters the calibration)."""
-    fams = state.get("families") or {}
-    launched = [
-        pb
-        for name, fst in fams.items()
-        if any(
-            (fst.get(ns) or {}).get(d)
-            for ns in ("certify_speed", "certify", "certify_vt")
-            for d in (fst.get(ns) or {})
-        )
-        for pb in [_registry_params(name)]
-        if pb is not None
-    ]
-    cutoff = max(launched) if launched else None
-    out = {"pass": 0, "kill": 0}
-    for name, fst in fams.items():
-        pb = _registry_params(name)
-        if cutoff is None or pb is None or pb > cutoff:
-            continue
-        for c in (fst.get("certify_arc") or {}).values():
-            if not isinstance(c, dict) or "v" not in c:
-                continue
-            out["pass" if c["v"] >= TASK_PASS_BARS["arc"] else "kill"] += 1
-    return out
