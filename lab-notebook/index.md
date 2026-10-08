@@ -37,3 +37,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 115: R-24 push per evaluated cell
 - [session-44](session-44.md) - addendum 116: R-25 - pytest out of the hook, weekly CI owns it; hook <= 5s
 - [session-44](session-44.md) - addendum 117: R-25 compromise - deterministic pytest in the hook, hypothesis weekly
+- [session-44](session-44.md) - addendum 118: R-26 - all agent edits through code_edit.py- [session-44](session-44.md) - addendum 119: R-25 - testmon hook: affected tests only per commit, full suite on push
