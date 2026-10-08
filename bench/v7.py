@@ -23,6 +23,7 @@ import os
 import random
 import string
 import sys
+import time
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,7 +37,12 @@ from etc import registry_data
 S_MAX = 262144
 SPANS = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 20  # questions per (span, hops) grade; pass = all h+1 names (upstream)
+K = 2  # questions per (span, hops) grade; pass = all h+1 names (upstream).
+# Session 44, addendum 120: the author's make-it-10x-easier ruling -
+# K 20 -> 2 cuts a cell from 800 questions (~hours) to 80 (~minutes).
+# Statistical cost: a grade pass-rate is now 0/0.5/1 in 0.5 steps;
+# the ranking favors big samples again only if K goes back up.
+CELL_BUDGET_SECONDS = 300  # addendum 121: the author's 5-min ceiling per cell
 BUDGET_GIB = 4.0
 CTX_GRID = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
@@ -208,10 +214,12 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
     num_noises = int(budget / tokens_per_sent)
     sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
     questions: list[dict] = []
-    for s in SPANS:
-        for h in HOPS:
-            for _ in range(K):
-                questions.append({"span": s, "hops": h})
+    # addendum 121: k-major order - a budget-stopped cell still
+    # covers every (span, hops) grade with at least one question
+    for k_i in range(K):
+        for s in SPANS:
+            for h in HOPS:
+                questions.append({"span": s, "hops": h, "k_i": k_i})
     cuts: dict[int, int] = {s: 0 for s in SPANS}
     for qi, q in enumerate(questions):
         s = q["span"]
@@ -322,15 +330,25 @@ def run_cell(
     per_grade: dict[tuple[int, int], dict] = {}
     samples: list[dict] = []
     answers_fh = open(answers_path, "a", encoding="utf-8") if answers_path else None
+    started = time.monotonic()
+    budget_hit = False
     try:
         for q in corpus["questions"]:
             if not grade_reachable(q["span"], q["hops"], window):
                 continue
             key = (q["span"], q["hops"])
             g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0})
+            if time.monotonic() - started > CELL_BUDGET_SECONDS:
+                # addendum 121: the 5-min ceiling - stop asking, score
+                # what landed. k-major order guarantees the grid is
+                # covered; the record reports the truncation honestly.
+                budget_hit = True
+                break
             prompt = question_prompt(corpus, q)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
+            t0 = time.monotonic()
             answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
+            elapsed = round(time.monotonic() - t0, 3)
             ok, found = ruler_gate.score_vt(answer, q["names"])
             g["asked"] += 1
             g["pass"] += 1 if ok else 0
@@ -345,6 +363,7 @@ def run_cell(
                             "value": q["value"],
                             "found": found,
                             "ok": ok,
+                            "elapsed_s": elapsed,
                             "answer": answer,
                         },
                         ensure_ascii=True,
@@ -378,6 +397,8 @@ def run_cell(
         "window": window,
         "score": round(score, 3),
         "max_score": asked_grades,
+        "budget_hit": budget_hit,
+        "wall_seconds": round(time.monotonic() - started, 1),
         "samples": samples,
         "per_grade": {
             f"{s}x{h}": {"pass": g["pass"], "asked": g["asked"]}
