@@ -152,3 +152,36 @@ partial-credit sum that was being discarded) and three sample
 answers per grade (one pass, up to two fails, answer capped at 200
 chars). The next run's state separates "found some names" from
 "answered debris" from "answered nothing" - evidence, not vibes.
+
+## Addendum 114 - R-23: answers are always logged
+
+The author: "start logging the answers, they are always important to
+have for debugging. it should be a requirement." Registered as R-23.
+
+run_cell(answers_path=...) writes one JSON line per question -
+window, grade, expected names, value, found, ok, the RAW answer -
+appended (never overwritten) next to the family's server log:
+models/tournament-results/<fam>/<fam>-ctx<ctx>-v7-answers.jsonl.
+Pinned by two tests (line count == asked; append on rerun).
+
+Also registered (the author's ruling on thinking suppression):
+no_thinking=True is the default and stays - if a designer offers a
+no-thinking mode and the model cannot work in it, that is a design
+issue of the model, not a harness bug. The granite-4.0-h suspect is
+closed on that ruling: the finding (if it materializes) is reported
+as-is.
+
+Scoring, explained (the author asked):
+
+- A cell's questions partition into GRADES = (span, hops) pairs;
+  K=20 questions per grade.
+- score = the MEAN over grades of (passes/asked) - a grade's rate,
+  averaged equally: an 80% at 2k-span counts exactly as much as an
+  80% at 256k, so reach earns its full weight.
+- A PASS is ALL h+1 names of the chain (upstream VT's rule) - a
+  partial trace is a broken trace. found/expected is logged per
+  question for diagnosis, but earns nothing.
+- UNREACHABLE grades (span + overhead + gen > window) are EXCLUDED
+  from the mean - excluded, not failed (R-19).
+- Example: ctx=16384 cell, window covers spans 2048..16384 => 15
+  reachable grades; all-fail => 0.0/15.
