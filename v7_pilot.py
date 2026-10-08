@@ -53,20 +53,29 @@ CTX_GRID = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 
 # weight-quant bytes per parameter (the tournament's axis, addendum
 # 140); the dict's order is the climb ladder, coarse to fine
+# below Q8_0 the K-encoding (block-scaled K-quants) is the ruling:
+# Q2_K/Q3_K/Q4_K/Q5_K/Q6_K; the top is F16 (32/64-bit ruled out -
+# F32 doubles F16 for no inference gain, FP64 has no kernels)
 W_QUANT_BPB = {
     "Q2_K": 0.40,
     "Q3_K": 0.48,
-    "Q4_0": 0.59,
+    "Q4_K": 0.56,
     "Q5_K": 0.72,
     "Q6_K": 0.82,
     "Q8_0": 1.06,
     "F16": 2.0,
 }
 W_LADDER = list(W_QUANT_BPB)
-# kv-quant factor vs f16 bytes (the KV axes q4_0..f16; K and V
-# caches carry the same geometry, so the factor applies per cache)
-KV_QUANT_LADDER = ["q2_0", "q4_0", "q8_0", "f16"]
-KV_QUANT_FACTOR = {"q2_0": 0.28125, "q4_0": 0.5625, "q8_0": 0.8125, "f16": 1.0}
+# kv-quant factor vs f16 bytes (the KV axes; K and V caches carry the
+# same geometry, so the factor applies per cache). Below q8_0 the
+# K-encoding (block-scaled) is the ruling; the top is f16.
+KV_QUANT_LADDER = ["q2_K", "q4_K", "q8_0", "f16"]
+KV_QUANT_FACTOR = {
+    "q2_K": 0.16,
+    "q4_K": 0.28125,
+    "q8_0": 0.8125,
+    "f16": 1.0,
+}
 
 
 def gen_name(rng: random.Random) -> str:
