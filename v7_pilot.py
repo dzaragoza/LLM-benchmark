@@ -201,6 +201,41 @@ def family_geometry(name: str) -> dict | None:
     return entry.get("geometry")
 
 
+def is_recurrent(name: str) -> bool:
+    """Recurrent/SSM architectures carry no KV cache (RWKV7 et al.) -
+    their memory is weights-only, so they are the CHEAPEST families at
+    large ctx (session 42's architecture finding, applied to the reach
+    race). Detected via the registry extract's model_type.
+    """
+    store = json.loads(registry_data.STORE.read_text())
+    ex = (store.get(name) or {}).get("extract") or {}
+    return str(ex.get("model_type") or "").lower().startswith("rwkv")
+
+
+def kv_per_token_f16(name: str, geom: dict | None) -> float | None:
+    """f16 KV bytes per token, or None when unknowable. Recurrent
+    families return 0.0 (weights-only); the geometry column wins when
+    present; MHA configs with null kv_heads (phi-1's shape) fall back
+    to the attention heads (the geometry() contract already does this
+    for head-dim, but nulls in the extract can leave geometry absent).
+    """
+    if is_recurrent(name):
+        return 0.0
+    if geom and geom.get("kv_bytes_per_token_f16"):
+        return float(geom["kv_bytes_per_token_f16"])
+    store = json.loads(registry_data.STORE.read_text())
+    ex = (store.get(name) or {}).get("extract") or {}
+    layers = ex.get("num_hidden_layers")
+    heads = ex.get("num_attention_heads")
+    kvh = ex.get("num_key_value_heads") or heads
+    hd = ex.get("head_dim")
+    if not hd and heads and ex.get("hidden_size"):
+        hd = ex["hidden_size"] // heads  # MHA fallback (phi-1's shape)
+    if not (layers and kvh and hd):
+        return None
+    return layers * 2 * kvh * hd * 2
+
+
 def family_window(name: str) -> int:
     """The family's mechanical window (max_position_embeddings), if the
     registry knows it; unlimited otherwise (the pilot flags these)."""
@@ -208,6 +243,17 @@ def family_window(name: str) -> int:
     entry = store.get(name) or {}
     ex = entry.get("extract") or {}
     return ex.get("max_position_embeddings") or 0
+
+
+def _alloc_total(name: str, p: float, geom: dict | None, wq: str, kq: str, vq: str, ctx: int) -> float | None:
+    """Estimated total GiB for one config, or None when the family's
+    memory cannot be estimated (no geometry and not recurrent)."""
+    per_token = kv_per_token_f16(name, geom)
+    if per_token is None:
+        return None
+    base = per_token / 2.0
+    kv = base * (KV_QUANT_FACTOR[kq] + KV_QUANT_FACTOR[vq]) * ctx
+    return weights_gib(p, wq) + kv / (1 << 30)
 
 
 def greedy_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
@@ -226,16 +272,16 @@ def greedy_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
     for p, name in rows[:roster_limit]:
         geom = family_geometry(name)
         window = family_window(name)
-        if geom is None:
+        if kv_per_token_f16(name, geom) is None:
             continue
         for ctx in CTX_GRID:
             if window and ctx > window:
                 continue
             wi, ki, vi = 0, 0, 0
-            total = weights_gib(p, W_LADDER[wi]) + kv_split_gib(
-                geom, KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
+            total = _alloc_total(
+                name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
             )
-            if total > budget_gib:
+            if total is None or total > budget_gib:
                 continue
             while True:
                 best = None
@@ -250,14 +296,24 @@ def greedy_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
                     )
                     if cand == (wi, ki, vi):
                         continue
-                    t = weights_gib(p, W_LADDER[cand[0]]) + kv_split_gib(
-                        geom, KV_QUANT_LADDER[cand[1]], KV_QUANT_LADDER[cand[2]], ctx
+                    t = _alloc_total(
+                        name,
+                        p,
+                        geom,
+                        W_LADDER[cand[0]],
+                        KV_QUANT_LADDER[cand[1]],
+                        KV_QUANT_LADDER[cand[2]],
+                        ctx,
                     )
-                    if t <= budget_gib and (best is None or t > best[0]):
+                    if t is not None and t <= budget_gib and (best is None or t > best[0]):
                         best = (t, cand)
                 if best is None:
                     break
                 total, (wi, ki, vi) = best
+            final = _alloc_total(
+                name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
+            )
+            assert final is not None
             out.append(
                 {
                     "family": name,
@@ -266,13 +322,7 @@ def greedy_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
                     "wq": W_LADDER[wi],
                     "kq": KV_QUANT_LADDER[ki],
                     "vq": KV_QUANT_LADDER[vi],
-                    "est_gib": round(
-                        weights_gib(p, W_LADDER[wi])
-                        + kv_split_gib(
-                            geom, KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
-                        ),
-                        2,
-                    ),
+                    "est_gib": round(final, 2),
                 }
             )
     return out
@@ -292,14 +342,16 @@ def plan_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
     for p, name, _repo in rows[:roster_limit]:
         geom = family_geometry(name)
         window = family_window(name)
-        if geom is None:
+        per_token = kv_per_token_f16(name, geom)
+        if per_token is None:
             continue
         for wq in W_QUANT_BPB:
             for kvq in KV_QUANT_FACTOR:
                 for ctx in CTX_GRID:
                     if window and ctx > window:
                         continue
-                    total = weights_gib(p, wq) + kv_gib(geom, kvq, ctx)
+                    kv = per_token * KV_QUANT_FACTOR[kvq] * ctx / (1 << 30)
+                    total = weights_gib(p, wq) + kv
                     if total <= budget_gib:
                         out.append(
                             {
