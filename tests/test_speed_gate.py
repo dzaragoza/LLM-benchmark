@@ -58,8 +58,8 @@ def test_git_pull_head(monkeypatch):
         calls.append("inside")
         return True
 
-    def fake_pull(autostash=True, no_verify=False):
-        calls.append(("pull", autostash, no_verify))
+    def fake_pull(autostash=True):
+        calls.append(("pull", autostash))
         return (1, "", "diverged")
 
     monkeypatch.setattr(git_ops, "inside_work_tree", fake_inside)
@@ -69,9 +69,9 @@ def test_git_pull_head(monkeypatch):
         raise AssertionError("failed pull did not stop the run")
     except SystemExit:
         pass
-    assert calls == ["inside", ("pull", True, True)]
+    assert calls == ["inside", ("pull", True)]
 
-    def fake_pull_ok(autostash=True, no_verify=False):
+    def fake_pull_ok(autostash=True):
         return (0, "Already up to date", "")
 
     monkeypatch.setattr(git_ops, "pull_rebase", fake_pull_ok)
@@ -91,7 +91,9 @@ def test_git_pull_before_tee():
     body = inspect.getsource(fb._run)
     assert body.index("git_pull_head()") < body.index("tee_output.install()")
     src = inspect.getsource(fb.git_pull_head)
-    assert "pull_rebase(no_verify=True)" in src
+    # session 43, R-20: the pull runs WITH hooks - the no_verify
+    # bypass is removed from pull_rebase and never used here
+    assert "pull_rebase()" in src
     import infra.git_ops as git_ops
 
     assert "--autostash" in inspect.getsource(git_ops.pull_rebase)
