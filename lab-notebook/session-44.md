@@ -376,3 +376,17 @@ families back, the 4096 ctx rung is the knob, not the span grid.
 
 Old K=2-era v7 cells in state are not comparable with the new
 K=1 cells - clear the v7 blocks before re-measuring.
+
+
+## Addendum 124 - the ceiling removed
+
+The author: "Remove the ceiling. Adjusting the number of questions
+is the correct fix."
+
+CELL_BUDGET_SECONDS (addendum 121) is deleted: run_cell asks every
+reachable question and reports wall_seconds honestly. A budget stop
+prices a slow cell at 300s and hides the rest; the question count
+(addenda 120/122/123 - K=1, 7 spans, 35 questions) is the correct
+runtime knob. wall_seconds stays in the record and elapsed_s per
+question stays in the answers JSONL - the calibration data for any
+future count adjustment.
