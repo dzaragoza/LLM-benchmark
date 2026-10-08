@@ -495,3 +495,28 @@ Also this session: the rebase over the live run's artifact
 commits resurrected the wiped v7 blocks in state (the conflict
 resolution picked the wrong side first) - wiped again, and the
 commit is rebased and pushed.
+## Addendum 132 - server-supported KV ladder; commit once per model
+
+Two rulings from the crash review of the live run:
+
+1. **KV ladder = server-supported cache types only.** The
+   addendum-131 ladder ([q2_K, q4_K, q8_0, f16]) put
+   `--cache-type-k/v q2_K` / `q4_K` on the command line and
+   llama-server died with "Unsupported cache type" at the
+   131072/262144 cells - those K-quant encodings exist for
+   WEIGHTS, not for the cache. The ladder is now
+   [q4_0, q5_0, q8_0, f16]: every rung is in
+   full_benchmark's `_KV_CHOICES` (hoisted to module level so the
+   pin can import it), factors stay monotone
+   (0.28125 / 0.34375 / 0.53125 / 1.0), top is f16 per the
+   author's 16-bit ruling. Side effect: the greedy floor is now
+   (Q2_K, q4_0, q4_0); the crash-run configs shift one rung up
+   (131072 -> q8_0, 262144 -> q4_0).
+
+2. **Commit once per model, not per cell.** The author: "reduce
+   the frequency of commits to once per model, so we just commit
+   when all the scores for a model are found."
+   certify_v7 buffers each family's cells (including skipped
+   ones - the batch must carry the whole family picture) and
+   fires on_model_commit at the family boundary; R-24 reworded
+   accordingly.

@@ -212,10 +212,14 @@ def test_greedy_ruling_shape():
     uses K-encoding below q8, tops at 16 bits, and every pilot cell
     reaches at least one span grade (exclusion, not failure)."""
     assert v7_pilot.W_LADDER[0] == "Q2_K" and v7_pilot.W_LADDER[-1] == "F16"
-    assert v7_pilot.KV_QUANT_LADDER[0] == "q2_K" and v7_pilot.KV_QUANT_LADDER[-1] == "f16"
+    assert v7_pilot.KV_QUANT_LADDER[0] == "q4_0" and v7_pilot.KV_QUANT_LADDER[-1] == "f16"
     for w in v7_pilot.W_LADDER[:-1]:
         assert w.endswith("_K") or w.endswith("_0")
-    assert all(q in ("q2_K", "q4_K", "q8_0", "f16") for q in v7_pilot.KV_QUANT_LADDER)
+    # addendum 132: every KV rung is a llama-server-supported
+    # --cache-type-k/v value (full_benchmark's _KV_CHOICES + f16)
+    from full_benchmark import _KV_CHOICES
+
+    assert all(q in (*_KV_CHOICES, "f16") for q in v7_pilot.KV_QUANT_LADDER)
     for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
         assert any(s <= cell["ctx"] for s in v7_pilot.SPANS)
 
@@ -236,36 +240,32 @@ def test_prefix_and_exclusion_ruling():
     assert "noise 49." in p and "noise 50." not in p
 
 
-def test_certify_v7_commits_per_cell(tmp_path, monkeypatch):
-    """Pins: R-24. Every evaluated (family, ctx) cell fires
-    on_cell_commit immediately - the author reads results through
-    the git rail while the run goes. Skipped (already-measured) and
-    dry-run cells do not fire it; a commit failure never stops the
-    run."""
+def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
+    """Pins: R-24. The commit hook fires once per MODEL, after its
+    LAST ctx cell is scored (addendum 132; was per cell) - the author
+    reads results through the git rail. A commit failure never
+    stops the run; the hook still fires for a family whose later
+    cells are skipped."""
     import bench.v7 as v7m
 
     committed = []
 
     def fake_alloc(budget, limit=4):
+        def cell(fam, ctx, est):
+            return {
+                "family": fam,
+                "params_b": 0.3,
+                "ctx": ctx,
+                "wq": "F16",
+                "kq": "f16",
+                "vq": "f16",
+                "est_gib": est,
+            }
+
         return [
-            {
-                "family": "famA",
-                "params_b": 0.3,
-                "ctx": 4096,
-                "wq": "F16",
-                "kq": "f16",
-                "vq": "f16",
-                "est_gib": 1.0,
-            },
-            {
-                "family": "famA",
-                "params_b": 0.3,
-                "ctx": 8192,
-                "wq": "F16",
-                "kq": "f16",
-                "vq": "f16",
-                "est_gib": 1.2,
-            },
+            cell("famA", 4096, 1.0),
+            cell("famA", 8192, 1.2),
+            cell("famB", 4096, 1.1),
         ]
 
     monkeypatch.setattr(v7m, "greedy_allocations", fake_alloc)
@@ -284,13 +284,13 @@ def test_certify_v7_commits_per_cell(tmp_path, monkeypatch):
         lambda port, corpus, window, answers_path=None: {"score": 0.5, "max_score": 3},
     )
     monkeypatch.setattr(v7m, "save_state", lambda *a: None)
-    # pre-measure the second cell: it must NOT fire the hook
+    # pre-measure famA's second cell: the hook still fires for
+    # famA (once, with both cells), then once for famB
     state = {"families": {"famA": {"v7": {"8192": {"score": 0.1}}}}}
 
-    def boom(entry):
-        committed.append((entry["family"], entry["ctx"]))
-        if len(committed) == 1:
-            raise RuntimeError("git is down")
+    def boom(entries):
+        committed.append((entries[0]["family"], tuple(e["ctx"] for e in entries)))
+        raise RuntimeError("git is down")
 
     res = v7m.certify_v7(
         str(tmp_path),
@@ -298,10 +298,11 @@ def test_certify_v7_commits_per_cell(tmp_path, monkeypatch):
         str(tmp_path / "st.json"),
         8210,
         False,
-        on_cell_commit=boom,
+        on_model_commit=boom,
     )
-    # the fresh cell fired (and survived the hook's own failure);
-    # the measured cell skipped without firing
-    assert committed == [("famA", 4096)]
+    # one commit per family, carrying ALL its cells (the measured
+    # one skipped); the hook's own failure was survived each time
+    assert committed == [("famA", (4096, 8192)), ("famB", (4096,))]
     assert res[0]["score"] == 0.5
     assert "skipped" in res[1]
+    assert res[2]["score"] == 0.5

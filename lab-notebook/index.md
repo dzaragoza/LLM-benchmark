@@ -48,3 +48,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 127: R-27 - check the latest completed push-regression verdict on every pull
 - [session-44](session-44.md) - addendum 129: --clean replaces --force - wipe all v7 cells and logs up front, never mixed results
 - [session-44](session-44.md) - addendum 130: R-28 - a scoring system never offers a cell whose max score is 0
+- [session-44](session-44.md) - addendum 132: KV ladder = server-supported cache types only (q4_0/q5_0/q8_0/f16); the v7 commit fires once per model, not per cell
