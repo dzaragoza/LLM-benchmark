@@ -251,3 +251,37 @@ This addendum itself was written through code_edit (the insert and
 this append) - eating the dog food from here on. Pinned by
 tests/test_code_edit_required.py (transaction all-or-nothing;
 atomic verified edit; the tool surface importable).
+
+
+## Addendum 119 - R-25: the testmon hook (the remaining 4 seconds)
+
+The author: "Let's find a use for the remaining 4 seconds. Is it
+possible to tie a test to a file changed in pytest? It would be
+amazing to have it run the unit tests corresponding to the files
+changed only. More complex test go still in github."
+
+pytest-testmon does exactly this: it maps every test to the source
+lines it covers (.testmondata), and at commit time runs only the
+tests whose covered code changed. Measured on the baseline map
+(258 tests, one ~30s full run to build):
+
+  bench/state_store.py changed  -> 41 tests, 2.8s
+  bench/cells.py changed        ->  6 tests, 1.3s
+  nothing changed              ->  0 tests, 0.2s
+
+Wired as hook id `testmon` (testmon_hook.py) with the contract:
+no map -> exit 0 with a note (the first full run is CI's job);
+0 selected -> pass; affected failures -> non-zero, the commit
+blocks; the map updates on success. The full suite (incl.
+hypothesis) + crosshair still run on every push (push-regression).
+
+The no-map pin test caught a real bug: the hook first resolved
+.testmondata relative to the repo root, so a chdir'd test run
+found the repo's live map instead of the empty tmp dir - the DB
+path is now Path.cwd(), which is what pre-commit actually gives
+us. Pinned by tests/test_testmon_hook.py (Pins: R-25).
+
+Caveat: .testmondata is per-machine (gitignored). On the T14s the
+first commit after pulling this passes through with the no-map
+note until one full `python3 -m pytest tests/ -q --testmon`
+(~30s) seeds the map.
