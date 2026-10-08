@@ -42,3 +42,31 @@ readable"):
 
 Coverage note: 12 tests in test_precommit_env.py now (10 + 2 R-21
 pins).
+
+## Addendum 110 - R-22: the state schema
+
+The author: "Yes schemas are helpful. Databases out until we really
+need them. No XML please." Parquet explained (columnar, typed,
+compressed - wrong for our small nested data, right as a derived
+results export if the full grid ever wants cross-cell analytics).
+
+R-22: `validate_state` in bench/state_store.py. The failure modes it
+replaces:
+
+- full_benchmark.py had a SECOND, unguarded `load_state` (raw
+  json.load, crash on corrupt) - now the orchestrator's loader is
+  the guarded one, exactly one loader.
+- state_store's old loader caught ALL exceptions and started
+  fresh - silent loss of measured cells (the never-re-measure
+  store's worst failure).
+
+The schema is strict where machinery reads typed values (cell
+records: int or {v,...}; v7 score: number or null) and loose where
+state is prose (verdicts, tournament metadata). StateSchemaError is
+a plain exception, so the crash rail owns it: traceback to
+results.txt, git tail runs, the corrupt file is never wiped.
+
+The R-22 pin class found its own test bug while at it: the corrupt
+fixtures must nest under families.<name>, not at the state top
+level - the validator correctly ignored the misplaced ones
+(schemas work).

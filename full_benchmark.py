@@ -77,10 +77,7 @@ def stamp(msg: str) -> None:
 
 
 def load_state(path: str) -> dict[str, Any]:
-    if os.path.isfile(path):
-        with open(path) as f:
-            return json.load(f)
-    return {"families": {}}
+    return _state_store.load_state(path)
 
 
 def save_state(path: str, state: dict[str, Any]) -> None:
