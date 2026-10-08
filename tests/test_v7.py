@@ -9,7 +9,8 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 800
+    # addendum 120: K 20 -> 2 (the 10x-easier ruling); grid stays 8x5
+    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 80
 
 
 def test_smallest_ctx_is_measurable():

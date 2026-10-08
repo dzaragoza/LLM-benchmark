@@ -285,3 +285,53 @@ Caveat: .testmondata is per-machine (gitignored). On the T14s the
 first commit after pulling this passes through with the no-map
 note until one full `python3 -m pytest tests/ -q --testmon`
 (~30s) seeds the map.
+
+
+## Addendum 120 - v7 made 10x easier: K 20 -> 2
+
+The author: "The rest is too hard. It takes forever to run a
+cell. Make it 10 times easier."
+
+The lever is K, the questions per (span, hops) grade. The worst
+cell was 8 spans x 5 hops x 20 = 800 questions, each paying its
+span's prefill - hours per cell. K=2 makes it 80 questions,
+exactly 10x fewer, without touching the grade grid or the
+all-h+1-names pass rule (the difficulty structure is unchanged;
+only the sampling thins out).
+
+Consequences:
+- the corpus artifact (state/v7-corpus.json) rebuilds on next
+  launch - its grid block records k, so the mismatch is detected
+  automatically and every contender gets the same new chains
+- a grade pass-rate now moves in 0.5 steps (0, 1 or 2 of 2);
+  fine-grained scores need bigger K later
+- previously certified v7 cells measured at K=20 are NOT
+  comparable with new K=2 cells - clear the v7 blocks before
+  re-measuring (the old runs stay in the answers JSONLs)
+
+Pinned by tests/test_v7_k_easier.py (K==2; 80 questions per full
+cell).
+
+
+## Addendum 121 - the 5-minute cell ceiling
+
+The author: "Let's aim for 5 minutes max per cell."
+
+K=2 (addendum 120) removed 10x of the work; the ceiling removes
+the hardware variance - a cell on a slow machine can no longer
+run for hours. Two pieces in run_cell:
+
+- CELL_BUDGET_SECONDS = 300: a wall-clock check before each
+  question; over budget -> stop asking, score what landed, mark
+  the record budget_hit=True and wall_seconds so the truncation
+  is visible in state, never silent
+- k-major question order (k_i outermost): a truncated cell
+  covers every (span, hops) grade at least once before any grade
+  gets its second sample - the grid stays covered
+
+Per-question elapsed_s now lands in the answers JSONL - the next
+run gives real prefill+generation numbers to calibrate the
+ceiling against.
+
+Pinned by tests/test_v7_cell_budget.py (budget==300; k-major
+grade coverage).
