@@ -7,8 +7,8 @@ module; none of them launches or kills the server process itself:
   - speed_gate.py   the worst-turn speed gate (live conversations)
   - ruler_gate.py   the RULER depth tasks (fwe - the depth score)
 
-It owns: binary resolution (repo-relative first, pre-reorg HOME
-fallback, llama-server.exe on Windows), server launch with a custom
+It owns: binary resolution (repo-relative,
+llama-server.exe on Windows), server launch with a custom
 argument vector, health polling, HTTP helpers, and the hardened
 teardown - a lingering server silently redirects the next run at the
 WRONG model, so the port is verified free before returning (Session
@@ -72,18 +72,12 @@ def port_serves_health(port: int, timeout: float = 2) -> str | None:
 
 
 def find_server() -> str | None:
-    """llama-server binary: repo-relative first, pre-reorg HOME fallback.
+    """llama-server binary: repo-relative only. None when absent -
+    the caller (check_tooling) fails loudly with install guidance.
     Windows builds ship llama-server.exe - pick the right name."""
-    home = os.path.expanduser("~")
     exe = "llama-server.exe" if os.name == "nt" else "llama-server"
-    for d in (
-        os.path.join(".", "llama-b10964-gpu"),
-        os.path.join(home, "technical_reports", "llama-b10964-gpu"),
-    ):
-        p = os.path.join(d, exe)
-        if os.path.isfile(p):
-            return p
-    return os.path.join(".", "llama-b10964-gpu", exe)
+    p = os.path.join(".", "llama-b10964-gpu", exe)
+    return p if os.path.isfile(p) else None
 
 
 def wait_healthy(port: int, timeout: float = 300, proc: Any = None) -> bool:

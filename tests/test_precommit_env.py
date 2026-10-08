@@ -81,3 +81,29 @@ def test_precommit_config_hooks_present():
     cfg = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
     for hook_id in ("ruff", "ruff-format", "ty", "pytest", "md-tables", "requirements-check"):
         assert f"id: {hook_id}" in cfg, f"hook {hook_id} missing from .pre-commit-config.yaml"
+
+
+def test_no_backward_compatibility_shims():
+    """Pins: R-21. Retired machinery is gone, not shimmed: the v6
+    prototype (superseded by bench/v7.py) is absent, the state store
+    has no reader for the retired certify/certify_arc namespaces, and
+    find_server resolves the llama-server binary repo-relative only -
+    no pre-reorg HOME fallback. Compat is added back only by explicit
+    requirement."""
+    assert not (ROOT / "v6_prototype.py").exists()
+    src = (ROOT / "bench" / "state_store.py").read_text(encoding="utf-8")
+    assert "def certify_cells" not in src
+    server = (ROOT / "infra" / "llama_server.py").read_text(encoding="utf-8")
+    assert "expanduser" not in server
+
+
+def test_task_store_has_no_retired_namespace_fallback():
+    """Pins: R-21. _task_store maps the live tasks to their namespaces
+    directly - an unknown task KeyErrors instead of silently writing
+    into the retired `certify` (FWE) namespace."""
+    from bench import state_store
+
+    fst: dict[str, object] = {}
+    with pytest.raises(KeyError):
+        state_store._task_store(fst, 8192, "arc", 1, 0, None, None)
+    assert "certify" not in fst
