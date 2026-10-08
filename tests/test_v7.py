@@ -9,8 +9,11 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    # addendum 123: 2k span dropped, K=1 flat - 7 spans x 5 hops
-    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 35
+    # addendum 123: 2k span dropped; addendum 137: K=3 - the full
+    # grid is 7 spans x 5 hops x 3 = 105 questions (90 reachable at
+    # the 262144 cell - the phase-balance ruling: measured gen
+    # 4.7 s/question x 90 = 423 s ~ the 450 s prefill floor)
+    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 105
 
 
 def test_smallest_ctx_is_measurable():

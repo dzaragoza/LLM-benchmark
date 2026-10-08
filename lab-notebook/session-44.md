@@ -663,3 +663,49 @@ generation 140.5 s = **3.21:1** (was 4.30:1). The Q8_0 config
 generates slightly longer answers (5904 vs 5299 tokens). To
 balance phases: ~3.2x questions, i.e. **~95-120 per cell** -
 the addendum-133 working figure of ~120 stands.
+## Addendum 136 - GPU-scope ruling: the estimator prices the accelerator only
+
+The author: "we need only to estimate accurately the ram usage
+in the gpu... the system ram that llama-cpp uses is out of
+scope." Registered: `_alloc_total` now prices the GPU footprint;
+host RAM (llama.cpp always parks a fixed chunk there) is out of
+scope. Recalibrated against the per-device census:
+
+- Weights on GPU land at ~1.00x params x bpB (MiniCPM4 1.000,
+  granite-4.0 0.999, granite-h 1.000; Qwen 0.86 - part of the
+  embedding table stays host-side, a small UNDER-count accepted
+  rather than modeling per-family offload splits). The
+  addendum-135 W_OVERHEAD=1.30 is DELETED - it was a
+  system-total artifact, not a GPU one.
+- GPU compute buffer: floor 0.03 GiB + 1 KiB/token (was
+  2 KiB system-wide).
+
+Net vs the per-device census (15 cells): -1.6%..+12.6%, mean
+|err| 4.1% (MiniCPM4 within 0.3%, granite within 2%). Test
+anchors moved to the GPU census columns.
+
+## Addendum 137 - K=3: 90 questions at 256k (phase balance)
+
+The author confirmed the arithmetic (30 grades reachable at
+262144) and ruled K=3. Question counts per cell (grades x K):
+8192:15, 16384:30, 32768:45, 65536:60, 131072:75, 262144:90.
+The 90 figure matches the addendum-135 phase measurement: gen
+4.7 s/question x 90 = 423 s ~ the 450 s prefill floor - the
+1:1 prefill:answer balance the author asked for at 256k.
+
+**Pre-registration for the K=3 run (one knob: K 1 -> 3):**
+- Hypothesis: more questions per grade lower the pass bar
+  (3 attempts per grade) and separate the bottom of the roster
+  without changing the reach ordering.
+- Predictions:
+  1. Qwen 262144 fraction stays in [0.10, 0.30] (more
+     questions, same reach; absolute score ~3x the K=1 cell's).
+  2. MiniCPM4 best fraction rises 0.06 -> >= 0.08.
+  3. granite-4.0-350m rises 0.04 -> >= 0.05.
+  4. granite-4.0-h stays 0.00 (malfunction, addenda 132/134).
+  5. Ranking unchanged: Qwen > MiniCPM4 > granite-4.0 > -h;
+     a flip means the knob measures something other than reach -
+     revert and register the anomaly.
+- Note: the corpus rebuilds (k in the grid block changes), so
+  run under --clean (addendum 129) - config drift alone does
+  not cover a corpus change.
