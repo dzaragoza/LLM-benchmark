@@ -588,3 +588,16 @@ Three rulings from the addendum-132 results review:
   129); grade fractions against the stored addendum-132 values.
   If the RANKING flips, the knob is measuring something other
   than reach: revert the count, register the anomaly.
+
+## Addendum 134 - config-aware resume (the rerun trap)
+
+Before the addendum-133 rerun: cells are keyed by ctx alone, so a
+plain resume would SKIP Qwen's cells and keep the old-config
+(Q5_K/q4_0) scores even though the estimator fix changed the plan
+to F16/f16 (Q8_0 at 262144) - silently measuring nothing and
+reporting stale numbers. Fix: a stored cell is skipped only when
+its (wq, kq, vq) match the plan; on drift it is wiped and
+re-measured (printed as "config drift ... re-measuring"). The
+three interval-1 families are unaffected and still skip - the
+rerun costs only Qwen's six cells. --clean remains the full-wipe
+path (addendum 129). Pinned by test_config_drift_remeasures.

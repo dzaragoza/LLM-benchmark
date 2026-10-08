@@ -286,7 +286,20 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
     monkeypatch.setattr(v7m, "save_state", lambda *a: None)
     # pre-measure famA's second cell: the hook still fires for
     # famA (once, with both cells), then once for famB
-    state = {"families": {"famA": {"v7": {"8192": {"score": 0.1}}}}}
+    state = {
+        "families": {
+            "famA": {
+                "v7": {
+                    "8192": {
+                        "score": 0.1,
+                        "wq": "F16",
+                        "kq": "f16",
+                        "vq": "f16",
+                    }
+                }
+            }
+        }
+    }
 
     def boom(entries):
         committed.append((entries[0]["family"], tuple(e["ctx"] for e in entries)))

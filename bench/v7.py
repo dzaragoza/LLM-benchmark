@@ -561,11 +561,24 @@ def certify_v7(
         v7 = fst.setdefault("v7", {})
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
-        if done.get("score") is not None:
+        if (
+            done.get("score") is not None
+            and done.get("wq") == cell["wq"]
+            and done.get("kq") == cell["kq"]
+            and done.get("vq") == cell["vq"]
+        ):
             entry["skipped"] = f"already measured (score {done['score']})"
             results.append(entry)
             pending.append(entry)
             continue
+        if done.get("score") is not None:
+            print(
+                f"  config drift: stored {done.get('wq')}/{done.get('kq')}/"
+                f"{done.get('vq')} != planned {cell['wq']}/{cell['kq']}/"
+                f"{cell['vq']} - re-measuring"
+            )
+            v7 = fst.setdefault("v7", {})
+            v7.pop(key, None)
         if dry_run:
             results.append(entry)
             continue
