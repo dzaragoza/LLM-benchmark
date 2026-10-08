@@ -34,3 +34,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 112: preflight + contracts + boundary tests against estimate-vs-server drift
 - [session-44](session-44.md) - addendum 113: zero-score diagnosis; run_cell instrumented with found tallies + answer samples
 - [session-44](session-44.md) - addendum 114: R-23 answers always logged; scoring explained
+- [session-44](session-44.md) - addendum 115: R-24 push per evaluated cell

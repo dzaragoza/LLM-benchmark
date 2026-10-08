@@ -185,3 +185,16 @@ Scoring, explained (the author asked):
   from the mean - excluded, not failed (R-19).
 - Example: ctx=16384 cell, window covers spans 2048..16384 => 15
   reachable grades; all-fail => 0.0/15.
+
+## Addendum 115 - R-24: push per evaluated cell
+
+The author: "make the benchmark push to git every time a context is
+evaluated, so you can get results." Registered as R-24.
+
+certify_v7(on_cell_commit=...) fires after each evaluated cell's
+state save; full_benchmark wires it to v7_cell_commit - the
+verdict_commit pattern (addendum 31) applied per v7 cell: stamp the
+cell result, tee off, git_tail (state + answers JSONL + server log
++ results), tee back on. Failures are caught and printed, never
+fatal - a git outage costs watchability, not the run. Skipped
+(already-measured) cells do not fire; --no-git/dry-run disable it.
