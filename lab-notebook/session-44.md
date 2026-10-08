@@ -70,3 +70,28 @@ The R-22 pin class found its own test bug while at it: the corrupt
 fixtures must nest under families.<name>, not at the state top
 level - the validator correctly ignored the misplaced ones
 (schemas work).
+
+## Addendum 111 - the reachability honesty fix (first live v7 crash)
+
+The first live pilot run crashed at the ctx=2048 cells: the
+span-2048 grade HTTP-400'd ("request (2237 tokens) exceeds the
+available context size (2048 tokens)"). R-19's reachability rule
+(span <= window) ignored the template + query tail and the
+generation headroom the server reserves for max_tokens.
+
+Fix: `grade_reachable(span, hops, window)` - span +
+PROMPT_OVERHEAD_TOKENS(128) + max(GEN_HEADROOM_TOKENS(192),
+gen(hops)) <= window. The 2048-span grade at ctx=2048 is now
+EXCLUDED, not asked. Plus: certify_v7 isolates a per-cell run_cell
+failure into entry["error"] and moves on - one bad cell no longer
+kills the run (the crash rail still owns real crashes).
+
+The two tests that encoded the buggy rule (span==window reachable)
+were corrected; a regression test pins the exact crash
+(2048-span at 2048-window is unreachable). Suite 246.
+
+Note for the rerun: ctx=2048 cells now have max_score 0 for every
+family (no reachable grades); the first grade that can fire is
+span=2048 at ctx>=2368... in practice ctx=4096. The ctx=2048 rung
+of the grid is structurally inert - worth remembering when reading
+the argmax (a 0/0 cell is excluded from ranking, not a zero score).

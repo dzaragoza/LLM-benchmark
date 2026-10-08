@@ -585,6 +585,8 @@ def _run(args: argparse.Namespace) -> None:
                 print(f"  {r['family']} ctx={r['ctx']}: {r.get('skipped', r.get('error', '?'))}")
                 continue
             print(f"  {r['family']} ctx={r['ctx']}: score {r['score']}/{r['max_score']}")
+            if not r["max_score"]:
+                continue  # no reachable grades: excluded, not a zero (R-19)
             if best is None or r["score"] > best["score"]:
                 best = r
         if best:

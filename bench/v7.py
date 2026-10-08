@@ -250,13 +250,29 @@ def question_prompt(corpus: dict, q: dict) -> str:
     return ruler_gate.VT_TEMPLATE.format(context=context, query=q["value"], num_v=q["hops"] + 1)
 
 
+PROMPT_OVERHEAD_TOKENS = 128
+GEN_HEADROOM_TOKENS = 192
+
+
+def grade_reachable(span: int, hops: int, window: int) -> bool:
+    """R-19's reachability with the server's own accounting (session 44:
+    the span-2048 grade at a ctx=2048 cell HTTP-400'd - the prompt was
+    2048 prefix + template + query, and the server also reserves room
+    for max_tokens, which grows with hops). A grade is reachable only
+    if the whole request fits: span + overhead + generation headroom
+    <= window. Overhead and headroom are generous constants - the
+    template is ~90 tokens, generation is at most VT_GEN_TOKENS."""
+    gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 12)
+    return span + PROMPT_OVERHEAD_TOKENS + max(GEN_HEADROOM_TOKENS, gen) <= window
+
+
 def run_cell(port: int, corpus: dict, window: int) -> dict:
     """Score one allocation: pass mass over the reachable (span, hops)
     grid. Questions with span > window are EXCLUDED (structurally
     unreachable), not failed. Pass = all h+1 names (upstream's rule)."""
     per_grade: dict[tuple[int, int], dict] = {}
     for q in corpus["questions"]:
-        if q["span"] > window:
+        if not grade_reachable(q["span"], q["hops"], window):
             continue
         key = (q["span"], q["hops"])
         g = per_grade.setdefault(key, {"pass": 0, "asked": 0})
@@ -381,7 +397,12 @@ def certify_v7(
             breakdown = llama_server.memory_breakdown_gib(log_path)
             if corpus is None:
                 corpus = corpus_from_artifact(port)
-            rec = run_cell(port, corpus, cell["ctx"])
+            try:
+                rec = run_cell(port, corpus, cell["ctx"])
+            except Exception as e:
+                entry["error"] = f"run_cell failed: {e}"
+                results.append(entry)
+                continue
             if breakdown is not None:
                 rec["mem_census"] = breakdown
                 print(

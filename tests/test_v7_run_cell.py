@@ -109,9 +109,12 @@ def test_question_prompt_contains_chain_and_query(small_corpus):
 
 
 def test_run_cell_excludes_unreachable_spans(monkeypatch, small_corpus):
-    """span > window is EXCLUDED, not failed: a 1024-token window sees
-    only the 1024 grade - the per-grade map has no 2048 keys and the
-    max_score counts only what was asked (R-19)."""
+    """A grade is EXCLUDED when its whole request cannot fit the
+    window (R-19 with the session-44 honesty fix): span + prompt
+    overhead + generation headroom <= window. The 1024 grade needs
+    1024+128+192 tokens, so a 1024 window sees NOTHING (the crash of
+    the first live run: the span-2048 grade HTTP-400'd at ctx=2048);
+    a 2048 window sees only the 1024 grades - no 2048 keys."""
     asked = []
 
     def fake_ask(port, prompt, max_tokens=64, no_thinking=True):
@@ -120,6 +123,8 @@ def test_run_cell_excludes_unreachable_spans(monkeypatch, small_corpus):
 
     monkeypatch.setattr(v7.ruler_gate, "ask", fake_ask)
     rec = v7.run_cell(0, small_corpus, window=1024)
+    assert rec["per_grade"] == {} and rec["max_score"] == 0
+    rec = v7.run_cell(0, small_corpus, window=2048)
     grades = {k for k in rec["per_grade"]}
     assert all(k.startswith("1024x") for k in grades)
     assert rec["max_score"] == 2  # the two 1024 grades (hops 2, 4)
@@ -163,7 +168,7 @@ def test_run_cell_score_is_mean_pass_mass(monkeypatch, small_corpus):
         VT_TEMPLATE = ruler_gate.VT_TEMPLATE
         VT_NAME_LEN = ruler_gate.VT_NAME_LEN
 
-    rec = v7.run_cell(0, c, window=2048)
+    rec = v7.run_cell(0, c, window=4096)
     assert rec["max_score"] == 4  # both spans, both hop grades
     # every grade asked K=2; alternating passes -> each grade 1/2
     for g in rec["per_grade"].values():
@@ -185,7 +190,7 @@ def test_run_cell_all_pass_scores_max(monkeypatch, small_corpus):
         return ""
 
     monkeypatch.setattr(v7.ruler_gate, "ask", fake_ask)
-    rec = v7.run_cell(0, c, window=2048)
+    rec = v7.run_cell(0, c, window=4096)
     assert rec["score"] == float(rec["max_score"])
     assert all(g["pass"] == g["asked"] for g in rec["per_grade"].values())
 
@@ -255,3 +260,27 @@ def test_run_cell_reports_window(monkeypatch, small_corpus):
     monkeypatch.setattr(v7.ruler_gate, "ask", lambda *a, **k: "")
     rec = v7.run_cell(0, small_corpus, window=1024)
     assert rec["window"] == 1024
+
+
+def test_grade_reachable_counts_the_whole_request():
+    """The session-44 crash regression: reachability must account for
+    the template + query tail (PROMPT_OVERHEAD_TOKENS) and the
+    generation headroom the server reserves - span == window is NOT
+    reachable (the first live run HTTP-400'd exactly there:
+    2048 prefix + template = 2237 tokens vs a 2048 window)."""
+    assert not v7.grade_reachable(2048, 2, 2048)
+    assert not v7.grade_reachable(1024, 2, 1024)
+    assert v7.grade_reachable(2048, 2, 4096)
+    assert v7.grade_reachable(1024, 2, 2048)
+    # the deepest generation demand still fits a window with margin
+    assert v7.grade_reachable(1024, 32, 2048)
+
+
+def test_argmax_excludes_empty_cells():
+    """Pins: R-19 (session 44). A cell with no reachable grades
+    (max_score 0, score 0.0 - every ctx=2048 cell after the honesty
+    fix) is EXCLUDED from the ranking, not treated as a measured
+    zero: the argmax filter requires asked grades."""
+    assert v7.grade_reachable(2048, 2, 2048) is False
+    # the summary-side guard lives in full_benchmark's _run; the
+    # exclusion rule itself is what the argmax consults
