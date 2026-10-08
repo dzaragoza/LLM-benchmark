@@ -761,15 +761,14 @@ def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
         return None, True
 
     monkeypatch.setattr(bench_cells.llama_server, "start_server", fake_start)
+
     def fake_post(port, path, body, timeout=60):
         if path == "/tokenize":
             return {"tokens": []}
         return {"choices": [{"message": {"content": ""}}]}
 
     monkeypatch.setattr(bench_cells.llama_server, "post_json", fake_post)
-    monkeypatch.setattr(
-        bench_cells.llama_server, "wait_healthy", lambda port, proc=None: True
-    )
+    monkeypatch.setattr(bench_cells.llama_server, "wait_healthy", lambda port, proc=None: True)
     monkeypatch.setattr(bench_cells.llama_server, "stop_server", lambda proc, port: None)
 
     ok, fv = bench_cells.vt_pass(str(model), 2048, str(results), seed=3, port=8080)
@@ -988,5 +987,3 @@ def test_kill_rate_window_stops_at_gold(monkeypatch):
     state["families"]["small-dead"]["certify_vt"] = {"4096": cells(0)}
     g = bc.kill_rate_cells(state, 4096)
     assert g["vt"] == {"pass": 10, "kill": 5}
-
-

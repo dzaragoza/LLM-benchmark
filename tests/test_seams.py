@@ -4,6 +4,7 @@ import argparse
 import os
 
 import code_edit
+
 import full_benchmark as fb
 import infra.hf_download as hf_download
 import ruler_gate
@@ -815,9 +816,8 @@ def test_code_edit_edit_many_runs_md_gates(tmp_path):
     """Session 40, addendum 3, fix 2: edit_many skipped _fix_markdown
     and _check_markdown entirely - an md file edited via edit_many got
     no MD047/MD058 auto-fix and no introduced-violation gate."""
-    import pytest
-
     import code_edit
+    import pytest
 
     p = tmp_path / "t.md"
     p.write_text("# t\n\nhello")  # no trailing newline

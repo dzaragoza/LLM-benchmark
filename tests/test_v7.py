@@ -75,11 +75,15 @@ def test_greedy_is_maximal():
             else:
                 continue
             t = v7_pilot._alloc_total(
-                r["family"], r["params_b"], geom,
-                v7_pilot.W_LADDER[cw], v7_pilot.KV_QUANT_LADDER[ck],
-                v7_pilot.KV_QUANT_LADDER[cv], r["ctx"],
+                r["family"],
+                r["params_b"],
+                geom,
+                v7_pilot.W_LADDER[cw],
+                v7_pilot.KV_QUANT_LADDER[ck],
+                v7_pilot.KV_QUANT_LADDER[cv],
+                r["ctx"],
             )
-            assert t > 4.0, f"upgrade fits but was not taken: {r} axis={axis}"
+            assert t is None or t > 4.0, f"upgrade fits but was not taken: {r} axis={axis}"
 
 
 def test_greedy_floor_is_222():

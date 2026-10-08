@@ -5,6 +5,7 @@ def test_safe_append_md_pipeline(tmp_path):
     file untouched. The notebook-append pattern can no longer smuggle
     a lint break into git."""
     import code_edit
+
     import md_check
 
     m = tmp_path / "notes.md"

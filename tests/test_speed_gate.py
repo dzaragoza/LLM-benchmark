@@ -493,7 +493,6 @@ def test_combined_medal_grading_from_records():
     assert fb.combined_medal(empty, 8192) is None
 
 
-
 def test_sigint_shutdown_sequence(tmp_path, capsys):
     """Addendum 8: Ctrl-C stops cleanly - llama-server pkilled, the tee
     uninstalled, the git tail only when --no-git is absent."""

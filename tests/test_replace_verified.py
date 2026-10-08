@@ -61,6 +61,7 @@ def test_replace_verified_runs_the_md_pipeline(tmp_path):
     breaks a judgment rule (ragged MD056) is refused before the
     write."""
     import code_edit
+
     import md_check
 
     p = tmp_path / "n.md"
