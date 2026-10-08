@@ -32,3 +32,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 110: R-22 state schema, one guarded loader
 - [session-44](session-44.md) - addendum 111: reachability honesty fix (span-2048 at ctx-2048 crash)
 - [session-44](session-44.md) - addendum 112: preflight + contracts + boundary tests against estimate-vs-server drift
+- [session-44](session-44.md) - addendum 113: zero-score diagnosis; run_cell instrumented with found tallies + answer samples
