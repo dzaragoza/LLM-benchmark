@@ -58,6 +58,7 @@ certify_cells = _state_store.certify_cells
 wilson_interval = _certify.wilson_interval
 certify_rung = _certify.certify_rung
 certify_rung_combined = _certify.certify_rung_combined
+from bench.v7 import certify_v7
 TASK_PASS_BARS = _certify.TASK_PASS_BARS
 combined_medal = _certify.combined_medal
 
@@ -454,9 +455,23 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="fwe",
-        choices=["fwe", "vt", "speed", "all"],
+        choices=["fwe", "vt", "speed", "all", "v7"],
         help="the certify task; 'all' is the combined controller - each "
-        "cell carries speed, fwe, vt and arc, measured only if missing",
+        "cell carries speed, fwe, vt and arc, measured only if missing; "
+        "'v7' is the fixed-budget reach benchmark (session 42/43: "
+        "greedy (q,k,v) cells, one fixed 256k corpus, graded (span, hops))",
+    )
+    ap.add_argument(
+        "--v7-budget-gib",
+        type=float,
+        default=None,
+        help="v7: the memory budget in GiB (default 4.0)",
+    )
+    ap.add_argument(
+        "--v7-families",
+        type=int,
+        default=None,
+        help="v7: the first N families param-ascending (default 4, the pilot)",
     )
     ap.add_argument(
         "--fwe-min-words",
@@ -519,6 +534,45 @@ def main() -> None:
             ap.error("--rungs needs at least one depth")
     else:
         rung_list = list(TOURNAMENT_DEPTHS)
+    if args.task == "v7":
+        from bench.v7 import BUDGET_GIB, PILOT_FAMILIES
+
+        results = certify_v7(
+            args.models_dir,
+            state,
+            args.state_file,
+            state.get("ladder_port", 8210),
+            args.dry_run,
+            args.v7_budget_gib or BUDGET_GIB,
+            args.v7_families or PILOT_FAMILIES,
+        )
+        state["v7"] = results
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp("V7 REACH BENCHMARK SUMMARY")
+        best = None
+        for r in results:
+            if r.get("score") is None:
+                print(f"  {r['family']} ctx={r['ctx']}: {r.get('skipped', r.get('error', '?'))}")
+                continue
+            print(
+                f"  {r['family']} ctx={r['ctx']}: score {r['score']}/{r['max_score']}"
+            )
+            if best is None or r["score"] > best["score"]:
+                best = r
+        if best:
+            stamp(
+                f"V7 ARGMAX at 4 GiB: {best['family']} ctx={best['ctx']} "
+                f"({best['wq']}, k={best['kq']}, v={best['vq']}) "
+                f"score {best['score']}/{best['max_score']}"
+            )
+        if not args.no_git and not args.dry_run:
+            tee_output.uninstall()
+            git_tail(args)
+        stamp("run complete")
+        return
+
     for depth in sorted(rung_list):
         if args.task == "all":
             results = certify_rung_combined(

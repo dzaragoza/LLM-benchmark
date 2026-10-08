@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import v7_pilot
+from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
@@ -13,7 +13,7 @@ def test_grid_shape():
 
 
 def test_allocation_plan_frontier():
-    rows = v7_pilot.plan_allocations(4.0, roster_limit=12)
+    rows = v7_pilot.greedy_allocations(4.0, roster_limit=12)
     assert rows, "4 GiB must admit at least one allocation"
     for r in rows:
         assert r["est_gib"] <= 4.0
@@ -58,10 +58,10 @@ def test_greedy_is_maximal():
                 cv = vi + 1
             else:
                 continue
-            t = v7_pilot.weights_gib(r["params_b"], v7_pilot.W_LADDER[cw]) + (
-                v7_pilot.kv_split_gib(
-                    geom, v7_pilot.KV_QUANT_LADDER[ck], v7_pilot.KV_QUANT_LADDER[cv], r["ctx"]
-                )
+            t = v7_pilot._alloc_total(
+                r["family"], r["params_b"], geom,
+                v7_pilot.W_LADDER[cw], v7_pilot.KV_QUANT_LADDER[ck],
+                v7_pilot.KV_QUANT_LADDER[cv], r["ctx"],
             )
             assert t > 4.0, f"upgrade fits but was not taken: {r} axis={axis}"
 
