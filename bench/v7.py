@@ -429,6 +429,7 @@ def certify_v7(
     dry_run: bool = False,
     budget_gib: float = BUDGET_GIB,
     roster_limit: int = PILOT_FAMILIES,
+    on_cell_commit: Any = None,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -512,4 +513,9 @@ def certify_v7(
             llama_server.stop_server(proc, port)
             save_state(state_path, state)
         results.append(entry)
+        if on_cell_commit is not None:
+            try:
+                on_cell_commit(entry)
+            except Exception as e:
+                print(f"  cell-commit failed (ignored): {e}")
     return results

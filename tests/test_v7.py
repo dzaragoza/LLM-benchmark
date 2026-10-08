@@ -226,3 +226,74 @@ def test_prefix_and_exclusion_ruling():
     }
     p = v7_pilot.question_prompt(corpus, corpus["questions"][0])
     assert "noise 49." in p and "noise 50." not in p
+
+
+def test_certify_v7_commits_per_cell(tmp_path, monkeypatch):
+    """Pins: R-24. Every evaluated (family, ctx) cell fires
+    on_cell_commit immediately - the author reads results through
+    the git rail while the run goes. Skipped (already-measured) and
+    dry-run cells do not fire it; a commit failure never stops the
+    run."""
+    import bench.v7 as v7m
+
+    committed = []
+
+    def fake_alloc(budget, limit=4):
+        return [
+            {
+                "family": "famA",
+                "params_b": 0.3,
+                "ctx": 4096,
+                "wq": "F16",
+                "kq": "f16",
+                "vq": "f16",
+                "est_gib": 1.0,
+            },
+            {
+                "family": "famA",
+                "params_b": 0.3,
+                "ctx": 8192,
+                "wq": "F16",
+                "kq": "f16",
+                "vq": "f16",
+                "est_gib": 1.2,
+            },
+        ]
+
+    monkeypatch.setattr(v7m, "greedy_allocations", fake_alloc)
+    # every acquisition and server launch faked out; run_cell scores empty
+    monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
+    monkeypatch.setattr(
+        v7m, "corpus_from_artifact", lambda port: {"questions": [], "cuts": {}, "sentences": []}
+    )
+    monkeypatch.setattr(v7m.llama_server, "start_server", lambda *a, **k: (object(), True))
+    monkeypatch.setattr(v7m.llama_server, "wait_healthy", lambda *a, **k: True)
+    monkeypatch.setattr(v7m.llama_server, "stop_server", lambda *a, **k: None)
+    monkeypatch.setattr(v7m, "preflight_reachable_grades", lambda port, c, w: {})
+    monkeypatch.setattr(
+        v7m,
+        "run_cell",
+        lambda port, corpus, window, answers_path=None: {"score": 0.5, "max_score": 3},
+    )
+    monkeypatch.setattr(v7m, "save_state", lambda *a: None)
+    # pre-measure the second cell: it must NOT fire the hook
+    state = {"families": {"famA": {"v7": {"8192": {"score": 0.1}}}}}
+
+    def boom(entry):
+        committed.append((entry["family"], entry["ctx"]))
+        if len(committed) == 1:
+            raise RuntimeError("git is down")
+
+    res = v7m.certify_v7(
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        on_cell_commit=boom,
+    )
+    # the fresh cell fired (and survived the hook's own failure);
+    # the measured cell skipped without firing
+    assert committed == [("famA", 4096)]
+    assert res[0]["score"] == 0.5
+    assert "skipped" in res[1]

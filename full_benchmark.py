@@ -26,6 +26,7 @@ import os
 import signal
 import sys
 import time
+from functools import partial
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -343,6 +344,26 @@ def git_tail(args: argparse.Namespace) -> None:
         stamp("pushed")
 
 
+def v7_cell_commit(args: argparse.Namespace, entry: dict[str, Any]) -> None:
+    """Session 44, addendum 115: every evaluated (family, ctx) cell
+    commits and pushes IMMEDIATELY - the author reads results through
+    the git rail while the run goes (the verdict_commit pattern,
+    applied per v7 cell). A git failure never stops the run; the cell
+    commit is skipped under --no-git/dry-run."""
+    score = entry.get("score")
+    what = (
+        f"{entry.get('family')} ctx={entry.get('ctx')} score {score}/{entry.get('max_score')}"
+        if score is not None
+        else f"{entry.get('family')} ctx={entry.get('ctx')} {entry.get('error', 'no score')}"
+    )
+    stamp(f"v7 cell done: {what} - committing artifacts")
+    tee_output.uninstall()
+    try:
+        git_tail(args)
+    finally:
+        tee_output.install()
+
+
 def verdict_commit(
     args: argparse.Namespace, fam: str, verdict: str, medal: Any, depth: int
 ) -> None:
@@ -573,6 +594,7 @@ def _run(args: argparse.Namespace) -> None:
             args.dry_run,
             args.v7_budget_gib or BUDGET_GIB,
             args.v7_families or PILOT_FAMILIES,
+            on_cell_commit=None if (args.no_git or args.dry_run) else partial(v7_cell_commit, args),
         )
         state["v7"] = results
         save_state(args.state_file, state)
