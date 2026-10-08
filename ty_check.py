@@ -14,12 +14,15 @@ verdict. Session 39, addendum 21: retired the --no-verify
 exceptions - the hook now runs for every commit and every push.
 """
 
+import os
 import site
 import subprocess
 import sys
 
 if __name__ == "__main__":
-    paths = [p for p in site.getsitepackages() + [site.getusersitepackages()] if p]
+    paths = [
+        p for p in site.getsitepackages() + [site.getusersitepackages()] if p and os.path.isdir(p)
+    ]
     args = [sys.executable, "-m", "ty", "check"]
     for p in paths:
         args += ["--extra-search-path", p]
