@@ -113,8 +113,21 @@ KV_QUANT_FACTOR = {
 }
 
 
+# addendum 135: llama.cpp's model buffer runs ~15-29% over
+# params x bits-per-byte (the census anchors: 1.153 Qwen, 1.173
+# MiniCPM4, 1.292 granite-4.0, 1.227 granite-4.0-h). The estimator
+# charges the worst observed so a recommendation never under-
+# quotes the real footprint.
+W_OVERHEAD = 1.30
+# the compute buffer: a floor plus ~2 KiB/token of attention
+# scratch, uniform across the pilot families (census: slope
+# ~1.9e-6 GiB/token, intercept 0.02-0.04 GiB)
+COMPUTE_FLOOR_GIB = 0.05
+COMPUTE_KIB_PER_TOKEN = 2.0
+
+
 def weights_gib(params_b: float, wq: str) -> float:
-    return params_b * 1e9 * W_QUANT_BPB[wq] / (1 << 30)
+    return params_b * 1e9 * W_QUANT_BPB[wq] / (1 << 30) * W_OVERHEAD
 
 
 def _store() -> dict[str, Any]:
@@ -177,7 +190,8 @@ def _alloc_total(
         return None
     base = per_token / 2.0
     kv = base * (KV_QUANT_FACTOR[kq] + KV_QUANT_FACTOR[vq]) * ctx
-    return weights_gib(p, wq) + kv / (1 << 30)
+    compute = COMPUTE_FLOOR_GIB + COMPUTE_KIB_PER_TOKEN * ctx / (1 << 20)
+    return weights_gib(p, wq) + kv / (1 << 30) + compute
 
 
 def greedy_allocations(budget_gib: float, roster_limit: int = PILOT_FAMILIES) -> list[dict]:
