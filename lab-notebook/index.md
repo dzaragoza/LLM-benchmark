@@ -40,3 +40,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 118: R-26 - all agent edits through code_edit.py- [session-44](session-44.md) - addendum 119: R-25 - testmon hook: affected tests only per commit, full suite on push
 - [session-44](session-44.md) - addendum 120: v7 10x easier - K 20 -> 2, 80 questions per cell
 - [session-44](session-44.md) - addendum 121: 5-minute cell ceiling (budget stop + k-major ordering)
+- [session-44](session-44.md) - addendum 122: questions match prefill time (k inverse in span, 45-question cell)

@@ -170,9 +170,12 @@ def test_run_cell_score_is_mean_pass_mass(monkeypatch, small_corpus):
 
     rec = v7.run_cell(0, c, window=4096)
     assert rec["max_score"] == 4  # both spans, both hop grades
-    # every grade asked K=2; alternating passes -> each grade 1/2
-    for g in rec["per_grade"].values():
-        assert g["asked"] == 2
+    # addendum 122: asked follows questions_for_span - span 1024 (the
+    # smallest) gets K=2, span 2048 gets K*1024/2048 = 1; alternating
+    # passes -> the 1024 grades land 1/2
+    for gname, g in rec["per_grade"].items():
+        span = int(gname.split("x")[0])
+        assert g["asked"] == v7.questions_for_span(span)
     assert 0.0 <= rec["score"] <= float(rec["max_score"])
 
 
@@ -249,7 +252,13 @@ def test_artifact_matching_grid_loads(monkeypatch, tmp_path):
 
     monkeypatch.setattr(v7, "CORPUS_ARTIFACT", str(art))
     monkeypatch.setattr(v7, "build_corpus", boom)
-    grid = {"spans": v7.SPANS, "hops": v7.HOPS, "k": v7.K, "s_max": v7.S_MAX}
+    grid = {
+        "spans": v7.SPANS,
+        "hops": v7.HOPS,
+        "k": v7.K,
+        "k_per_span": {s: v7.questions_for_span(s) for s in v7.SPANS},
+        "s_max": v7.S_MAX,
+    }
     art.write_text(json.dumps({"grid": grid, "corpus": corpus}), encoding="utf-8")
     assert v7.corpus_from_artifact(0) == corpus
 

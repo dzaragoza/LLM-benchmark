@@ -335,3 +335,21 @@ ceiling against.
 
 Pinned by tests/test_v7_cell_budget.py (budget==300; k-major
 grade coverage).
+
+
+## Addendum 122 - questions match prefill time
+
+The author: "OK prefill rate is a good indicator. Make the
+questions match prefill time."
+
+questions_for_span(span) = max(1, round(K * SPANS[0] / span)).
+Prefill is ~s tokens at ~618 tok/s (T14s, measured over 1,908
+speed-gate turns), so inverse question counts equalize prefill
+time per span: span 2048 earns K=2 questions, 4096 gets 1, and
+everything >= 4x the smallest span floors at 1 (every grade stays
+measured). The full cell drops from 80 to 45 questions. The
+corpus artifact records k_per_span in its grid block, so the
+mismatch rebuilds it on next launch.
+
+Pinned by tests/test_v7_prefill_match.py (inverse law; floor;
+equal prefill product) and the updated 45-question grid pin.
