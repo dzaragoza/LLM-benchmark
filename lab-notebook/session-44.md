@@ -353,3 +353,26 @@ mismatch rebuilds it on next launch.
 
 Pinned by tests/test_v7_prefill_match.py (inverse law; floor;
 equal prefill product) and the updated 45-question grid pin.
+
+
+## Addendum 123 - the 2k span dropped; K=1 flat
+
+The author: "Honestly just drop the 2k span. Then everything is
+k=1."
+
+With the prefill-matched ladder floored at 1 for every span above
+2048, dropping the 2k span makes the ladder vestigial - so the
+simplification is total: SPANS and CTX_GRID both start at 4096,
+K=1 flat, questions_for_span deleted, the k-major loop collapsed
+to a single span-major sweep. A full cell is 7 spans x 5 hops x 1
+= 35 questions.
+
+The honest consequence, pinned rather than silently dropped:
+phi-1, phi-2 and RWKV7-World-2.9B all have a 2048 window - below
+the smallest ctx rung now - so they place in the registry but earn
+no cell. (gemma-3-1b-it, Llama-3.2-1B, gemma-3-4b were already out
+- missing registry extracts.) If the author wants the 2048-window
+families back, the 4096 ctx rung is the knob, not the span grid.
+
+Old K=2-era v7 cells in state are not comparable with the new
+K=1 cells - clear the v7 blocks before re-measuring.

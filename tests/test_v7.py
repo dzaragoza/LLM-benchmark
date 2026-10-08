@@ -9,16 +9,14 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    # addendum 120/122: K 20 -> 2 at the smallest span, then scaled
-    # inversely with prefill cost - 45 questions per full cell
-    total = sum(v7_pilot.questions_for_span(s) for s in v7_pilot.SPANS) * len(v7_pilot.HOPS)
-    assert total == 45
+    # addendum 123: 2k span dropped, K=1 flat - 7 spans x 5 hops
+    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 35
 
 
 def test_smallest_ctx_is_measurable():
-    """The 2k rung must reach at least one span grade (the first live
-    run's bug: SPANS started at 4096, so 2048-window cells asked zero
-    questions and scored 0/0)."""
+    """The smallest ctx rung must reach at least one span grade (the
+    first live run's bug: a ctx smaller than every span asks zero
+    questions and scores 0/0)."""
     smallest_ctx = min(v7_pilot.CTX_GRID)
     assert any(s <= smallest_ctx for s in v7_pilot.SPANS)
     for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
@@ -101,24 +99,31 @@ def test_greedy_floor_is_222():
 
 
 def test_recurrent_family_is_kvless():
-    """RWKV7 carries no KV cache: per-token KV is 0 and it earns cells
-    at every ctx its window allows (weights-only memory)."""
+    """RWKV7 carries no KV cache: per-token KV is 0. Addendum 123
+    dropped the 2k rung and RWKV7's window is 2048, so it can no
+    longer earn a cell - pinned as the honest consequence of the
+    ruling, not silently forgotten."""
     assert v7_pilot.is_recurrent("RWKV7-World-2.9B")
     pt = v7_pilot.kv_per_token_f16("RWKV7-World-2.9B", None)
     assert pt == 0.0
+    assert v7_pilot.family_window("RWKV7-World-2.9B") == 2048
+    assert min(v7_pilot.CTX_GRID) == 4096, "addendum 123: the 2k rung is dropped"
     rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
     rwkv = [r for r in rows if r["family"] == "RWKV7-World-2.9B"]
-    assert rwkv, "the recurrent family must earn cells"
+    assert not rwkv, "window 2048 < smallest ctx rung: no cell is reachable"
     assert all(r["est_gib"] <= 4.0 for r in rwkv)
 
 
 def test_mha_fallback_places_phi1():
     """phi-1's config has null kv_heads/head_dim (MHA shape): the
-    hidden_size//heads fallback must place it, not drop it."""
+    hidden_size//heads fallback must place it, not drop it.
+    Addendum 123: its window is 2048 < the smallest ctx rung, so it
+    places but earns no cell - pinned as the honest consequence."""
     pt = v7_pilot.kv_per_token_f16("phi-1", None)
     assert pt and pt > 0
+    assert v7_pilot.family_window("phi-1") == 2048
     rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
-    assert any(r["family"] == "phi-1" for r in rows)
+    assert not any(r["family"] == "phi-1" for r in rows), "window 2048 earns no cell at ctx>=4096"
 
 
 def test_question_prompt_is_prefix_cut():

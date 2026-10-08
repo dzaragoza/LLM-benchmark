@@ -35,28 +35,19 @@ from bench.state_store import save_state
 from etc import registry_data
 
 S_MAX = 262144
-SPANS = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 2  # questions per (span, hops) grade at the SMALLEST span; pass =
-# all h+1 names (upstream). Session 44, addendum 120: the author's
-# make-it-10x-easier ruling - K 20 -> 2.
-CELL_BUDGET_SECONDS = 300  # addendum 121: the author's 5-min ceiling per cell
-
-
-def questions_for_span(span: int) -> int:
-    """Addendum 122: the author's make-questions-match-prefill-time
-    ruling. Prefill cost grows linearly with the span (~s tokens at
-    ~618 tok/s on the T14s), so the question count shrinks inversely:
-    k(s) = max(1, round(K * SPANS[0] / s)). Every grade then costs
-    roughly the same prefill time - span 2048 earns K questions,
-    span 4096 half, anything >= 4x the smallest span floors at 1.
-    The floor keeps every grade measured; k-major ordering keeps
-    the grid covered under a budget stop."""
-    return max(1, round(K * SPANS[0] / span))
+K = 1  # questions per (span, hops) grade; pass = all h+1 names
+# (upstream). Session 44 addenda 120/122/123: the author's rulings -
+# 10x easier (K 20 -> 2), prefill-matched counts (k inverse in span),
+# then the 2k span dropped: with K=1 flat, the ladder was
+# vestigial, so the span grid starts at 4096 and every grade asks
+# exactly K questions. A cell is 7 spans x 5 hops x 1 = 35 questions.
+CELL_BUDGET_SECONDS = 300  # addendum 121: the 5-min ceiling per cell
 
 
 BUDGET_GIB = 4.0
-CTX_GRID = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+CTX_GRID = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
 
 # weight-quant bytes per parameter; the dict's order is the climb
@@ -226,15 +217,10 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
     num_noises = int(budget / tokens_per_sent)
     sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
     questions: list[dict] = []
-    # addendum 121: k-major order - a budget-stopped cell still
-    # covers every (span, hops) grade with at least one question;
-    # addendum 122: per-span counts follow the prefill-time rule
-    for k_i in range(K):
+    for _ in range(K):
         for s in SPANS:
-            if k_i >= questions_for_span(s):
-                continue
             for h in HOPS:
-                questions.append({"span": s, "hops": h, "k_i": k_i})
+                questions.append({"span": s, "hops": h})
     cuts: dict[int, int] = {s: 0 for s in SPANS}
     for qi, q in enumerate(questions):
         s = q["span"]
@@ -438,7 +424,6 @@ def corpus_from_artifact(port: int) -> dict:
         "spans": SPANS,
         "hops": HOPS,
         "k": K,
-        "k_per_span": {str(s): questions_for_span(s) for s in SPANS},
         "s_max": S_MAX,
     }
     if os.path.exists(CORPUS_ARTIFACT):
