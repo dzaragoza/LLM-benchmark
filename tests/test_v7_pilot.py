@@ -75,3 +75,24 @@ def test_greedy_floor_is_222():
     # and at a starved budget, the floor config itself must appear
     tiny = v7_pilot.greedy_allocations(0.1, roster_limit=12)
     assert tiny == []
+
+
+def test_recurrent_family_is_kvless():
+    """RWKV7 carries no KV cache: per-token KV is 0 and it earns cells
+    at every ctx its window allows (weights-only memory)."""
+    assert v7_pilot.is_recurrent("RWKV7-World-2.9B")
+    pt = v7_pilot.kv_per_token_f16("RWKV7-World-2.9B", None)
+    assert pt == 0.0
+    rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
+    rwkv = [r for r in rows if r["family"] == "RWKV7-World-2.9B"]
+    assert rwkv, "the recurrent family must earn cells"
+    assert all(r["est_gib"] <= 4.0 for r in rwkv)
+
+
+def test_mha_fallback_places_phi1():
+    """phi-1's config has null kv_heads/head_dim (MHA shape): the
+    hidden_size//heads fallback must place it, not drop it."""
+    pt = v7_pilot.kv_per_token_f16("phi-1", None)
+    assert pt and pt > 0
+    rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
+    assert any(r["family"] == "phi-1" for r in rows)
