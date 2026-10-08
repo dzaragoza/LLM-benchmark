@@ -59,6 +59,7 @@ wilson_interval = _certify.wilson_interval
 certify_rung = _certify.certify_rung
 certify_rung_combined = _certify.certify_rung_combined
 from bench.v7 import certify_v7
+
 TASK_PASS_BARS = _certify.TASK_PASS_BARS
 combined_medal = _certify.combined_medal
 

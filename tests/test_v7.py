@@ -138,6 +138,7 @@ def test_corpus_artifact_roundtrip(tmp_path):
     to state/v7-corpus.json, load back byte-identical on the next
     run - citable and machine-independent."""
     import json
+
     import bench.v7 as v7m
 
     class Fake:
@@ -161,8 +162,9 @@ def test_crash_tail_always_runs(tmp_path, monkeypatch):
     exception, stamps the traceback into results.txt, runs git_tail
     (unless --no-git), and re-raises."""
     import argparse
-    import full_benchmark as fb
     import unittest.mock as m
+
+    import full_benchmark as fb
 
     calls = []
 
