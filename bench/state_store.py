@@ -1,10 +1,10 @@
 """bench.state_store -- the never-re-measure store (session 38,
-addendum 15: the full_benchmark.py refactor). The four task
-namespaces (certify_vt, certify_speed; the historical certify = fwe
-and certify_arc cells remain readable history - session 43 retired
-the fwe/arc tasks)
-and their loaders; a cell is stored once and only once. Extracted
-verbatim -- addendum citations stay."""
+addendum 15: the full_benchmark.py refactor). The task
+namespaces (certify_vt, certify_speed) and their loaders; a cell is
+stored once and only once. The retired certify/certify_arc namespaces
+are historical state, never read - no backward compatibility
+(session 43 retired the fwe/arc tasks; session 44 removed the
+readers). Extracted verbatim -- addendum citations stay."""
 
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ def _task_store(
     ns = {
         "vt": "certify_vt",
         "speed": "certify_speed",
-    }.get(task, "certify")
+    }[task]
     record: Any = value
     if variant is not None:
         record = {
@@ -214,7 +214,7 @@ def _task_measure(
     """Measure one cell's one task. Returns (passed_at_gold, graded
     record, human line, wall seconds - session 40, addendum 32: the
     per-test cost, so the expensive tests are visible). The graded
-    record is the speed stall count, the FWE word count, the VT 5-name
+    record is the speed stall count, the VT 5-name
     count - all re-gradable at any bar later without re-measuring.
     Raises WindowCap when the launch's banner shows the trained
     window below the rung's ctx (addendum 45) - that is not a FAIL,
@@ -261,34 +261,6 @@ def _task_measure(
             time.time() - t0,
         )
     raise ValueError(f"task {task!r} is retired or unknown (session 43: speed and vt only)")
-
-
-def certify_cells(
-    fst: dict[str, Any],
-    depth: int,
-    min_words: int = 1,
-    want: dict[str, Any] | None = None,
-    legacy: dict[str, Any] | None = None,
-) -> dict[int, bool]:
-    """Session 37, addendum 8: the CELL model - a cell is (model, run
-    number, step) and is NEVER measured twice. The cells
-    live in fst["certify"][str(depth)] as {run: pass}
-    (or {run: words_found} once cells record word counts).
-    Returns {run: passed} for every MEASURED cell.
-
-    Re-grading (session 37, the 2/3 tightening): a direct cell that
-    stored an INTEGER word count is graded at >= min_words exactly;
-    cells stored as booleans were graded under the old 1/3 rule and
-    are dropped from the measured set at a stricter bar - they are
-    re-run, never silently trusted. Session 41, addendum 39: the
-    tournament inheritance is DELETED (the author: 'remove it, it
-    is obsolete') - bench/tournament_helpers.py and the falls
-    re-grading are gone; every cell is the certify run's own."""
-    cells: dict[int, bool] = {}
-    direct = _int_cells((fst.get("certify") or {}).get(str(depth)), want, legacy)
-    for key, words in direct.items():
-        cells[int(key)] = words >= min_words
-    return cells
 
 
 def speed_cells(

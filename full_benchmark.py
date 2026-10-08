@@ -45,7 +45,6 @@ from bench.constants import (
 )
 from bench.v7 import certify_v7
 
-# re-exports: the tests patch these seams
 vt_pass = _cells.vt_pass
 speed_pass = _cells.speed_pass
 speed_cell = _cells.speed_cell
@@ -55,7 +54,6 @@ _task_load = _state_store._task_load
 _task_store = _state_store._task_store
 speed_cells = _state_store.speed_cells
 vt_cells = _state_store.vt_cells
-certify_cells = _state_store.certify_cells
 wilson_interval = _certify.wilson_interval
 certify_rung = _certify.certify_rung
 certify_rung_combined = _certify.certify_rung_combined

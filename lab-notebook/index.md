@@ -28,3 +28,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [Session 41 — 2026-10-07 (protocol v5.x: requirements as a test-linked contract; ctx = depth, the window tax ruled away; the 4k-window trio revived; the answered-rung terminal fix; the state-name 404 crash fix)](session-41.md)
 - [Session 42 — 2026-10-07 (the reframe: v7 fixed-budget reach benchmark, pilot shipped — session 42)](session-42.md)
 - [Session 43 — 2026-10-08 (v7 merged into full_benchmark; the greedy allocation; ARC/FWE retired; the crash rail; the corpus artifact; R-16..R-19)](session-43.md)
+- [session-44](session-44.md) - the no-backward-compatibility ruling: R-21; v6 prototype deleted, HOME fallback and FWE readers removed

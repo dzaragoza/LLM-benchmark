@@ -192,7 +192,7 @@ def certify_rung(
     the author's param-ascending ruling - no hidden selection
     mechanism favoring any model; the caller's order IS the
     evaluation order). Each candidate is tested cell by
-    cell (direct single-rung FWE at the rung, seed = the run
+    cell (direct single-rung task at the rung, seed = the run
     number, cells already measured are NEVER re-run) until EARLY
     ACCEPT or EARLY REJECT (mathematically dead: even passing
     every remaining cell cannot reach the bar).
@@ -582,7 +582,7 @@ def certify_rung_combined(
 ) -> list[dict[str, Any]]:
     """The combined controller (session 38, addendum 3 - the author's
     ruling): a cell is (model, rung, run) carrying THREE independent
-    measurements - speed, FWE and VT. A cell's task is measured only
+    measurements - speed and VT. A cell's task is measured only
     if missing (never twice); the three tasks carry their own pass/fail
     tallies and their own accept/dead verdicts. The candidate certifies
     the rung when ALL THREE accept; it dies when ANY ONE is dead (the
