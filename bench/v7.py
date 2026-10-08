@@ -189,11 +189,16 @@ def gen_name(rng: random.Random) -> str:
 
 
 def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
-    """One fixed VT corpus at ~s_max tokens, identical bytes every run.
-    The shared context (noise + every chain embedded) is built once; a
-    chain for span grade s has its links among the first ~s tokens.
-    The query tail is per-question, so the shared prefill rides the
-    prompt cache - reach is measured, not re-paid per question."""
+    """One fixed VT corpus, identical bytes every run. The corpus is a
+    sentence list (noise + every question's chain embedded); a chain
+    for span grade s has its links among the first ~s tokens. Per-span
+    CUT indices record where each span's region ends (the deepest
+    insertion position of that span's chains plus one hop of margin)
+    - a span-s question presents only sentences[:cut_s], so its
+    prompt is ~s tokens (the full-corpus prompt of the first live run
+    was HTTP-400 dead on any small-window cell: 357k tokens vs a 2k
+    ctx). Prefix fairness holds: every model sees the same bytes for
+    a given grade; prefill cost is proportional to the span."""
     rng = random.Random(seed)
     budget = s_max - ruler_gate.ANSWER_HEADROOM
     probe = ruler_gate.VT_HAYSTACK * 20
@@ -206,6 +211,7 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
         for h in HOPS:
             for _ in range(K):
                 questions.append({"span": s, "hops": h})
+    cuts: dict[int, int] = {s: 0 for s in SPANS}
     for qi, q in enumerate(questions):
         s = q["span"]
         limit = max(ruler_gate.VT_NAME_LEN, int(s / tokens_per_sent))
@@ -223,14 +229,25 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
         positions = sorted(rng.sample(range(sub), chain_len))
         for pi, j in zip(positions, range(chain_len), strict=True):
             sentences.insert(pi + j, chain[j])
+        cuts[s] = max(cuts[s], positions[-1] + 2 * chain_len)
         questions[qi] = {**q, "names": names, "value": value}
-    context = "\n".join(sentences).replace(". \n", ".\n")
-    return {"context": context, "questions": questions, "s_max": s_max}
+    for s in SPANS:
+        cuts[s] = min(cuts[s] + 8, len(sentences))
+    return {
+        "sentences": sentences,
+        "questions": questions,
+        "cuts": cuts,
+        "s_max": s_max,
+    }
 
 
 def question_prompt(corpus: dict, q: dict) -> str:
+    """The span-s question: the corpus PREFIX up to that span's cut,
+    plus the query tail. ~s tokens of prefill, chain included."""
+    cut = corpus["cuts"][q["span"]]
+    context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
     return ruler_gate.VT_TEMPLATE.format(
-        context=corpus["context"], query=q["value"], num_v=q["hops"] + 1
+        context=context, query=q["value"], num_v=q["hops"] + 1
     )
 
 

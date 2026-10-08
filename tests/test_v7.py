@@ -35,7 +35,12 @@ def test_allocation_plan_frontier():
 
 
 def test_question_prompt_tail():
-    corpus = {"context": "NOISE", "questions": [], "s_max": 100}
+    corpus = {
+        "sentences": ["NOISE"],
+        "questions": [],
+        "cuts": {4096: 1},
+        "s_max": 100,
+    }
     q = {"span": 4096, "hops": 4, "names": ["AAAAA", "BBBBB"], "value": "12345"}
     p = v7_pilot.question_prompt(corpus, q)
     assert "NOISE" in p and "12345" in p and "5 variables" in p
@@ -107,3 +112,22 @@ def test_mha_fallback_places_phi1():
     assert pt and pt > 0
     rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
     assert any(r["family"] == "phi-1" for r in rows)
+
+
+def test_question_prompt_is_prefix_cut():
+    """The span-s question must present only the corpus prefix up to
+    that span's cut (the 357k-token HTTP-400 bug: the full corpus was
+    pasted into every question, dead on any small-window cell)."""
+    corpus = {
+        "sentences": [f"sentence {i}." for i in range(1000)],
+        "questions": [],
+        "cuts": {2048: 100, 262144: 1000},
+        "s_max": 262144,
+    }
+    q_small = {"span": 2048, "hops": 4, "names": ["AAAAA", "BBBBB"], "value": "12345"}
+    p_small = v7_pilot.question_prompt(corpus, q_small)
+    assert "sentence 99." in p_small
+    assert "sentence 100." not in p_small
+    q_big = {"span": 262144, "hops": 4, "names": ["AAAAA", "BBBBB"], "value": "12345"}
+    p_big = v7_pilot.question_prompt(corpus, q_big)
+    assert "sentence 999." in p_big
