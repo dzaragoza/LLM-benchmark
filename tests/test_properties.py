@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -18,6 +19,8 @@ from bench.certify import wilson_interval
 from bench.state_store import _int_cells, speed_cells
 from infra.hf_download import RUNG_BITS, estimate_rung_gib, find_rung_file, has_safetensors
 from law_fit import kv_gib, law_worst
+
+pytestmark = pytest.mark.hypothesis_props
 
 RUNGS = sorted(RUNG_BITS)
 

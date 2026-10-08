@@ -1,0 +1,35 @@
+name: push regression run
+# R-25 final form (session 44): the commit hook stays <=5s (ruff,
+# ruff-format, ty, md, requirements - NO pytest); the FULL pytest
+# suite (deterministic pins + the 21 hypothesis properties) runs
+# HERE on every push. The workflow's verdict is checked before the
+# next push - a red run blocks the next delivery, not the commit.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage
+      - name: pytest (the full suite - 255 tests incl. hypothesis properties)
+        run: python3 -m pytest tests -q
+      - name: crosshair (the contract proofs)
+        run: crosshair check tests/contracts.py
+      - name: coverage (the missing-test map)
+        run: |
+          coverage run -m pytest tests -q
+          coverage report -m
