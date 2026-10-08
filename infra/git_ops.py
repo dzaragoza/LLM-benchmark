@@ -26,13 +26,14 @@ def inside_work_tree() -> bool:
     return r.returncode == 0 and r.stdout.strip() == "true"
 
 
-def pull_rebase(autostash: bool = True, no_verify: bool = False) -> tuple[int, str, str]:
-    """git pull --rebase (autostash optional). Returns (rc, stdout, stderr)."""
+def pull_rebase(autostash: bool = True) -> tuple[int, str, str]:
+    """git pull --rebase (autostash optional). Returns (rc, stdout, stderr).
+
+    Session 43, R-20: the no_verify bypass is REMOVED - the hooks are
+    never omitted; a pull that trips a hook is fixed, not skipped."""
     args = ["git", "pull", "--rebase"]
     if autostash:
         args.append("--autostash")
-    if no_verify:
-        args.append("--no-verify")
     r = _run(args)
     return r.returncode, r.stdout, r.stderr
 

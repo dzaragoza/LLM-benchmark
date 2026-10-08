@@ -96,3 +96,23 @@ test_properties.py excluded in the sandbox - hypothesis absent
 there, it runs on the author's machine). PENDING on the author:
 fresh `git pull`, clear the stale v7 cells, rerun
 `python3 full_benchmark.py --task v7` on the T14s.
+
+## Addendum 107 - R-20: the hooks run for real, and are never omitted
+
+The author's ruling: "All the dependencies for the commit hook shall
+be installed. The commit hook shall not be omitted." The sandbox gap
+(ty, hypothesis, then huggingface_hub/pyarrow/transformers for ty's
+import resolution, ruff as a binary) is CLOSED - every hook entry
+runs green in this environment, and the addendum-21 ruling ("no
+--no-verify exceptions") is now ENFORCED, not just intended:
+
+- R-20 added to md/protocol.md: hook dependencies installed; no
+  bypass; a failing hook is fixed, never skipped.
+- tests/test_precommit_env.py pins it: binaries on PATH (ruff,
+  pre-commit), modules importable (ty, pytest, hypothesis,
+  huggingface_hub, pyarrow, transformers), ty_check.py exits 0,
+  the .pre-commit-config.yaml hook list stays complete, and no
+  repo source carries a quoted --no-verify literal.
+- The bypass is REMOVED from the machinery: infra/git_ops.py's
+  pull_rebase drops its no_verify parameter; full_benchmark's
+  git_pull_head pulls WITH hooks.

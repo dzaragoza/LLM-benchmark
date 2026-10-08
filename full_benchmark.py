@@ -283,7 +283,7 @@ def git_pull_head() -> None:
     if not git_ops.inside_work_tree():
         stamp("git pull skipped - not a git work tree")
         return
-    rc, out, err = git_ops.pull_rebase(no_verify=True)
+    rc, out, err = git_ops.pull_rebase()
     if rc != 0:
         stamp(f"git pull failed - FIX BEFORE RUNNING: {err.strip()[:200]}")
         raise SystemExit(1)
