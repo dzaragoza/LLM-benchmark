@@ -51,7 +51,8 @@ K = 20  # questions per (span, hops) grade; pass = all h+1 names (upstream)
 BUDGET_GIB = 4.0
 CTX_GRID = [2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
 
-# weight-quant bytes per parameter (the tournament's axis, addendum 140)
+# weight-quant bytes per parameter (the tournament's axis, addendum
+# 140); the dict's order is the climb ladder, coarse to fine
 W_QUANT_BPB = {
     "Q2_K": 0.40,
     "Q3_K": 0.48,
@@ -60,8 +61,11 @@ W_QUANT_BPB = {
     "Q6_K": 0.82,
     "Q8_0": 1.06,
 }
-# kv-quant factor vs f16 bytes (the KV axis q4_0..f16)
-KV_QUANT_FACTOR = {"q4_0": 0.5625, "q8_0": 0.8125, "f16": 1.0}
+W_LADDER = list(W_QUANT_BPB)
+# kv-quant factor vs f16 bytes (the KV axes q4_0..f16; K and V
+# caches carry the same geometry, so the factor applies per cache)
+KV_QUANT_LADDER = ["q2_0", "q4_0", "q8_0", "f16"]
+KV_QUANT_FACTOR = {"q2_0": 0.28125, "q4_0": 0.5625, "q8_0": 0.8125, "f16": 1.0}
 
 
 def gen_name(rng: random.Random) -> str:
@@ -180,6 +184,15 @@ def kv_gib(geom: dict, kvq: str, ctx: int) -> float:
     return per_token * ctx / (1 << 30)
 
 
+def kv_split_gib(geom: dict, kq: str, vq: str, ctx: int) -> float:
+    """KV total with independent K and V quant rungs (each cache half of
+    the f16 per-token bytes).
+    """
+    base = geom["kv_bytes_per_token_f16"] / 2.0
+    per_token = base * (KV_QUANT_FACTOR[kq] + KV_QUANT_FACTOR[vq])
+    return per_token * ctx / (1 << 30)
+
+
 def family_geometry(name: str) -> dict | None:
     """The family's KV geometry from the registry store."""
     store = json.loads(registry_data.STORE.read_text())
@@ -194,6 +207,74 @@ def family_window(name: str) -> int:
     entry = store.get(name) or {}
     ex = entry.get("extract") or {}
     return ex.get("max_position_embeddings") or 0
+
+
+def greedy_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
+    """The author's model-selection ruling (session 43): for each
+    (family, ctx), start at the LOWEST quant everywhere - weights q=Q2_K,
+    K=q2_0, V=q2_0 - and greedily climb: at each step try every
+    single-axis one-notch upgrade (q, k, v), keep the one whose result
+    lands CLOSEST to the budget without exceeding it, stop when no
+    upgrade fits. The output is the largest config <= budget per
+    (family, ctx) - the allocation the benchmark then scores.
+    """
+    rows = sorted(
+        (registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER
+    )
+    out = []
+    for p, name in rows[:roster_limit]:
+        geom = family_geometry(name)
+        window = family_window(name)
+        if geom is None:
+            continue
+        for ctx in CTX_GRID:
+            if window and ctx > window:
+                continue
+            wi, ki, vi = 0, 0, 0
+            total = weights_gib(p, W_LADDER[wi]) + kv_split_gib(
+                geom, KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
+            )
+            if total > budget_gib:
+                continue
+            while True:
+                best = None
+                for axis in range(3):
+                    cand = (wi, ki, vi)
+                    cand = (
+                        (min(wi + 1, len(W_LADDER) - 1), ki, vi)
+                        if axis == 0
+                        else (wi, min(ki + 1, len(KV_QUANT_LADDER) - 1), vi)
+                        if axis == 1
+                        else (wi, ki, min(vi + 1, len(KV_QUANT_LADDER) - 1))
+                    )
+                    if cand == (wi, ki, vi):
+                        continue
+                    t = weights_gib(p, W_LADDER[cand[0]]) + kv_split_gib(
+                        geom, KV_QUANT_LADDER[cand[1]], KV_QUANT_LADDER[cand[2]], ctx
+                    )
+                    if t <= budget_gib and (best is None or t > best[0]):
+                        best = (t, cand)
+                if best is None:
+                    break
+                total, (wi, ki, vi) = best
+            out.append(
+                {
+                    "family": name,
+                    "params_b": p,
+                    "ctx": ctx,
+                    "wq": W_LADDER[wi],
+                    "kq": KV_QUANT_LADDER[ki],
+                    "vq": KV_QUANT_LADDER[vi],
+                    "est_gib": round(
+                        weights_gib(p, W_LADDER[wi])
+                        + kv_split_gib(
+                            geom, KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
+                        ),
+                        2,
+                    ),
+                }
+            )
+    return out
 
 
 def plan_allocations(budget_gib: float, roster_limit: int = 12) -> list[dict]:
