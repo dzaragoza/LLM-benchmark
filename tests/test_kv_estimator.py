@@ -57,17 +57,24 @@ def test_kv_est_fits_census_anchors():
         assert abs(pred_gib - meas) / meas < 0.05, (ctx, pred_gib, meas)
 
 
-def test_allocations_climb_higher_after_fix():
-    """The greedy climb no longer stops early: Qwen3.5-0.8B at
-    262144 must reach a HIGHER weight rung than the addendum-132
-    Q5_K (the wrong estimator starved the weights to fund a
-    4x-overpriced cache)."""
-    rows = [r for r in v7.greedy_allocations(4.0) if r["family"] == "Qwen3.5-0.8B"]
-    top = [r for r in rows if r["ctx"] == 262144]
-    assert top, "Qwen must place at 262144"
-    w_ladder = v7.W_LADDER
-    assert w_ladder.index(top[0]["wq"]) >= w_ladder.index("Q5_K")
-    assert top[0]["est_gib"] <= 4.0
+def test_allocations_within_budget_at_every_ctx():
+    """Addendum 135: with the calibrated estimator (weights
+    overhead 1.30, compute buffer) every planned cell fits the
+    budget - the addendum-134 run's 262144 cell measured 4.558
+    GiB, OVER budget, because the pre-calibration estimate (3.86)
+    undercounted. Honest numbers, no cell over."""
+    for r in v7.greedy_allocations(4.0):
+        assert r["est_gib"] <= 4.0, r
+
+
+def test_layer_types_interval_granite_h():
+    """Addendum 135: layer_types wins - granite-4.0-h-350m lists
+    28 mamba + 4 attention layers, so interval 8 and per-token KV
+    4096 B (the census measured ~4 KiB/token slope)."""
+    geom = v7.family_geometry("granite-4.0-h-350m")
+    assert geom and geom.get("full_attention_interval") == 8
+    got = v7.kv_per_token_f16("granite-4.0-h-350m", geom)
+    assert got == 32768 / 8
 
 
 def test_config_drift_remeasures(tmp_path, monkeypatch):

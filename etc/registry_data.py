@@ -152,6 +152,7 @@ FETCH_FIELDS = [
     "moe_intermediate_size",
     "architectures",
     "model_type",
+    "layer_types",
 ]
 
 
@@ -178,6 +179,14 @@ def geometry(c):
     if hd is None and c.get("hidden_size") and heads:
         hd = c["hidden_size"] // heads
     interval = c.get("full_attention_interval") or 1
+    # addendum 135: layer_types wins when present - a granite-h
+    # config lists 28 mamba + 4 attention layers, so only 4 layers
+    # keep a full-window cache (the interval field stays for
+    # interval-only configs like Qwen3.5)
+    layer_types = c.get("layer_types") or []
+    attn_layers = sum(1 for t in layer_types if str(t).lower() == "attention")
+    if attn_layers:
+        interval = L // attn_layers
     if not (L and kvh and hd):
         return None
     per_token = L * 2 * kvh * hd * 2

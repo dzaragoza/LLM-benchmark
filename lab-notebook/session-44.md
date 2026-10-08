@@ -601,3 +601,65 @@ re-measured (printed as "config drift ... re-measuring"). The
 three interval-1 families are unaffected and still skip - the
 rerun costs only Qwen's six cells. --clean remains the full-wipe
 path (addendum 129). Pinned by test_config_drift_remeasures.
+## Addendum 135 - post-fix run graded; estimator calibrated (weights overhead, compute buffer, layer_types)
+
+**The rerun (addendum 134 protections, config-aware) is graded
+against the addendum-133 pre-registration:**
+
+| family | 262144-old (Q5_K) | best-new | frac |
+|---|---|---|---|
+| Qwen3.5-0.8B | 4.618 | **5.217/30 @262k Q8_0** | 0.17->0.21 peak @16384 |
+| MiniCPM4-0.5B | - | 0.638/15 | 0.06 peak |
+| granite-4.0-350m | - | 0.532/15 | 0.04 peak |
+| granite-4.0-h-350m | - | 0.0 | 0.00 (malfunction reproduced) |
+
+1. Prediction 1 (Qwen 262k fraction in [0.10, 0.30]): **PASS**
+   (0.17; and the new-config absolute score 5.217 > old 4.618 -
+   the memory fix measurably helped the model, +0.56 points).
+2. Predictions 2-3 (MiniCPM4 >= 0.08, granite >= 0.05): **FAIL**
+   (0.06 and 0.04) - difficulty remains too high for the bottom
+   of the roster. Confirms the addendum-133 difficulty knob
+   (more questions) is the next move.
+3. Predictions 4-5 (granite-h 0.00; ranking unchanged):
+   **PASS** - the malfunction reproduces; Qwen > MiniCPM4 >
+   granite-4.0 > granite-h holds at every context.
+4. Absolute scores rise monotonically with ctx for Qwen
+   (1.019 -> 5.217): context buys more than quant costs, now
+   measured on honest configs.
+
+**Estimator improvements (3 factors, all census-calibrated):**
+
+- **layer_types**: granite-4.0-h-350m's config lists 28 mamba +
+  4 attention layers; the registry now extracts `layer_types`
+  (store refetched) and interval = layers/attention_count = 8.
+  KV error at granite-h 32768: +92% -> +5%. (The
+  addendum-133 interval field stays for interval-only configs
+  like Qwen3.5's `full_attention_interval: 4`.)
+- **Weights overhead 1.30**: llama.cpp's model buffer runs
+  15-29% over params x bits-per-byte (worst observed 1.292,
+  granite-4.0); the estimator charges 1.30 so a VRAM
+  recommendation never under-quotes.
+- **Compute buffer**: floor 0.05 GiB + 2 KiB/token (census
+  slope, uniform across the pilot families) added to
+  `_alloc_total`.
+
+Net: est vs measured now +2.0% to +11.1% (mean |err| 6.8%),
+safely over, for all 15 pilot cells. Registry store refetched
+(35/38 extracts; 3 gated unchanged).
+
+**Flag to the author (design, not bug):** the calibrated
+estimator exposes that the pilot's 262144 cell measured
+**4.558 GiB - OVER the 4 GiB budget** (the pre-calibration
+3.86 estimate undercounted; the T14s UMA absorbed it). With
+honest numbers, Qwen at 262k + f16 cache leaves only ~0.4 GiB
+for weights -> the greedy (which maximizes memory fill) picks
+**Q2_K** weights. Options next session: (a) accept Q2_K at
+262k (it is the honest budget fit), (b) drop 262k to q8_0
+cache to fund Q4_K+ weights, or (c) rule a min-weights-quant
+floor in the climb. No change made without a ruling.
+
+**Phase balance at 256k (new run):** prefill 450.6 s vs
+generation 140.5 s = **3.21:1** (was 4.30:1). The Q8_0 config
+generates slightly longer answers (5904 vs 5299 tokens). To
+balance phases: ~3.2x questions, i.e. **~95-120 per cell** -
+the addendum-133 working figure of ~120 stands.
