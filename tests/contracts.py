@@ -168,3 +168,105 @@ def vt_cells_ref(fst: dict[str, dict[str, int]], depth: int) -> dict:
     from bench.state_store import vt_cells
 
     return vt_cells(fst, depth)
+
+
+# ================================================== session 43: the v7 layer
+# The fixed-budget benchmark's pure functions: the weight/KV
+# arithmetic, the ladder ordering, and the VT pass predicate.
+
+
+def weights_gib_positive_ref(params_b: float, wi: int) -> bool:
+    """A weight estimate is positive for any positive parameter count
+    at any ladder rung (the planner's feasibility filter rests on it).
+    pre: params_b > 0.0
+    pre: 0 <= wi < 7
+    post: __return__
+    """
+    from bench.v7 import W_LADDER, weights_gib
+
+    return weights_gib(params_b, W_LADDER[wi]) > 0.0
+
+
+def weights_gib_linear_ref(a: float, wi: int) -> bool:
+    """Weights scale LINEARLY in parameters: doubling the model doubles
+    the weight cost at any quant (the per-axis budget accounting).
+    pre: a > 0.0
+    pre: 0 <= wi < 7
+    post: __return__
+    """
+    from bench.v7 import W_LADDER, weights_gib
+
+    return math.isclose(
+        weights_gib(2 * a, W_LADDER[wi]), 2 * weights_gib(a, W_LADDER[wi]), rel_tol=1e-12
+    )
+
+
+def kv_quant_factor_order_ref() -> bool:
+    """The KV ladder is ordered by factor: a later rung never costs
+    LESS per token - the climb's closest-without-exceeding rule needs
+    monotone rungs or it can oscillate."""
+    from bench.v7 import KV_QUANT_FACTOR, KV_QUANT_LADDER
+
+    return all(
+        KV_QUANT_FACTOR[KV_QUANT_LADDER[i]] < KV_QUANT_FACTOR[KV_QUANT_LADDER[i + 1]]
+        for i in range(len(KV_QUANT_LADDER) - 1)
+    )
+
+
+def w_quant_bpb_order_ref() -> bool:
+    """The weight ladder is ordered by bits-per-byte (same reason)."""
+    from bench.v7 import W_LADDER, W_QUANT_BPB
+
+    return all(
+        W_QUANT_BPB[W_LADDER[i]] < W_QUANT_BPB[W_LADDER[i + 1]] for i in range(len(W_LADDER) - 1)
+    )
+
+
+def alloc_total_positive_ref(
+    per_token: float, params_b: float, ctx: int, wi: int, ki: int, vi: int
+) -> bool:
+    """An allocation total is positive: weights + KV, both
+    non-negative terms, so the estimate never lands at or below zero
+    for a placeable family (the greedy floor (2,2,2) is feasible).
+    pre: per_token >= 0.0 and params_b > 0.0 and ctx > 0
+    pre: 0 <= wi < 7 and 0 <= ki < 4 and 0 <= vi < 4
+    post: __return__
+    """
+    import bench.v7 as v7m
+
+    kv = (
+        (per_token / 2.0)
+        * (
+            v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki]]
+            + v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[vi]]
+        )
+        * ctx
+    )
+    return v7m.weights_gib(params_b, v7m.W_LADDER[wi]) + kv / (1 << 30) > 0.0
+
+
+def alloc_kv_monotone_in_ctx_ref(per_token: float, ctx1: int, ctx2: int, ki: int, vi: int) -> bool:
+    """The KV term is monotone in ctx: a deeper context never costs
+    LESS cache - the reach-vs-smarts tradeoff the argmax balances.
+    pre: per_token >= 0.0 and 0 < ctx1 <= ctx2
+    pre: 0 <= ki < 4 and 0 <= vi < 4
+    post: __return__
+    """
+    import bench.v7 as v7m
+
+    f = v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki]] + v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[vi]]
+    return (per_token / 2.0) * f * ctx1 <= (per_token / 2.0) * f * ctx2
+
+
+def alloc_kv_monotone_in_rung_ref(per_token: float, ctx: int, ki: int) -> bool:
+    """The KV term is monotone in the cache ladder: a higher rung
+    never costs LESS at the same depth.
+    pre: per_token >= 0.0 and ctx > 0
+    pre: 0 <= ki < 3
+    post: __return__
+    """
+    import bench.v7 as v7m
+
+    f_lo = v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki]]
+    f_hi = v7m.KV_QUANT_FACTOR[v7m.KV_QUANT_LADDER[ki + 1]]
+    return (per_token / 2.0) * f_lo * ctx <= (per_token / 2.0) * f_hi * ctx
