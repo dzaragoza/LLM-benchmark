@@ -170,3 +170,28 @@ command (no -m "not hypothesis_props"), so a commit touching
 tests/test_properties.py would have run the slow property layer
 inside the 5s hook. Restored in testmon_hook.py; the R-31 pin
 (test_r31_hypothesis_never_in_the_hook) holds it from now on.
+
+
+## Addendum 146 - ruff format never aborts the commit (the author's ruling)
+
+"Ruff format should not abort the commit, since it is only
+formatting changes." Correct - the stock ruff-format hook exits
+non-zero whenever it MODIFIES a file, which aborts the commit so
+the human re-stages; for a formatting-only delta that is pure
+friction (it cost a failed commit in BOTH of today's deliveries).
+
+The fix (verified in a scratch repo before shipping): format_hook.py
+replaces the stock entry - it runs ruff format on the hook's files,
+RE-STAGES everything it touched, and exits 0. The commit proceeds
+WITH the formatting already applied (the committed tree is the
+formatted tree - verified by inspecting the scratch repo's HEAD).
+The exit-0 is scoped to style deltas ONLY: a genuine ruff format
+failure (a syntax-broken file) still exits non-zero and blocks the
+commit - a broken file must not slip in under a formatting flag.
+Ruff LINT (ruff with --fix) keeps its stock aborting behavior: a
+lint finding is a code-quality signal, not a formatting delta.
+
+Pinned by tests/test_format_hook.py (Pins: R-25): style delta ->
+format + restage + exit 0; clean file -> silent pass; broken file
+-> non-zero; exactly one ruff-format entry in the hook config (the
+wrapper - the stock aborting entry is gone).

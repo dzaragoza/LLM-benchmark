@@ -4,9 +4,13 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-      - id: ruff-format
   - repo: local
     hooks:
+      - id: ruff-format
+        name: ruff-format (fix + restage + exit 0; never aborts the commit)
+        entry: python3 format_hook.py
+        language: system
+        types: [python]
       - id: ty
         name: ty (type check)
         entry: python3 ty_check.py
