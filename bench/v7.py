@@ -211,8 +211,8 @@ KV_QUANT_FACTOR = {
 # GPU compute buffer: floor + ~1 KiB/token (census slope
 # 9.6e-7 GiB/token across the pilot families; the old 2 KiB
 # figure was the system-wide one).
-COMPUTE_FLOOR_GIB = 0.075  # addendum 187: SmolLM3-3B census intercept 0.074; 0.06
-                         # under-counted the compute floor (an under-estimate is an error)  # addendum 171: the census shows ~0.055 GPU compute floor;
+COMPUTE_FLOOR_GIB = 0.075  # addendum 187: SmolLM3 census intercept 0.074;
+                         # an under-estimate is an error (addendum 170)  # addendum 171: the census shows ~0.055 GPU compute floor;
                             # 0.03 under-counted - an under-estimate is an error
 COMPUTE_KIB_PER_TOKEN = 1.0
 
