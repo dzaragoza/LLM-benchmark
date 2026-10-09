@@ -104,9 +104,10 @@ def test_tokenize_missing_tokens_field_raises(stub):
 def test_ask_content_and_reasoning_fields(stub):
     """ask reads content first, falls back to reasoning_content - the
     thinking-mode contract; no_thinking injects the chat_template_kwargs."""
-    stub.routes["/v1/chat/completions"] = (200, {
-        "choices": [{"message": {"content": "answer", "reasoning_content": "thinking"}}]
-    })
+    stub.routes["/v1/chat/completions"] = (
+        200,
+        {"choices": [{"message": {"content": "answer", "reasoning_content": "thinking"}}]},
+    )
     assert ruler_gate.ask(stub.port, "q") == "answer"
     method, path, body = stub.calls[-1]
     payload = json.loads(body)

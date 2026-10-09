@@ -694,3 +694,33 @@ coverage, vulture, mutmut - ten tools, ten verdicts, no mercy
 clause. A tool that fails IS a finding; a finding that cannot
 fail the run is decoration (the addendum-151 lesson applied to
 the workflow itself).
+
+
+## Addendum 165 - wow.md becomes the authority document for interactions
+
+The author's ruling: "Let's use wow.md as the authority document
+for our interactions. It will be easier for both of us, instead of
+relying on the conversation." Plus: "Add the Ci check last finished
+run and fix before pull" - and the code_edit rule was confirmed
+already present (R-26 / wow.md section 3).
+
+wow.md gains section 0, "Daniela's session rules (live - the
+authority section)", placed at the top: Vibe reads it FIRST every
+prompt cycle and applies it in order. Five live rules seeded:
+(1) CI before pull - the last completed verdict, reds fixed before
+pulling, in-flight never waited on; (2) nothing runs locally (R-38);
+(3) commands handed over immediately, bugs fixed as they come;
+(4) every edit through code_edit (R-26); (5) speed first - the
+author's time is the constraint.
+
+The conversation-vs-document gap that motivated this: the author
+updated rules in the Skill Hub and Vibe reasoned from chat remarks -
+the two disagreed and neither was authoritative. Now the file is:
+Daniela edits the section, commits, and the rules apply - the
+commit is the announcement. This closes the drift class the whole
+session struggled with (the every-prompt CI skill being "used",
+mis-used, and disused with no shared source of truth).
+
+Also this delivery: the red format finding fixed (test_io_fakes
+stub dict, the formatter's own wrapping), read from the completed
+CI verdict before this commit per the new rule 1.

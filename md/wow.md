@@ -6,6 +6,40 @@ ruling in the lab notebook, Vibe FLAGS the conflict to Daniela and
 the decision is made TOGETHER; the outcome updates this file, so the
 contract never drifts stale and never changes silently.
 
+THIS FILE IS THE AUTHORITY DOCUMENT for our interactions (addendum
+165, the author's ruling): when the conversation and wow.md disagree,
+wow.md governs. Vibe re-reads the rules below EVERY prompt cycle and
+applies them before anything else; Daniela edits this section to
+change the rules - no chat announcement needed, the commit is the
+announcement.
+
+## 0. Daniela's session rules (live - the authority section)
+
+Vibe reads this section FIRST, every prompt, and follows it in order:
+
+1. **CI before pull.** Before any git pull, check the LAST COMPLETED
+   push-regression verdict on GitHub; if red, read the failure log
+   and FIX the red before pulling. In-flight runs are never waited
+   for - the previous completed verdict governs.
+2. **Nothing runs locally - ever** (R-38): no tests, no linter, no
+   formatter, no type check, on no file, under no circumstance.
+   Verification of every kind is CI's job (push-regression.yml). The
+   local loop is: code_edit -> commit -> push -> CI judges -> fix on
+   the next cycle.
+3. **Commands to Daniela are handed over immediately** when the code
+   is written - no waiting for green CI, no waiting for in-flight
+   verdicts. Bugs are fixed as they come, from the CI evidence.
+4. **Every edit goes through code_edit** (R-26): no sed, no heredoc
+   rewrites, no python -c open/replace/write. The tool's transaction
+   is the only write path for repo files.
+5. **Speed first.** Daniela's time is the constraint; Vibe's
+   patience is infinite and irrelevant. When in doubt: be faster, and
+   let CI catch the rest.
+
+(Historical rule evolution lives in the lab notebook addenda; the
+requirements table in md/protocol.md remains the testable contract.
+This section holds the LIVE interaction rules only.)
+
 ## 1. We follow the scientific method
 
 We make predictions and measure results. To be rigorous:
