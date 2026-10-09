@@ -825,3 +825,29 @@ Changes:
 
 All cells rerun: k=1 with the new template is a new
 measurement; nothing is comparable to the previous run.
+
+## Addendum 142 - scoring contract fixed: credit primary, pass diagnostic
+
+The author confirmed the addendum-141 pattern and ruled on the
+pass signal. Contract: CREDIT is the primary score (found/(h+1)
+per question, averaged per grade, summed over asked grades) -
+it IS RULER's string_match_all, so reach stays comparable to
+upstream. PASS (all h+1 names) is kept as a per-grade DIAGNOSTIC
+only: it is the difficulty-calibration signal - if no model ever
+passes a grade, the benchmark is too hard at that grade, more
+legible than a drifting credit average. It is never summed as a
+score (the addendum-125 lesson: all-or-nothing left every pilot
+cell at 0). format_ok remains the compliance diagnostic
+(addendum 141). Reproducibility audited in the same session:
+corpus seeded (random.Random(7)), committed as the artifact with
+a grid fingerprint check; per-question derived seeds;
+temperature 0. Residual nondeterminism is llama.cpp/hardware
+reduction order at greedy argmax near-ties - out of scope,
+same class as RULER-on-vLLM.
+
+Addendum-141 RULER diff, author-ruled points (1-10): strict
+answer KEPT (if too hard, answers are recorded and difficulty
+gets evaluated from them); no ICL example (ours is zero-shot -
+RULER always prepends one, our difficulty stays ours, tweak
+later if too hard); the rest of the diff table stands as
+verified against upstream main.
