@@ -13,9 +13,6 @@ from __future__ import annotations
 
 import math
 
-from bench.certify import wilson_interval
-from infra.hf_download import find_rung_file, has_safetensors
-
 # ---- wilson_interval: the accept/dead math of every certify run ----
 
 

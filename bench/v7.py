@@ -59,13 +59,14 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import infra.llama_server as llama_server
-import ruler_gate
-import infra.hf_download as hf_download
-
 # addendum 183: the acquire path, moved from bench/certify.py (the v5
 # controllers retired; v7 is the only consumer)
-from typing import cast
+from typing import cast  # noqa: E402
+
+import infra.convert_quant as convert_quant
+import infra.hf_download as hf_download
+import infra.llama_server as llama_server
+import ruler_gate
 
 
 def _acquire_missing_model(
@@ -129,8 +130,8 @@ def _acquire_missing_model(
 
 
 
-from bench.state_store import save_state
-from etc import registry_data
+from bench.state_store import save_state  # noqa: E402
+from etc import registry_data  # noqa: E402
 
 S_MAX = 262144
 SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
