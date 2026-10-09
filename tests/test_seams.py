@@ -1,7 +1,14 @@
 """Pin the addendum-90 refactor seams (addendum 87's contract style)."""
-
 import argparse
 import os
+import sys
+
+# mutmut's staging dir does not run the repo-root conftest.py, so the bare
+# `import code_edit` resolves only when AI_tools is on the path explicitly
+# (addendum 175 - the mutation-stats run crashed on exactly this import).
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "AI_tools")
+)
 
 import code_edit
 
