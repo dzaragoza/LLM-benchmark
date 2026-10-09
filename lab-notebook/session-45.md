@@ -1067,3 +1067,41 @@ The split's own fixup: test_convert_quant_deletes_tensors_after_f16
 moved back to test_seams (it imports infra - my grep missed the
 from-import form); test_seams drops its unused code_edit import
 (55/6 test split stands).
+
+
+## Addendum 183 - the retirement audit: only the v7.1 machinery survives
+
+The author's ruling: "We only need V7.1 machinery. Rest is dead
+code." The import map, built from the code:
+
+THE V7.1 LIVE SET (kept):
+- full_benchmark.py (the orchestrator; its v7 task path)
+- bench/v7.py, bench/state_store.py (validate_state, save/load),
+  bench/constants.py (only what v7 + the gate read), bench/tee_output
+- infra/* (llama_server, hf_download, convert_quant, git_ops),
+  etc/registry_data.py, ruler_gate.py (the VT constants, task
+  builders, score_vt, format_ok_vt - v7 imports it heavily)
+- AI_tools/code_edit.py, md_check.py (the editor, R-26), the gates
+  (requirements_check, validate_jsonl)
+
+THE DEAD SET (retired):
+- law_fit.py (12% coverage, imported only by depth_probe - also
+  dead - and one contract ref): the standalone analysis tool.
+- depth_probe.py, lag_analyze.py, session_replicate.py: the
+  standalone instruments, nothing imports them.
+- speed_gate.py: the streaming conversation gate - the v5 speed
+  cells used it; v7 measures no speed cells. bench/cells.py (the
+  v5 cell machinery) and bench/certify.py's rung controllers die
+  with the vt/speed/all tasks.
+- code_search.py: the dev tool, unused since session 40.
+- size_predict.py: the v5-era size table.
+
+THE TASKS: choices shrink to ["v7"] - vt/speed/all are the v5
+controllers (R-05 already retired ARC/FWE; this finishes the set).
+Historical state cells stay readable (R-22's schema reads them;
+the readers for retired namespaces were already gone).
+
+SEQUENCE: delete the dead set; strip full_benchmark's v5 task
+branches and the v5 imports; the R-05 row's history clause covers
+the retired cells. Suite follows (the v5 tests retire with the
+code they pinned). Registered as one R-21 pass.

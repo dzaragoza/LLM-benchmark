@@ -61,7 +61,74 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 import ruler_gate
-from bench.certify import _acquire_missing_model
+import infra.hf_download as hf_download
+
+# addendum 183: the acquire path, moved from bench/certify.py (the v5
+# controllers retired; v7 is the only consumer)
+from typing import cast
+
+
+def _acquire_missing_model(
+    spec: str,
+    fam: str,
+    famdir: str,
+    rung: str | None,
+    state: dict[str, Any],
+    dry_run: bool,
+) -> str | None:
+    """The certify controllers acquire their own entry files (addendum 16,
+    refinement: the same phase-1 path the tournament uses - the author runs
+    one command, not a download step per model). Returns the local path or
+    None (in dry-run the plan is only reported)."""
+    if not rung:
+        return None
+    model_repo, _, source_repo = spec.partition("=")
+    hf_download.require_hub()
+    list_repo_files = cast("Any", hf_download.list_repo_files)
+    try:
+        model_files = list_repo_files(model_repo)
+        source_repo_eff = source_repo or model_repo
+        source_files = (
+            model_files if source_repo_eff == model_repo else list_repo_files(source_repo_eff)
+        )
+        path, plan = hf_download.acquire(
+            fam,
+            famdir,
+            rung,
+            model_repo,
+            model_files,
+            source_repo_eff,
+            source_files,
+            dry_run,
+        )
+    except SystemExit as e:
+        if e.code == 130:
+            raise
+        return None
+    if path:
+        state["families"].setdefault(fam, {})["tournament_entry"] = {
+            "rung": rung,
+            "file": path,
+        }
+        return path
+    if dry_run:
+        return None
+    # acquire returned a plan but no file (session 40, addendum 20): the
+    # safetensors/bin download branches end in "convert + quantize" - the
+    # same phase 2 the tournament path runs (full_benchmark phase 2). The
+    # certify controllers previously stopped at phase 1 and errored
+    # model-file-not-found for every family whose model must be built, not
+    # downloaded - the whole 11:12 run died on it.
+    built = convert_quant.create(fam, famdir, rung, plan, dry_run)
+    if built:
+        state["families"].setdefault(fam, {})["tournament_entry"] = {
+            "rung": rung,
+            "file": built,
+        }
+    return built
+
+
+
 from bench.state_store import save_state
 from etc import registry_data
 

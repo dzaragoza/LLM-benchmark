@@ -36,35 +36,16 @@ import infra.convert_quant as convert_quant
 import infra.git_ops as git_ops
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
-from bench import cells as _cells
-from bench import certify as _certify
 from bench import state_store as _state_store
-from bench.constants import (
-    CORPUS_DEFAULT,
-    RUNG_DEFAULT,
-    TOURNAMENT_DEPTHS,
-)
 from bench.v7 import certify_v7
 
 # addendum 132: the llama-server-supported --cache-type-k/v values
 # (the KV_QUANT_LADDER rungs must come from this set)
 _KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
 
-vt_pass = _cells.vt_pass
-speed_pass = _cells.speed_pass
-speed_cell = _cells.speed_cell
-kill_stale_server = _cells.kill_stale_server
-COMBINED_TASKS = _state_store.COMBINED_TASKS
-_task_load = _state_store._task_load
-_task_store = _state_store._task_store
-speed_cells = _state_store.speed_cells
-vt_cells = _state_store.vt_cells
-wilson_interval = _certify.wilson_interval
-certify_rung = _certify.certify_rung
-certify_rung_combined = _certify.certify_rung_combined
-
-TASK_PASS_BARS = _certify.TASK_PASS_BARS
-combined_medal = _certify.combined_medal
+# addendum 183: the v5 cell/controller surface is retired; only the v7
+# machinery and the state-store loader remain
+kill_stale_server = llama_server.kill_stale_server
 
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
 MODELS_DIR_DEFAULT = "./models"
@@ -441,38 +422,13 @@ def build_parser() -> argparse.ArgumentParser:
         "omitted = the state file's families or the full registered "
         "roster (param-ascending)",
     )
-    ap.add_argument("--corpus", default=CORPUS_DEFAULT)
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
-        "--rung",
-        default=RUNG_DEFAULT,
-        help="the quant to benchmark (default Q8_0)",
-    )
-    ap.add_argument(
-        "--force-rung",
-        dest="rung_forced",
-        nargs="?",
-        const=True,
-        default=False,
-        metavar="RUNG",
-        help="certify EVERY family at --rung, ignoring stored selections "
-        "(addendum 25). An optional value sets the rung too "
-        "(--force-rung f16 == --rung f16 --force-rung, addendum 33).",
-    )
-    ap.add_argument(
-        "--rungs",
-        type=str,
-        default=None,
-        metavar="D1,D2,...",
-        help="comma-separated rung(s) to certify (e.g. --rungs 32768,65536), "
-        "cheapest-first; omitted = the full ladder 4096..262144",
-    )
-    ap.add_argument(
         "--task",
-        default="vt",
-        choices=["vt", "speed", "all", "v7"],
+        default="v7",
+        choices=["v7"],
         help="the certify task; 'all' is the combined controller "
         "(speed + vt per cell, measured only if missing); 'v7' is the "
         "fixed-budget reach benchmark (session 42/43: greedy (q,k,v) "
@@ -522,8 +478,6 @@ def build_parser() -> argparse.ArgumentParser:
         "the largest-fitting single-axis upgrade (R-18), stingy the smallest, "
         "random a seeded random one (reproducible)",
     )
-    ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
-    ap.add_argument("--kv-quant-v", default=None, choices=_KV_CHOICES)
     ap.add_argument(
         "--dry-run",
         action="store_true",
@@ -580,14 +534,6 @@ def main() -> None:
 
 
 def _run(args: argparse.Namespace) -> None:
-    if isinstance(args.rung_forced, str):
-        if "/" in args.rung_forced or "=" in args.rung_forced:
-            raise SystemExit(
-                f"--force-rung takes a RUNG (e.g. f16, Q8_0), not a family - "
-                f"families are positional: {args.rung_forced!r}"
-            )
-        args.rung = args.rung_forced
-        args.rung_forced = True
     global DRY_RUN_ACTIVE
     DRY_RUN_ACTIVE = args.dry_run
     install_sigint_handler(args)
@@ -599,20 +545,8 @@ def _run(args: argparse.Namespace) -> None:
         check_tooling(args)
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.kv_quant_k:
-        state["kv_quant_k"] = args.kv_quant_k
-    if args.kv_quant_v:
-        state["kv_quant_v"] = args.kv_quant_v
     resolve_families(args, state)
-    if args.rungs:
-        try:
-            rung_list = [int(x) for x in args.rungs.split(",") if x.strip()]
-        except ValueError as e:
-            raise SystemExit(f"--rungs must be comma-separated integers, got {args.rungs!r}") from e
-        if not rung_list:
-            raise SystemExit("--rungs needs at least one depth")
-    else:
-        rung_list = list(TOURNAMENT_DEPTHS)
+    # addendum 183: the v5 rung ladder args are retired with the v5 tasks
     if args.task == "v7":
         from bench.v7 import BUDGET_GIB
 
@@ -668,66 +602,15 @@ def _run(args: argparse.Namespace) -> None:
         stamp("run complete")
         return
 
-    for depth in sorted(rung_list):
-        if args.task == "all":
-            results = certify_rung_combined(
-                depth,
-                args.families,
-                args.models_dir,
-                state,
-                args.state_file,
-                state.get("ladder_port", 8210),
-                args.dry_run,
-                rung_override=args.rung if args.rung_forced else None,
-                on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
-            )
-        else:
-            results = certify_rung(
-                depth,
-                args.families,
-                args.models_dir,
-                state,
-                args.state_file,
-                state.get("ladder_port", 8210),
-                args.dry_run,
-                task=args.task,
-                rung_override=args.rung if args.rung_forced else None,
-                on_verdict=(None if args.no_git or args.dry_run else partial_commit_hook(args)),
-            )
-        state["certify"] = results
-        save_state(args.state_file, state)
-        print()
-        print("=" * 60)
-        stamp(f"CERTIFY 2_sigma {depth:,} SUMMARY")
-        for r in results:
-            v = r.get("verdict", r.get("error", r.get("skipped", "?")))
-            extra = f" w/s median {r['wps_median']}" if r.get("wps_median") else ""
-            print(
-                f"  {r['family']}: {v} ({r.get('passes', 0)}/"
-                f"{r.get('cells_measured', 0)} cells, ran {r.get('ran_now', 0)} now){extra}"
-            )
-        verdicts = [r.get("verdict") for r in results if "verdict" in r]
-        if "accept" in verdicts:
-            # session 40, addendum 56: a rung ANSWERED by an accept moves
-            # the ladder UP to the next depth - the author's v4 ruling ("one
-            # model is crowned or every model is dead -> go to next rung"),
-            # and EVERYONE climbs: the only permanent outs are the two
-            # ruled-out categories (infeasible - addendum 45; speed-dead -
-            # addendum 13, the gate only hardens with depth). The old break
-            # ENDED the whole run at the first medal (the 4k stop).
-            stamp(
-                f"rung {depth:,} ANSWERED - the ladder moves up "
-                f"(everyone climbs; infeasible and speed-dead stay out)"
-            )
-            continue
-        if verdicts and all(v in ("dead", "infeasible") for v in verdicts):
-            stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
-            continue
+    # addendum 183: the v5 task controllers (vt/speed/all) are retired with
+    # the v5 cell machinery - only the v7 task remains (the author's ruling:
+    # "We only need V7.1 machinery. Rest is dead code.")
+    if args.task != "v7":
+        raise SystemExit(f"task {args.task!r} is retired (addendum 183) - only --task v7 exists")
     if not args.no_git:
         tee_output.uninstall()
         git_tail(args)
     stamp("run complete")
-
 
 if __name__ == "__main__":
     main()
