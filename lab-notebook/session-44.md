@@ -730,3 +730,47 @@ results are in; any allocator improvement (quality-weighted
 climb, min-quant floors, q/k/v trade-off search) waits for
 that evidence. Do not "fix" the Q2_K-at-256k outcome without
 a new ruling.
+## Addendum 139 - K reverted to 1; the addendum-137 phase-balance premise was wrong
+
+The author: "So k does increase prefill :( then we keep k=1 due
+to resources."
+
+The correction (Vibe's addendum-137 claim "K multiplies
+generation only" was WRONG): each of the K questions per grade
+embeds a fresh chain in the corpus, and the corpus budget is
+s_max tokens shared across all of them - so at deep spans the
+CHAINS displace noise and the per-question prompt grows. Measured
+Qwen 262144 prefill: 450 s at K=1 -> 1093 s at K=3 (and the
+phase ratio went 3.21:1 -> 3.35:1, worse not better; the K=3
+corpus also diluted the prefix-cache hit rate).
+
+K reverted to 1; the grid pin back to 35. The phase-balance
+question stays OPEN with the K knob ruled out: prefill at deep
+spans is structural (the span itself sets the prompt length),
+and generation is a per-question tail. Balancing phases at 256k
+would need either shorter spans at the deep end or accepting
+prefill dominance.
+
+## Addendum 139 grading note - the K=3 run (partial, 5.5/8 models)
+
+Graded against addendum 137 before the revert, from the stored
+K=3 cells (kept in state history until the --clean rerun):
+- P1 Qwen 262k frac [0.10,0.30]: PASS (0.140, score 4.196/30)
+- P2 MiniCPM4 >= 0.08: FAIL (0.042 - DOWN from K=1's 0.06)
+- P3 granite-4.0 >= 0.05: FAIL (0.029 - DOWN from 0.04)
+- P4 granite-h 0.00: PASS (malfunction reproduces under K=3)
+- P5 ranking unchanged: PASS so far (Qwen >> MiniCPM4 >
+  granite-4.0 > MiniCPM5-1B = granite-h = 0.00)
+
+The K hypothesis is REJECTED: more attempts did not help the
+bottom of the roster (both FAILs went DOWN), confirming the
+binding constraint is task difficulty, not sampling variance.
+K=1 restores the cheaper corpus; difficulty tuning is h or the
+question format, evidence pending the full 8-model K=1 run.
+
+New malfunction class registered: MiniCPM5-1B answers are
+degenerate template-echo loops ("[INST]... Answer: The sun is
+yellow...") - a chat-TEMPLATE mismatch signature, not a lookup
+failure. Candidate follow-up (not built): a template-sanity
+preflight probe so template malfunctions are labeled, not
+scored 0.
