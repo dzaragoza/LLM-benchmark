@@ -820,3 +820,32 @@ that, an estimate." Three parts:
    GPU breakdown (3.49 GiB for Qwen3.5-2B@262k), not the
    estimate; the whole-machine figure noted as the host-share-
    inclusive number.
+
+
+## Addendum 171 - the estimator calibrated: an under-estimate is an error
+
+The author's ruling: "check your estimator, every under estimation
+in the estimator is an error. fix the estimator for gpu ram usage.
+overall usage is irrelevant, only gpu counts."
+
+THE AUDIT: 68 census records replayed est vs measured GPU. 24
+under-estimates across 6 families - every one an error. The
+decomposition found three wrong constants:
+
+1. Q4_K weights: 0.56 bpB -> 0.65. The census measured 0.625
+   (granite-4.0-1b) to 0.646 (Llama-3.2-1B) bits-per-weight; the
+   old constant under-counted ~13% - the granite-3.1@65k budget
+   violation (addendum 170) traces to exactly this. The register
+   takes the measured UPPER bound: over-estimation costs a little
+   fidelity, under-estimation violates the budget.
+2. Q8_0 weights: 1.06 -> 1.0625 bpB. The census (granite-3.1-2b:
+   2.507 GiB / 2.5335B params) shows the scale byte llama.cpp's
+   q8_0 blocks carry; 1.06 was a hair light.
+3. COMPUTE_FLOOR_GIB: 0.03 -> 0.06. The census shows a ~0.055 GPU
+   compute floor across families; 0.03 under-counted every cell.
+
+VERIFICATION: all 61 in-scope census records replay with est >=
+measured GPU - zero under-estimates remain. Pinned by
+tests/test_estimator_no_under.py: any future census record that
+lands under its estimate fails CI (the pin replays the whole
+state), and the calibrated constants are pinned by value.

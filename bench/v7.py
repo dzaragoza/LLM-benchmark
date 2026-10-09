@@ -98,10 +98,14 @@ PILOT_FAMILIES = 4
 W_QUANT_BPB = {
     "Q2_K": 0.40,
     "Q3_K": 0.48,
-    "Q4_K": 0.56,
+    "Q4_K": 0.65,  # addendum 171: measured 0.625-0.646 on the census
+                     # (Llama-3.2-1B, granite-4.0-1b) - the 0.56 under-counted
+                     # ~13%; the register takes the measured UPPER bound: an
+                     # under-estimate is an error (addendum 170)
     "Q5_K": 0.72,
     "Q6_K": 0.82,
-    "Q8_0": 1.06,
+    "Q8_0": 1.0625,  # addendum 171: measured on the census (granite-3.1-2b: 2.507 GiB
+                       # / 2.5335B params); llama.cpp q8_0 blocks carry the scale byte
     "F16": 2.0,
 }
 W_LADDER = list(W_QUANT_BPB)
@@ -130,7 +134,8 @@ KV_QUANT_FACTOR = {
 # GPU compute buffer: floor + ~1 KiB/token (census slope
 # 9.6e-7 GiB/token across the pilot families; the old 2 KiB
 # figure was the system-wide one).
-COMPUTE_FLOOR_GIB = 0.03
+COMPUTE_FLOOR_GIB = 0.06  # addendum 171: the census shows ~0.055 GPU compute floor;
+                            # 0.03 under-counted - an under-estimate is an error
 COMPUTE_KIB_PER_TOKEN = 1.0
 
 
