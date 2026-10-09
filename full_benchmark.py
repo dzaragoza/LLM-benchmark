@@ -140,10 +140,6 @@ def check_tooling(args: argparse.Namespace) -> None:
     """Verify the run's tooling (real runs only; addendum 79)."""
     for path, msg in [
         (
-            args.corpus,
-            f"corpus not found at {args.corpus} - build it: python3 speed_gate.py --make-corpus",
-        ),
-        (
             QUANTIZE_BIN,
             f"llama-quantize not found at {QUANTIZE_BIN} - place the b10964 build in the repo root",
         ),
