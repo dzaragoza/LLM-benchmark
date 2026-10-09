@@ -101,3 +101,72 @@ below it with a HIGHER score is direct quant-impact evidence.
 No code change in this addendum; the baseline is derivable from
 climb_allocations' own estimator arithmetic when the grading
 needs it.
+
+
+## Addendum 145 - the requirements review: two classes; the tool environment and the test strategy become requirements; the quality run goes daily
+
+The author's rulings (three): "There should be a requirement
+explicitly about the tool environment. And about test policy or
+strategy. Can you review the requirements?"; "Let's have two types
+of requirements, project and wow requirements. Project for
+requirements about full_benchmark, wow about the wow."; "Change the
+ci weekly workflow in github from weekly to daily."
+
+THE REVIEW (all 29 requirements re-read against their subjects):
+
+- PROJECT class (the benchmark machinery - full_benchmark, the
+  bench/ controllers, state/results contracts, the v7 corpus):
+  R-01..R-12, R-13..R-19. R-17 (the crash rail) stays project - its
+  code lives in full_benchmark's entry path; R-16 (the corpus
+  artifact) project by subject.
+- WOW class (the way of working - environment, editor, hooks, CI,
+  test policy): R-20..R-29.
+- Gaps found by the review, now closed as new requirements:
+  - R-30 (the tool environment): the environment was pinned only
+    from the installed side (test_precommit_env checks the modules
+    import) - nothing pinned that requirements.txt DECLARES them.
+    R-30 makes the declaration explicit: every hook/test/CI
+    dependency is in requirements.txt; a missing dependency is an
+    environment bug (install it), never a reason to skip a hook or
+    bypass a gate; a new tool enters through requirements.txt plus
+    a pinning test.
+  - R-31 (the test strategy): the layers existed in practice
+    (deterministic pins, hypothesis properties, crosshair
+    contracts, the full suite on push) but the POLICY was spread
+    across addenda 116/117/119/127. R-31 registers the strategy:
+    (1) deterministic pins, affected-subset in the commit hook via
+    testmon; (2) hypothesis properties marked hypothesis_props,
+    never in the 5s hook; (3) crosshair contracts; (4) the FULL
+    suite on every push and daily in CI; a red push-regression
+    blocks the next delivery (R-27). A bug that reaches a run
+    becomes a regression test and, where the class warrants it, a
+    requirement (wow.md rule 3). Coverage: a discovery helper,
+    never a metric.
+
+THE PROTOCOL SPLIT: md/protocol.md's Requirements section now
+carries two tables - "Project requirements (the benchmark
+machinery)" and "WoW requirements (the way of working)". R-numbers
+are stable (no renumbering - history preserved); the class is the
+table a row lives in. requirements_check.py is unchanged - it
+scans the whole file for R-rows either way.
+
+THE DAILY QUALITY RUN: weekly-quality.yml is retired (deleted);
+daily-quality.yml replaces it - same steps plus the full pytest
+suite (the R-31 daily home), cron 00:00 UTC DAILY. The weekly
+cadence was addendum 24's; the author's ruling supersedes it.
+
+Changes: md/protocol.md (the two-class split + R-30/R-31),
+tests/test_tooling_reqs.py (Pins: R-30, R-31 - requirements.txt
+declares the environment; the workflows install from it; the
+hypothesis marker stays out of the hook; the layers have their
+homes; the daily workflow exists, the weekly one is gone),
+.github/workflows/daily-quality.yml (new), weekly-quality.yml
+(deleted).
+
+BONUS FIND (the pin paying for itself at birth): writing the R-31
+pin caught a live regression - the addendum-119 testmon rewrite had
+DROPPED the addendum-117 hypothesis deselect from the hook's pytest
+command (no -m "not hypothesis_props"), so a commit touching
+tests/test_properties.py would have run the slow property layer
+inside the 5s hook. Restored in testmon_hook.py; the R-31 pin
+(test_r31_hypothesis_never_in_the_hook) holds it from now on.

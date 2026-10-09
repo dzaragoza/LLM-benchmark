@@ -1,14 +1,15 @@
-name: weekly quality run
+name: daily quality run
 
-# The once-in-a-while class (session 40): the tools that are too slow
-# or too exploratory for the pre-commit hook, run at midnight every
-# Monday. Ruled by the author; mutmut deliberately left out (too
-# expensive). Nothing here blocks commits - the artifacts land in the
-# run log for the next session to read.
+# The once-in-a-while class (session 40, addendum 24), DAILY since
+# addendum 145 (the author's ruling: the weekly cadence became the
+# daily cadence). The tools too slow or exploratory for the commit
+# hook run at 00:00 UTC every day. Nothing here blocks commits - the
+# artifacts land in the run log for the next session to read.
+# mutmut deliberately left out (too expensive).
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # 00:00 UTC Monday
+    - cron: "0 0 * * *" # 00:00 UTC daily
   workflow_dispatch: {} # manual trigger for interrupted evaluations
 
 permissions:
@@ -27,6 +28,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install coverage vulture
+      - name: pytest (the full suite - the R-31 layer home)
+        run: python3 -m pytest tests -q
       - name: coverage (the missing-test map - a discovery helper, never a metric)
         run: |
           coverage run -m pytest tests -q
