@@ -4,11 +4,12 @@ import os
 import sys
 
 # mutmut's staging dir does not run the repo-root conftest.py, so the bare
-# `import code_edit` resolves only when AI_tools is on the path explicitly
-# (addendum 175 - the mutation-stats run crashed on exactly this import).
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "AI_tools")
-)
+# root-module imports (code_edit, full_benchmark, infra.*) resolve only when
+# the paths are set explicitly (addenda 175/178 - the mutation-stats run
+# crashed on each import in turn; both dirs go on the path).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_HERE, "..", "AI_tools"))
+sys.path.insert(0, os.path.join(_HERE, ".."))
 
 import code_edit
 
