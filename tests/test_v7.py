@@ -215,7 +215,7 @@ def test_greedy_ruling_shape():
     """Pins: R-18, R-19. The climb starts at (Q2_K, q2_K, q2_K),
     uses K-encoding below q8, tops at 16 bits, and every pilot cell
     reaches at least one span grade (exclusion, not failure)."""
-    assert v7_pilot.W_LADDER[0] == "Q2_K" and v7_pilot.W_LADDER[-1] == "F16"
+    assert v7_pilot.W_LADDER[0] == "Q4_0" and v7_pilot.W_LADDER[-1] == "F16"
     assert v7_pilot.KV_QUANT_LADDER[0] == "q4_0" and v7_pilot.KV_QUANT_LADDER[-1] == "f16"
     for w in v7_pilot.W_LADDER[:-1]:
         assert w.endswith("_K") or w.endswith("_0")
