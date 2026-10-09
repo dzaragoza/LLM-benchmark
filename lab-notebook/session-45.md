@@ -262,3 +262,37 @@ first full run, unchanged.
 Pinned by tests/test_testmon_hook.py: the explicit arm runs (probe
 in a scratch repo executes and reports), a failing changed test
 file blocks, and the existing contract pins hold.
+
+
+## Addendum 149 - code_edit robustness: the docstring-apostrophe fix and the quote-style rescue
+
+The author's ask: "Any bug fixes or improvement to code edit? I
+have seen you struggle with single quotes." Two real defects,
+both demonstrated in today's session:
+
+1. THE DOCSTRING-APOSTROPHE FALSE BLOCK. The region balance check
+   (_check_delimiters) scanned each edited region as CODE even
+   when the region sits inside a triple-quoted string - so editing
+   docstring PROSE containing an apostrophe ("CI's job",
+   "addendum-117's") read as an unclosed quote and blocked the
+   edit (it cost two re-aimed edits in addendum 147's delivery).
+   Fix: a region that sits inside a triple-quoted string is prose -
+   the check requires only that the region keeps its triple-quote
+   pairing even (a truncated docstring fragment still blocks);
+   code regions keep the full quote/bracket balance check.
+
+2. THE QUOTE-STYLE RESCUE. The addendum-146 format hook legally
+   rewrites quote styles across the file (' -> " under the repo's
+   ruff config), so an old_str written against the pre-format
+   style stops matching exactly while the CODE is unchanged
+   (this bit twice: the test_tooling_reqs.py re-aims). Fix: after
+   the exact and whitespace-flexible passes fail, the finder tries
+   the quote-swapped target (both directions) - uniqueness
+   required, the same contract as the whitespace rescue; the
+   FILE's own text is returned so the apply stays exact.
+
+Both fixes verified against their live failure cases (6 direct
+probes + the session-45 shapes), the guards regression-tested
+(truncated code, broken triple-quote, quote opened in code still
+block), and pinned by tests/test_code_edit_robustness.py (8
+tests, Pins: R-26).
