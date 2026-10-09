@@ -50,6 +50,7 @@ def test_random_under_budget():
 
 
 def test_random_is_reproducible():
+    """Pins: R-32 - the seeded random climb reproduces its plan."""
     a = v7.climb_allocations(4.0, roster_limit=12, policy="random")
     b = v7.climb_allocations(4.0, roster_limit=12, policy="random")
     assert a == b, "the same seed must produce the same plan"
