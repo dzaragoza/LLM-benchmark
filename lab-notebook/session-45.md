@@ -792,3 +792,31 @@ Note: the format step writes to the CI workspace only - it does not
 commit back; formatting drift is fixed on the next local delivery
 (or by the author's editor). The step's purpose is that the rest of
 the run sees a consistently formatted tree, without gating on it.
+
+
+## Addendum 170 - the MEASURED budget gate; the audit; the page shows measured RAM
+
+The author's ruling: "Census on Llama's deep cell: total 4.32
+GiB (est 3.86) - this should have been an error. check always the
+gpu memory usage in llama-cpp is under 4 gib! the estimate is
+that, an estimate." Three parts:
+
+1. THE RUNTIME GATE: BudgetExceeded - after every cell's census,
+   the GPU footprint (Vulkan0 model+context+compute) is checked
+   against the budget; over-budget raises, the cell is labelled
+   error=budget, never scored. The estimate plans; the census
+   decides.
+
+2. THE AUDIT of all runs: one true violator on the GPU scope -
+   granite-3.1-2b-instruct @65536, GPU 4.03 GiB (greedy 1.961,
+   stingy 2.139). ERASED: the cells from both state files and the
+   answers logs. The cells I had quoted with totals over 4
+   (Llama 4.51/4.32, Qwen 4.33) are GPU-scope-compliant (3.95,
+   3.99, 3.88) - the totals include the host share, out of scope
+   per addendum 136. My earlier "safe direction" framing answered
+   the wrong question and is corrected here.
+
+3. THE PAGE: the winner's entry now shows llama-server's measured
+   GPU breakdown (3.49 GiB for Qwen3.5-2B@262k), not the
+   estimate; the whole-machine figure noted as the host-share-
+   inclusive number.
