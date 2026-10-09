@@ -10,9 +10,9 @@ _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE / "tests"))
 sys.path.insert(0, str(_HERE))
 
-import test_answers_jsonl  # noqa: E402
+import test_answers_jsonl as _taj  # noqa: E402
 
-validate = test_answers_jsonl.validate
+validate = _taj.validate
 
 ROOT = Path(__file__).resolve().parent
 files = list((ROOT / "models" / "tournament-results").rglob("*-answers.jsonl"))
