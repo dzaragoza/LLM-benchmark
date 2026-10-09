@@ -367,3 +367,38 @@ Both re-tested after strengthening: the mutations now FAIL the
 pins, the clean tree passes all 26 WoW pin tests. The audit method
 itself is registered: a pin that cannot fail is decoration - run
 the mutation before trusting the pin.
+
+
+## Addendum 152 - mutmut joins CI; wow.md trimmed of requirement-covered items
+
+Two rulings. First: "We tried a test mutation tool but discarded it
+because it was too slow. Add it to github ci." - mutmut (the
+session-40 first trial: 1922 mutants, 584 killed, the selection
+caveat on record) returns as a CI step in push-regression.yml,
+NON-GATING (|| true): the tally lands in the run log for the next
+session to read, never blocks a delivery - mutation survival is a
+discovery helper like coverage, never a gate. Too slow locally is
+exactly the addendum-147 split: CI owns what cannot fit the local
+budget. The session-40 caveat stands: the [tool.mutmut] selection
+is the 4 pure test files; a fair code_edit score still needs
+test_seams (staging-dir limit, on record). The removal clause also
+stands: if the CI trials add no finding beyond coverage + the
+gates, remove it.
+
+WATCH ITEM, on record: pushes are frequent during a live benchmark
+(the artifact rail fires per model), and every push now runs the
+mutmut sweep. If CI minutes or queue latency bite, the knob is a
+separate manual-dispatch workflow - the author rules if it moves.
+
+Second: "There's overlap between wow.md and requirements for wow.
+Remove from wow.md the items already covered by requirements."
+The overlap audit: former section 4 (Vibe uses the code_edit tool)
+was FULLY covered by R-26 - removed, sections renumbered (4-9 now
+Daniela-human/fish/naming/help/review). Section 3's
+a-bug-becomes-a-regression-test clause now cites R-31 (the test
+strategy's closing clause) instead of restating it. Section 10
+(review on demand) and the scientific-method sections stay - no
+requirement covers them (they are ways of working the requirements
+table deliberately does not duplicate). Historical notebook
+references to "wow.md section 4" resolve to R-26 - a pointer note
+in wow.md section 3 states it.
