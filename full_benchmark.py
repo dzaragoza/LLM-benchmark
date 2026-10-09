@@ -696,7 +696,7 @@ def _run(args: argparse.Namespace) -> None:
         if verdicts and all(v in ("dead", "infeasible") for v in verdicts):
             stamp(f"rung {depth:,} ALL-DEAD - the ladder moves up")
             continue
-    if not args.no_git and not args.dry_run:
+    if not args.no_git:
         tee_output.uninstall()
         git_tail(args)
     stamp("run complete")
