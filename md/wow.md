@@ -17,10 +17,14 @@ announcement.
 
 Vibe reads this section FIRST, every prompt, and follows it in order:
 
-1. **CI before pull.** Before any git pull, check the LAST COMPLETED
-   push-regression verdict on GitHub; if red, read the failure log
-   and FIX the red before pulling. In-flight runs are never waited
-   for - the previous completed verdict governs.
+1. **CI before pull - and ONLY before pull.** Before any git pull,
+   check the LAST COMPLETED push-regression verdict on GitHub; if
+   red, read the failure log and FIX the red before pulling.
+   In-flight runs are never waited for - the previous completed
+   verdict governs. Do NOT check CI on every prompt (the
+   every-prompt habit is retired): the check is owed before a pull
+   and before a push, nowhere else. Answering a question, grading
+   results, or planning work never requires a CI check.
 2. **Nothing runs locally - ever** (R-38): no tests, no linter, no
    formatter, no type check, on no file, under no circumstance. Do
    NOT run pytest, ruff, ty, coverage, vulture, mutmut, or any other
