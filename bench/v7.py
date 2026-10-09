@@ -290,7 +290,11 @@ def climb_allocations(
             )
             if total is None or total > budget_gib:
                 continue
-            rng = random.Random(ALLOC_RANDOM_SEED + p) if policy == "random" else None
+            rng = (
+                random.Random(ALLOC_RANDOM_SEED) if policy == "random" else None
+            )  # addendum 167: ONE fixed seed, the same for every cell -
+            # a fresh rng per (family, ctx) from the registered constant;
+            # no params-dependence, no cross-cell stream coupling
             while True:
                 if rng is not None:
                     options = []

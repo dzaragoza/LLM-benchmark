@@ -750,3 +750,21 @@ Also this delivery: wow.md rule 2 gains the explicit habits clause
 ("Do NOT run pytest... HABITS DO NOT OVERRIDE THIS RULE"), and the
 red format finding from the completed verdict was fixed before the
 push (test_io_fakes, second stub dict - the formatter's wrapping).
+
+
+## Addendum 167 - the random climb's seed is ONE fixed constant, same for every cell
+
+The author's sanity check before the multi-arm run: "Make sure the
+random seed for random climb is fixed and is the same for every
+cell." The addendum-150 form seeded ALLOC_RANDOM_SEED + params -
+DIFFERENT streams per family (and params-dependent: reproducing a
+plan required the registry's params, not the constant alone). The
+registered text even said "seeded per family" - the author's check
+caught a real reproducibility weakness.
+
+Fixed: ONE fixed seed. A fresh random.Random(ALLOC_RANDOM_SEED) per
+(family, ctx) - the same constant for every cell, no params-
+dependence, no cross-cell stream coupling: the plan for any cell
+reproduces from the registered constant alone. The pin's docstring
+updated to match. R-29's "seeded per family" wording is corrected
+by this addendum (the protocol row carries the new form).
