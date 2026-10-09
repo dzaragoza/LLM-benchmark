@@ -793,7 +793,8 @@ def certify_v7(
             and done.get("vq") == cell["vq"]
         ):
             if multi_arm:
-                stored_arms = (done.get("arms") or {}).get
+                arms_record = done.get("arms") or {}
+                stored_arms = arms_record.get
                 arms_needed = []
                 for pol in ("stingy", "random"):
                     alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
@@ -805,7 +806,8 @@ def certify_v7(
                         cell["vq"],
                     ):
                         continue  # agrees with greedy - already measured
-                    if stored_arms(pol) and stored_arms(pol).get("score") is not None:
+                    stored = stored_arms(pol)
+                    if stored is not None and stored.get("score") is not None:
                         continue  # that arm already measured
                     arms_needed.append(pol)
                 if not arms_needed:

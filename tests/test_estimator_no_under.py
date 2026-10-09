@@ -35,7 +35,11 @@ def test_no_under_estimate_in_any_census_record():
                     r.get("wq") or c.get("wq"), r.get("kq") or c.get("kq"),
                     r.get("vq") or c.get("vq"), int(ctx),
                 )
-                gpu = (v.get("model_gib") or 0) + (v.get("context_gib") or 0) + (v.get("compute_gib") or 0)
+                gpu = (
+                    (v.get("model_gib") or 0)
+                    + (v.get("context_gib") or 0)
+                    + (v.get("compute_gib") or 0)
+                )
                 if est is None:
                     continue
                 rows += 1
