@@ -179,7 +179,7 @@ def weights_gib_positive_ref(params_b: float, wi: int) -> bool:
     """A weight estimate is positive for any positive parameter count
     at any ladder rung (the planner's feasibility filter rests on it).
     pre: params_b > 0.0
-    pre: 0 <= wi < 7
+    pre: 0 <= wi < 4  # the _0 ladder: Q4_0, Q5_0, Q8_0, F16 (addenda 172/173)
     post: __return__
     """
     from bench.v7 import W_LADDER, weights_gib
@@ -191,7 +191,7 @@ def weights_gib_linear_ref(a: float, wi: int) -> bool:
     """Weights scale LINEARLY in parameters: doubling the model doubles
     the weight cost at any quant (the per-axis budget accounting).
     pre: a > 0.0
-    pre: 0 <= wi < 7
+    pre: 0 <= wi < 4  # the _0 ladder: Q4_0, Q5_0, Q8_0, F16 (addenda 172/173)
     post: __return__
     """
     from bench.v7 import W_LADDER, weights_gib
@@ -229,7 +229,7 @@ def alloc_total_positive_ref(
     non-negative terms, so the estimate never lands at or below zero
     for a placeable family (the greedy floor (2,2,2) is feasible).
     pre: per_token >= 0.0 and params_b > 0.0 and ctx > 0
-    pre: 0 <= wi < 7 and 0 <= ki < 4 and 0 <= vi < 4
+    pre: 0 <= wi < 4 and 0 <= ki < 4 and 0 <= vi < 4  # the _0 ladders (addenda 172/173)
     post: __return__
     """
     import bench.v7 as v7m
@@ -249,7 +249,7 @@ def alloc_kv_monotone_in_ctx_ref(per_token: float, ctx1: int, ctx2: int, ki: int
     """The KV term is monotone in ctx: a deeper context never costs
     LESS cache - the reach-vs-smarts tradeoff the argmax balances.
     pre: per_token >= 0.0 and 0 < ctx1 <= ctx2
-    pre: 0 <= ki < 4 and 0 <= vi < 4
+    pre: 0 <= ki < 4 and 0 <= vi < 4  # the _0 KV ladder (addenda 172/173)
     post: __return__
     """
     import bench.v7 as v7m
