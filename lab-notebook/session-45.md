@@ -653,3 +653,30 @@ P4 the agreeing cells are identical across arms by construction -
    the null arm.
 A family-ranking flip = the allocation policy is a scoring
 variable, not just a memory plan - register the finding.
+
+
+## Addendum 163 - mutmut selection fixed; the I/O layer covered by a loopback stub
+
+Two rulings. "Fix mutmut." The CI trial (addendum 152) crashed the
+stats run on a pre-existing failure in the OLD selection - session
+40's list named test files whose bare root-module imports break
+under mutmut 3.x's staging dir. The selection now points at the
+CURRENT test homes for both registered sources: test_seams.py (61
+tests, the strongest code_edit file - the session-40 verdict that
+a fair score requires it), test_code_edit_cli.py (PYTHONPATH-based,
+staging-compatible), test_code_edit_robustness.py, and
+test_md_check.py (the second source's home). The conftest sys.path
+insert is staging-consistent (mutmut stages the whole tree), so
+the staged mutants are the ones the tests exercise.
+
+Second: "use fakes to test the io layer" - tests/test_io_fakes.py:
+a loopback HTTP stub (real sockets, real urllib, an in-process
+HTTPServer answering like llama-server) so the I/O layer runs its
+REAL request paths offline: tokenize's round trip and its
+no-tokens-field error, ask's content/reasoning_content contract
+and its chat_template_kwargs injection, the HTTP-error body
+surfacing (the addendum-102 crash shape), trim_to_tokens'
+never-over-budget bisection, and wait_healthy's poll-to-green and
+unreachable branches. The addendum-112 discipline holds: the stub
+fakes the SERVER, never the measurement contract - production code
+unmodified, no GPU, no binary.

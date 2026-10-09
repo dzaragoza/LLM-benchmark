@@ -14,7 +14,19 @@ extra-paths = ["AI_tools"]
 
 [tool.mutmut]
 source_paths = ["AI_tools/code_edit.py", "AI_tools/md_check.py"]
-pytest_add_cli_args_test_selection = ["tests/test_code_edit.py", "tests/test_python_syntax_gate.py", "tests/test_replace_verified.py", "tests/test_safe_append_md.py"]
+# addendum 163: the selection points at the CURRENT test homes for both
+# sources - the session-40 selection named test files whose imports break
+# under mutmut 3.x's staging dir (code_edit imported as a root module);
+# the CI trial of addendum 152 crashed the stats run on exactly that.
+# test_seams.py is IN (the session-40 verdict: a fair code_edit score
+# requires it - 61 tests, the strongest file) and imports code_edit the
+# same way mutmut stages it.
+pytest_add_cli_args_test_selection = [
+    "tests/test_seams.py",
+    "tests/test_code_edit_cli.py",
+    "tests/test_code_edit_robustness.py",
+    "tests/test_md_check.py",
+]
 
 [tool.pytest.ini_options]
 markers = ["hypothesis_props: hypothesis property tests - excluded from the commit hook (R-25), run on push and daily"]
