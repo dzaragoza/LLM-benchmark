@@ -20,7 +20,6 @@ def make_args(**kw):
     defaults = dict(
         families=["A/Qwen-A", "B/Qwen-B"],
         roster=None,
-        rung=fb.RUNG_DEFAULT,
         state_file="/tmp/unused-state.json",
         results_file="/tmp/unused-results.json",
     )

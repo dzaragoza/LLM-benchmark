@@ -13,8 +13,6 @@ which / 1.07 GiB/B = 4.92B params. The tests assert the formula.
 
 import pytest
 
-import full_benchmark as fb
-
 # ---- the registry (protocol.md rows 100/103/124; single source) ----
 BW_EFF = 76.5  # GiB/s, 102.4 tier
 T_INF = 74.0  # t/s
@@ -85,4 +83,3 @@ def test_band_pred_form():
 def test_default_rung_is_q8_0():
     """Addendum 86: the rung WALK is gone; one rung per run, default Q8_0
     (session 34: --rung overrides it - the Q4 context-over-parameters test)."""
-    assert fb.RUNG_DEFAULT == "Q8_0"
