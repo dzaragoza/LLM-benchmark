@@ -3,7 +3,7 @@ reports maps to the markdownlint rule of the same name, restricted to
 the GitHub-rendering failure class (tables, fences, trailing newline).
 """
 
-import md_check
+import AI_tools.md_check as md_check
 
 
 def run(tmp_path, text):

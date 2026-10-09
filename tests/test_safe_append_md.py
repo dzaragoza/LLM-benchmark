@@ -6,7 +6,7 @@ def test_safe_append_md_pipeline(tmp_path):
     a lint break into git."""
     import code_edit
 
-    import md_check
+    import AI_tools.md_check as md_check
 
     m = tmp_path / "notes.md"
     m.write_text("# notes\n")
