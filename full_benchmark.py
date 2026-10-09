@@ -496,6 +496,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
         "measure - never leave mixed-era results in the table (addendum 129)",
     )
+    ap.add_argument(
+        "--v7-alloc",
+        default="greedy",
+        choices=["greedy", "stingy"],
+        help="v7: the allocation climb policy (addendum 144) - greedy takes "
+        "the largest-fitting single-axis upgrade (R-18), stingy the smallest",
+    )
     ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
     ap.add_argument("--kv-quant-v", default=None, choices=_KV_CHOICES)
     ap.add_argument(
@@ -602,6 +609,7 @@ def _run(args: argparse.Namespace) -> None:
             if (args.no_git or args.dry_run)
             else partial(v7_model_commit, args),
             clean=args.clean,
+            alloc_policy=args.v7_alloc,
         )
         state["v7"] = results
         save_state(args.state_file, state)

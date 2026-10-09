@@ -25,7 +25,7 @@ def test_every_ctx_rung_reaches_at_least_one_grade():
 def test_allocation_plan_has_no_zero_max_cells():
     """Every cell in the real greedy plan can reach at least one
     grade at its ctx - no structural 0/0 rows in the table."""
-    rows = v7.greedy_allocations(4.0, roster_limit=38)
+    rows = v7.climb_allocations(4.0, roster_limit=38)
     assert rows, "the plan must have cells"
     for r in rows:
         reachable = [

@@ -23,13 +23,13 @@ def test_smallest_ctx_is_measurable():
     questions and scores 0/0)."""
     smallest_ctx = min(v7_pilot.CTX_GRID)
     assert any(s <= smallest_ctx for s in v7_pilot.SPANS)
-    for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
+    for cell in v7_pilot.climb_allocations(4.0, v7_pilot.PILOT_FAMILIES):
         reach = [s for s in v7_pilot.SPANS if s <= cell["ctx"]]
         assert reach, f"ctx {cell['ctx']} cannot reach any span grade"
 
 
 def test_allocation_plan_frontier():
-    rows = v7_pilot.greedy_allocations(4.0, roster_limit=12)
+    rows = v7_pilot.climb_allocations(4.0, roster_limit=12)
     assert rows, "4 GiB must admit at least one allocation"
     for r in rows:
         assert r["est_gib"] <= 4.0
@@ -52,7 +52,7 @@ def test_question_prompt_tail():
 
 
 def test_greedy_starts_low_and_climbs():
-    rows = v7_pilot.greedy_allocations(4.0, roster_limit=12)
+    rows = v7_pilot.climb_allocations(4.0, roster_limit=12)
     assert rows
     for r in rows:
         assert r["wq"] in v7_pilot.W_LADDER
@@ -63,7 +63,7 @@ def test_greedy_starts_low_and_climbs():
 
 def test_greedy_is_maximal():
     """No single-axis one-notch upgrade fits after the climb stops."""
-    rows = v7_pilot.greedy_allocations(4.0, roster_limit=12)
+    rows = v7_pilot.climb_allocations(4.0, roster_limit=12)
     for r in rows:
         geom = v7_pilot.family_geometry(r["family"])
         wi = v7_pilot.W_LADDER.index(r["wq"])
@@ -94,11 +94,11 @@ def test_greedy_is_maximal():
 def test_greedy_floor_is_222():
     """The tiny families with headroom must climb to the top; the
     starting point (2,2,2) must be feasible for every emitted cell."""
-    rows = v7_pilot.greedy_allocations(0.45, roster_limit=12)
+    rows = v7_pilot.climb_allocations(0.45, roster_limit=12)
     for r in rows:
         assert r["est_gib"] <= 0.45
     # and at a starved budget, the floor config itself must appear
-    tiny = v7_pilot.greedy_allocations(0.1, roster_limit=12)
+    tiny = v7_pilot.climb_allocations(0.1, roster_limit=12)
     assert tiny == []
 
 
@@ -112,7 +112,7 @@ def test_recurrent_family_is_kvless():
     assert pt == 0.0
     assert v7_pilot.family_window("RWKV7-World-2.9B") == 2048
     assert min(v7_pilot.CTX_GRID) == 8192, "addenda 123/128: the 2k and 4k rungs are dropped"
-    rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
+    rows = v7_pilot.climb_allocations(4.0, roster_limit=38)
     rwkv = [r for r in rows if r["family"] == "RWKV7-World-2.9B"]
     assert not rwkv, "window 2048 < smallest ctx rung: no cell is reachable"
     assert all(r["est_gib"] <= 4.0 for r in rwkv)
@@ -126,7 +126,7 @@ def test_mha_fallback_places_phi1():
     pt = v7_pilot.kv_per_token_f16("phi-1", None)
     assert pt and pt > 0
     assert v7_pilot.family_window("phi-1") == 2048
-    rows = v7_pilot.greedy_allocations(4.0, roster_limit=38)
+    rows = v7_pilot.climb_allocations(4.0, roster_limit=38)
     assert not any(r["family"] == "phi-1" for r in rows), "window 2048 earns no cell at ctx>=4096"
 
 
@@ -224,7 +224,7 @@ def test_greedy_ruling_shape():
     from full_benchmark import _KV_CHOICES
 
     assert all(q in (*_KV_CHOICES, "f16") for q in v7_pilot.KV_QUANT_LADDER)
-    for cell in v7_pilot.greedy_allocations(4.0, v7_pilot.PILOT_FAMILIES):
+    for cell in v7_pilot.climb_allocations(4.0, v7_pilot.PILOT_FAMILIES):
         assert any(s <= cell["ctx"] for s in v7_pilot.SPANS)
 
 
@@ -254,7 +254,7 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
 
     committed = []
 
-    def fake_alloc(budget, limit=4):
+    def fake_alloc(budget, limit=4, policy="greedy"):
         def cell(fam, ctx, est):
             return {
                 "family": fam,
@@ -272,7 +272,7 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
             cell("famB", 4096, 1.1),
         ]
 
-    monkeypatch.setattr(v7m, "greedy_allocations", fake_alloc)
+    monkeypatch.setattr(v7m, "climb_allocations", fake_alloc)
     # every acquisition and server launch faked out; run_cell scores empty
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
     monkeypatch.setattr(

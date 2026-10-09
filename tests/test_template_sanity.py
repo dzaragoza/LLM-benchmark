@@ -52,8 +52,8 @@ def test_malfunction_labels_cell_not_score(tmp_path, monkeypatch):
     carries no score, so the tables never show a fake 0."""
     monkeypatch.setattr(
         v7m,
-        "greedy_allocations",
-        lambda b, budget=4: [
+        "climb_allocations",
+        lambda b, budget=4, policy="greedy": [
             {
                 "family": "famA",
                 "params_b": 0.3,
