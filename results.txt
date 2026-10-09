@@ -66992,3 +66992,39 @@ UnboundLocalError: cannot access local variable 'entry' where it is not associat
   arm greedy: Q5_0/q8_0/q5_0 -> 3.023/30
   arm stingy: Q4_0/q8_0/q8_0 -> 3.223/30
 [2026-10-09T20:26:36] v7 model done: AI21-Jamba2-3B (6/6 cells scored) - committing artifacts
+
+===== 2026-10-09T20:26:42 | full_benchmark.py --task v7 --v7-families 32 --v7-multi-arm --state-file state/benchmark-state-v7-1.json --results-file benchmark-results-v7-1.json =====
+=== SmolLM3-3B (model 18 of 25) ctx=8192 wq=Q8_0 k=f16 v=f16
+  [2] quantizing SmolLM3-3B-f16.gguf -> Q8_0 (output hidden; shown on error)
+  preflight: {'4096x2': 4059, '4096x32': 4059}
+  census: GPU 3.69 GiB (est 3.67) - weights 3.04, context 0.56, compute 0.08
+  score 0.685 / 5
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q8_0/f16/f16 -> 0.685/5
+=== SmolLM3-3B (model 18 of 25) ctx=16384 wq=Q8_0 k=f16 v=q8_0
+  preflight: {'4096x2': 4059, '8192x32': 7219}
+  census: GPU 3.99 GiB (est 3.98) - weights 3.04, context 0.86, compute 0.09
+  score 1.52 / 10
+  arm stingy: Q5_0/f16/f16 differs - measuring
+  [2] quantizing SmolLM3-3B-f16.gguf -> Q5_0 (output hidden; shown on error)
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q8_0/f16/q8_0 -> 1.52/10
+  arm stingy: Q5_0/f16/f16 -> 1.661/10
+=== SmolLM3-3B (model 18 of 25) ctx=32768 wq=Q8_0 k=q5_0 v=q5_0
+  preflight: {'4096x2': 4059, '16384x32': 14390}
+  census: GPU 3.92 GiB (est 3.91) - weights 3.04, context 0.77, compute 0.10
+  score 2.437 / 15
+  arm stingy: Q5_0/f16/q8_0 differs - measuring
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q8_0/q5_0/q5_0 -> 2.437/15
+  arm stingy: Q5_0/f16/q8_0 -> 2.336/15
+=== SmolLM3-3B (model 18 of 25) ctx=65536 wq=Q5_0 k=q8_0 v=q4_0
+  preflight: {'4096x2': 4059, '32768x32': 29466}
+  census: GPU 3.97 GiB (est 3.92) - weights 2.00, context 1.83, compute 0.14
+  score 2.346 / 20
+  arm stingy: Q5_0/q5_0/q5_0 differs - measuring
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q5_0/q8_0/q4_0 -> 2.346/20
+  arm stingy: Q5_0/q5_0/q5_0 -> 2.726/20
+[2026-10-09T20:37:22] v7 model done: SmolLM3-3B (4/4 cells scored) - committing artifacts
