@@ -30,7 +30,7 @@ class FakeTokenizerPort:
         self.tokens_per_probe = tokens_per_probe
 
 
-def _fake_tokenize_factory(retval):
+def _fake_tokenize_factory(_retval):
     def tokenize(port, content, timeout=300):
         return [0] * (len(content) // 4)
 

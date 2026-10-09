@@ -754,7 +754,7 @@ def test_cell_logs_live_in_the_results_tree(tmp_path, monkeypatch):
     results = tmp_path / "tournament-results" / "fam"
     written: list[str] = []
 
-    def fake_start(model_, port, extra=None, server_bin=None, log_path=None, **kw):
+    def fake_start(_model, port, extra=None, server_bin=None, log_path=None, **kw):
         written.append(str(log_path))
         with open(str(log_path), "wb") as f:
             f.write(b"server up")
