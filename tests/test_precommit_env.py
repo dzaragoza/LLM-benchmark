@@ -35,7 +35,14 @@ def test_r20_ci_installs_from_requirements():
     undeclared dependency, no skipped check."""
     wf = (ROOT / ".github" / "workflows" / "push-regression.yml").read_text(encoding="utf-8")
     assert "requirements.txt" in wf
-    for step in ("ruff check", "ruff format --check", "ty_check.py", "md_check.py", "requirements_check.py", "pytest tests"):
+    for step in (
+        "ruff check",
+        "ruff format --check",
+        "ty_check.py",
+        "md_check.py",
+        "requirements_check.py",
+        "pytest tests",
+    ):
         assert step in wf, f"CI must run {step} (nothing is skipped)"
 
 
