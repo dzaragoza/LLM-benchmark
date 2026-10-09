@@ -668,7 +668,15 @@ def certify_v7(
     clean: bool = False,
     alloc_policy: str = "greedy",
     only_cells: list[tuple[str, int]] | None = None,
+    multi_arm: bool = False,
 ) -> list[dict[str, Any]]:
+    """Addendum 166: multi_arm mode - all three allocation policies
+    measured TOGETHER, in one cell record: greedy goes first, then
+    stingy IFF its config differs from greedy's, then random IFF its
+    config differs from both. Every arm's config and score land in the
+    SAME cell (state[...][ctx]["arms"] = {policy: {wq,kq,vq,score,
+    ...}}), so all the data is in one file. Cells where all three
+    agree measure once (the null arm needs no re-measure)."""
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
     bench.cells shape (ctx, -fa on, cache types), score the fixed
@@ -696,6 +704,13 @@ def certify_v7(
         print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
         save_state(state_path, state)
     cells = climb_allocations(budget_gib, roster_limit, alloc_policy, report_unplaceable=True)
+    # addendum 166: the multi-arm plans - stingy/random configs per cell,
+    # measured only where they diverge from the arms already measured
+    alt_plans: dict[str, dict[tuple[str, int], dict]] = {}
+    if multi_arm:
+        for pol in ("stingy", "random"):
+            plan = [r for r in climb_allocations(budget_gib, roster_limit, pol) if "reason" not in r]
+            alt_plans[pol] = {(r["family"], r["ctx"]): r for r in plan}
     # addendum 154: the unplaceable are FINDINGS, reported before the
     # run - the measured count is honest by construction
     findings = [c for c in cells if "reason" in c]
@@ -835,8 +850,68 @@ def certify_v7(
                     f"-> total {breakdown['total_gib']:.2f} GiB (est {cell['est_gib']})"
                 )
             print(f"  score {rec['score']} / {rec['max_score']}")
-            v7[key] = {**cell, **rec}
+            # addendum 166: the multi-arm cell record - every arm's config
+            # and score in the SAME cell, one file; arms that agree with an
+            # already-measured config need no re-measure (they ARE it)
+            arms = {alloc_policy: {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}}
+            if multi_arm:
+                measured_cfgs = {
+                    (cell["wq"], cell["kq"], cell["vq"]),
+                }
+                for pol in ("stingy", "random"):
+                    alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
+                    if alt is None:
+                        continue
+                    cfg = (alt["wq"], alt["kq"], alt["vq"])
+                    if cfg in measured_cfgs:
+                        print(f"  arm {pol}: same config as a measured arm - skipped")
+                        continue
+                    print(f"  arm {pol}: {cfg[0]}/{cfg[1]}/{cfg[2]} differs - measuring")
+                    # the arm has its OWN launch cycle: a different weights
+                    # quant is a different GGUF, different cache flags - the
+                    # greedy server cannot serve it. Stop, relaunch, score.
+                    llama_server.stop_server(proc, port)
+                    try:
+                        arm_gguf = _acquire_missing_model(
+                            repo, fam, famdir, alt["wq"], state, False
+                        )
+                        if not arm_gguf:
+                            arms[pol] = {
+                                "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
+                                "error": "arm: could not acquire the quant",
+                            }
+                            continue
+                        arm_extra = ["-c", str(cell["ctx"]), "--parallel", "1"]
+                        if alt["kq"] != "f16" or alt["vq"] != "f16":
+                            arm_extra += [
+                                "-fa", "on", "--cache-type-k", alt["kq"],
+                                "--cache-type-v", alt["vq"],
+                            ]
+                        proc, healthy = llama_server.start_server(
+                            arm_gguf, port=port, extra_args=arm_extra,
+                            log_path=log_path,
+                        )
+                        if not healthy or not llama_server.wait_healthy(port, proc=proc):
+                            arms[pol] = {
+                                "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
+                                "error": "arm: server did not come up",
+                            }
+                            continue
+                        arm_rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
+                        arms[pol] = {"wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"], **arm_rec}
+                        measured_cfgs.add(cfg)
+                    except Exception as e:
+                        arms[pol] = {
+                            "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
+                            "error": f"arm failed: {e}",
+                        }
+                for pol, a in arms.items():
+                    if "score" in a:
+                        print(f"  arm {pol}: {a['wq']}/{a['kq']}/{a['vq']} -> {a['score']}/{a['max_score']}")
+            v7[key] = {**cell, **rec, **({"arms": arms} if multi_arm else {})}
             entry.update(rec)
+            if multi_arm:
+                entry["arms"] = arms
         finally:
             llama_server.stop_server(proc, port)
             save_state(state_path, state)
