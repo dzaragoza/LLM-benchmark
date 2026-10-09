@@ -771,6 +771,15 @@ def certify_v7(
             except Exception as e:
                 print(f"  model-commit failed (ignored): {e}")
 
+    # addendum 181: the position print - the plan is param-ascending, so
+    # the family's first cell marks its position: "model x of n"
+    plan_fams = []
+    for _c in cells:
+        if _c["family"] not in plan_fams:
+            plan_fams.append(_c["family"])
+    fam_position = {f: i + 1 for i, f in enumerate(plan_fams)}
+    n_models = len(plan_fams)
+
     for cell in cells:
         fam = cell["family"]
         if pending_fam is not None and fam != pending_fam:
@@ -857,7 +866,10 @@ def certify_v7(
             results.append(entry)
             continue
         repo = registry_data.ROSTER.get(fam, fam)
-        print(f"=== {fam} ctx={cell['ctx']} wq={cell['wq']} k={cell['kq']} v={cell['vq']}")
+        print(
+            f"=== {fam} (model {fam_position[fam]} of {n_models}) "
+            f"ctx={cell['ctx']} wq={cell['wq']} k={cell['kq']} v={cell['vq']}"
+        )
         famdir = os.path.join(models_dir, fam)
         gguf = _acquire_missing_model(repo, fam, famdir, cell["wq"], state, False)
         if not gguf:

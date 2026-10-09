@@ -1005,3 +1005,28 @@ THE ANALYSIS (pre-registered, graded when the arms blocks fill):
 
 The pre-registration: no strategy proposal before the deltas are
 pooled; the verdict cites the cells that made it.
+
+
+## Addendum 181 - the seams split re-arms the mutation selection; the position print
+
+The author's rulings: "Do 1. Let's reduce the number of survivors."
+and "Add to the benchmark to print the model position in the list
+as x of n models in the benchmark."
+
+1. THE SPLIT: test_seams.py's 56 code_edit-only tests move to
+   tests/test_code_edit_seams.py - a file that imports nothing but
+   code_edit, so it RUNS in mutmut's staging dir and re-enters
+   the selection (addendum 179's staging limit, addressed at the
+   test side instead of accepted). The 5 root-module tests stay
+   in test_seams.py (check_requirements x2, score_fwe x2,
+   resolve_f16_local - they import full_benchmark/ruler_gate/
+   infra and cannot stage). The survivor-heavy core
+   (_verify_blocks 411, _apply 273, _check_delimiters 242 - 926
+   of the 1834) faces the strongest tests again; the next tally
+   shows how many die. The session-40 verdict (seams in for a
+   fair score) is finally honored via the split.
+
+2. THE POSITION PRINT: every cell banner now reads
+   "=== <fam> (model x of n) ctx=..." - the plan's param-ascending
+   family order, computed once from the plan. The author's
+   running-output readability ask.
