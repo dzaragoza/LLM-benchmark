@@ -680,3 +680,17 @@ never-over-budget bisection, and wait_healthy's poll-to-green and
 unreachable branches. The addendum-112 discipline holds: the stub
 fakes the SERVER, never the measurement contract - production code
 unmodified, no GPU, no binary.
+
+
+## Addendum 164 - every tool failure fails the CI run
+
+The author's ruling: "Make any tool failure in ci make the Ci run
+fail." The last non-gating arm was mutmut's `|| true` (the
+addendum-152/158 tolerance: the tally lands in the log, never
+blocks). Removed - mutmut's exit code now gates the run like
+every other tool. The CI run is now fully gating: ruff, ruff
+format, ty, md_check, requirements_check, pytest, crosshair,
+coverage, vulture, mutmut - ten tools, ten verdicts, no mercy
+clause. A tool that fails IS a finding; a finding that cannot
+fail the run is decoration (the addendum-151 lesson applied to
+the workflow itself).
