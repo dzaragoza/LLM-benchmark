@@ -17,17 +17,13 @@ announcement.
 
 Vibe reads this section FIRST, every prompt, and follows it in order:
 
-1. **CI check before git pulls - and ONLY before git pulls.**
-   Before any git pull, check the LAST COMPLETED push-regression
-   verdict on GitHub; if red, read the failure log and FIX the
-   red before pulling. In-flight runs are never waited for - the
-   previous completed verdict governs. NOWHERE ELSE. Not before
-   pushes (push freely; the next pull's check will read that
-   run's verdict), not before answering questions, not before
-   grading, not "just in case", not bundled into a command that
-   reads files. THE ONLY COMMAND THAT BEGINS WITH A CI CHECK IS
-   A git pull. If a turn contains no pull, it contains no CI
-   check - no exceptions, no riding along, no habit.
+1. **CI is on-demand (addendum 190: the every-push suite was too
+   expensive). Nothing runs on ordinary pushes - the checks fire
+   on workflow_dispatch (manual) and a weekly Monday cron only.
+   The check discipline: read a CI verdict ONLY when the author
+   asks for one, or before a pull when a run is known to have
+   been dispatched. No every-prompt checks, no every-push runs,
+   no result-hunting - the emails stop, the runs are on demand.
 2. **Nothing runs locally - ever** (R-38): no tests, no linter, no
    formatter, no type check, on no file, under no circumstance. Do
    NOT run pytest, ruff, ty, coverage, vulture, mutmut, or any other

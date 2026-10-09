@@ -1354,3 +1354,23 @@ REGISTERED: the estimator's host-offload acceptance note moves
 from folklore to audit result - the offload under-count is
 -10..-19% for the affected families and CONSERVATIVE (never
 over-quotes GPU), consistent with addendum 136's ruling.
+
+## Addendum 190 - CI goes on-demand: the every-push suite is too expensive
+
+The author's ruling: "We need to stop ci and you looking for
+result of the tests. It's too expensive." The push-regression
+suite (~5 min/run, 13 gates, mutmut the heaviest) ran on EVERY
+push - and with the benchmark's artifact rail pushing per
+model, that was dozens of paid minutes per benchmark run plus
+my result-hunting turns on top.
+
+THE CHANGE: the workflow's `on:` triggers shrink to
+workflow_dispatch (manual) + a weekly Monday 03:00 UTC cron.
+Ordinary pushes run NOTHING - no tests, no emails, no verdict
+to hunt. The full 13-gate suite is unchanged and runs on
+demand: the author (or the agent, when asked) dispatches it
+when a check is wanted; the weekly cron is the standing
+backstop. Wow.md rule 1 rewritten to match: read a verdict
+only when asked or when a run is known dispatched - the
+every-prompt and every-push habits are both retired, this time
+by economics.

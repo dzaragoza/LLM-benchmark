@@ -1,16 +1,15 @@
 name: push regression run
 
-# Addendum 158+169 (the author's rulings): the hook is abolished -
-# this workflow is the ONLY verification gate. Ruff format APPLIES
-# formatting in place (never an error; drift is fixed, not gated).
-# The run CONTINUES after any error: every tool step carries
-# continue-on-error, so ALL tools always run - a red anywhere can
-# never hide the steps below it. The verdict is the AGGREGATE: the
-# final gate fails the run iff any tool failed.
+# Addendum 190 (the author's cost ruling): the CI suite is TOO EXPENSIVE to
+# run on every push - the checks now fire ONLY on workflow_dispatch (manual)
+# and a weekly schedule. Nothing runs on ordinary pushes. The aggregate
+# verdict, all gates, and the fixed-tool set are unchanged - they are simply
+# on-demand now. Red CI emails stop: no runs unless asked for.
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 3 * * 1" # 03:00 UTC Monday - the weekly full check
 
 permissions:
   contents: read
@@ -53,7 +52,7 @@ jobs:
       - name: crosshair (the contract proofs)
         id: crosshair
         continue-on-error: true
-        run: crosshair check tests/contracts.py --unblock=open:/:
+        run: crosshair check tests/contracts.py "--unblock=open:/"
       - name: coverage (the missing-test map - a discovery helper, never a metric)
         id: coverage
         continue-on-error: true
@@ -100,7 +99,6 @@ jobs:
           if [ "${{ steps.compile312.outcome }}" = "failure" ]; then echo "compile312: FAILURE"; RED=1; else echo "compile312: ${{ steps.compile312.outcome }}"; fi
           if [ "${{ steps.jsonl.outcome }}" = "failure" ]; then echo "jsonl: FAILURE"; RED=1; else echo "jsonl: ${{ steps.jsonl.outcome }}"; fi
           if [ "${{ steps.smoke.outcome }}" = "failure" ]; then echo "smoke: FAILURE"; RED=1; else echo "smoke: ${{ steps.smoke.outcome }}"; fi
-          echo "compile312 (the default): ${{ steps.compile312.outcome }}"
           if [ "$RED" = "1" ]; then
             echo "AGGREGATE: RED - at least one tool failed"
             exit 1
