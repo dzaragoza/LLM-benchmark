@@ -475,3 +475,34 @@ statistics-are-justified (all rule-1 disciplines); Daniela-is-human
 review-on-demand (rule 9). These stay as the working agreement.
 
 The requirements table now carries 36 requirements, all pinned.
+
+
+## Addendum 154 - selection semantics made explicit; the page goes v7
+
+The author's ruling: "Clear how you pick families. But make it
+clear. We go with all candidates and pick the first n that are in
+the list sorted by number of parameters. The fact that some cannot
+run is a finding. Report them as such. Saying 12 was confusing."
+
+The semantics were always first-N-param-ascending, but the
+UNPLACEABLE were silently skipped inside climb_allocations - so
+"we ran with 16" and the table showed 12 with no explanation.
+Now: report_unplaceable=True makes the plan carry the findings
+(family, params, reason) and certify_v7 PRINTS them before the
+run - "4 of the first 16 candidates cannot earn a cell (findings)",
+each with its reason (missing registry extract / window below the
+grid / floor config over budget). The measured count is honest by
+construction. THE FIRST-16 FINDINGS: gemma-3-1b-it and
+Llama-3.2-1B-Instruct (missing extracts, recoverable via
+etc/registry_data.py fetch), MiniCPM-1B-sft and phi-1 (windows
+4096/2048 below the grid - the addendum-123 honest consequence).
+
+Second ruling: "Let's make the result webpage based in V7. With
+the data we have now." docs/index.md is now the v7 deliverable:
+the argmax (Qwen3.5-2B at 262,144, Q8_0/q8_0/q5_0, 6.88/30, est
+3.84 GiB) with its llama-server command line, the full 11-family
+ranking with the reach curves, the findings table (the four
+unplaceable, the labelled-not-scored malfunction classes), and the
+what-the-numbers-mean section (credit scoring, exclusion-not-
+failure, reproducibility). The v5-era per-rung gold sections are
+retired from the page (history in the notebook and the registry).

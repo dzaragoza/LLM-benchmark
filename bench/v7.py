@@ -206,6 +206,7 @@ def climb_allocations(
     budget_gib: float,
     roster_limit: int = PILOT_FAMILIES,
     policy: str = "greedy",
+    report_unplaceable: bool = False,
 ) -> list[dict]:
     """For each (family, ctx): start at the (Q2_K, q4_0, q4_0) floor and
     climb by single-axis one-notch upgrades that land under the budget
@@ -217,7 +218,17 @@ def climb_allocations(
     assumption-free climb: no ordering over the axes, no step
     preference, maximality still guaranteed by the no-upgrade-fits
     stop. Output: the maximal config
-    <= budget per (family, ctx), param-ascending."""
+    <= budget per (family, ctx), param-ascending.
+
+    SELECTION (addendum 154, the author's ruling): the candidates are
+    ALL roster families, sorted by parameter count ascending; the
+    limit takes the FIRST N of that sorted list. A family that cannot
+    earn a cell (missing registry extract / window below the grid /
+    floor config over budget) is a FINDING, not a silent drop: with
+    report_unplaceable=True the unplaceable are returned in the
+    plan's findings list (family, params, reason) so the run reports
+    them - the count of MEASURED families is then honest by
+    construction."""
     if policy not in ("greedy", "stingy", "random"):
         raise ValueError(f"unknown allocation policy: {policy!r}")
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
@@ -225,11 +236,54 @@ def climb_allocations(
     for p, name in rows[:roster_limit]:
         geom = family_geometry(name)
         window = family_window(name)
+        findings: list[dict] = []
         if kv_per_token_f16(name, geom) is None:
+            findings.append(
+                {
+                    "family": name,
+                    "params_b": p,
+                    "reason": "unplaceable: missing registry extract (KV geometry "
+                    "unknowable) - run etc/registry_data.py fetch",
+                }
+            )
+            if report_unplaceable:
+                out.append(findings[0])
             continue
-        for ctx in CTX_GRID:
-            if window and ctx > window:
-                continue
+        ctxs = [c for c in CTX_GRID if not (window and c > window)]
+        if not ctxs:
+            findings.append(
+                {
+                    "family": name,
+                    "params_b": p,
+                    "reason": (
+                        f"unplaceable: trained window {window} below the "
+                        f"grid's smallest ctx rung {CTX_GRID[0]} (addendum 123)"
+                    ),
+                }
+            )
+            if report_unplaceable:
+                out.append(findings[0])
+            continue
+        feasible = any(
+            (t := _alloc_total(name, p, geom, "Q2_K", "q4_0", "q4_0", c)) is not None
+            and t <= budget_gib
+            for c in ctxs
+        )
+        if not feasible:
+            findings.append(
+                {
+                    "family": name,
+                    "params_b": p,
+                    "reason": (
+                        f"unplaceable: floor config (Q2_K, q4_0, q4_0) exceeds "
+                        f"the {budget_gib} GiB budget at every reachable ctx"
+                    ),
+                }
+            )
+            if report_unplaceable:
+                out.append(findings[0])
+            continue
+        for ctx in ctxs:
             wi, ki, vi = 0, 0, 0
             total = _alloc_total(
                 name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
@@ -641,6 +695,17 @@ def certify_v7(
         print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
         save_state(state_path, state)
     cells = climb_allocations(budget_gib, roster_limit, alloc_policy)
+    # addendum 154: the unplaceable are FINDINGS, reported before the
+    # run - the measured count is honest by construction
+    findings = [c for c in cells if "reason" in c]
+    cells = [c for c in cells if "reason" not in c]
+    if findings:
+        print(
+            f"\n{len(findings)} of the first {roster_limit} candidates "
+            f"cannot earn a cell (findings, addendum 154):"
+        )
+        for f in findings:
+            print(f"  {f['family']}: {f['reason']}")
     results: list[dict[str, Any]] = []
     corpus = None
     # addendum 132: the commit hook fires once per family, after its
