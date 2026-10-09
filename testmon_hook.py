@@ -17,6 +17,10 @@ Contract:
                                 trailing-newline case)
 - affected tests fail        -> non-zero, the commit is blocked
 - the map updates on success, so it stays current
+- hypothesis stays OUT of the hook: -m "not hypothesis_props"
+  (the addendum-117 compromise, restored after the addendum-119
+  rewrite dropped it - caught by the R-31 pin); the properties run
+  in the push workflow and the daily quality run
 """
 
 from __future__ import annotations
@@ -34,7 +38,17 @@ def main() -> int:
         print("testmon: no .testmondata map - first full run is CI's job (R-25)")
         return 0
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", str(ROOT / "tests"), "-q", "--testmon", "--no-header"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(ROOT / "tests"),
+            "-q",
+            "--testmon",
+            "--no-header",
+            "-m",
+            "not hypothesis_props",
+        ],
         cwd=ROOT,
     )
     return proc.returncode
