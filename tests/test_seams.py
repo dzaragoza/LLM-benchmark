@@ -11,8 +11,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "AI_tools"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
-import code_edit  # noqa: E402, I001
-import full_benchmark as fb  # noqa: E402
+import full_benchmark as fb  # noqa: E402, I001
 import infra.hf_download as hf_download  # noqa: E402
 import ruler_gate  # noqa: E402
 
@@ -101,3 +100,31 @@ def test_resolve_f16_local_never_returns_a_quantized_file(tmp_path):
     (famdir / "MiniCPM-1B-sft-bf16-f16.gguf").write_text("x")
     got = hf_download.resolve_f16_local(str(famdir))
     assert got and got.endswith("MiniCPM-1B-sft-bf16-f16.gguf")
+
+
+def test_convert_quant_deletes_tensors_after_f16(tmp_path, monkeypatch):
+    # addendum 42: the safetensors are dead weight once the f16 exists;
+    # create() deletes safetensors-source only after the conversion is
+    # verified on disk, and never when the f16 was already local
+    import infra.convert_quant as convert_quant
+
+    famdir = tmp_path / "fam"
+    famdir.mkdir()
+    (famdir / "safetensors-source").mkdir()
+    (famdir / "safetensors-source" / "model.safetensors").write_text("x")
+    out_f16 = famdir / "fam-f16.gguf"
+    out_q = famdir / "fam-Q4_K_M.gguf"
+    monkeypatch.setattr(convert_quant.hf_download, "local_rung", lambda d, r: None)
+    monkeypatch.setattr(convert_quant.hf_download, "resolve_f16_local", lambda d: None)
+    monkeypatch.setattr(
+        convert_quant,
+        "run_quiet",
+        lambda cmd, log, phase, rung, what: (
+            (out_f16.write_text("f16"), out_q.write_text("q4"), 0)[2]
+            if cmd[1] == str(famdir / "safetensors-source") or "--outfile" in cmd
+            else (out_q.write_text("q4"), 0)[1]
+        ),
+    )
+    got = convert_quant.create("fam", str(famdir), "Q4_K_M")
+    assert got == str(out_q)
+    assert not (famdir / "safetensors-source").exists(), "tensors deleted after f16"

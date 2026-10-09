@@ -299,3 +299,50 @@ def grade_reachable_boundary_tight_ref(span: int, hops: int) -> bool:
     return v7m.grade_reachable(span, hops, minimal) and not v7m.grade_reachable(
         span, hops, minimal - 1
     )
+
+
+def spans_ascending_ref() -> bool:
+    """The span grid is strictly ascending - the dyadic ladder law.
+    post: __return__
+    """
+    from bench.v7 import SPANS
+
+    return all(a < b for a, b in zip(SPANS, SPANS[1:]))
+
+
+def ctx_grid_ascending_ref() -> bool:
+    """The ctx grid is strictly ascending.
+    post: __return__
+    """
+    from bench.v7 import CTX_GRID
+
+    return all(a < b for a, b in zip(CTX_GRID, CTX_GRID[1:]))
+
+
+def format_theorem_q4_ref(params_b: float) -> bool:
+    """The q4_0 format theorem: weights_gib is EXACTLY params x 18/32
+    bytes - derivable from the block structure (16 payload + 2 scale
+    per 32 weights), not a calibrated constant.
+    pre: params_b > 0.0
+    post: __return__
+    """
+    import math
+
+    from bench.v7 import W_QUANT_BPB, weights_gib
+
+    expected = params_b * 1e9 * (18 / 32) / (1 << 30)
+    return math.isclose(weights_gib(params_b, "Q4_0"), expected, rel_tol=1e-12)
+
+
+def format_theorem_q8_ref(params_b: float) -> bool:
+    """The q8_0 format theorem: 32 payload bytes + 2 scale bytes per
+    32-weight block = 34/32 bytes/weight, census-confirmed.
+    pre: params_b > 0.0
+    post: __return__
+    """
+    import math
+
+    from bench.v7 import W_QUANT_BPB, weights_gib
+
+    expected = params_b * 1e9 * (34 / 32) / (1 << 30)
+    return math.isclose(weights_gib(params_b, "Q8_0"), expected, rel_tol=1e-12)
