@@ -50,6 +50,8 @@ def small_corpus(monkeypatch):
 
 
 def test_build_corpus_deterministic(monkeypatch):
+    """Pins: R-32 - the same seed builds the byte-identical corpus
+    (reproducibility is wow.md rule 1, now a requirement)."""
     """Same seed, same bytes: two builds produce IDENTICAL corpora -
     the prefix-fairness promise (every model sees the same text)."""
     monkeypatch.setattr(v7.llama_server, "tokenize", _fake_tokenize_factory(None))

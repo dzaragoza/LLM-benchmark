@@ -13,7 +13,9 @@ We make predictions and measure results. To be rigorous:
 - **Pre-register before measuring.** Every experiment's hypothesis,
   prediction, and grading criterion is written in the notebook BEFORE
   the run. Results are graded against the pre-registration, never
-  reinterpreted after the fact to fit.
+  reinterpreted after the fact to fit. (Requirement-covered: R-33;
+  this clause stays as the human discipline - the pin checks the
+  notebook structure, not the honesty.)
 - **One variable at a time.** When testing a knob, everything else is
   held constant. Concurrent changes are split into separate runs or
   explicitly registered as a package.
@@ -23,6 +25,7 @@ We make predictions and measure results. To be rigorous:
 - **Measurements are reproducible.** Every run is seeded and its
   command recorded; the same command must produce the same data.
   Where randomness is involved, n and the seed policy are registered.
+  (Requirement-covered: R-32.)
 - **Calibration is standing work.** Predictors are validated against
   every new anchor, and disagreements >5% per factor trigger a
   recalibration with the derivation recorded. An unmeasured factor is
@@ -30,6 +33,7 @@ We make predictions and measure results. To be rigorous:
 - **Negative results are recorded, not discarded.** Fails, rejections,
   and broken hypotheses go in the tables and the notebook with their
   reason - they close the question and prevent re-evaluation loops.
+  (Requirement-covered: R-34.)
 - **Rulings are explicit.** When the author rules (a new ceiling
   interpretation, a rank statistic), the ruling is registered with its
   addendum number and supersedes prior rules explicitly, never
@@ -48,7 +52,8 @@ past midnight - an early-morning finish belongs to the day it started. All entri
 easy. The notebook is the single source of truth for: rulings,
 pre-registrations, incident reports, predictor calibrations, and
 anything the current session needs from a previous one. If it is not
-in the notebook, it did not happen.
+in the notebook, it did not happen. (The one-session-per-day
+structure is requirement-covered: R-35.)
 
 ## 3. We are always improving
 
@@ -100,7 +105,7 @@ upstream behavior are verified against the notebook or the source
 before being asserted - and when the notebook and reality disagree,
 the notebook is corrected with a registered addendum.
 
-## 7. Naming convention (session 36, addendum 25)
+## 7. Naming convention (session 36, addendum 25 - requirement-covered: R-36)
 
 Documents are lowercase-kebab (`models.md`, `model-selection.md`,
 `practitioner-goals.md`, `protocol.md`, `wow.md`, `session-NN.md`) -

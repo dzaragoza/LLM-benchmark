@@ -437,3 +437,41 @@ requirement covers them (they are ways of working the requirements
 table deliberately does not duplicate). Historical notebook
 references to "wow.md section 4" resolve to R-26 - a pointer note
 in wow.md section 3 states it.
+
+
+## Addendum 153 - the reverse conversion: wow.md items become WoW requirements
+
+The author's ask: "Now the other way. Can we make items in wow.md
+into requirements for wow?" The v5.0 bar governs: a requirement is
+a TESTABLE statement, so only items with a mechanically checkable
+core convert; the human-discipline clauses stay in wow.md marked
+"(Requirement-covered: R-xx)".
+
+CONVERTED (five new WoW requirements, R-32..R-36):
+- R-32 (reproducibility, wow.md rule 1): seeded runs, registered
+  commands, registered seed constants. Pins: the corpus determinism
+  test and the seeded random-climb reproduction test.
+- R-33 (pre-registration, rule 1): the notebook carries the
+  pre-registrations BEFORE the run, quantitative with bands. The
+  pin checks the structure; the honesty stays in wow.md.
+- R-34 (negative results, rule 1): a score-0 v7 cell carries either
+  its answers log (evidence) or an error label - a bare unexplained
+  0 fails. THE PIN FOUND THE LIVE DATA COMPLIANT.
+- R-35 (one session per day, rule 2): the index links every session
+  file; no orphans.
+- R-36 (naming, rule 7): lowercase-kebab, ALL-CAPS reserved for
+  README alone. THE PIN CAUGHT TWO PRE-EXISTING VIOLATORS on its
+  first run - md/conversation up to 2026-09-27.md and the reports/
+  Zenodo mirror (spaces in filenames) - both renamed via git mv
+  (history preserved; the README cites the report by title and DOI,
+  not path, so nothing broke). A pin born yesterday enforcing a
+  session-36 rule: the requirement caught what the convention could
+  not.
+
+NOT CONVERTED (deliberately - no test can pin them): one-variable-
+at-a-time, calibration-is-standing-work, rulings-are-explicit,
+statistics-are-justified (all rule-1 disciplines); Daniela-is-human
+(fish, checklists - rules 4/5); ask-for-help (rule 8);
+review-on-demand (rule 9). These stay as the working agreement.
+
+The requirements table now carries 36 requirements, all pinned.
