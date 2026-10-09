@@ -351,8 +351,10 @@ def git_tail(args: argparse.Namespace) -> None:
 def v7_model_commit(args: argparse.Namespace, entries: list[dict[str, Any]]) -> None:
     """Session 44, addendum 132: the commit fires once per MODEL,
     after all its ctx cells are scored (was per cell, addendum 115 -
-    too frequent). A git failure never stops the run; the commit is
-    skipped under --no-git/dry-run."""
+    too frequent). Addendum 147: it fires only when at least one
+    cell RAN - a fully-skipped family (resume) commits nothing.
+    A git failure never stops the run; the commit is skipped under
+    --no-git/dry-run."""
     fam = entries[0].get("family")
     scored = sum(1 for e in entries if e.get("score") is not None)
     stamp(f"v7 model done: {fam} ({scored}/{len(entries)} cells scored) - committing artifacts")
