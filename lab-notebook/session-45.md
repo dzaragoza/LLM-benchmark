@@ -233,3 +233,32 @@ delivery. R-31 reworded to the final form; pins updated
 Note: the never-abort format wrapper (addendum 146) is part of the
 local-fast side - formatting changes apply and re-stage without
 aborting, keeping the 5s loop friction-free.
+
+
+## Addendum 148 - the changed-test-files arm of the hook; testmon in CI
+
+Two rulings. First: "OK. Run pytest with testmon in the github ci."
+push-regression.yml now runs the full suite WITH --testmon - the map
+seeds itself in CI, so any clone gets a warm map as a side effect of
+the registered full-suite step.
+
+Second: "But it leaves to us to manually run every test file that
+changed. Can you make it part of pre commit hook?" Correct, and the
+root cause is structural: the testmon map only knows tests that
+have ALREADY RUN (test_execution rows). A new test file has no rows,
+so testmon selects nothing for it - and an edited test file whose
+only change is a new test likewise. The hook now owns that arm
+directly: _changed_test_files() reads git status (staged, modified,
+untracked; -uall so untracked directories list their files) and runs
+every changed tests/*.py EXPLICITLY, before the testmon selection -
+and even when no map exists (a fresh clone still gates its own new
+tests). A failure in the explicit arm blocks the commit with the
+same weight as a testmon-selected failure; the exit codes combine
+(the explicit arm's failure short-circuits the testmon run).
+
+The no-map note still fires when nothing changed - CI owns the
+first full run, unchanged.
+
+Pinned by tests/test_testmon_hook.py: the explicit arm runs (probe
+in a scratch repo executes and reports), a failing changed test
+file blocks, and the existing contract pins hold.

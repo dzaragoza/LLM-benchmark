@@ -39,3 +39,36 @@ def test_hook_runs_affected_tests_from_map(monkeypatch):
     testmon's job (deselected tests reported, not run)."""
     src = HOOK.read_text(encoding="utf-8")
     assert '"--testmon"' in src and "tests" in src
+
+
+def test_changed_test_files_run_explicitly(tmp_path, monkeypatch):
+    """Pins: R-25 (addendum 148): a new/untracked tests/*.py runs
+    EXPLICITLY even with no map - testmon cannot know a test that has
+    never run, so the hook owns the changed-test-file arm itself. No
+    more running changed test files by hand."""
+    import subprocess as sp
+
+    (tmp_path / "tests").mkdir()
+    sp.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    probe = tmp_path / "tests" / "test_zz_probe.py"
+    probe.write_text("def test_probe():\n    assert 1 + 1 == 2\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    proc = sp.run([sys.executable, str(HOOK)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "ran 1 changed test file(s)" in proc.stdout, proc.stdout
+    assert "1 passed" in proc.stdout, "the probe test actually executed"
+
+
+def test_changed_test_file_failure_blocks(tmp_path, monkeypatch):
+    """Pins: R-25 (addendum 148): a failing changed test file blocks
+    the commit - the explicit arm carries the same verdict weight as
+    the testmon selection."""
+    import subprocess as sp
+
+    (tmp_path / "tests").mkdir()
+    sp.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    probe = tmp_path / "tests" / "test_zz_probe.py"
+    probe.write_text("def test_probe():\n    assert 1 + 1 == 3\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    proc = sp.run([sys.executable, str(HOOK)], capture_output=True, text=True)
+    assert proc.returncode != 0, "a failing changed test file must block the commit"

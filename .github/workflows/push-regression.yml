@@ -28,8 +28,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install coverage vulture pre-commit
-      - name: pytest (the full suite - deterministic pins + hypothesis properties)
-        run: python3 -m pytest tests -q
+      - name: pytest with testmon (the full suite - deterministic pins + hypothesis
+          properties - the map seeds itself for any local clones)
+        run: python3 -m pytest tests -q --testmon
       - name: crosshair (the contract proofs)
         run: crosshair check tests/contracts.py
       - name: coverage (the missing-test map - a discovery helper, never a metric)
