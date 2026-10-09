@@ -122,11 +122,11 @@ lives in.
 | R-01 | RETIRED (addendum 185): the v5 cell controllers are gone (addendum 183) - v7 cells persist via save_state, pinned by the v7 suite | addendum 185 (the v5 retirement) |
 | R-02 | RETIRED (addendum 185): verdict persistence per (family, rung) was the v5 ladder; v7's resume/config-drift is the live form (pinned by test_config_drift_remeasures) | addendum 185 (the v5 retirement) |
 | R-03 | RETIRED (addendum 185): TASK_PASS_BARS was the v5 gate constant - the v5 gates are gone | addendum 185 (the v5 retirement) |
-| R-04 | An accept answers the rung and the ladder climbs: quality-dead families re-measure at deeper rungs; only infeasible and speed-dead are permanent outs. | addendum 56 ("everyone climbs") |
+| R-04 | RETIRED (addendum 185): the v5 ladder climb rule retired with the controllers - v7's climb is the live form (R-18/R-29) | addendum 185 (the v5 retirement) |
 | R-05 | RETIRED (session 43): ARC and FWE are retired from the benchmark - v7 sharpened the focus to reach vs reasoning (the fixed corpus carries both axes); historical arc/fwe cells stay in state, no new ones are measured. The combined controller is speed + vt. | session 43 (the v7 focus ruling) |
 | R-06 | RETIRED (addendum 185): the v5 rung/window infeasibility machinery retired with the controllers - v7's findings report is the live form | addendum 185 (the v5 retirement) |
 | R-07 | Families evaluate in param-ascending order; the sort resolves both repo-carried and name-carried specs identically. | addendum 57 |
-| R-08 | A speed-gate death at rung k ends that family's climb at every deeper rung (the speed gate only hardens with depth). | addendum 13, session 40 |
+| R-08 | RETIRED (addendum 185): the v5 speed-death climb rule retired with the controllers - v7 measures no speed cells until the winner's certification | addendum 185 (the v5 retirement) |
 | R-09 | RETIRED (addendum 185): single-sourcing survives as the format-theorem contracts (addendum 182) - the registry row retires | addendum 185 (the v5 retirement) |
 | R-10 | RETIRED (addendum 185): the v5 cell-artifact layout retired; R-23 (answers logging) and R-24 (per-family commits) are the live artifact rules | addendum 185 (the v5 retirement) |
 | R-11 | RETIRED (addendum 185): the answered-rung rule was the v5 ladder - v7 has no rungs to answer | addendum 185 (the v5 retirement) |
