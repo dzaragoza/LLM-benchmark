@@ -6,8 +6,13 @@ the required keys. Exit 1 names the first offenders.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "tests"))
-from test_answers_jsonl import validate  # noqa: E402
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE / "tests"))
+sys.path.insert(0, str(_HERE))
+
+import test_answers_jsonl  # noqa: E402
+
+validate = test_answers_jsonl.validate
 
 ROOT = Path(__file__).resolve().parent
 files = list((ROOT / "models" / "tournament-results").rglob("*-answers.jsonl"))
