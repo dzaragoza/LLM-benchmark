@@ -9,12 +9,12 @@ from bench import v7 as v7_pilot
 
 
 def test_grid_shape():
-    # addendum 123: 2k span dropped; addendum 139: K reverted to 1
-    # - the addendum-137 phase-balance premise was WRONG: K embeds
-    # more chains in the corpus, so the DEEP PREFILL grew with K
-    # (Qwen 262k: 450s at K=1 -> 1093s at K=3), the opposite of
+    # addendum 123: 2k span dropped; addendum 139: K reverted to 1;
+    # addendum 143: K removed outright (seed=n corpus reruns are
+    # the stability mechanism). The addendum-137 premise was WRONG:
     # free. 7 spans x 5 hops x 1 = 35 questions.
-    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) * v7_pilot.K == 35
+    assert len(v7_pilot.SPANS) * len(v7_pilot.HOPS) == 35
+    assert not hasattr(v7_pilot, "K")
 
 
 def test_smallest_ctx_is_measurable():
@@ -168,7 +168,7 @@ def test_corpus_artifact_roundtrip(tmp_path):
         with m.patch.object(v7m, "CORPUS_ARTIFACT", str(tmp_path / "corpus.json")):
             c1 = v7m.corpus_from_artifact(0)
             art = json.loads((tmp_path / "corpus.json").read_text())
-            assert art["grid"]["k"] == v7m.K
+            assert art["grid"]["seed"] == v7m.CORPUS_SEED
             c2 = v7m.corpus_from_artifact(0)
             assert c1 == c2
 

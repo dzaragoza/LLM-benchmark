@@ -851,3 +851,29 @@ gets evaluated from them); no ICL example (ours is zero-shot -
 RULER always prepends one, our difficulty stays ours, tweak
 later if too hard); the rest of the diff table stands as
 verified against upstream main.
+
+## Addendum 143 - K removed; the corpus seed IS the run number n
+
+Correction registered first (the author caught it): Vibe's
+session claim "K repetitions reuse one prefill per span" was
+WRONG, as was "TG-only cost". Addendum 139 already measured the
+truth: each K question embeds a fresh chain, chains displace
+noise in the fixed s_max budget, the deep-span prompts GROW
+(450s -> 1093s prefill at 262k, K=1 -> 3), and prefix-cache hit
+rate dilutes. K is not a free variance knob.
+
+The author's ruling follows: REMOVE K. Stability across runs
+comes from re-running the benchmark with corpus n+1 - the nth
+corpus has seed n. This is the project definition of n
+(carried from the earlier gates). This run is n=1.
+
+Changes:
+- bench/v7.py: K deleted; CORPUS_SEED = 1 added;
+  build_corpus default seed 7 -> CORPUS_SEED; the artifact
+  grid fingerprint swaps "k" for "seed" - an old artifact
+  cannot silently load across the seed change (the mismatch
+  forces a rebuild, same mechanism that guards spans/hops).
+- Question generation loop: one question per (span, hops)
+  grade - 35 questions per cell, unchanged.
+- tests: K attribute asserted absent; artifact fingerprint
+  asserts seed; runtime-knob docstrings updated.
