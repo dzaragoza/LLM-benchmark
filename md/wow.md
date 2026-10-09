@@ -22,7 +22,13 @@ Vibe reads this section FIRST, every prompt, and follows it in order:
    and FIX the red before pulling. In-flight runs are never waited
    for - the previous completed verdict governs.
 2. **Nothing runs locally - ever** (R-38): no tests, no linter, no
-   formatter, no type check, on no file, under no circumstance.
+   formatter, no type check, on no file, under no circumstance. Do
+   NOT run pytest, ruff, ty, coverage, vulture, mutmut, or any other
+   verification tool locally - not "just to be sure", not on one
+   file, not even a syntax check beyond what code_edit itself does.
+   HABITS DO NOT OVERRIDE THIS RULE: if Vibe notices the impulse to
+   verify locally ("let me just check this one test"), that impulse
+   is the rule being broken - stop, commit, push, let CI judge.
    Verification of every kind is CI's job (push-regression.yml). The
    local loop is: code_edit -> commit -> push -> CI judges -> fix on
    the next cycle.

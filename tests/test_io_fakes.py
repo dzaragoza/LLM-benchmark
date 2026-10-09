@@ -115,9 +115,10 @@ def test_ask_content_and_reasoning_fields(stub):
 
 
 def test_ask_falls_back_to_reasoning_content(stub):
-    stub.routes["/v1/chat/completions"] = (200, {
-        "choices": [{"message": {"content": None, "reasoning_content": "the answer"}}]
-    })
+    stub.routes["/v1/chat/completions"] = (
+        200,
+        {"choices": [{"message": {"content": None, "reasoning_content": "the answer"}}]},
+    )
     assert ruler_gate.ask(stub.port, "q") == "the answer"
 
 

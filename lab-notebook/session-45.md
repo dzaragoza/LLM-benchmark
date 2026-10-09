@@ -724,3 +724,29 @@ mis-used, and disused with no shared source of truth).
 Also this delivery: the red format finding fixed (test_io_fakes
 stub dict, the formatter's own wrapping), read from the completed
 CI verdict before this commit per the new rule 1.
+
+
+## Addendum 166 - the multi-arm run: all three policies per cell, one file
+
+The author's ruling: "Regarding the different arms greedy stingy
+and random. Let's apply them together from the next run on. For
+every cell greedy goes first, then stingy iff it produces a
+different configuration, last random iff it produces a different
+configuration to the other two. Store all this info in the cell in
+a single file. So all the data is there."
+
+--v7-multi-arm: certify_v7 computes all three plans, walks greedy's
+cells, and per cell measures greedy, then stingy IFF its config
+differs, then random IFF its config differs from both measured
+arms. Each diverging arm gets its OWN launch cycle (a different
+weights quant is a different GGUF with different cache flags - the
+greedy server cannot serve it): stop, acquire, relaunch, health,
+score. Every arm's config and score land in the SAME cell record -
+state[family][ctx]["arms"] = {greedy: {...}, stingy: {...}, random:
+{...}} - one file holds all the data. Cells where all three agree
+measure once (the agreeing arms ARE the same measurement).
+
+Also this delivery: wow.md rule 2 gains the explicit habits clause
+("Do NOT run pytest... HABITS DO NOT OVERRIDE THIS RULE"), and the
+red format finding from the completed verdict was fixed before the
+push (test_io_fakes, second stub dict - the formatter's wrapping).

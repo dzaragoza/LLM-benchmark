@@ -502,6 +502,13 @@ def build_parser() -> argparse.ArgumentParser:
         "measured. E.g. --v7-cells Qwen3.5-2B:262144,granite-4.0-1b:16384",
     )
     ap.add_argument(
+        "--v7-multi-arm",
+        action="store_true",
+        help="v7: measure all three allocation policies per cell (addendum 166) - "
+        "greedy first, then stingy/random only where their config differs; every "
+        "arm's config and score stored in the same cell record",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -632,6 +639,7 @@ def _run(args: argparse.Namespace) -> None:
             clean=args.clean,
             alloc_policy=args.v7_alloc,
             only_cells=parse_v7_cells(args.v7_cells),
+            multi_arm=args.v7_multi_arm,
         )
         state["v7"] = results
         save_state(args.state_file, state)
