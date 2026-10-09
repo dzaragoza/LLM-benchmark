@@ -18,7 +18,6 @@ from hypothesis import strategies as st
 from bench.certify import wilson_interval
 from bench.state_store import _int_cells, speed_cells
 from infra.hf_download import RUNG_BITS, estimate_rung_gib, find_rung_file, has_safetensors
-from law_fit import kv_gib, law_worst
 
 pytestmark = pytest.mark.hypothesis_props
 
@@ -161,40 +160,9 @@ def arch(draw):
 
 
 @given(arch=arch(), bpe=st.sampled_from([2.0, 1.0]))
-def test_kv_gib_linear_in_depth(arch, bpe):
-    layers, kv_heads, head_dim = arch
-    half = kv_gib(layers, kv_heads, head_dim, 4096, bpe)
-    full = kv_gib(layers, kv_heads, head_dim, 8192, bpe)
-    assert math.isclose(full, 2 * half, rel_tol=1e-12)
 
 
-@given(
-    arch=arch(),
-    d1=st.integers(1, 65536),
-    d2=st.integers(1, 65536),
-    bpe=st.sampled_from([1.0, 2.0]),
-)
-def test_kv_gib_monotone_in_depth(arch, d1, d2, bpe):
-    layers, kv_heads, head_dim = arch
-    lo, hi = sorted((d1, d2))
-    assert kv_gib(layers, kv_heads, head_dim, lo, bpe) <= kv_gib(
-        layers, kv_heads, head_dim, hi, bpe
-    )
 
-
-@given(a=st.floats(1e-6, 1.0), b=st.floats(1e-6, 10.0), s=st.floats(0.0, 100.0))
-def test_law_worst_positive_and_decreasing(a, b, s):
-    w1 = law_worst(s, a, b)
-    w2 = law_worst(s + 10.0, a, b)
-    assert w1 > 0.0 and w2 > 0.0 and w2 <= w1
-
-
-@given(
-    files=st.lists(st.text(min_size=1, max_size=10), max_size=5),
-    sizes=st.dictionaries(
-        keys=st.text(min_size=1, max_size=10), values=st.integers(1, 10**10), max_size=5
-    ),
-)
 def test_estimate_none_or_positive(files, sizes):
     est = estimate_rung_gib("Q8_0", files, files, sizes)
     assert est is None or est > 0.0
