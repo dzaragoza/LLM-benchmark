@@ -50,7 +50,10 @@ def _install(monkeypatch, tmp_path, *, run_cell=None, probe=None, acquire="/tmp/
     monkeypatch.setattr(
         v7m,
         "climb_allocations",
-        lambda b, limit=4, policy="greedy", report_unplaceable=False: [cell("famA", 4096, 1.0), cell("famA", 8192, 1.2)],
+        lambda b, limit=4, policy="greedy", report_unplaceable=False: [
+            cell("famA", 4096, 1.0),
+            cell("famA", 8192, 1.2),
+        ],
     )
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: acquire)
     monkeypatch.setattr(
@@ -121,7 +124,7 @@ def test_server_never_comes_up(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        v7m, "climb_allocations", lambda b, limit=4, policy="greedy", report_unplaceable=False: [cell("famA", 4096, 1.0)]
+        v7m, "climb_allocations", lambda b, limit=4, policy="greedy", report_unplaceable=False: [cell("famA", 4096, 1.0)]  # noqa: E501
     )
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
     monkeypatch.setattr(
@@ -188,7 +191,7 @@ def test_acquire_failure_labels_cell(tmp_path, monkeypatch):
         }
 
     monkeypatch.setattr(
-        v7m, "climb_allocations", lambda b, limit=4, policy="greedy", report_unplaceable=False: [cell("famA", 4096, 1.0)]
+        v7m, "climb_allocations", lambda b, limit=4, policy="greedy", report_unplaceable=False: [cell("famA", 4096, 1.0)]  # noqa: E501
     )
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: None)
     monkeypatch.setattr(v7m, "save_state", lambda *a: None)
