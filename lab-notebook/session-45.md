@@ -1238,3 +1238,35 @@ GRADING: when the 32-model field lands, each numbered finding
 grades against the full data - a prediction that fails is
 registered as such (the pre-registration discipline; the
 skeleton does not bend to fit).
+
+
+## Addendum 187 - SmolLM3-3B exposed two under-estimates; the constants corrected
+
+The author's question: "Any model that needs better vram
+predictions to work properly?" - YES: SmolLM3-3B, the first
+newcomer with census records, exposed two under-estimating
+constants (caught by the addendum-171 replay pin - it would
+have failed CI on the next push):
+
+1. Q5_0 WEIGHTS: 0.6875 -> 0.70. The structural form (22 bytes/
+   32 weights) under-counted ~1.6%: SmolLM3's measured Q5_0
+   model buffer backs out to 0.6987 bpB. The format theorems
+   held for q4_0/q8_0 (their block scales are exact) but the
+   5-bit blocks carry padding the simple form misses - the
+   register takes the measured upper bound (addendum 170: an
+   under-estimate is an error). NOTE: the census-based constant
+   means Q5_0 joins Q4_K's class (measured, not derived) - the
+   q4_0/q8_0/f16 theorems stand.
+
+2. COMPUTE FLOOR: 0.06 -> 0.075 GiB. SmolLM3's census intercept
+   is 0.074; the floor under-counted every cell by ~0.014 GiB.
+   The slope (1 KiB/token) was confirmed exactly (1.01 measured).
+
+REPLAY: all census records in the v7.1 state now pass with est
+>= measured GPU - zero under-estimates. The addendum-186 search-
+strategy skeleton's skip rules rest on this estimator; the
+corrections keep them honest.
+
+ALSO: the crosshair red fixed for real - the tmp write is
+crosshair's own sandbox artifact (not bytecode); the proof run
+now carries --unblock=open:/tmp.
