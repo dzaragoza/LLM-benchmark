@@ -18,7 +18,7 @@ def test_replace_verified_unique_pairs(tmp_path):
     text = p.read_text()
     assert "replaced line" in text and "intro line" not in text
     assert "| 3 | 4 |" in text
-    import md_check
+    import AI_tools.md_check as md_check
 
     assert md_check.check(str(p)) == []
 
@@ -62,7 +62,7 @@ def test_replace_verified_runs_the_md_pipeline(tmp_path):
     write."""
     import code_edit
 
-    import md_check
+    import AI_tools.md_check as md_check
 
     p = tmp_path / "n.md"
     p.write_text("# head\n\npara\n")
