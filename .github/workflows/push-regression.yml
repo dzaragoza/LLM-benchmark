@@ -1,12 +1,13 @@
 name: push regression run
 
-# Addendum 158 (the author's ruling: "let's go nuclear. abolish the
-# pre commit hook. run everything only in ci. If something fails we
-# learn about it next pull and you fix"): THE hook is abolished; this
-# workflow is the ONLY verification gate. It runs everything the hook
-# used to run (ruff, format check, ty, md, requirements) plus the full
-# suite, crosshair, coverage, vulture and mutmut. A red verdict is
-# caught on the next pull (R-27) and fixed - nothing is skipped.
+# Addendum 158+169 (the author's rulings): the hook is abolished -
+# this workflow is the ONLY verification gate. Ruff format APPLIES
+# formatting in place (never an error; drift is fixed, not gated).
+# The run CONTINUES after any error: every tool step carries
+# continue-on-error, so ALL tools always run - a format red must
+# never hide the pytest results or the mutmut tally again. The job's
+# verdict is the AGGREGATE: the final gate reads every step's
+# outcome and fails the run if ANY tool failed.
 
 on:
   push:
@@ -29,27 +30,60 @@ jobs:
           pip install -r requirements.txt
           pip install coverage vulture
       - name: ruff (lint)
+        id: ruff
+        continue-on-error: true
         run: python3 -m ruff check .
-      - name: ruff format (the format contract, checked not applied)
-        run: python3 -m ruff format --check .
+      - name: ruff format (applied in place, never an error)
+        run: python3 -m ruff format .
       - name: ty (type check)
+        id: ty
+        continue-on-error: true
         run: python3 ty_check.py
       - name: markdown check (GFM compliance)
+        id: md
+        continue-on-error: true
         run: python3 AI_tools/md_check.py
       - name: requirements check (R-xx traceability)
+        id: reqs
+        continue-on-error: true
         run: python3 requirements_check.py
       - name: pytest (the full suite - deterministic pins + hypothesis properties)
+        id: pytest
+        continue-on-error: true
         run: python3 -m pytest tests -q
       - name: crosshair (the contract proofs)
+        id: crosshair
+        continue-on-error: true
         run: crosshair check tests/contracts.py
       - name: coverage (the missing-test map - a discovery helper, never a metric)
+        id: coverage
+        continue-on-error: true
         run: |
           coverage run -m pytest tests -q
           coverage report -m
       - name: vulture (dead code)
+        id: vulture
+        continue-on-error: true
         run: vulture . --min-confidence 80 --exclude .git,.venv,__pycache__,models,llama-b10964-gpu,mutants,.testmondata
       - name: mutmut (the mutation trial)
+        id: mutmut
+        continue-on-error: true
         run: |
           pip install mutmut
           mutmut run
           mutmut results
+      - name: the aggregate verdict (any tool red = the run is red)
+        if: always()
+        run: |
+          echo "=== TOOL VERDICTS ==="
+          RED=0
+          for s in ruff ty md reqs pytest crosshair coverage vulture mutmut; do
+            OUTCOME="${{ steps.$s.outcome }}"
+            echo "$s: $OUTCOME"
+            if [ "$OUTCOME" = "failure" ]; then RED=1; fi
+          done
+          if [ "$RED" = "1" ]; then
+            echo "AGGREGATE: RED - at least one tool failed"
+            exit 1
+          fi
+          echo "AGGREGATE: GREEN - all tools passed"
