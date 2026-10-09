@@ -66197,3 +66197,22 @@ UnboundLocalError: cannot access local variable 'entry' where it is not associat
   preflight: {'4096x2': 4401, '8192x32': 7804}
 [2026-10-09T13:32:00] SIGINT - shutting down cleanly (addendum 8)
 [2026-10-09T13:32:00] llama-server stopped
+
+===== 2026-10-09T13:39:03 | full_benchmark.py --task v7 --v7-families 16 --v7-multi-arm =====
+  [0] no stale llama-server found
+
+2 of the first 16 candidates cannot earn a cell (findings, addendum 154):
+  MiniCPM-1B-sft: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  phi-1: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+  greedy measured; arms still needed: ['random'] - launching only for them
+  config drift: stored Q6_K/f16/f16 != planned Q6_K/f16/f16 - re-measuring
+=== Qwen3.5-0.8B ctx=262144 wq=Q6_K k=f16 v=f16
+  preflight: {'4096x2': 4367, '131072x32': 132901}
+  census: weights 0.77 GiB, context 3.02 GiB -> total 4.33 GiB (est 3.95)
+  greedy kept (score 3.217/30) - measuring arms only
+  arm greedy: Q6_K/f16/f16 -> 3.217/30
+  arm stingy: Q8_0/f16/q8_0 differs - measuring
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q6_K/f16/f16 -> 3.217/30
+  arm stingy: Q8_0/f16/q8_0 -> 4.764/30
+[2026-10-09T13:54:49] v7 model done: Qwen3.5-0.8B (1/6 cells scored) - committing artifacts
