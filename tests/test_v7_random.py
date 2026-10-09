@@ -4,8 +4,8 @@ author rejected the lexicographic fidelity ceiling for exactly that
 flaw - an order assigns importance), no step preference; a SEEDED rng
 picks each upgrade among the fitting ones; the stop is the same
 maximality contract (no upgrade fits). Reproducibility is a wow.md
-rule-1 obligation: ALLOC_RANDOM_SEED is registered, seeded per
-(family, ctx) via params.
+rule-1 obligation: ALLOC_RANDOM_SEED is registered - ONE fixed
+seed, the same for every cell (addendum 167; was seed+params).
 """
 
 import os
