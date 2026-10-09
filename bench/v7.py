@@ -174,10 +174,6 @@ PILOT_FAMILIES = 4
 # exists on the ladder. R-18's "k encoding below q8" clause is retired.
 W_QUANT_BPB = {
     "Q4_0": 0.5625,  # 18 bytes / 32 weights (4-bit payload + fp16 scale)
-    "Q5_0": 0.70,  # addendum 187: the structural 22/32 = 0.6875 under-counts ~1.6% on
-    # the census (SmolLM3-3B measured 0.6987 bpB at Q5_0) - the format-theorem
-    # held for q4_0/q8_0 (2-block scales are exact) but the 5-bit blocks carry
-    # padding the simple form misses; the register takes the measured upper bound
     "Q8_0": 1.0625,  # 34 bytes: 8-bit payload + scale (census-confirmed)
     "F16": 2.0,
 }
@@ -190,10 +186,9 @@ W_LADDER = list(W_QUANT_BPB)
 # addendum 173: the ladders are EQUAL - the same _0 family for weights
 # and KV cache (the author's ruling, corrected: _0 ONLY, no _1 variants);
 # every size is the exact structural constant, no K-quant bookkeeping (R-40).
-KV_QUANT_LADDER = ["q4_0", "q5_0", "q8_0", "f16"]
+KV_QUANT_LADDER = ["q4_0", "q8_0", "f16"]  # addendum 188: q5_0 retired (R-41)
 KV_QUANT_FACTOR = {
     "q4_0": 0.28125,
-    "q5_0": 0.34375,
     "q8_0": 0.53125,
     "f16": 1.0,
 }

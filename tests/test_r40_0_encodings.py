@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_r40_the_ladder_is_0_encodings_only():
-    assert v7.W_LADDER == ["Q4_0", "Q5_0", "Q8_0", "F16"], (
-        "the weights ladder is the _0 formats + f16 only (addenda 172/173)"
+    assert v7.W_LADDER == ["Q4_0", "Q8_0", "F16"], (
+        "the weights ladder is the closed-form formats only (addenda 172/173/188)"
     )
 
 

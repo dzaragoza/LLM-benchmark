@@ -1270,3 +1270,37 @@ corrections keep them honest.
 ALSO: the crosshair red fixed for real - the tmp write is
 crosshair's own sandbox artifact (not bytecode); the proof run
 now carries --unblock=open:/tmp.
+
+
+## Addendum 188 - R-41: closed form or retirement (Q5_0 retires); the BW efficiency factor on the page
+
+Three rulings. First: "We need to either find a closed form for
+q5_0 or retire it. Make a requirement to have a closed form
+formula for size calculation." The investigation: SmolLM3's Q5_0
+census backs out to 0.6987 bpB vs the structural 22/32 = 0.6875;
+the embed-at-Q8 hypothesis fit SmolLM3 (0.6998 blended vs 2.001
+measured - within 0.15%!) but does NOT generalize (the solved
+vocab came out 44k/17k/25k across three families - inconsistent
+with their real vocabs; llama.cpp's quantizer keeps
+high-importance tensors above the target per-tensor, a mix
+the (params, vocab) registry cannot predict). NO CLOSED FORM ->
+Q5_0 RETIRES from both ladders. R-41 registered: every size
+constant on a ladder must have a closed-form derivation from
+the format's block structure; a census-calibrated constant is
+a finding, not a ladder rung. The ladders are [Q4_0, Q8_0, F16]
+weights / [q4_0, q8_0, f16] KV - every constant exact.
+
+Second: the page's bandwidth note now carries the EFFICIENCY
+FACTOR: the law's 76.5 GiB/s is the measured effective
+bandwidth (~75% of spec) - "do not compare against your RAM's
+rated speed; compare against ~75% of it." Spec bandwidth would
+underpower every recommendation by a quarter.
+
+Third: the champion's BW position computed (the demonstration
+of the search strategy): Qwen3.5-2B@262k decodes 16.9 t/s ->
+7.0 w/s at 76.5 eff - 1.4x the reader line; needs 51 GiB/s eff
+(68 GB/s spec-equivalent). NEXT SIZE TARGET: the 6-8 GiB class
+(Jamba2-3B@262k is 3.02 scoring at 8-GiB-class memory; the
+doubling curve: 6 GiB -> 4.5 w/s (still readable), 8 GiB ->
+3.5 w/s (below the line) - the 6 GiB budget is the natural
+next grid for the search strategy.

@@ -33,6 +33,10 @@ def test_no_under_estimate_in_any_census_record():
                 wq = r.get("wq") or c.get("wq")
                 if wq not in v7.W_QUANT_BPB:
                     continue  # a retired format (historical K-quant cells) - out of the replay
+                if (r.get("kq") or c.get("kq")) not in v7.KV_QUANT_FACTOR:
+                    continue  # a retired KV format - out of the replay
+                if (r.get("vq") or c.get("vq")) not in v7.KV_QUANT_FACTOR:
+                    continue  # a retired KV format (q5_0, addendum 188) - out of the replay
                 est = v7._alloc_total(
                     name, p, v7.family_geometry(name),
                     r.get("wq") or c.get("wq"), r.get("kq") or c.get("kq"),
@@ -55,5 +59,5 @@ def test_no_under_estimate_in_any_census_record():
 def test_the_calibrated_constants():
     assert v7.W_QUANT_BPB["Q4_0"] == 0.5625
     assert v7.W_QUANT_BPB["Q8_0"] == 1.0625
-    assert v7.W_QUANT_BPB["Q5_0"] == 0.70  # addendum 187: the measured upper bound
-    assert v7.COMPUTE_FLOOR_GIB == 0.075  # addendum 187
+    assert "Q5_0" not in v7.W_QUANT_BPB  # retired (addendum 188, R-41: no closed form)
+    assert v7.COMPUTE_FLOOR_GIB == 0.075
