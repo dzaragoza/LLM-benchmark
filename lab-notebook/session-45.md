@@ -1397,3 +1397,47 @@ the state; the search-strategy skeleton pre-registered
 (addendum 186); the format theorems audited (addendum 189);
 the ladder [Q4_0, Q8_0, F16] with every constant closed-form;
 CI on-demand; the suite frozen.
+
+
+## Addendum 192 - the q5_0 source-verified closed form: our measurements CONFIRM it, and R-41's verdict stands sharpened
+
+The author found the source-verified q5_0 analysis (llama.cpp
+master, Oct 2026): block_q5_0 = 2 (d) + 4 (qh) + 16 (qs) = 22
+bytes/32 weights = 0.6875 bpb exactly, straight from
+ggml-common.h's struct. THE FORM IS REAL AND WE CONFIRM IT.
+
+THE CROSS-CHECK against our census measurements:
+- q8_0: their form 34/32 = 1.0625; our census measured
+  1.0625-1.0626 on the fully-resident families (+0.00-0.01%).
+  THEIR FORM AND OUR CENSUS AGREE TO THE FOURTH DECIMAL.
+- q4_0: their form 18/32 = 0.5625 - the same block arithmetic
+  we derive; untested by our census (no own-census records),
+  now source-verified instead.
+- q5_0: their form 0.6875; our census measured 0.6929-0.6987
+  (+0.79/+1.15/+1.63% on granite/Jamba2/SmolLM3) - and THEIR
+  OWN CAVEAT SECTION PREDICTS EXACTLY THIS: "embeddings, output
+  head, and norms usually stay at fp16/f32, so real GGUF files
+  come out slightly above 0.6875 x N."
+
+THE SHARPENED UNDERSTANDING: the closed form is exact for the
+QUANTIZED BLOCKS; the overshoot is the MIXED-PRECISION TENSORS
+the quantizer keeps above the target. Neither pure hypothesis
+fits the overshoot (embed@f16 predicts +5-14%, embed@q8
+predicts +1.5-4% - the measured +0.8-1.6% is a PARTIAL,
+importance-driven mix), which is why no closed form can predict
+the FILE size from (params, vocab) alone.
+
+R-41's VERDICT STANDS, now with the mechanism named: the
+ladder's admission rule was "closed form for SIZE" - the precise
+statement is "closed form for the whole FILE", and q5_0's file
+size is block-exact PLUS a family-dependent mixed-precision
+tail the registry cannot see. q5_0 stays retired from the
+ladders; the census stays the arbiter; the source verification
+is registered as the confirmation, not the reversal.
+
+BONUS CONFIRMATIONS from their doc: the KV formula matches ours
+(2 x layers x ctx x kv_heads x head_dim x 2 bytes f16 - the
+same term in _alloc_total); the q4_1/q5_1 rows in their format
+table match the constants we retired with the _1 ruling; the
+GPU-offload note ("the formula is exact for GPU offload
+(VRAM)") matches our addendum-136 GPU-scope ruling.
