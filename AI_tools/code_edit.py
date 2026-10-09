@@ -395,8 +395,29 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
             # insert/delete-only edit: like with like - the whole-buffer
             # check applies only when the source already balanced
             covered = [(0, len(out))]
+
+        # addendum 149: a region that sits INSIDE a triple-quoted
+        # string is prose - the old check scanned it as code, so an
+        # apostrophe in edited docstring text ("CI's job",
+        # "addendum-117's") read as an unclosed quote and blocked
+        # legitimate edits. Extend each region to its string
+        # boundaries: if the enclosing text is a docstring, the
+        # region only needs its triple-quote count to stay even.
+        def _in_tq_region(text: str, start: int, end: int) -> bool:
+            head = text[:start]
+            return (head.count(chr(34) * 3) % 2 == 1) or (head.count(chr(39) * 3) % 2 == 1)
+
         for j0, j1 in covered:
             region = out[j0:j1]
+            if _in_tq_region(out, j0, j1):
+                tq34 = region.count(chr(34) * 3)
+                tq39 = region.count(chr(39) * 3)
+                if tq34 % 2 or tq39 % 2:
+                    raise CodeEditError(
+                        f"{path}: edited prose inside a docstring breaks its "
+                        f"triple-quote pairing - likely a truncated fragment"
+                    )
+                continue
             problem = balance_no_underflow(region)
             if problem:
                 raise CodeEditError(
@@ -622,6 +643,24 @@ def _find_replace_target(buf: str, target: str, i: int) -> tuple[str, str]:
             f"block {i}: replace target not found exactly; a whitespace-flexible "
             f"pass found {len(matches)} candidate places - add context to make it unique"
         )
+    # addendum 149: quote-style-flexible rescue - the format hook (and
+    # any formatter) legally rewrites ' to " across the file, so an
+    # old_str written against the pre-format style stops matching
+    # exactly while the CODE is unchanged. Try the quote-swapped
+    # target both ways; uniqueness required, same as the whitespace
+    # rescue. The file's own text is returned, so the apply is exact.
+    swapped = (
+        target.replace(chr(39), chr(34)) if chr(39) in target else target.replace(chr(34), chr(39))
+    )
+    if swapped != target:
+        n_sw = buf.count(swapped)
+        if n_sw == 1:
+            return swapped, target
+        if n_sw > 1:
+            raise CodeEditError(
+                f"block {i}: replace target found {n_sw} times after the "
+                f"quote-style swap - add context to make it unique"
+            )
     target_lines = target.splitlines()
     first_target_line = target_lines[0] if target_lines else target
     needle = first_target_line.strip()
