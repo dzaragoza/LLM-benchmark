@@ -789,7 +789,9 @@ def certify_v7(
                     if alt is None:
                         continue
                     if (alt["wq"], alt["kq"], alt["vq"]) == (
-                        cell["wq"], cell["kq"], cell["vq"]
+                        cell["wq"],
+                        cell["kq"],
+                        cell["vq"],
                     ):
                         continue  # agrees with greedy - already measured
                     if stored_arms(pol) and stored_arms(pol).get("score") is not None:
