@@ -95,17 +95,18 @@ PILOT_FAMILIES = 4
 # ladder. Below Q8_0 the K-encoding (block-scaled K-quants) is the
 # ruling; the top is F16 (32/64-bit ruled out - F32 doubles F16 for
 # no inference gain, FP64 has no kernels).
+# addendum 172 (the author's ruling: "k encodings are a risk for our
+# size limit. use _0 encodings for everything except f16"): the
+# weights ladder is the _0 legacy formats ONLY below f16 - exact
+# structural sizes, no K-quant bookkeeping risk (Q4_K's measured
+# 0.625-0.646 bpB vs the naive 0.56 was the addendum-170/171 lesson:
+# the super-block scales are a size-limit hazard at the budget line).
+# q4_0: 18 bytes / 32 weights = 0.5625 (exact); q8_0: 34/32 = 1.0625
+# (exact, census-confirmed). Q8_0 -> F16 is the climb; nothing between
+# exists on the ladder. R-18's "k encoding below q8" clause is retired.
 W_QUANT_BPB = {
-    "Q2_K": 0.40,
-    "Q3_K": 0.48,
-    "Q4_K": 0.65,  # addendum 171: measured 0.625-0.646 on the census
-                     # (Llama-3.2-1B, granite-4.0-1b) - the 0.56 under-counted
-                     # ~13%; the register takes the measured UPPER bound: an
-                     # under-estimate is an error (addendum 170)
-    "Q5_K": 0.72,
-    "Q6_K": 0.82,
-    "Q8_0": 1.0625,  # addendum 171: measured on the census (granite-3.1-2b: 2.507 GiB
-                       # / 2.5335B params); llama.cpp q8_0 blocks carry the scale byte
+    "Q4_0": 0.5625,
+    "Q8_0": 1.0625,
     "F16": 2.0,
 }
 W_LADDER = list(W_QUANT_BPB)
@@ -270,7 +271,7 @@ def climb_allocations(
                 out.append(findings[0])
             continue
         feasible = any(
-            (t := _alloc_total(name, p, geom, "Q2_K", "q4_0", "q4_0", c)) is not None
+            (t := _alloc_total(name, p, geom, W_LADDER[0], KV_QUANT_LADDER[0], KV_QUANT_LADDER[0], c)) is not None
             and t <= budget_gib
             for c in ctxs
         )
@@ -289,7 +290,7 @@ def climb_allocations(
                 out.append(findings[0])
             continue
         for ctx in ctxs:
-            wi, ki, vi = 0, 0, 0
+            wi, ki, vi = 0, 0, 0  # the floor: (W_LADDER[0], q4_0, q4_0) = (Q4_0, q4_0, q4_0) after addendum 172
             total = _alloc_total(
                 name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
             )

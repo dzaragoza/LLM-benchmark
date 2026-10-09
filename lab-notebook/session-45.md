@@ -849,3 +849,26 @@ measured GPU - zero under-estimates remain. Pinned by
 tests/test_estimator_no_under.py: any future census record that
 lands under its estimate fails CI (the pin replays the whole
 state), and the calibrated constants are pinned by value.
+
+
+## Addendum 172 - R-40: _0 encodings only below f16
+
+The author's ruling: "k encodings are a risk for our size limit.
+use _0 encodings for everything except f16. make it a requirement."
+
+The weights ladder is now exactly [Q4_0, Q8_0, F16] - the legacy
+block formats with EXACT structural sizes (q4_0: 18 bytes/32
+weights = 0.5625 bpB; q8_0: 34/32 = 1.0625 bpB, census-confirmed).
+No K-quant super-block bookkeeping: the k-scales are the size
+hazard (Q4_K measured 0.625-0.646 vs the assumed 0.56 - the
+granite-3.1@65k budget violation's root cause, addenda 170/171).
+R-18's "k encoding below q8" clause is RETIRED; the floor config
+is (Q4_0, q4_0, q4_0). Registered as R-40, pinned by
+tests/test_r40_0_encodings.py (the ladder, no _K suffix anywhere,
+the structural constants).
+
+Consequences: plans re-compute with the coarser ladder (fewer
+rungs = coarser climbs at the budget line; the q4_0 rung is
+smaller than Q4_K so some cells gain headroom, others lose the
+in-between steps). Stored cells whose configs carried _K encodings
+drift from the new plans and re-measure (addendum 134).
