@@ -19,7 +19,7 @@ scoring; it needs explanation because it is counter-intuitive):
 
   credit   found / (h+1) per question - how far down the chain
            the answer got; 1.0 = the full chain. A grade's rate is
-           its mean credit (K=1: the question's credit).
+           its mean credit (one question per grade: the grade credit).
   score    SUM of grade credits over the REACHABLE grades. Each
            reachable grade contributes at most 1.0, so
            max_score (the grade count) is the natural ceiling.
@@ -68,12 +68,15 @@ from etc import registry_data
 S_MAX = 262144
 SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 1  # questions per (span, hops) grade; pass = all h+1 names
-# (upstream). Session 44 addenda 120/122/123: the author's rulings -
-# 10x easier (K 20 -> 2), prefill-matched counts (k inverse in span),
-# then the 2k span dropped: with K=1 flat, the ladder was
-# vestigial, so the span grid starts at 4096 and every grade asks
-# exactly K questions. A cell is 7 spans x 5 hops x 1 = 35 questions.
+# Addendum 143: K removed - the per-grade repetition mechanism is
+# dead (addendum 139: it grew the deep prefill). Stability across
+# runs comes from RE-RUNNING with corpus n+1: the nth corpus has
+# seed n (CORPUS_SEED). This run is n=1.
+CORPUS_SEED = 1
+# (upstream). Session 44 addenda 120/122/123/143: the author
+# rulings - 10x easier (K 20 -> 2), prefill-matched counts, the
+# 2k span dropped, then K removed outright. A cell is
+# 7 spans x 5 hops = 35 questions, one per grade.
 # Addendum 124: no wall-clock ceiling - the question count is the
 # correct fix for runtime, and a budget stop would hide slow cells
 # instead of pricing them honestly (wall_seconds records the price;
@@ -265,7 +268,7 @@ def gen_name(rng: random.Random) -> str:
     return "".join(rng.choices(string.ascii_uppercase, k=ruler_gate.VT_NAME_LEN))
 
 
-def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
+def build_corpus(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
     """One fixed VT corpus, identical bytes every run. The corpus is a
     sentence list (noise + every question's chain embedded); a chain
     for span grade s has its links among the first ~s tokens. Per-span
@@ -284,10 +287,9 @@ def build_corpus(port: int, s_max: int = S_MAX, seed: int = 7) -> dict:
     num_noises = int(budget / tokens_per_sent)
     sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
     questions: list[dict] = []
-    for _ in range(K):
-        for s in SPANS:
-            for h in HOPS:
-                questions.append({"span": s, "hops": h})
+    for s in SPANS:
+        for h in HOPS:
+            questions.append({"span": s, "hops": h})
     cuts: dict[int, int] = {s: 0 for s in SPANS}
     for qi, q in enumerate(questions):
         s = q["span"]
@@ -532,7 +534,7 @@ def corpus_from_artifact(port: int) -> dict:
     grid = {
         "spans": SPANS,
         "hops": HOPS,
-        "k": K,
+        "seed": CORPUS_SEED,
         "s_max": S_MAX,
     }
     if os.path.exists(CORPUS_ARTIFACT):

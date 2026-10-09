@@ -44,7 +44,6 @@ def small_corpus(monkeypatch):
     monkeypatch.setattr(v7, "S_MAX", 2000, raising=False)
     monkeypatch.setattr(v7, "SPANS", [1024, 2048], raising=False)
     monkeypatch.setattr(v7, "HOPS", [2, 4], raising=False)
-    monkeypatch.setattr(v7, "K", 1, raising=False)  # addendum 123: flat K=1
     # build_corpus reads the module-level constants through its
     # defaults; call it with the small grid explicitly instead
     return v7.build_corpus(0, s_max=2000)
@@ -249,7 +248,12 @@ def test_artifact_matching_grid_loads(monkeypatch, tmp_path):
 
     monkeypatch.setattr(v7, "CORPUS_ARTIFACT", str(art))
     monkeypatch.setattr(v7, "build_corpus", boom)
-    grid = {"spans": v7.SPANS, "hops": v7.HOPS, "k": v7.K, "s_max": v7.S_MAX}
+    grid = {
+        "spans": v7.SPANS,
+        "hops": v7.HOPS,
+        "seed": v7.CORPUS_SEED,
+        "s_max": v7.S_MAX,
+    }
     art.write_text(json.dumps({"grid": grid, "corpus": corpus}), encoding="utf-8")
     assert v7.corpus_from_artifact(0) == corpus
 

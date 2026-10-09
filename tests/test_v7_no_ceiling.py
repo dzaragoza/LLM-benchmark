@@ -2,7 +2,7 @@
 
 The author: "Remove the ceiling. Adjusting the number of questions
 is the correct fix." A budget stop would truncate a cell and hide
-its true runtime; the question count (K, SPANS) is the only runtime
+its true runtime; the question count (SPANS, HOPS) is the only runtime
 knob. run_cell asks every reachable question, and the record reports
 wall_seconds - the honest price, never a silent truncation.
 """
