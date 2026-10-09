@@ -4,10 +4,9 @@ name: push regression run
 # this workflow is the ONLY verification gate. Ruff format APPLIES
 # formatting in place (never an error; drift is fixed, not gated).
 # The run CONTINUES after any error: every tool step carries
-# continue-on-error, so ALL tools always run - a format red must
-# never hide the pytest results or the mutmut tally again. The job's
-# verdict is the AGGREGATE: the final gate reads every step's
-# outcome and fails the run if ANY tool failed.
+# continue-on-error, so ALL tools always run - a red anywhere can
+# never hide the steps below it. The verdict is the AGGREGATE: the
+# final gate fails the run iff any tool failed.
 
 on:
   push:
@@ -77,11 +76,15 @@ jobs:
         run: |
           echo "=== TOOL VERDICTS ==="
           RED=0
-          for s in ruff ty md reqs pytest crosshair coverage vulture mutmut; do
-            OUTCOME="${{ steps.$s.outcome }}"
-            echo "$s: $OUTCOME"
-            if [ "$OUTCOME" = "failure" ]; then RED=1; fi
-          done
+          if [ "${{ steps.ruff.outcome }}" = "failure" ]; then echo "ruff: FAILURE"; RED=1; else echo "ruff: ${{ steps.ruff.outcome }}"; fi
+          if [ "${{ steps.ty.outcome }}" = "failure" ]; then echo "ty: FAILURE"; RED=1; else echo "ty: ${{ steps.ty.outcome }}"; fi
+          if [ "${{ steps.md.outcome }}" = "failure" ]; then echo "md: FAILURE"; RED=1; else echo "md: ${{ steps.md.outcome }}"; fi
+          if [ "${{ steps.reqs.outcome }}" = "failure" ]; then echo "reqs: FAILURE"; RED=1; else echo "reqs: ${{ steps.reqs.outcome }}"; fi
+          if [ "${{ steps.pytest.outcome }}" = "failure" ]; then echo "pytest: FAILURE"; RED=1; else echo "pytest: ${{ steps.pytest.outcome }}"; fi
+          if [ "${{ steps.crosshair.outcome }}" = "failure" ]; then echo "crosshair: FAILURE"; RED=1; else echo "crosshair: ${{ steps.crosshair.outcome }}"; fi
+          if [ "${{ steps.coverage.outcome }}" = "failure" ]; then echo "coverage: FAILURE"; RED=1; else echo "coverage: ${{ steps.coverage.outcome }}"; fi
+          if [ "${{ steps.vulture.outcome }}" = "failure" ]; then echo "vulture: FAILURE"; RED=1; else echo "vulture: ${{ steps.vulture.outcome }}"; fi
+          if [ "${{ steps.mutmut.outcome }}" = "failure" ]; then echo "mutmut: FAILURE"; RED=1; else echo "mutmut: ${{ steps.mutmut.outcome }}"; fi
           if [ "$RED" = "1" ]; then
             echo "AGGREGATE: RED - at least one tool failed"
             exit 1
