@@ -74,10 +74,13 @@ CUT_BELOW_DISK = "gemma-4-e2b-it"
 
 # gated repos the study cannot fetch; geometry from the author's pull / public cards.
 # kept explicit so `check` knows why a row has no hub extract.
+# Addendum 161: gemma-3-1b-it and Llama-3.2-1B-Instruct are NO LONGER
+# gated for this study - the author's HF token can access both (the
+# models are downloaded and measured); fetch pulls their config.json
+# directly, exactly like every non-gated family. gemma-3-4b-it stays
+# paper-sourced (out of the roster's weight class regardless).
 GATED = {
-    "gemma-3-1b-it": "author pull (addendum 22)",
     "gemma-3-4b-it": "author pull (addendum 22)",
-    "Llama-3.2-1B-Instruct": "author pull (addendum 22)",
 }
 
 
