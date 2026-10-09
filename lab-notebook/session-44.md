@@ -681,7 +681,9 @@ scope. Recalibrated against the per-device census:
   2 KiB system-wide).
 
 Net vs the per-device census (15 cells): -1.6%..+12.6%, mean
+
 |err| 4.1% (MiniCPM4 within 0.3%, granite within 2%). Test
+
 anchors moved to the GPU census columns.
 
 ## Addendum 137 - K=3: 90 questions at 256k (phase balance)
@@ -774,3 +776,52 @@ yellow...") - a chat-TEMPLATE mismatch signature, not a lookup
 failure. Candidate follow-up (not built): a template-sanity
 preflight probe so template malfunctions are labeled, not
 scored 0.
+
+## Addendum 140 - template-sanity preflight (the MiniCPM5-1B class)
+
+The author ruled option 1 (label, don't score). Before any
+question is asked, one probe: "Reply with the single word
+PINEAPPLE and nothing else." A healthy model answers short and
+echo-free; a template-mangled one (MiniCPM5-1B, addendum 139 -
+its embedded template rendered an endless <|im_start|>
+assistant loop) returns template fragments, parrots the
+instruction, or comes back empty. On detection the cell is
+LABELLED error=template_malfunction and skipped - no score is
+recorded, so a packaging failure never masquerades as a
+measured 0. Rationale: the 0.0 was real but the MECHANISM was
+not reach - the model never saw a question; tables stay honest.
+Pinned by tests/test_template_sanity.py (fragment/echo/empty
+detection, healthy pass, and the certify-loop labeling).
+
+## Addendum 141 - strict answer pattern + compliance measurement
+
+The author asked whether the model can be asked for a specific
+answer pattern so compliance itself is measurable, and whether
+our VT template followed RULER. Corrections first: the RULER
+upstream constants (scripts/data/synthetic/constants.py) are
+VT tokens_to_generate=30, CWE=120, NIAH=128, FWE=50, QA=32 - my
+earlier "120 for VT" was a CWE/VT mix-up, now verified at the
+source. Our template WAS RULER-verbatim until this addendum
+(both question and answer_prefix, typo included); the change
+below is a deliberate, registered deviation.
+
+Changes:
+- VT_TEMPLATE: the verbose RULER answer_prefix ("According to
+  the chain(s)... they are: ") is replaced by "Answer ONLY with
+  the {num_v} variable names, comma-separated, and nothing
+  else." Strict answer-size, and compliance becomes a first-
+  class observable.
+- VT_GEN_TOKENS 128 -> 32: upstream VT uses 30; our k=1, h=4
+  answer is 5 names (~15-20 tokens); 32 is headroom without
+  letting a chatty model burn TG time. bench/v7.py keeps
+  max(VT_GEN_TOKENS, (hops+1)*12) so h-tuning stays consistent.
+- format_ok_vt() in ruler_gate.py: strict pattern ^NAME(,
+  NAME)*$ (VT_NAME_LEN letters). Compliance is MEASURED, never
+  scored: per-question format_ok in the answers JSONL, per-
+  grade and cell-level format_ok / format_ok_asked in the cell
+  record. score_vt stays lenient so reach scores remain
+  comparable across the rerun; a compliance-vs-reach gap is
+  the instruction-following signal.
+
+All cells rerun: k=1 with the new template is a new
+measurement; nothing is comparable to the previous run.

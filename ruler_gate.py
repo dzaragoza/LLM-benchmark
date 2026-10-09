@@ -76,14 +76,13 @@ VT_TEMPLATE = (
     "[INST] Memorize and track the chain(s) of variable assignment "
     "hidden in the following text.\n\n{context}\nQuestion: Find all "
     "variables that are assigned the value {query} in the text above. "
-    "[/INST] Answer: According to the chain(s) of variable assignment "
-    "in the text above, {num_v} variables are assgined the value "
-    '{query}, they are: "\n'
+    "[/INST] Answer ONLY with the {num_v} variable names, "
+    "comma-separated, and nothing else. "
 )
 VT_NAME_LEN = 5
 VT_NUM_CHAINS = 1
 VT_NUM_HOPS = 4
-VT_GEN_TOKENS = 128
+VT_GEN_TOKENS = 32
 
 
 def build_vt_task(
@@ -159,6 +158,16 @@ def score_vt(answer: str, expected: list[str]) -> tuple[bool, int]:
     clean = re.sub(r"\s+", "", strip_template_debris(answer)).upper()
     found = [v for v in expected if v in clean]
     return len(found) == len(expected), len(found)
+
+
+VT_ANSWER_RE = re.compile("^[A-Z]{" + str(VT_NAME_LEN) + "}(, [A-Z]{" + str(VT_NAME_LEN) + "})*$")
+
+
+def format_ok_vt(answer: str) -> bool:
+    """Addendum 141: strict answer-pattern compliance - variable names,
+    comma-separated, nothing else. Compliance is measured, never
+    scored; score_vt stays lenient so reach stays comparable."""
+    return bool(VT_ANSWER_RE.match(strip_template_debris(answer or "").strip()))
 
 
 def zeta(alpha: float, k: int) -> float:

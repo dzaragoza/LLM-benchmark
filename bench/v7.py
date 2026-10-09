@@ -332,8 +332,21 @@ class PreflightError(Exception):
     both live crashes shared. Reported per cell, never a crash."""
 
 
+class TemplateMalfunction(Exception):
+    """The model fails a template-sanity probe (addendum 140): asked
+    to reply with a single word, it echoes chat-template fragments
+    or the prompt text instead - the GGUF's embedded template (or
+    the server's auto-parse of it) mangles the message, so the
+    model never sees a well-formed question. The cell is LABELLED
+    (template_malfunction), not scored: a measured 0 would lie
+    about the model's reach (MiniCPM5-1B, session 45 - its
+    prefill was an endless <|im_start|> assistant loop and the
+    answers parroted haystack noise)."""
+
+
 PROMPT_OVERHEAD_TOKENS = 128
 GEN_HEADROOM_TOKENS = 192
+TEMPLATE_PROBE_PROMPT = "Reply with the single word PINEAPPLE and nothing else."
 
 
 def grade_reachable(span: int, hops: int, window: int) -> bool:
@@ -381,6 +394,26 @@ def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str
     return {f"{s}x{h}": t for (s, h), t in seen.items()}
 
 
+def preflight_template_sanity(port: int) -> None:
+    """Addendum 140: a one-question sanity probe BEFORE the cell runs.
+    A healthy model asked to reply with the single word PINEAPPLE
+    returns something short and echo-free; a template-mangled one
+    parrots template fragments (<|im_start|>, [INST]) or the
+    instruction text itself. Raises TemplateMalfunction so the
+    cell is labelled, never scored-0."""
+    reply = ruler_gate.ask(port, TEMPLATE_PROBE_PROMPT, max_tokens=32)
+    r = (reply or "").strip()
+    if not r:
+        raise TemplateMalfunction("empty reply to the sanity probe")
+    low = r.lower()
+    if any(frag in low for frag in ("<|im_start|>", "<|im_end|>", "[inst]", "</s>", "<s>")):
+        raise TemplateMalfunction(f"template fragment in sanity probe: {r[:120]!r}")
+    # a model that parrots the instruction back ("reply with the word...")
+    # is echoing, not answering
+    if low.startswith("reply with") or low.startswith("respond with"):
+        raise TemplateMalfunction(f"prompt echo in sanity probe: {r[:120]!r}")
+
+
 def run_cell(
     port: int,
     corpus: dict,
@@ -404,14 +437,18 @@ def run_cell(
             if not grade_reachable(q["span"], q["hops"], window):
                 continue
             key = (q["span"], q["hops"])
-            g = per_grade.setdefault(key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0})
+            g = per_grade.setdefault(
+                key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0, "format_ok": 0}
+            )
             prompt = question_prompt(corpus, q)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
             t0 = time.monotonic()
             answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
             elapsed = round(time.monotonic() - t0, 3)
             ok, found = ruler_gate.score_vt(answer, q["names"])
+            fmt_ok = ruler_gate.format_ok_vt(answer)
             g["asked"] += 1
+            g["format_ok"] += 1 if fmt_ok else 0
             g["pass"] += 1 if ok else 0
             g["found"] += found
             # addendum 125: partial credit - found/(h+1) per question.
@@ -429,6 +466,7 @@ def run_cell(
                             "value": q["value"],
                             "found": found,
                             "ok": ok,
+                            "format_ok": fmt_ok,
                             "elapsed_s": elapsed,
                             "answer": answer,
                         },
@@ -465,11 +503,14 @@ def run_cell(
         "max_score": asked_grades,
         "wall_seconds": round(time.monotonic() - started, 1),
         "samples": samples,
+        "format_ok": sum(g["format_ok"] for g in per_grade.values()),
+        "format_ok_asked": sum(g["asked"] for g in per_grade.values()),
         "per_grade": {
             f"{s}x{h}": {
                 "pass": g["pass"],
                 "asked": g["asked"],
                 "credit": round(g["credit"], 3),
+                "format_ok": g["format_ok"],
             }
             for (s, h), g in sorted(per_grade.items())
         },
@@ -630,11 +671,16 @@ def certify_v7(
             if corpus is None:
                 corpus = corpus_from_artifact(port)
             try:
+                preflight_template_sanity(port)
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
                 if probe_toks:
                     print(f"  preflight: {probe_toks}")
                 answers_path = os.path.join(results_dir, f"{fam}-ctx{cell['ctx']}-v7-answers.jsonl")
                 rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
+            except TemplateMalfunction as e:
+                entry["error"] = f"template_malfunction: {e}"
+                results.append(entry)
+                continue
             except PreflightError as e:
                 entry["error"] = f"preflight: {e}"
                 results.append(entry)

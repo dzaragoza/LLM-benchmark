@@ -106,6 +106,7 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
     monkeypatch.setattr(v7m.llama_server, "wait_healthy", lambda *a, **k: True)
     monkeypatch.setattr(v7m.llama_server, "stop_server", lambda *a, **k: None)
     monkeypatch.setattr(v7m, "preflight_reachable_grades", lambda port, c, w: {})
+    monkeypatch.setattr(v7m, "preflight_template_sanity", lambda port: None)
     monkeypatch.setattr(
         v7m,
         "run_cell",
