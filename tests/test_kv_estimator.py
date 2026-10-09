@@ -84,7 +84,7 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
     would silently keep the old-config scores."""
     import bench.v7 as v7m
 
-    def fake_alloc(budget, limit=4, policy="greedy"):
+    def fake_alloc(budget, limit=4, policy="greedy", report_unplaceable=False):
         return [
             {
                 "family": "famA",
