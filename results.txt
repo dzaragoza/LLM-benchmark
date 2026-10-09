@@ -67232,3 +67232,24 @@ AttributeError: 'Namespace' object has no attribute 'corpus'
   arm greedy: Q4_0/q8_0/q4_0 -> 1.102/25
   arm random: Q4_0/q4_0/q8_0 -> 1.324/25
 [2026-10-10T00:44:06] v7 model done: MiniCPM5-2B (2/5 cells scored) - committing artifacts
+
+===== 2026-10-10T00:44:12 | full_benchmark.py --task v7 --v7-families 32 --v7-multi-arm --state-file state/benchmark-state-v7-1.json --results-file benchmark-results-v7-1.json =====
+  greedy measured; arms still needed: ['stingy'] - launching only for them
+=== granite-3.1-2b-instruct (model 14 of 25) ctx=32768 wq=Q8_0 k=q8_0 v=q8_0
+  preflight: {'4096x2': 4587, '16384x32': 16201}
+  census: GPU 3.92 GiB (est 3.94) - weights 2.51, context 1.33, compute 0.09
+  greedy kept (score 2.272/15) - measuring arms only
+  arm stingy: Q4_0/f16/f16 differs - measuring
+  [2] quantizing granite-3.1-2b-instruct-f16.gguf -> Q4_0 (output hidden; shown on error)
+  arm random: same config as a measured arm - skipped
+  arm greedy: Q8_0/q8_0/q8_0 -> 2.272/15
+  arm stingy: Q4_0/f16/f16 -> 2.433/15
+=== granite-3.1-2b-instruct (model 14 of 25) ctx=65536 wq=Q4_0 k=q8_0 v=q4_0
+  preflight: {'4096x2': 4587, '32768x32': 33158}
+  census: GPU 3.50 GiB (est 3.5) - weights 1.35, context 2.03, compute 0.12
+  score 2.608 / 20
+  arm stingy: same config as a measured arm - skipped
+  arm random: Q4_0/q4_0/q8_0 differs - measuring
+  arm greedy: Q4_0/q8_0/q4_0 -> 2.608/20
+  arm random: Q4_0/q4_0/q8_0 -> 1.712/20
+[2026-10-10T00:55:24] v7 model done: granite-3.1-2b-instruct (2/4 cells scored) - committing artifacts
