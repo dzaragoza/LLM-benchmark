@@ -859,11 +859,15 @@ def certify_v7(
             # addendum 166: the multi-arm cell record - every arm's config
             # and score in the SAME cell, one file; arms that agree with an
             # already-measured config need no re-measure (they ARE it)
-            arms = {alloc_policy: {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}}
+            arms = {"greedy": {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}}
             if multi_arm:
                 measured_cfgs = {
                     (cell["wq"], cell["kq"], cell["vq"]),
                 }
+                print(
+                    f"  arm greedy: {cell['wq']}/{cell['kq']}/{cell['vq']} "
+                    f"-> {rec['score']}/{rec['max_score']}"
+                )
                 for pol in ("stingy", "random"):
                     alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
                     if alt is None:
@@ -883,7 +887,9 @@ def certify_v7(
                         )
                         if not arm_gguf:
                             arms[pol] = {
-                                "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
+                                "wq": alt["wq"],
+                                "kq": alt["kq"],
+                                "vq": alt["vq"],
                                 "error": "arm: could not acquire the quant",
                             }
                             continue
