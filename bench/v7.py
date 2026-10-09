@@ -922,11 +922,21 @@ def certify_v7(
                     + (v.get("context_gib") or 0)
                     + (v.get("compute_gib") or 0)
                 ) if v else breakdown.get("total_gib")
-                print(
-                    f"  census: weights {breakdown['weights_gib']:.2f} GiB, "
-                    f"context {breakdown['context_gib']:.2f} GiB "
-                    f"-> total {breakdown['total_gib']:.2f} GiB (est {cell['est_gib']})"
-                )
+                # addendum 177: print the GPU footprint (the estimate's own
+                # scope) - the whole-machine total was confusing to read next
+                # to a GPU-scoped estimate (the author's ruling)
+                if v:
+                    print(
+                        f"  census: GPU {gpu_gib:.2f} GiB (est {cell['est_gib']}) "
+                        f"- weights {(v.get('model_gib') or 0):.2f}, "
+                        f"context {(v.get('context_gib') or 0):.2f}, "
+                        f"compute {(v.get('compute_gib') or 0):.2f}"
+                    )
+                else:
+                    print(
+                        f"  census: GPU {gpu_gib:.2f} GiB (est {cell['est_gib']}) "
+                        f"- no device split; whole-machine fallback"
+                    )
                 # addendum 170: the MEASURED budget gate - the estimate is an
                 # estimate; the verdict is llama-server's own GPU census. A cell
                 # over the budget is an ERROR, never a scored result (the author's
