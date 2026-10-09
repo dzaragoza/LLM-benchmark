@@ -637,7 +637,7 @@ def _run(args: argparse.Namespace) -> None:
                 f"({best['wq']}, k={best['kq']}, v={best['vq']}) "
                 f"score {best['score']}/{best['max_score']}"
             )
-        if not args.no_git and not args.dry_run:
+        if not args.no_git:
             tee_output.uninstall()
             git_tail(args)
         stamp("run complete")
