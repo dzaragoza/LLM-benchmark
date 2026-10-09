@@ -888,3 +888,21 @@ R-40 pin extended: no _K anywhere, and the ladders' sets are equal.
 Also fixed this delivery: the estimator pin's constants follow
 the retired Q4_K (KeyError on CI), and the ty/E501 pair from the
 pre-launch check.
+
+
+## Addendum 174 - v7.1: the fresh-table restart; the _1 correction
+
+The author's rulings: "Let's restart the benchmark with the new
+machinery. let's call this version v7.1" and the correction "youre
+wrong, we dont use _1" - the registered ladders are the _0 formats
+ONLY: [Q4_0, Q5_0, Q8_0, F16], weights and KV both, EQUAL sets.
+The _1 variants never enter a plan (my addendum-173 draft added
+them to the ladders prematurely; corrected before the v7.1 run).
+
+v7.1: a completely fresh state (benchmark-state-v7-1.json), every
+cell measured from scratch under the full new machinery - equal
+_0 ladders, structural sizes, the measured budget gate
+(BudgetExceeded), the calibrated estimator, the multi-arm records,
+the mandatory candidate count, the findings report. The v7.0
+tables stand as history; the v7.1 table is the first fully-honest
+one (no format risk, no estimate-only verdicts).
