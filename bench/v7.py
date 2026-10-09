@@ -813,7 +813,11 @@ def certify_v7(
                 results.append(entry)
                 pending.append(entry)
                 continue
-        if done.get("score") is not None:
+        if done.get("score") is not None and not cell.get("_skip_greedy_rescore", False):
+            # addendum 168: in the arms-only path the cell IS measured -
+            # no drift re-measure; the flag is consumed here so the scoring
+            # site sees a clean cell (the earlier delivery left the drift
+            # check firing on identical configs in that path)
             print(
                 f"  config drift: stored {done.get('wq')}/{done.get('kq')}/"
                 f"{done.get('vq')} != planned {cell['wq']}/{cell['kq']}/"
