@@ -945,3 +945,26 @@ compute 0.06" (the whole-machine total is out of the print; the
 no-device-split fallback says so explicitly). And "only check the
 default python version fo compil" - the 3.13 setup-python gate is
 removed; one compile gate on the workflow's default (3.12).
+
+
+## Addendum 179 - the mutmut staging limit registered; the selection scoped to it
+
+The third mutmut baseline crash (full_benchmark ModuleNotFound,
+after code_edit and the same class twice) exposed the structural
+limit: mutmut stages ONLY the mutated sources (AI_tools/) plus the
+selected tests - the repo root never enters the staging dir, so
+any test importing root modules (full_benchmark, infra.*) breaks
+the baseline no matter the sys.path setup. test_seams imports
+full_benchmark in 3 places - it cannot run in staging.
+
+THE SCOPE: the mutmut selection drops test_seams (its code_edit
+coverage is carried by test_code_edit_robustness and
+test_code_edit_cli, which import only staged paths). The
+session-40 verdict wanted seams IN for a fair score; the staging
+limit rules that out - registered as the tool's known limit, not
+silently worked around. code_edit's mutation score is a LOWER
+BOUND over the cli+robustness tests.
+
+Also this delivery: the I001 noqa on the seams import block (the
+path-setup constraint suppresses the sort), the validator inline
+(ty), the E402s - the full red-chain of the day burning off.
