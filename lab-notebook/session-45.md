@@ -933,3 +933,15 @@ the E501 pair from the ladder-refs fix; and the addendum-176
 lesson from the crosshair miss - the check protocol now reads the
 FULL TOOL VERDICTS block, every red named and fixed before any
 push (no fixing the loud red while the quiet one sits).
+
+
+## Addendum 177 - the census prints the GPU footprint; the compile gate keeps the default python
+
+Two rulings: "in the benchmark don't print total ram usage, print
+gpu ram usage. it is confusing to read because the estimates are
+for gpu" - the census line now reads the estimate's own scope:
+"census: GPU 3.49 GiB (est 3.84) - weights 1.9, context 1.4,
+compute 0.06" (the whole-machine total is out of the print; the
+no-device-split fallback says so explicitly). And "only check the
+default python version fo compil" - the 3.13 setup-python gate is
+removed; one compile gate on the workflow's default (3.12).
