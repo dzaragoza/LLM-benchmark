@@ -1105,3 +1105,33 @@ SEQUENCE: delete the dead set; strip full_benchmark's v5 task
 branches and the v5 imports; the R-05 row's history clause covers
 the retired cells. Suite follows (the v5 tests retire with the
 code they pinned). Registered as one R-21 pass.
+
+
+## Addendum 184 - speed_gate restored: the winner's certification step
+
+The author's ruling: "Speed gate will be run on the overall
+winner of the memory category. As soon as we have the 32 models
+result, we measure speed gate on the winner. Get rid of the rest."
+
+Addendum 183 retired speed_gate as dead code; the author's ruling
+supersedes: the speed gate is NOT dead - it is the CERTIFICATION
+step of the v7 deliverable (addendum 98's design: the argmax goes
+through the speed gate at the winner's OWN ctx - a 262k
+recommendation must hold the reader wall at 262k). The rest of
+addendum 183's deletions stand (the v5 task controllers, the
+standalone instruments, the v5 cells/certify machinery).
+
+THE FLOW, registered: (1) the 32-model v7.1 run completes - the
+argmax is the winner (model, config, ctx); (2) the speed gate
+runs on THAT config at THAT ctx - the reader-wall verdict at the
+recommended cell; (3) the page's winner section carries the
+verdict (pass/stall-rate at the winner's ctx, the reader line).
+The gate measures ONE cell - the winner's - not a per-model sweep:
+the certification is the last gate the argmax passes before the
+recommendation is published.
+
+The pre-registration: the winner (currently Qwen3.5-2B@262k
+Q8_0/q8_0/q5_0 at 4 GiB, subject to the 32-model field) passes
+the reader-wall test at its own ctx - a stall-rate verdict at
+the winner's depth, per the v3.1 protocol constants (5.0 w/s
+line, 0.45 s reaction, cal-50 corpus, n=50 conversations).
