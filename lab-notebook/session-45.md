@@ -1441,3 +1441,30 @@ same term in _alloc_total); the q4_1/q5_1 rows in their format
 table match the constants we retired with the _1 ruling; the
 GPU-offload note ("the formula is exact for GPU offload
 (VRAM)") matches our addendum-136 GPU-scope ruling.
+
+## Addendum 193 - the state files pruned to the approved ladders
+
+The author's ruling before restarting: "Remove from the state
+file any cell using quants outside the approved list. Then it
+will be clean." Executed on all three state files: any CELL
+whose (wq, kq, vq) is off the closed-form ladders
+([Q4_0, Q8_0, F16] / [q4_0, q8_0, f16]) is deleted, and any
+ARM record with an off-ladder config is pruned from its cell's
+arms block. Verified: ZERO off-ladder records remain.
+
+PRUNED: v7-1 state 15 cells + 27 arm records (the Q5_0-era
+configs: the granite twins' 65k peaks at Q5_0/q8_0/q5_0,
+SmolLM3's Q5_0 cells, MiniCPM5-2B's, Jamba2's stingy arm, the
+champion's old q5_0-V cell); the v7.0 state 9 cells + 8 arms;
+the stingy sidecar 3 cells. Kept: every on-ladder cell (60 in
+v7-1, 44 in v7.0, 4 in the sidecar).
+
+CONSEQUENCE, on record: the champion's 262k cell (Q8_0/q8_0/q5_0,
+6.878) is GONE with its q5_0 V cache - the surviving best is
+Qwen3.5-2B @131k (Q8_0/f16/f16, 6.787), a clean-ladder config.
+The rerun will climb the approved ladders only: the champion's
+262k cell re-measures at a q4_0/q8_0/f16 V cache, and the
+ranking's deep end re-derives from clean configs. No config-
+drift re-measures fire (the off-ladder cells are deleted, not
+stored); the run measures exactly the missing clean cells plus
+the never-measured newcomers.
