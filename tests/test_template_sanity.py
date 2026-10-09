@@ -53,7 +53,7 @@ def test_malfunction_labels_cell_not_score(tmp_path, monkeypatch):
     monkeypatch.setattr(
         v7m,
         "climb_allocations",
-        lambda b, budget=4, policy="greedy": [
+        lambda b, budget=4, policy="greedy", report_unplaceable=False: [
             {
                 "family": "famA",
                 "params_b": 0.3,

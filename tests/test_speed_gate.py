@@ -1182,7 +1182,17 @@ def test_accept_answers_the_rung_and_climbs(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(fb, "save_state", lambda p, s: None)
     monkeypatch.setattr(fb, "stamp_disk", lambda s, p: None)
     monkeypatch.chdir(tmp_path)
-    argv = ["full_benchmark.py", "--task", "all", "--force-rung", "f16", "--rungs", "4096,8192"]
+    argv = [
+        "full_benchmark.py",
+        "--task",
+        "all",
+        "--force-rung",
+        "f16",
+        "--rungs",
+        "4096,8192",
+        "--v7-families",
+        "16",
+    ]
     monkeypatch.setattr("sys.argv", argv)
     fb.DRY_RUN_ACTIVE = False
     try:

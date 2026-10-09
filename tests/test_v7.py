@@ -200,7 +200,7 @@ def test_crash_tail_always_runs(tmp_path, monkeypatch):
         m.patch.object(fb.llama_server, "kill_stale_server", lambda: False),
         m.patch.object(fb.tee_output, "uninstall", lambda: None),
         m.patch.object(fb.tee_output, "install", lambda: None),
-        m.patch.object(fb.sys, "argv", ["full_benchmark.py"]),
+        m.patch.object(fb.sys, "argv", ["full_benchmark.py", "--v7-families", "16"]),
     ):
         monkeypatch.chdir(tmp_path)
         try:
