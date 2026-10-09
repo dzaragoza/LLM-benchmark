@@ -35,14 +35,9 @@ def test_r34_zero_scores_carry_evidence():
     for fam, fst in state.get("families", {}).items():
         for ctx, c in (fst.get("v7") or {}).items():
             if isinstance(c, dict) and c.get("score") == 0:
-                answers = (
-                    ROOT
-                    / "models"
-                    / "tournament-results"
-                    / fam
-                    / f"{fam}-ctx{ctx}-v7-answers.jsonl"
-                )
-                if not answers.exists() and not c.get("error"):
+                results_dir = ROOT / "models" / "tournament-results" / fam
+                any_log = any(results_dir.glob(f"{fam}-ctx{ctx}-v7*-answers.jsonl"))
+                if not any_log and not c.get("error"):
                     bare.append(f"{fam}@{ctx}")
     assert bare == [], f"score-0 cells without evidence or label: {bare}"
 

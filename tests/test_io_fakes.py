@@ -61,7 +61,7 @@ class StubServer:
             def do_POST(self):
                 self._dispatch("POST")
 
-            def log_message(self, *a):
+            def log_message(self, format, *args):  # noqa: A002
                 pass
 
         self._srv = HTTPServer(("127.0.0.1", 0), Handler)
