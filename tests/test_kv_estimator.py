@@ -63,7 +63,7 @@ def test_allocations_within_budget_at_every_ctx():
     budget - the addendum-134 run's 262144 cell measured 4.558
     GiB, OVER budget, because the pre-calibration estimate (3.86)
     undercounted. Honest numbers, no cell over."""
-    for r in v7.greedy_allocations(4.0):
+    for r in v7.climb_allocations(4.0):
         assert r["est_gib"] <= 4.0, r
 
 
@@ -84,7 +84,7 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
     would silently keep the old-config scores."""
     import bench.v7 as v7m
 
-    def fake_alloc(budget, limit=4):
+    def fake_alloc(budget, limit=4, policy="greedy"):
         return [
             {
                 "family": "famA",
@@ -97,7 +97,7 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
             }
         ]
 
-    monkeypatch.setattr(v7m, "greedy_allocations", fake_alloc)
+    monkeypatch.setattr(v7m, "climb_allocations", fake_alloc)
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
     monkeypatch.setattr(
         v7m, "corpus_from_artifact", lambda port: {"questions": [], "cuts": {}, "sentences": []}

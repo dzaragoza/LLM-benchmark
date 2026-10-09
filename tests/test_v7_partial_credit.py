@@ -67,7 +67,7 @@ def test_clean_wipes_all_cells_and_logs_up_front(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise AssertionError("clean must finish before any measuring")
 
-    monkeypatch.setattr(v7, "greedy_allocations", boom)
+    monkeypatch.setattr(v7, "climb_allocations", boom)
     try:
         v7.certify_v7(
             str(tmp_path),
@@ -83,7 +83,7 @@ def test_clean_wipes_all_cells_and_logs_up_front(tmp_path, monkeypatch):
     except AssertionError as e:
         assert "before any measuring" in str(e), "the boom must be the measuring gate"
     else:
-        raise AssertionError("greedy_allocations must still be called (post-clean)")
+        raise AssertionError("climb_allocations must still be called (post-clean)")
     assert "v7" not in state["families"]["FamA"]
     assert "v7" not in state["families"]["FamB"]
     assert state["families"]["FamB"]["other"] == "keep", "non-v7 state survives"

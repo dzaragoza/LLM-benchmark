@@ -36,7 +36,7 @@ def test_4096_window_families_earn_no_cell():
         "MiniCPM-2B-sft",
     ):
         assert v7.family_window(fam) == 4096
-    rows = v7.greedy_allocations(4.0, roster_limit=38)
+    rows = v7.climb_allocations(4.0, roster_limit=38)
     for fam in (
         "Phi-3-mini-4k-instruct",
         "granite-3.0-2b-instruct",

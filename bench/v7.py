@@ -199,11 +199,20 @@ def _alloc_total(
     return weights_gib(p, wq) + kv / (1 << 30) + compute
 
 
-def greedy_allocations(budget_gib: float, roster_limit: int = PILOT_FAMILIES) -> list[dict]:
-    """For each (family, ctx): start at (Q2_K, q2_K, q2_K) and greedily
-    climb, taking the single-axis one-notch upgrade that lands closest
-    to the budget without exceeding it. Output: the maximal config
+def climb_allocations(
+    budget_gib: float,
+    roster_limit: int = PILOT_FAMILIES,
+    policy: str = "greedy",
+) -> list[dict]:
+    """For each (family, ctx): start at the (Q2_K, q4_0, q4_0) floor and
+    climb by single-axis one-notch upgrades that land under the budget
+    without exceeding it, until no upgrade fits (the maximal config).
+    Policy (addendum 144): "greedy" takes the LARGEST-fitting upgrade
+    each step (R-18); "stingy" takes the SMALLEST - the paths diverge,
+    the maximality contract is identical. Output: the maximal config
     <= budget per (family, ctx), param-ascending."""
+    if policy not in ("greedy", "stingy"):
+        raise ValueError(f"unknown allocation policy: {policy!r}")
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
     out = []
     for p, name in rows[:roster_limit]:
@@ -241,7 +250,9 @@ def greedy_allocations(budget_gib: float, roster_limit: int = PILOT_FAMILIES) ->
                         KV_QUANT_LADDER[cand[2]],
                         ctx,
                     )
-                    if t is not None and t <= budget_gib and (best is None or t > best[0]):
+                    if t is None or t > budget_gib:
+                        continue
+                    if best is None or (t > best[0] if policy == "greedy" else t < best[0]):
                         best = (t, cand)
                 if best is None:
                     break
@@ -566,6 +577,7 @@ def certify_v7(
     roster_limit: int = PILOT_FAMILIES,
     on_model_commit: Any = None,
     clean: bool = False,
+    alloc_policy: str = "greedy",
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -593,7 +605,7 @@ def certify_v7(
                     os.remove(os.path.join(models_dir, "tournament-results", fam, f_))
         print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
         save_state(state_path, state)
-    cells = greedy_allocations(budget_gib, roster_limit)
+    cells = climb_allocations(budget_gib, roster_limit, alloc_policy)
     results: list[dict[str, Any]] = []
     corpus = None
     # addendum 132: the commit hook fires once per family, after its
