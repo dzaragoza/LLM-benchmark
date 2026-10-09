@@ -1158,3 +1158,83 @@ certification: n=20 conversations from the cal-50 corpus, the
 stall-rate verdict at 2-sigma confidence, PASS at >= 15/20
 conversations stall-free (75% - the 2-sigma band on n=20). One
 cell, one config, once - the last gate before the page.
+
+
+## Addendum 186 - the search-strategy findings pre-registered (the paper's discussion skeleton)
+
+The author's ask: "For this research we have been running all
+the models from 8k to 256k with the three arms. Let's determine
+what's the optimum strategy to look for the champion." The
+skeleton below is REGISTERED BEFORE the full-32 field lands, so
+the final numbers slot into a pre-registered structure rather
+than a post-hoc narrative.
+
+THE EXHAUSTIVE BASELINE (what v7.1 measured): the full grid -
+every family x every trained-window-feasible rung x the three
+allocation arms (only where they diverge). It is the gold
+standard any cheaper search is graded against.
+
+1. START DEEP. The separating information lives at the budget-
+   binding rungs: shallow cells are cheap but nearly
+   uninformative (all arms agree on config; scores cluster),
+   and reach - the champion's defining feature - only exists
+   at depth. RULE: start at min(trained_window,
+   budget_feasible_depth); one cell, one arm, and the score
+   there ranks the field's top half.
+
+2. THE CLIMBING ARM IS A FUNCTION OF KV GEOMETRY, knowable
+   from the registry BEFORE any measurement: weights-geometry
+   families (many layers, wide KV) take GREEDY (weights
+   fidelity is what scores); thin-KV families (few layers,
+   single kv-head) take STINGY (the cache axis pays: Llama@
+   131k +79%, MiniCPM5-2B both cells). RANDOM is the control,
+   never the candidate - it won nowhere outright.
+
+3. THE COARSE-TO-FINE SCHEDULE (3x cheaper than the grid):
+   (a) one arm, deepest feasible rung, whole field -> the top-3
+   candidates (~32 cells); (b) the candidates' full curves, one
+   arm (~20 cells) - the shape (rising/peaked/declining) says
+   whether deeper or other arms can help; (c) arms only at the
+   finalists' budget-binding cells (~8 cells). ~50 cells vs the
+   ~150 the grid cost; the loss is the null-arm verification,
+   which the exhaustive baseline already banked.
+
+4. SKIPPABLE, WITH REASONS: (a) shallow cells where the
+   estimator proves all arms agree - the config is identical by
+   arithmetic, the measurement re-proves nothing; (b) a family
+   below ~0.5 at its BEST rung - the scores-desert is flat, no
+   observed family jumps from 0.1 to 3.0 with depth, cut the
+   family not the rung; (c) unreachable-by-window rungs (R-19
+   machinery); (d) NEVER skippable: the winner's neighborhood -
+   every rung of the top-2, every arm at their peak (the
+   multi-arm deltas flip cells: Llama's +79%).
+
+THE SCORING SYSTEM, for the discussion section:
+ADVANTAGES - partial recall is measured, not discarded (a model
+finding 3 of 5 names earns 3/5 - the desert's residents
+separate BY HOW MUCH they fail); the fixed corpus makes scores
+comparable across (family, ctx, config); the reach axis is
+honest (unreachable grades excluded - a bigger window strictly
+raises the attainable max, bigger cannot fake a win).
+DISADVANTAGES - the credit signal is weak at the bottom (n=1
+per grade: single-answer luck moves small scores - K=1 was
+ruled for cost, the price is variance); single task shape (VT
+only - a model bad at variable-tracking but good at
+summarization scores zero: a fairness limit, not a capability
+limit); one fixed haystack (a tokenizer-friendly family gets a
+bonus unrelated to its window; the n+1 corpus seed rule is the
+registered mitigation, unexercised so far).
+
+FOR PRACTITIONERS: one line - the champion (model, config,
+ctx) and the memory it needs. FOR RESEARCHERS: the search
+findings above, the two-regime allocation rule, the format
+theorems (the _0 sizes are structural and provable; the
+K-quant bookkeeping hazard is a CLASS of estimator risk), and
+the honest negatives (granite's value-vs-names malfunction,
+MiniCPM5-1B's template echo, the scores-desert as the
+difficulty signal).
+
+GRADING: when the 32-model field lands, each numbered finding
+grades against the full data - a prediction that fails is
+registered as such (the pre-registration discipline; the
+skeleton does not bend to fit).
