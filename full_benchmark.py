@@ -618,7 +618,6 @@ def _run(args: argparse.Namespace) -> None:
                 out.append((fam.strip(), int(ctx)))
             return out
 
-
         results = certify_v7(
             args.models_dir,
             state,
