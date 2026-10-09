@@ -1374,3 +1374,26 @@ backstop. Wow.md rule 1 rewritten to match: read a verdict
 only when asked or when a run is known dispatched - the
 every-prompt and every-push habits are both retired, this time
 by economics.
+
+## Addendum 191 - no test updates either; the suite is frozen
+
+The author's ruling: "Do not update tests either. Too
+expensive. I think the benchmark is in a good place now."
+
+The suite freezes at its current state: 253 tests, all green,
+pinned to 40 requirements. No new test files, no edits to
+existing ones - the author's ruling is that the marginal value
+of further test work is below its cost. Wow.md rule 2 carries
+it: nothing runs locally AND no test updates; the weekly CI
+cron (addendum 190) verifies the frozen suite against whatever
+the code becomes. If the code drifts and a frozen test breaks,
+that is a finding REPORTED to the author - never a silent test
+edit to make it pass.
+
+SESSION STATE: the benchmark is in a good place - the author's
+own words, on record as the session-close signal. v7.1
+machinery complete and running; the 32-model extension filling
+the state; the search-strategy skeleton pre-registered
+(addendum 186); the format theorems audited (addendum 189);
+the ladder [Q4_0, Q8_0, F16] with every constant closed-form;
+CI on-demand; the suite frozen.
