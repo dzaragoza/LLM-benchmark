@@ -68,7 +68,7 @@ from etc import registry_data
 S_MAX = 262144
 SPANS = [4096, 8192, 16384, 32768, 65536, 131072, 262144]
 HOPS = [2, 4, 8, 16, 32]
-K = 3  # questions per (span, hops) grade; pass = all h+1 names
+K = 1  # questions per (span, hops) grade; pass = all h+1 names
 # (upstream). Session 44 addenda 120/122/123: the author's rulings -
 # 10x easier (K 20 -> 2), prefill-matched counts (k inverse in span),
 # then the 2k span dropped: with K=1 flat, the ladder was

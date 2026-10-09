@@ -55,3 +55,4 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 136: GPU-scope ruling - estimator prices the accelerator only (weights overhead deleted, compute 1 KiB/token; -1.6..+12.6% vs GPU census)
 - [session-44](session-44.md) - addendum 137: K=3 ruled - 90 questions at 256k, phase-balanced (~423s gen ~ 450s prefill); predictions pre-registered
 - [session-44](session-44.md) - addendum 138: the greedy allocation is intentionally unoptimized - no allocator changes until the full-roster data shows the q/k/v quant impact
+- [session-44](session-44.md) - addendum 139: K reverted to 1 - the K=3 corpus GREW the deep prefill (450->1093s at 256k), premise wrong; K hypothesis rejected (bottom models went down); MiniCPM5-1B = template-echo malfunction class
