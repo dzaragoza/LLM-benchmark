@@ -220,7 +220,7 @@ def climb_allocations(
     policy: str = "greedy",
     report_unplaceable: bool = False,
 ) -> list[dict]:
-    """For each (family, ctx): start at the (Q2_K, q4_0, q4_0) floor and
+    """For each (family, ctx): start at the (W_LADDER[0], q4_0, q4_0) floor and
     climb by single-axis one-notch upgrades that land under the budget
     without exceeding it, until no upgrade fits (the maximal config).
     Policy (addendum 144): "greedy" takes the LARGEST-fitting upgrade
@@ -287,7 +287,7 @@ def climb_allocations(
                     "family": name,
                     "params_b": p,
                     "reason": (
-                        f"unplaceable: floor config (Q2_K, q4_0, q4_0) exceeds "
+                        f"unplaceable: floor config ({W_LADDER[0]}, q4_0, q4_0) exceeds "
                         f"the {budget_gib} GiB budget at every reachable ctx"
                     ),
                 }
