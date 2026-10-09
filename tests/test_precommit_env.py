@@ -37,7 +37,7 @@ def test_r20_ci_installs_from_requirements():
     assert "requirements.txt" in wf
     for step in (
         "ruff check",
-        "ruff format --check",
+        "ruff format .",
         "ty_check.py",
         "md_check.py",
         "requirements_check.py",

@@ -914,10 +914,6 @@ def certify_v7(
                 measured_cfgs = {
                     (cell["wq"], cell["kq"], cell["vq"]),
                 }
-                print(
-                    f"  arm greedy: {cell['wq']}/{cell['kq']}/{cell['vq']} "
-                    f"-> {rec['score']}/{rec['max_score']}"
-                )
                 for pol in ("stingy", "random"):
                     alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
                     if alt is None:
