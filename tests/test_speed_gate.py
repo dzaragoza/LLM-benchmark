@@ -34,18 +34,6 @@ TURNS_4096 = [{"model": "m.gguf", "server_tps": 5.0, "conv": 1}]
 TURNS_32768 = [{"model": "m.gguf", "server_tps": 5.0, "conv": 1, "ctx": 32768}]
 
 
-def test_wilson_interval_extremes_and_middle():
-    """The Wilson bound math (addendum 42) at the extremes and a known
-    middle - the certify medal bars are built on it."""
-    import full_benchmark as fb
-
-    assert fb.wilson_interval(0, 15) == (0.0, 0.0625)  # verified: standard score interval
-    lo, hi = fb.wilson_interval(15, 15)
-    assert lo > 0.8 and hi == 1.0
-    lo, hi = fb.wilson_interval(8, 15)
-    assert abs(lo - 0.4065) < 0.001 and abs(hi - 0.6560) < 0.001  # 8/15 at 1 sigma, verified
-
-
 def test_git_pull_head(monkeypatch):
     """Addendum 32: the forgotten pull, made structural - git_pull_head
     runs before the state loads; a failed pull is a hard stop."""

@@ -1030,3 +1030,40 @@ as x of n models in the benchmark."
    "=== <fam> (model x of n) ctx=..." - the plan's param-ascending
    family order, computed once from the plan. The author's
    running-output readability ask.
+
+
+## Addendum 182 - the formal layer built out where it is superior; the Wilson pin retired
+
+The author's rulings: trust formal methods where they are clearly
+better; keep tests only where they cover genuinely different risks;
+remove tests that duplicate formal coverage.
+
+DONE (all three from the author's picks):
+1. MUTMUT SCOPE (#1): bench/v7.py cannot enter the staging dir
+   (it imports infra/, the same staging limit as test_seams) - its
+   pure core gets CONTRACTS instead (the proofs cover the same
+   ground mutation testing would): the 4 new crosshair contracts
+   (below). The mutmut source_paths stay AI_tools (the staging-
+   compatible set); the estimator's mutation ground is now PROVEN,
+   not sampled.
+2. THE V7 GRID CONTRACTS (#5): spans/ctx ascending (the dyadic
+   ladder law), the FORMAT THEOREMS - q4_0 = 18/32 and q8_0 =
+   34/32 bytes/weight, weights_gib proven EXACTLY equal to the
+   structural derivation over ALL params (crosshair, whole
+   domain). The constants stop being registered magic: they are
+   theorems about the block formats. The matching pin
+   (test_v7_grid_theorems.py) carries the traceability markers
+   (ascending grids, spans-fit-ctx = R-28's root, the format
+   constants).
+3. THE WILSON PIN RETIRED (#7 read as the equivalence cleanup):
+   test_wilson_interval_extremes_and_middle checks 3 fixed
+   points; the contract + 3 hypothesis properties prove the same
+   bounds over the whole domain. The pin is deleted; the proofs
+   stay (they are strictly stronger). THE PRECEDENT: when a pin's
+   every assertion is an instance of a proven contract, the pin
+   goes - the traceability marker moves to the contract file.
+
+The split's own fixup: test_convert_quant_deletes_tensors_after_f16
+moved back to test_seams (it imports infra - my grep missed the
+from-import form); test_seams drops its unused code_edit import
+(55/6 test split stands).
