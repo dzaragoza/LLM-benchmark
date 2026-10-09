@@ -694,7 +694,7 @@ def certify_v7(
                     os.remove(os.path.join(models_dir, "tournament-results", fam, f_))
         print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
         save_state(state_path, state)
-    cells = climb_allocations(budget_gib, roster_limit, alloc_policy)
+    cells = climb_allocations(budget_gib, roster_limit, alloc_policy, report_unplaceable=True)
     # addendum 154: the unplaceable are FINDINGS, reported before the
     # run - the measured count is honest by construction
     findings = [c for c in cells if "reason" in c]
@@ -757,6 +757,10 @@ def certify_v7(
             v7 = fst.setdefault("v7", {})
             v7.pop(key, None)
         if dry_run:
+            print(
+                f"plan: {fam} ctx={cell['ctx']} wq={cell['wq']} k={cell['kq']} "
+                f"v={cell['vq']} est={cell['est_gib']} GiB"
+            )
             results.append(entry)
             continue
         repo = registry_data.ROSTER.get(fam, fam)
