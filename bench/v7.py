@@ -667,6 +667,7 @@ def certify_v7(
     on_model_commit: Any = None,
     clean: bool = False,
     alloc_policy: str = "greedy",
+    only_cells: list[tuple[str, int]] | None = None,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each greedy cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -729,6 +730,14 @@ def certify_v7(
 
     for cell in cells:
         fam = cell["family"]
+        # addendum 162: the cell selector - measure ONLY the cells whose
+        # (family, ctx) is listed; everything else is reported as skipped
+        # (selector), never measured. Comparison arms re-measure only the
+        # diverging cells - no sense re-measuring what cannot change.
+        if only_cells is not None and (fam, cell["ctx"]) not in only_cells:
+            entry["skipped"] = "cell not selected (--v7-cells)"
+            results.append(entry)
+            continue
         if pending_fam is not None and fam != pending_fam:
             _flush_model_commit()
             pending.clear()
@@ -799,7 +808,10 @@ def certify_v7(
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
                 if probe_toks:
                     print(f"  preflight: {probe_toks}")
-                answers_path = os.path.join(results_dir, f"{fam}-ctx{cell['ctx']}-v7-answers.jsonl")
+                suffix = "" if alloc_policy == "greedy" else f".{alloc_policy}"
+                answers_path = os.path.join(
+                    results_dir, f"{fam}-ctx{cell['ctx']}-v7{suffix}-answers.jsonl"
+                )
                 rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
             except TemplateMalfunction as e:
                 entry["error"] = f"template_malfunction: {e}"

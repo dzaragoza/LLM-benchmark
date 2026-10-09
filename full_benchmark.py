@@ -495,6 +495,13 @@ def build_parser() -> argparse.ArgumentParser:
         "honest by construction (addendum 154)",
     )
     ap.add_argument(
+        "--v7-cells",
+        default=None,
+        help="v7: measure ONLY these cells, comma-separated family:ctx "
+        "pairs (addendum 162) - everything else reports as skipped, never "
+        "measured. E.g. --v7-cells Qwen3.5-2B:262144,granite-4.0-1b:16384",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -602,6 +609,16 @@ def _run(args: argparse.Namespace) -> None:
     if args.task == "v7":
         from bench.v7 import BUDGET_GIB
 
+        def parse_v7_cells(spec: str | None) -> list[tuple[str, int]] | None:
+            if not spec:
+                return None
+            out = []
+            for pair in spec.split(","):
+                fam, ctx = pair.rsplit(":", 1)
+                out.append((fam.strip(), int(ctx)))
+            return out
+
+
         results = certify_v7(
             args.models_dir,
             state,
@@ -615,6 +632,7 @@ def _run(args: argparse.Namespace) -> None:
             else partial(v7_model_commit, args),
             clean=args.clean,
             alloc_policy=args.v7_alloc,
+            only_cells=parse_v7_cells(args.v7_cells),
         )
         state["v7"] = results
         save_state(args.state_file, state)
