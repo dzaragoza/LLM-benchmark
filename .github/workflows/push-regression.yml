@@ -48,8 +48,8 @@ jobs:
           coverage report -m
       - name: vulture (dead code)
         run: vulture . --min-confidence 80 --exclude .git,.venv,__pycache__,models,llama-b10964-gpu,mutants,.testmondata
-      - name: mutmut (the mutation trial - non-gating, the tally lands in the log)
+      - name: mutmut (the mutation trial)
         run: |
           pip install mutmut
-          mutmut run || true
-          mutmut results || true
+          mutmut run
+          mutmut results
