@@ -768,3 +768,27 @@ dependence, no cross-cell stream coupling: the plan for any cell
 reproduces from the registered constant alone. The pin's docstring
 updated to match. R-29's "seeded per family" wording is corrected
 by this addendum (the protocol row carries the new form).
+
+
+## Addendum 169 - CI continues after any error; format is applied, never gated
+
+The author's ruling: "Make ruff format di the formatting without
+reporting error. Make the Ci continue even after error." Two
+changes to push-regression.yml:
+
+1. RUFF FORMAT APPLIES: `ruff format .` runs in place - formatting
+   drift is fixed by the run, never reported as an error (the
+   format gate is retired; the formatter's output is the fix).
+2. CONTINUE-ON-ERROR EVERYWHERE: every tool step carries
+   continue-on-error, so ALL tools always run - a red anywhere can
+   never hide the steps below it again (the mutmut tally was being
+   hidden by format reds dying at step 3). The verdict is the
+   AGGREGATE: a final always()-gate reads every step's outcome and
+   fails the run iff any tool failed. The log always carries the
+   full ten-tool picture: lint, format (applied), ty, md,
+   requirements, pytest, crosshair, coverage, vulture, mutmut.
+
+Note: the format step writes to the CI workspace only - it does not
+commit back; formatting drift is fixed on the next local delivery
+(or by the author's editor). The step's purpose is that the rest of
+the run sees a consistently formatted tree, without gating on it.
