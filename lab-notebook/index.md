@@ -56,3 +56,5 @@ One session per working day (the session-40 addendum-19 ruling). A merged file c
 - [session-44](session-44.md) - addendum 137: K=3 ruled - 90 questions at 256k, phase-balanced (~423s gen ~ 450s prefill); predictions pre-registered
 - [session-44](session-44.md) - addendum 138: the greedy allocation is intentionally unoptimized - no allocator changes until the full-roster data shows the q/k/v quant impact
 - [session-44](session-44.md) - addendum 139: K reverted to 1 - the K=3 corpus GREW the deep prefill (450->1093s at 256k), premise wrong; K hypothesis rejected (bottom models went down); MiniCPM5-1B = template-echo malfunction class
+- [session-44](session-44.md) - addendum 140: template-sanity preflight - one PINEAPPLE probe per cell; template-mangled models (MiniCPM5-1B class) get labelled, never scored 0
+- [session-44](session-44.md) - addendum 141: strict VT answer pattern ("names, comma-separated, nothing else"), VT_GEN_TOKENS 128->32 (upstream VT=30; my 120 claim was a CWE mix-up), format_ok compliance measured per question/grade/cell, never scored; full rerun

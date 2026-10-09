@@ -48,7 +48,7 @@ def test_question_prompt_tail():
     }
     q = {"span": 4096, "hops": 4, "names": ["AAAAA", "BBBBB"], "value": "12345"}
     p = v7_pilot.question_prompt(corpus, q)
-    assert "NOISE" in p and "12345" in p and "5 variables" in p
+    assert "NOISE" in p and "12345" in p and "5 variable names, comma-separated" in p
 
 
 def test_greedy_starts_low_and_climbs():
@@ -282,6 +282,7 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
     monkeypatch.setattr(v7m.llama_server, "wait_healthy", lambda *a, **k: True)
     monkeypatch.setattr(v7m.llama_server, "stop_server", lambda *a, **k: None)
     monkeypatch.setattr(v7m, "preflight_reachable_grades", lambda port, c, w: {})
+    monkeypatch.setattr(v7m, "preflight_template_sanity", lambda port: None)
     monkeypatch.setattr(
         v7m,
         "run_cell",
