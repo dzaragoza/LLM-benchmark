@@ -49,10 +49,23 @@ def test_r30_no_undeclared_ci_dependency():
 
 def test_r31_hypothesis_never_in_the_hook():
     """Pins: R-31. The hypothesis layer lives OUTSIDE the 5s commit hook
-    (R-25): the hook's pytest selection excludes the hypothesis_props
-    marker, and the hook config has no bare pytest entry."""
+    (R-25): BOTH pytest arms of the hook deselect the hypothesis_props
+    marker - a substring check anywhere in the file is toothless (the
+    teeth audit caught it: breaking only the testmon arm's deselect
+    left the docstring mention and the pin passed)."""
     hook = (ROOT / "testmon_hook.py").read_text(encoding="utf-8")
-    assert "not hypothesis_props" in hook, "the hook must deselect the hypothesis layer"
+    # every pytest invocation in the hook must deselect the marker:
+    # each pytest call site ends with the marker arg before the
+    # closing bracket - count must match the number of call sites
+    import re
+
+    call_sites = re.findall(r"subprocess\.run\(\s*\[", hook)
+    deselects = hook.count('"not hypothesis_props"')
+    assert deselects >= len(call_sites), (
+        f"{deselects} deselects for {len(call_sites)} subprocess call sites - "
+        "every hook pytest arm must deselect hypothesis_props"
+    )
+    assert '"--testmon"' in hook, "the testmon arm must stay a testmon run"
     props = (ROOT / "tests" / "test_properties.py").read_text(encoding="utf-8")
     assert "hypothesis_props" in props, "the properties must carry their layer marker"
 

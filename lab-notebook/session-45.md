@@ -330,3 +330,40 @@ diverges from greedy).
 The three-way comparison (greedy vs stingy vs random at the same
 budget) is the allocation-sensitivity evidence for the addendum-138
 open question once the full-roster data is in.
+
+
+## Addendum 151 - the WoW teeth audit: pins mutation-tested; two strengthened
+
+The author's ask: "Let's check the wow requirements have teeth.
+That they actually have an effect and stop you from breaking the
+requirement." Method: for each WoW requirement, MUTATE the guarded
+artifact, run the pin, expect failure; revert.
+
+RESULTS (7 requirements mutation-tested):
+- R-21 (compat shim reintroduced): BITES.
+- R-24 (no-op push restored): BITES.
+- R-28 (zero-max floor broken): BITES.
+- R-30 (dep removed from requirements.txt): BITES.
+- R-31 (scheduled workflow reintroduced): BITES.
+- R-25/R-31 (hypothesis deselect dropped from ONE hook arm): DID NOT
+  BITE - the pin checked the substring anywhere in the file, so
+  breaking the testmon arm's deselect while the docstring and the
+  explicit arm still mentioned the marker passed the pin. TOO WEAK.
+- R-20 (bypass embedded in a longer command string): DID NOT BITE -
+  the pin grepped for the flag as the WHOLE quoted literal, so
+  "git commit --no-verify -q" escaped it. TOO WEAK.
+
+THE TWO STRENGTHENED PINS:
+- test_r31_hypothesis_never_in_the_hook now counts the deselects
+  against the hook's subprocess call sites: EVERY pytest arm must
+  deselect the marker (>= call sites), and the testmon arm must
+  stay a testmon run.
+- test_no_verify_is_not_used_in_history now scans for the flag
+  inside ANY string literal in code (triple-quoted docstring blocks
+  are stripped first - narrating the retired bypass is history,
+  ty_check.py's docstring stays legal).
+
+Both re-tested after strengthening: the mutations now FAIL the
+pins, the clean tree passes all 26 WoW pin tests. The audit method
+itself is registered: a pin that cannot fail is decoration - run
+the mutation before trusting the pin.

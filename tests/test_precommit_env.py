@@ -64,11 +64,25 @@ def test_no_verify_is_not_used_in_history():
     for py in ROOT.rglob("*.py"):
         if "__pycache__" in py.parts or py.name == "test_precommit_env.py":
             continue
-        # quoted string literals only - a docstring NARRATING the
-        # retired bypass (ty_check.py) is history, not a usage
         text = py.read_text(encoding="utf-8")
-        if f'"{needle}"' in text or f"'{needle}'" in text:
-            offenders.append(str(py.relative_to(ROOT)))
+        # ANY quoted literal containing the flag - not just the flag
+        # as the whole literal: a bypass embedded in a longer command
+        # string ("git commit --no-verify") escaped the old exact-
+        # literal check (the teeth audit caught it). Docstrings
+        # narrating the retired bypass are history, not usage: only
+        # string literals (single- or double-quoted lines that also
+        # look like code: not inside a docstring block) count.
+        import re
+
+        tq = chr(34) * 3
+        code_only = re.sub(tq + ".*?" + tq, "", text, flags=re.DOTALL)
+        code_only = re.sub(chr(39) * 3 + ".*?" + chr(39) * 3, "", code_only, flags=re.DOTALL)
+        for m in re.finditer(
+            r"[\"]([^\"]*" + re.escape(needle) + r"[^\"]*)[\"]",
+            code_only,
+        ):
+            line_no = text[: m.start()].count("\n") + 1
+            offenders.append(f"{py.relative_to(ROOT)}:{line_no}")
     assert offenders == [], offenders
 
 
