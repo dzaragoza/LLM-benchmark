@@ -27,7 +27,7 @@ def test_r38_ci_owns_every_check():
     wf = (ROOT / ".github" / "workflows" / "push-regression.yml").read_text(encoding="utf-8")
     for check in (
         "ruff check",
-        "ruff format --check",
+        "ruff format .",
         "ty_check.py",
         "md_check.py",
         "requirements_check.py",

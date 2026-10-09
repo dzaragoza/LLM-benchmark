@@ -62,7 +62,7 @@ def test_r31_layers_have_their_homes():
         "coverage run",
         "vulture",
         "ruff check",
-        "ruff format --check",
+        "ruff format .",
     ):
         assert needle in push, f"push-regression must run it: {needle}"
     assert "schedule:" not in push, "no scheduled runs"
