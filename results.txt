@@ -66577,3 +66577,30 @@ UnboundLocalError: cannot access local variable 'entry' where it is not associat
   arm random: same config as a measured arm - skipped
   arm greedy: F16/f16/f16 -> 1.703/15
 [2026-10-09T16:10:25] v7 model done: Qwen2.5-1.5B-Instruct (3/3 cells scored) - committing artifacts
+
+===== 2026-10-09T16:10:31 | full_benchmark.py --task v7 --v7-families 16 --v7-multi-arm --state-file state/benchmark-state-v7-1.json --results-file benchmark-results-v7-1.json =====
+=== granite-4.0-1b ctx=8192 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4063, '4096x32': 4063}
+  census: weights 3.42 GiB, context 0.62 GiB -> total 4.10 GiB (est 3.73)
+  score 0.0 / 5
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/f16 -> 0.0/5
+=== granite-4.0-1b ctx=16384 wq=F16 k=f16 v=q5_0
+  preflight: {'4096x2': 4063, '8192x32': 7224}
+  census: weights 3.42 GiB, context 0.84 GiB -> total 4.34 GiB (est 3.95)
+  score 0.0 / 10
+  arm stingy: Q8_0/f16/f16 differs - measuring
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/q5_0 -> 0.0/10
+=== granite-4.0-1b ctx=32768 wq=F16 k=q5_0 v=q5_0
+  preflight: {'4096x2': 4063, '16384x32': 14401}
+  census: weights 3.42 GiB, context 0.86 GiB -> total 4.38 GiB (est 3.99)
+  score 0.0 / 15
+  arm stingy: Q8_0/f16/q8_0 differs - measuring
+  arm random: Q8_0/f16/q8_0 differs - measuring
+  arm greedy: F16/q5_0/q5_0 -> 0.0/15
+=== granite-4.0-1b ctx=65536 wq=Q8_0 k=q8_0 v=q5_0
+=== granite-4.0-1b ctx=131072 wq=Q4_0 k=q4_0 v=q4_0
+  [2] quantizing granite-4.0-1b-f16.gguf -> Q4_0 (output hidden; shown on error)
+[2026-10-09T16:15:36] v7 model done: granite-4.0-1b (3/3 cells scored) - committing artifacts
