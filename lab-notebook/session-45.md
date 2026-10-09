@@ -968,3 +968,40 @@ BOUND over the cli+robustness tests.
 Also this delivery: the I001 noqa on the seams import block (the
 path-setup constraint suppresses the sort), the validator inline
 (ty), the E402s - the full red-chain of the day burning off.
+
+
+## Addendum 180 - the v7.1 analysis plan pre-registered: the quant effect by climb strategy
+
+The author's plan for when the v7.1 run lands: "I want to add a
+few other models if disk space allows it and analyze the effect
+of quants in q,k,v based on the climb strategy. we could either
+propose a climb strategy from the findings or declare one of the
+three as the best."
+
+THE ANALYSIS (pre-registered, graded when the arms blocks fill):
+1. PER-CELL QUANT EFFECT: for every cell where >= 2 arms measured,
+   the score delta against the config delta - which axis (wq, kq,
+   vq) moved, in which direction, and what it cost/bought. The
+   64-record v7.0 census said the estimator's terms were the
+   story; the v7.1 arms say what the SCORE says.
+2. THE PATTERN TEST: pool the deltas by axis - if weights moves
+   dominate the score effect (the addendum-162 P2/P3 hint:
+   Qwen3.5-0.8B@262k gained +48% from better weights), the
+   allocation question has an answer: fund weights first.
+3. THE VERDICT, one of three:
+   a. ONE STRATEGY WINS - declare it (per-cell or overall);
+   b. A PATTERN EMERGES - propose a climb strategy FROM it (e.g.
+      "climb weights to the top rung before touching KV", or
+      "the KV axis pays at deep ctx only") - registered as a
+      proposal, measured by a targeted run;
+   c. NO SIGNAL - the policies are score-equivalent within noise
+      at the budget line; declare greedy the default (simplest)
+      and register the insensitivity as the finding.
+4. NEW MODELS: the disk-space question gates the roster
+   extension - candidates from the findings-adjacent families
+   (the granites 3.2/3.3 placeable but unmeasured; gemma-3-4b
+   paper-sourced). Each addition = disk for its f16 + the _0
+   rungs the climb visits.
+
+The pre-registration: no strategy proposal before the deltas are
+pooled; the verdict cites the cells that made it.
