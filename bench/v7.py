@@ -432,6 +432,11 @@ def question_prompt(corpus: dict, q: dict) -> str:
     return ruler_gate.VT_TEMPLATE.format(context=context, query=q["value"], num_v=q["hops"] + 1)
 
 
+class BudgetExceeded(Exception):
+    """Addendum 170: the MEASURED GPU census exceeded the budget - the
+    estimate was wrong. The cell is an error, never a scored result."""
+
+
 class PreflightError(Exception):
     """The measured prompt does not fit the window the arithmetic said
     it would (session 44, addendum 112) - the estimate-vs-server drift
@@ -881,17 +886,38 @@ def certify_v7(
                 entry["error"] = f"preflight: {e}"
                 results.append(entry)
                 continue
+            except BudgetExceeded as e:
+                entry["error"] = f"budget: {e}"
+                results.append(entry)
+                continue
             except Exception as e:
                 entry["error"] = f"run_cell failed: {e}"
                 results.append(entry)
                 continue
             if breakdown is not None:
                 rec["mem_census"] = breakdown
+                devs = breakdown.get("devices") or {}
+                v = devs.get("Vulkan0") or {}
+                gpu_gib = (
+                    (v.get("model_gib") or 0)
+                    + (v.get("context_gib") or 0)
+                    + (v.get("compute_gib") or 0)
+                ) if v else breakdown.get("total_gib")
                 print(
                     f"  census: weights {breakdown['weights_gib']:.2f} GiB, "
                     f"context {breakdown['context_gib']:.2f} GiB "
                     f"-> total {breakdown['total_gib']:.2f} GiB (est {cell['est_gib']})"
                 )
+                # addendum 170: the MEASURED budget gate - the estimate is an
+                # estimate; the verdict is llama-server's own GPU census. A cell
+                # over the budget is an ERROR, never a scored result (the author's
+                # ruling; the addendum-135 4.558 GiB cell was the precedent).
+                if gpu_gib is not None and gpu_gib > budget_gib:
+                    raise BudgetExceeded(
+                        f"measured GPU {gpu_gib:.2f} GiB exceeds the {budget_gib} GiB "
+                        f"budget (est was {cell['est_gib']}) - the cell is erased, "
+                        f"never scored"
+                    )
             skip_rescore = cell.pop("_skip_greedy_rescore", False)
             if skip_rescore:
                 # addendum 168: greedy already measured - this launch exists

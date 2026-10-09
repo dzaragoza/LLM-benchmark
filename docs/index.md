@@ -9,7 +9,7 @@ The deliverable: given the budget, the **best (model, context, quantization) all
 - **Model**: Qwen3.5-2B (Q8_0 weights, q8_0 K cache, q5_0 V cache)
 - **Context**: 262,144 tokens — the full grid depth
 - **Score**: 6.88 of 30 — the reach curve was still rising at the top
-- **GPU memory**: 3.84 GiB estimated
+- **GPU memory**: 3.49 GiB — llama-server's own measured breakdown (weights + context + compute on the GPU; the 4.25 GiB whole-machine figure includes the host-side share)
 
 ```bash
 llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q8_0 --cache-type-v q5_0 -fa on --parallel 1
