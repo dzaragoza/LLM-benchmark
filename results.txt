@@ -66321,3 +66321,33 @@ UnboundLocalError: cannot access local variable 'entry' where it is not associat
   preflight: {'4096x2': 4367, '131072x32': 132901}
 [2026-10-09T14:25:07] SIGINT - shutting down cleanly (addendum 8)
 [2026-10-09T14:25:07] llama-server stopped
+
+===== 2026-10-09T15:07:17 | full_benchmark.py --task v7 --v7-families 16 --v7-multi-arm --state-file state/benchmark-state-v7-1.json --results-file benchmark-results-v7-1.json =====
+  [0] no stale llama-server found
+[2026-10-09T15:07:17] fresh state: the full registered roster, param-ascending (38 models, smallest first)
+
+2 of the first 16 candidates cannot earn a cell (findings, addendum 154):
+  MiniCPM-1B-sft: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  phi-1: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+=== granite-4.0-h-350m ctx=8192 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4063, '4096x32': 4063}
+  census: weights 0.78 GiB, context 0.05 GiB -> total 0.87 GiB (est 0.73)
+  score 0.089 / 5
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/f16 -> 0.089/5
+=== granite-4.0-h-350m ctx=16384 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4063, '8192x32': 7224}
+  census: weights 0.78 GiB, context 0.08 GiB -> total 0.92 GiB (est 0.77)
+  score 0.089 / 10
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/f16 -> 0.089/10
+=== granite-4.0-h-350m ctx=32768 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4063, '16384x32': 14401}
+  census: weights 0.78 GiB, context 0.15 GiB -> total 1.01 GiB (est 0.85)
+  score 0.089 / 15
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/f16 -> 0.089/15
+[2026-10-09T15:07:58] v7 model done: granite-4.0-h-350m (3/3 cells scored) - committing artifacts
