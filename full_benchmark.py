@@ -607,9 +607,9 @@ def _run(args: argparse.Namespace) -> None:
             state,
             args.state_file,
             state.get("ladder_port", 8210),
-            args.dry_run,
-            args.v7_budget_gib or BUDGET_GIB,
             args.v7_families,
+            dry_run=args.dry_run,
+            budget_gib=args.v7_budget_gib or BUDGET_GIB,
             on_model_commit=None
             if (args.no_git or args.dry_run)
             else partial(v7_model_commit, args),
