@@ -30,6 +30,9 @@ def test_no_under_estimate_in_any_census_record():
                 p = r.get("params_b") or c.get("params_b")
                 if p is None:
                     continue
+                wq = r.get("wq") or c.get("wq")
+                if wq not in v7.W_QUANT_BPB:
+                    continue  # a retired format (historical K-quant cells) - out of the replay
                 est = v7._alloc_total(
                     name, p, v7.family_geometry(name),
                     r.get("wq") or c.get("wq"), r.get("kq") or c.get("kq"),
