@@ -31,6 +31,11 @@ jobs:
       - name: pytest with testmon (the full suite - deterministic pins + hypothesis
           properties - the map seeds itself for any local clones)
         run: python3 -m pytest tests -q --testmon
+      - name: mutmut (the mutation trial - session 40 addendum; too slow locally, CI owns it)
+        run: |
+          pip install mutmut
+          mutmut run || true
+          mutmut results || true
       - name: crosshair (the contract proofs)
         run: crosshair check tests/contracts.py
       - name: coverage (the missing-test map - a discovery helper, never a metric)

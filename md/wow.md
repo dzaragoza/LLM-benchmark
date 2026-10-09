@@ -54,18 +54,19 @@ in the notebook, it did not happen.
 
 We have known limitations and we always find solutions. We avoid
 making the same mistake twice by improving methodology and tooling -
-a bug that reaches a run becomes a regression test; a class of bug
-becomes a tool guarantee (see `safe_append`); a wrong manual step
-becomes an automated one. Tooling incidents are audited, reported,
-and fixed (addendum 21).
+a bug that reaches a run becomes a regression test (the closing
+clause of R-31, md/protocol.md); a class of bug becomes a tool
+guarantee (see `safe_append`); a wrong manual step becomes an
+automated one. Tooling incidents are audited, reported, and fixed
+(addendum 21).
 
-## 4. Vibe uses the code_edit tool to make changes in files
+(Removed per addendum 152: the former sections 4 - Vibe uses
+code_edit, fully covered by R-26 - and the retired numbering live
+in the notebook; the protocol's WoW requirements table is the
+governing contract for everything tooled. Historical notebook
+references to "wow.md section 4" resolve to R-26.)
 
-Any issue found is reported and fixed. Improvements, like new
-functions, are also part of the report. Tool failures are reported
-in the turn they happen, even when the retry succeeds.
-
-## 5. Daniela is human, and prone to making mistakes
+## 4. Daniela is human, and prone to making mistakes
 
 We record procedures clearly to make them as error-proof as
 possible:
@@ -83,7 +84,7 @@ possible:
   steps (git pull, the state file flag, the dry-run first) called
   out explicitly.
 
-## 6. Daniela is human, so it is easy to forget things
+## 5. Daniela is human, so it is easy to forget things
 
 Many errors come from missing steps in procedures, like doing git
 pull. So: procedures include the pull; the dry-run gate comes before
@@ -91,7 +92,7 @@ every real run; and when a run fails on a stale checkout or a
 missing flag, the procedure is amended so the same forgetting cannot
 recur.
 
-## 7. Vibe is prone to forgetting things too
+## 6. Vibe is prone to forgetting things too
 
 Vibe checks the notebook for information when it needs it, or asks
 for clarification. Claims about prior sessions, parameters, or
@@ -99,7 +100,7 @@ upstream behavior are verified against the notebook or the source
 before being asserted - and when the notebook and reality disagree,
 the notebook is corrected with a registered addendum.
 
-## 8. Naming convention (session 36, addendum 25)
+## 7. Naming convention (session 36, addendum 25)
 
 Documents are lowercase-kebab (`models.md`, `model-selection.md`,
 `practitioner-goals.md`, `protocol.md`, `wow.md`, `session-NN.md`) -
@@ -109,14 +110,14 @@ update every cross-reference in the same commit. Study documents live
 in `docs/` (session 40, addendum 21); `README.md` stays at the root
 and the lab notebook keeps its own `lab-notebook/` directory.
 
-## 9. Daniela is always available to help
+## 8. Daniela is always available to help
 
 Due to the restricted nature of the sandbox, Daniela usually has
 access to more tools and external websites. If Vibe cannot figure
 out something - a gated model repo, a measurement on the real
 machine, an upstream source - it asks for help rather than guessing.
 
-## 10. Review is on demand
+## 9. Review is on demand
 
 Vibe will integrate directly to main. Vibe will only wait for a
 review if Daniela asked for it.
