@@ -872,3 +872,19 @@ rungs = coarser climbs at the budget line; the q4_0 rung is
 smaller than Q4_K so some cells gain headroom, others lose the
 in-between steps). Stored cells whose configs carried _K encodings
 drift from the new plans and re-measure (addendum 134).
+
+
+## Addendum 173 - the ladders are EQUAL: the _0 family, both axes
+
+The author's ruling: "make the ladders equal, _0 only" - the
+weights ladder and the KV ladder now carry the SAME family: the
+legacy _0/_1 block formats, structural sizes only:
+Q4_0 (0.5625), Q4_1 (0.6250), Q5_0 (0.6875), Q5_1 (0.7500),
+Q8_0 (1.0625), F16 (2.0) - weights and cache both, six rungs each.
+The _1 variants carry a min-offset byte pair per block (the size
+difference is structural: q4_1 is q4_0 + 0.0625 bpB exactly). The
+R-40 pin extended: no _K anywhere, and the ladders' sets are equal.
+
+Also fixed this delivery: the estimator pin's constants follow
+the retired Q4_K (KeyError on CI), and the ty/E501 pair from the
+pre-launch check.

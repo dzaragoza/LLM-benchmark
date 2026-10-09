@@ -50,6 +50,6 @@ def test_no_under_estimate_in_any_census_record():
 
 
 def test_the_calibrated_constants():
-    assert v7.W_QUANT_BPB["Q4_K"] == 0.65
+    assert v7.W_QUANT_BPB["Q4_0"] == 0.5625
     assert v7.W_QUANT_BPB["Q8_0"] == 1.0625
     assert v7.COMPUTE_FLOOR_GIB == 0.06
