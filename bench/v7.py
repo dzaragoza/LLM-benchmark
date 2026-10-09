@@ -770,16 +770,47 @@ def certify_v7(
             entry["skipped"] = "cell not selected (--v7-cells)"
             results.append(entry)
             continue
+        # addendum 168: the multi-arm pre-launch check - decide BEFORE the
+        # launch cycle (acquire, start, corpus, preflight) whether ANY arm
+        # needs measuring. Greedy measured + every diverging arm already in
+        # the cell's arms block => nothing to do; the launch cycle is pure
+        # waste in that case (the author's compute-time catch).
         if (
             done.get("score") is not None
             and done.get("wq") == cell["wq"]
             and done.get("kq") == cell["kq"]
             and done.get("vq") == cell["vq"]
         ):
-            entry["skipped"] = f"already measured (score {done['score']})"
-            results.append(entry)
-            pending.append(entry)
-            continue
+            if multi_arm:
+                stored_arms = (done.get("arms") or {}).get
+                arms_needed = []
+                for pol in ("stingy", "random"):
+                    alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
+                    if alt is None:
+                        continue
+                    if (alt["wq"], alt["kq"], alt["vq"]) == (
+                        cell["wq"], cell["kq"], cell["vq"]
+                    ):
+                        continue  # agrees with greedy - already measured
+                    if stored_arms(pol) and stored_arms(pol).get("score") is not None:
+                        continue  # that arm already measured
+                    arms_needed.append(pol)
+                if not arms_needed:
+                    entry["skipped"] = f"already measured (score {done['score']})"
+                    entry["arms"] = done.get("arms") or {}
+                    results.append(entry)
+                    pending.append(entry)
+                    continue
+                print(
+                    f"  greedy measured; arms still needed: {arms_needed} - "
+                    "launching only for them"
+                )
+                cell["_skip_greedy_rescore"] = True
+            else:
+                entry["skipped"] = f"already measured (score {done['score']})"
+                results.append(entry)
+                pending.append(entry)
+                continue
         if done.get("score") is not None:
             print(
                 f"  config drift: stored {done.get('wq')}/{done.get('kq')}/"
@@ -855,11 +886,24 @@ def certify_v7(
                     f"context {breakdown['context_gib']:.2f} GiB "
                     f"-> total {breakdown['total_gib']:.2f} GiB (est {cell['est_gib']})"
                 )
-            print(f"  score {rec['score']} / {rec['max_score']}")
+            skip_rescore = cell.pop("_skip_greedy_rescore", False)
+            if skip_rescore:
+                # addendum 168: greedy already measured - this launch exists
+                # only for the arms; keep the stored record, no re-score
+                rec = {k: done[k] for k in ("score", "max_score")}
+                print(
+                    f"  greedy kept (score {done['score']}/{done['max_score']})"
+                    " - measuring arms only"
+                )
+            else:
+                print(f"  score {rec['score']} / {rec['max_score']}")
             # addendum 166: the multi-arm cell record - every arm's config
             # and score in the SAME cell, one file; arms that agree with an
             # already-measured config need no re-measure (they ARE it)
-            arms = {"greedy": {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}}
+            greedy_arm = {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}
+            if skip_rescore:
+                greedy_arm = {**greedy_arm, "score": done["score"], "max_score": done["max_score"]}
+            arms = {"greedy": greedy_arm}
             if multi_arm:
                 measured_cfgs = {
                     (cell["wq"], cell["kq"], cell["vq"]),
@@ -923,7 +967,15 @@ def certify_v7(
                             f"  arm {pol}: {a['wq']}/{a['kq']}/{a['vq']} "
                             f"-> {a['score']}/{a['max_score']}"
                         )
-            v7[key] = {**cell, **rec, **({"arms": arms} if multi_arm else {})}
+            if skip_rescore:
+                # addendum 168: keep the stored record intact - only the
+                # arms block updates (rec here is a stub; overwriting would
+                # drop the stored per_grade/mem_census)
+                stored = dict(done)
+                stored["arms"] = arms
+                v7[key] = stored
+            else:
+                v7[key] = {**cell, **rec, **({"arms": arms} if multi_arm else {})}
             entry.update(rec)
             if multi_arm:
                 entry["arms"] = arms
