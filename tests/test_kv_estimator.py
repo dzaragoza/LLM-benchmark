@@ -125,6 +125,7 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
         state,
         str(tmp_path / "st.json"),
         8210,
+        4,
         False,
         on_model_commit=None,
     )

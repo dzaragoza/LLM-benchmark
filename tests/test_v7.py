@@ -315,6 +315,7 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
         state,
         str(tmp_path / "st.json"),
         8210,
+        4,
         False,
         on_model_commit=boom,
     )
@@ -376,6 +377,7 @@ def test_certify_v7_no_commit_when_nothing_ran(tmp_path, monkeypatch):
         state,
         str(tmp_path / "st.json"),
         8210,
+        4,
         False,
         on_model_commit=lambda entries: committed.append(entries),
     )

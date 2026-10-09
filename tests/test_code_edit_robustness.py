@@ -56,7 +56,7 @@ def test_docstring_multiline_apostrophes(tmp_path):
     carries apostrophes on several lines."""
     rc, out = _edit(
         '''def h():
-    """Pins: R-25.
+    """Pins: R-37.
 
     The map is CI's job.
     """

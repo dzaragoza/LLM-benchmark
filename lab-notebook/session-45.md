@@ -527,3 +527,71 @@ measurements; the plan lands in the repo where it can be read.
 
 The crash rail already had this shape (it runs under no_git
 only, not dry_run) - the clean path now matches.
+
+
+## Addendum 156 - the candidate count is mandatory
+
+The author's ruling: "let's remove the default, make the number of
+models mandatory." The --v7-families flag had default None with a
+silent fallback to PILOT_FAMILIES=4 - exactly how the author's
+"we ran 16" became a 4-family plan in the 11:11 dry run (nobody
+stated the count; the pilot default answered). The count is now
+MANDATORY at every entry point: --v7-families is required=True
+(argparse exits 2 without it), and certify_v7's roster_limit is a
+positional parameter with NO default (moved before the defaulted
+params - a no-default parameter cannot follow defaulted ones).
+PILOT_FAMILIES the constant stays only as an explicit value tests
+pass; no code path defaults to it.
+
+Pinned by tests/test_v7_mandatory_count.py (the flag is required,
+no default accompanies it, certify_v7's signature carries no
+fallback, --help documents the flag). The pin caught its own
+delivery bug: the first CLI edit silently failed mid-transaction
+(the tool refused a syntax-breaking intermediate state) and the
+pin's required=True assertion failed - fixed before commit.
+
+
+## Addendum 156 - the candidate count is mandatory
+
+The author's ruling: "let's remove the default, make the number of
+models mandatory." The --v7-families flag had default None with a
+silent fallback to PILOT_FAMILIES=4 - exactly how the author's
+"we ran 16" became a 4-family plan in the 11:11 dry run (nobody
+stated the count; the pilot default answered). The count is now
+MANDATORY at every entry point: --v7-families is required=True
+(argparse exits 2 without it), and certify_v7's roster_limit is a
+positional parameter with NO default (moved before the defaulted
+params - a no-default parameter cannot follow defaulted ones).
+PILOT_FAMILIES the constant stays only as an explicit value tests
+pass; no code path defaults to it.
+
+Pinned by tests/test_v7_mandatory_count.py (the flag is required,
+no default accompanies it, certify_v7's signature carries no
+fallback, --help documents the flag). The pin caught its own
+delivery bug: the first CLI edit silently failed mid-transaction
+(the tool refused a syntax-breaking intermediate state) and the
+pin's required=True assertion failed - fixed before commit.
+
+
+## Addendum 159 - nothing verification-shaped runs locally, ever
+
+The author's ruling: "expand: no linter, no tests no formatter.
+nothing. only ci run those. If not the experience is dramatically
+degraded, you have infinite patience. I do not."
+
+R-38 registered: the agent NEVER runs a test, a linter, a
+formatter, a type check, coverage, vulture or mutmut locally - not
+on a file, not on a test, not "just to be sure". The local loop is
+edit (code_edit) -> commit -> push -> CI judges -> the verdict is
+read on the next pull (R-27) and failures are fixed there. The
+author's patience is the protected constraint: the local loop must
+stay seconds-long; the agent's patience is infinite and irrelevant.
+
+This closes the arc of the day: addendum 116 installed the 5s hook,
+148 gave it the changed-test arm, 157 made it function-granular, 158
+abolished it - 159 abolishes the hand-run habit too. Verification
+is CI's job, all of it, only.
+
+The delivery of this very addendum follows the rule: no local
+verification was run; the CI verdict on the next pull grades this
+commit.

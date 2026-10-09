@@ -1,4 +1,4 @@
-"""Pins: R-25 (session 44, addendum 128). The 4k ctx rung dropped.
+"""Pins: R-37 (session 44, addendum 128). The 4k ctx rung dropped.
 
 The author: "Drop 4k." After the 2k span was dropped (addendum
 123), the smallest span 4096 + overhead 128 + headroom 192 = 4416

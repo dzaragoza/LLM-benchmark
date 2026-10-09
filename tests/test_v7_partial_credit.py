@@ -1,4 +1,4 @@
-"""Pins: R-25 (session 44, addendum 125). Partial credit scoring.
+"""Pins: R-37 (session 44, addendum 125). Partial credit scoring.
 
 The author: "Partial credit it is." The strict all-names rule left
 every pilot cell at 0 while models traced parts of the chain
@@ -46,7 +46,7 @@ def test_full_pass_still_scores_one(monkeypatch):
 
 
 def test_clean_wipes_all_cells_and_logs_up_front(tmp_path, monkeypatch):
-    """Pins: R-25 (session 44, addendum 129). --clean wipes EVERY
+    """Pins: R-37 (session 44, addendum 129). --clean wipes EVERY
     family's v7 block and every answer log BEFORE any measuring -
     per-cell cleaning left mixed-era records for families not yet
     reached; the author's rule is never leave mixed results."""
