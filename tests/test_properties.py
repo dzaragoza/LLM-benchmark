@@ -404,8 +404,8 @@ def test_grade_reachable_monotone_in_window(overhead, headroom):
     that DO fit."""
     import bench.v7 as v7
 
-    for span in (1024, 2048, 8192):
-        for hops in (2, 16):
+    for span in (1024, 2048, overhead + 1 if overhead else 1024):
+        for hops in (2, 16, headroom % 17):
             for w1, w2 in ((2048, 4096), (4096, 8192), (16384, 32768)):
                 r1 = v7.grade_reachable(span, hops, w1)
                 r2 = v7.grade_reachable(span, hops, w2)

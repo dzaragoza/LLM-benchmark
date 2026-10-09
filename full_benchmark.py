@@ -392,7 +392,7 @@ def partial_commit_hook(args: argparse.Namespace) -> Any:
 # =========================================================== sigint
 
 
-def sigint_shutdown(signum, frame, args=None):
+def sigint_shutdown(_signum, _frame, args=None):
     """Session 38, addendum 8: Ctrl-C stops cleanly - stop llama-server,
     stop results logging, git commit and pull. os._exit, not sys.exit:
     a SystemExit inside the handler unwinds through huggingface_hub's

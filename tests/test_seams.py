@@ -580,10 +580,7 @@ def test_code_edit_verify_failure_leaves_the_file_untouched(tmp_path):
     # write - a verify failure must not leave a modified file behind
     p = tmp_path / "code.py"
     p.write_text("x = 1\n")
-    try:
-        code_edit.edit(str(p), [("replace", "x = 1", "x = 2")]) if False else None
-    except Exception:
-        pass
+
     # real case: a replace whose new text is empty cannot pass verify
     # via the not-in-result rule when it IS in the result - use a
     # delete of a nonexistent... instead force a bad regex block
