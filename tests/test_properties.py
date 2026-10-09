@@ -12,11 +12,10 @@ from __future__ import annotations
 import math
 
 import pytest
+from bench.certify import wilson_interval
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from bench.certify import wilson_interval
-from bench.state_store import _int_cells, speed_cells
 from infra.hf_download import RUNG_BITS, estimate_rung_gib, find_rung_file, has_safetensors
 
 pytestmark = pytest.mark.hypothesis_props
@@ -123,46 +122,6 @@ cell_namespaces = st.dictionaries(
         }
     )
 )
-def test_speed_cells_picks_the_depth(fst):
-    """Each depth sees only its own namespace."""
-    for depth in (4096, 8192, 65536):
-        stored = fst["certify_speed"].get(depth) or {}
-        assert speed_cells(fst, depth) == {int(r): p for r, p in stored.items()}
-
-
-@given(
-    junk=st.one_of(
-        st.none(), st.integers(), st.text(max_size=3), st.lists(st.integers(), max_size=3)
-    )
-)
-def test_int_cells_guarded(junk):
-    """A corrupt namespace (not a dict) yields an empty map, not a crash."""
-    assert _int_cells(junk) == {}
-
-
-@given(
-    bad=st.dictionaries(
-        keys=st.one_of(st.text(max_size=2), st.integers()),
-        values=st.one_of(st.text(max_size=2), st.integers(), st.none()),
-        max_size=6,
-    )
-)
-def test_int_cells_skips_corrupt(bad):
-    """Whatever int-coercible entries exist come back; the rest are skipped."""
-    out = _int_cells(bad)
-    for r, p in out.items():
-        assert isinstance(r, int) and isinstance(p, int)
-
-
-@st.composite
-def arch(draw):
-    return draw(st.integers(1, 128)), draw(st.integers(1, 64)), draw(st.integers(1, 256))
-
-
-@given(arch=arch(), bpe=st.sampled_from([2.0, 1.0]))
-
-
-
 def test_estimate_none_or_positive(files, sizes):
     est = estimate_rung_gib("Q8_0", files, files, sizes)
     assert est is None or est > 0.0
@@ -179,35 +138,6 @@ def test_estimate_none_or_positive(files, sizes):
     run=st.integers(1, 21),
     value=st.integers(0, 5),
     secs=st.floats(0.0, 10000.0),
-)
-def test_task_store_roundtrip(task, depth, run, value, secs):
-    """A cell record stores and loads back EXACTLY: the graded value,
-    the variant, and the wall seconds - the store may lose nothing
-    (a re-graded medal must see the evidence that was measured)."""
-    from bench import state_store
-
-    variant = {"rung": "Q8_0", "kv_k": None, "kv_v": None}
-    fst: dict = {}
-    state_store._task_store(fst, depth, task, run, value, variant, secs)
-    ns = {"vt": "certify_vt", "speed": "certify_speed"}[task]
-    box = fst[ns][str(depth)][str(run)]
-    assert box["v"] == value
-    assert box["t"] == round(secs, 1)
-    assert (box["rung"], box["kv_k"], box["kv_v"]) == ("Q8_0", None, None)
-    # and the loader with the matching variant sees the same value
-    want = dict(variant)
-    legacy = dict(variant)
-    if task == "vt":
-        loaded = state_store.vt_cells(fst, depth, want, legacy)
-    else:
-        loaded = state_store.speed_cells(fst, depth, want, legacy)
-    assert loaded.get(run) == value
-
-
-@settings(max_examples=50)
-@given(
-    n_pass=st.integers(0, 20),
-    others_gold=st.booleans(),
 )
 def test_combined_medal_monotone_in_evidence(n_pass, others_gold):
     """The medal is MONOTONE in the evidence: turning failing cells

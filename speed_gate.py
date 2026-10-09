@@ -1088,7 +1088,9 @@ def main() -> None:
         help="step 1 (once): build the fixed corpus from english_sample.json",
     )
     ap.add_argument("--corpus-out", default=CORPUS_DEFAULT)
-    ap.add_argument("--n-conversations", type=int, default=5)
+    # addendum 185: the winner's certification defaults - 20 conversations,
+    # PASS at >= 15/20 stall-free (the author's 2-sigma ruling)
+    ap.add_argument("--n-conversations", type=int, default=20)
     ap.add_argument("--min-turns", type=int, default=4)
     ap.add_argument("--max-turns", type=int, default=8)
     ap.add_argument("--max-cap-tokens", type=int, default=300)

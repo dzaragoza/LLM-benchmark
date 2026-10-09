@@ -24,7 +24,6 @@ COMBINED_TASKS = ("speed", "vt")
 
 
 def stamp(msg: str) -> None:
-    import time
 
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 

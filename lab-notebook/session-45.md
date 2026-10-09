@@ -1135,3 +1135,26 @@ Q8_0/q8_0/q5_0 at 4 GiB, subject to the 32-model field) passes
 the reader-wall test at its own ctx - a stall-rate verdict at
 the winner's depth, per the v3.1 protocol constants (5.0 w/s
 line, 0.45 s reaction, cal-50 corpus, n=50 conversations).
+
+
+## Addendum 185 - the retirement burn-off: v5 requirements RETIRED; the speed-gate certification parameters
+
+The retirement's second pass, graded from CI (every red named):
+- the v5 test files (code_search, size_predict) deleted with their
+  modules; test_speed_gate stripped of its 9 v5-controller tests
+  (the gate-native 21 stay - the winner's certification machinery);
+  test_properties/contracts cleaned of the v5 machinery tests.
+- R-01/02/03/06/09/10/11/13/14/15 RETIRED in the protocol - the
+  v5 controller requirements, each with its live v7 successor
+  named in the row (resume/config-drift, findings, contracts,
+  answers logging, the argmax page). The traceability gate
+  passes: 40 requirements, all pinned or retired.
+- v7.py's acquire path import fixes (convert_quant, the E402s).
+
+THE SPEED-GATE CERTIFICATION PARAMETERS (the author's ruling):
+"we're doing only 2 sigma confidence, 20 conversations instead of
+50. As long as 15 pass the gate it is done" - the winner's
+certification: n=20 conversations from the cal-50 corpus, the
+stall-rate verdict at 2-sigma confidence, PASS at >= 15/20
+conversations stall-free (75% - the 2-sigma band on n=20). One
+cell, one config, once - the last gate before the page.
