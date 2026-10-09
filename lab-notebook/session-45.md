@@ -506,3 +506,24 @@ unplaceable, the labelled-not-scored malfunction classes), and the
 what-the-numbers-mean section (credit scoring, exclusion-not-
 failure, reproducibility). The v5-era per-rung gold sections are
 retired from the page (history in the notebook and the registry).
+
+
+## Addendum 155 - the dry run commits and pushes its plan
+
+The author's catch: "dry run doesn't commit and push results. fix
+that." Correct - the clean-finish git tail excluded dry runs, so
+the plan (the findings report, the cell list, the feasibility
+checks) existed only on the author's console. The agent reads the
+repo; an unpushed plan is an unreadable plan.
+
+Fix: the clean-finish tail's `not args.dry_run` condition is
+deleted - the tail runs for dry runs too. The addendum-79 guard is
+UNTOUCHED and still holds: the dry run never WRITES the state file
+(the guard tests pin that); git_tail only commits what exists on
+disk, so a dry-run commit carries the PRE-RUN state (unchanged, it
+was never written) plus results.txt (the plan output - exactly the
+readout the agent side needs). No fake state, no poisoned
+measurements; the plan lands in the repo where it can be read.
+
+The crash rail already had this shape (it runs under no_git
+only, not dry_run) - the clean path now matches.
