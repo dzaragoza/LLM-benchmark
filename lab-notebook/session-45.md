@@ -595,3 +595,25 @@ is CI's job, all of it, only.
 The delivery of this very addendum follows the rule: no local
 verification was run; the CI verdict on the next pull grades this
 commit.
+
+
+## Addendum 160 - R-39: the CI verdict gates every git command
+
+The author's ruling: "Let's make things clearer. before running
+any git command, check the status of the last ci completed run in
+github and fix any issues before continuing. any git command."
+
+R-39 registered (R-27's final form): before ANY git command -
+pull, commit, push, rebase, status - the agent checks the latest
+COMPLETED push-regression verdict and fixes any red issues FIRST.
+In-flight runs are never waited for; the previous completed verdict
+governs. This closes the gap the email noise exposed: red runs
+accumulating across my pushes because "next pull's verdict
+governs" deferred the check instead of making it blocking.
+
+The delivery of this addendum demonstrates the rule: the latest
+completed run (37915318674) was read BEFORE the commit; its
+failures - the fake climb_allocations stubs missing the
+report_unplaceable kwarg (addendum 154's signature change) and the
+four parser tests hitting the now-mandatory --v7-families
+(addendum 156) - are fixed in this same commit.

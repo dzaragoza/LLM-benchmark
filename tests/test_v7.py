@@ -191,7 +191,7 @@ def test_crash_tail_always_runs(tmp_path, monkeypatch):
         raise RuntimeError("boom")
 
     args = argparse.Namespace(no_git=False)
-    for attr, default in vars(fb.build_parser().parse_args([])).items():
+    for attr, default in vars(fb.build_parser().parse_args(["--v7-families", "16"])).items():
         setattr(args, attr, default) if not hasattr(args, attr) else None
     crash_log = tmp_path / "results.txt"
     with (
@@ -254,7 +254,7 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
 
     committed = []
 
-    def fake_alloc(budget, limit=4, policy="greedy"):
+    def fake_alloc(budget, limit=4, policy="greedy", report_unplaceable=False):
         def cell(fam, ctx, est):
             return {
                 "family": fam,
@@ -335,7 +335,7 @@ def test_certify_v7_no_commit_when_nothing_ran(tmp_path, monkeypatch):
 
     committed = []
 
-    def fake_alloc(budget, limit=4, policy="greedy"):
+    def fake_alloc(budget, limit=4, policy="greedy", report_unplaceable=False):
         def cell(fam, ctx, est):
             return {
                 "family": fam,

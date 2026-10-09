@@ -1017,7 +1017,7 @@ def test_force_rung_takes_optional_value():
     import full_benchmark as fb
 
     def parse(argv):
-        args = fb.build_parser().parse_args(argv)
+        args = fb.build_parser().parse_args(["--v7-families", "16", *argv])
         if isinstance(args.rung_forced, str):
             if "/" in args.rung_forced or "=" in args.rung_forced:
                 return "guard", args.rung_forced
@@ -1134,6 +1134,8 @@ def test_main_startup_smoke(tmp_path, monkeypatch, capsys):
         "--force-rung",
         "f16",
         "--dry-run",
+        "--v7-families",
+        "16",
     ]
     monkeypatch.setattr("sys.argv", argv)
     fb.DRY_RUN_ACTIVE = False
