@@ -617,3 +617,39 @@ failures - the fake climb_allocations stubs missing the
 report_unplaceable kwarg (addendum 154's signature change) and the
 four parser tests hitting the now-mandatory --v7-families
 (addendum 156) - are fixed in this same commit.
+
+
+## Addendum 162 - the comparison arms without wiping: separate files + the cell selector
+
+The author's ruling: "Do not clean the results. let's use separate
+results files. let's add the functionality to run only the cells we
+want measured, no sense in measuring everything we know is not
+going to change."
+
+Two changes:
+1. SEPARATE ARMS: --state-file/--results-file already exist as CLI
+   flags; the answers JSONLs now carry the policy suffix (the greedy
+   arm keeps the bare filenames - history unchanged; the stingy arm
+   writes <fam>-ctx<ctx>-v7.stingy-answers.jsonl, the random arm
+   .random) - no arm overwrites another's evidence, no --clean
+   needed for a comparison run.
+2. THE CELL SELECTOR (--v7-cells): comma-separated family:ctx pairs;
+   only the listed cells measure, everything else reports
+   "cell not selected (--v7-cells)" and is never touched. The
+   three-way comparison plans diverge at only 8 (stingy) / 11
+   (random) of 52 cells - the agreeing cells are already measured
+   in the greedy arm and CANNOT change (same config, same corpus,
+   same seed), so re-measuring them is pure cost. The comparison
+   arms measure exactly the diverging cells.
+
+Pre-registration (from the session's standing comparison table):
+P1 Qwen3.5-2B@262k stingy (Q6_K/q8_0/q8_0) scores [5.0, 6.9],
+   below greedy's 6.88 - the argmax family holds.
+P2 Qwen3.5-0.8B@262k stingy (Q8_0/f16/q8_0) scores >= greedy's
+   3.22 (better weights than greedy's Q6_K at that cell).
+P3 granite-4.0-1b scores above its greedy 0.0 at >= 2 cells under
+   stingy (the weights-term prediction).
+P4 the agreeing cells are identical across arms by construction -
+   the null arm.
+A family-ranking flip = the allocation policy is a scoring
+variable, not just a memory plan - register the finding.
