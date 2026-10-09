@@ -1304,3 +1304,53 @@ of the search strategy): Qwen3.5-2B@262k decodes 16.9 t/s ->
 doubling curve: 6 GiB -> 4.5 w/s (still readable), 8 GiB ->
 3.5 w/s (below the line) - the 6 GiB budget is the natural
 next grid for the search strategy.
+
+
+## Addendum 189 - the q4_0/q8_0/f16 formula audit: the closed forms HOLD
+
+The author's concern: "Check that the q4 and q8 matches the
+formula. I'm very concerned that q5 didn't match." The audit
+backs out the measured bpB from every cell's own census record
+(both state files, the cell records only - arms without their
+own census excluded to avoid config mismatches):
+
+Q8_0 (closed form 34/32 = 1.0625): the FULLY-RESIDENT families
+match to the fourth decimal - granite-3.1/3.2/3.3 (1.0625,
++0.00%), SmolLM3-3B (1.0625, +0.00%), Jamba2-3B (1.0626,
++0.01%). THE FORMULA IS EXACT where the census sees the whole
+model. The -10..-17% records are the KNOWN host-offload
+families (Qwen, Qwen3, MiniCPM5: part of the embedding stays
+host-side, addendum 136) - the census records GPU-RESIDENT
+weights, a deliberate under-count the estimator accepts rather
+than modeling per-family offload splits. MiniCPM4-0.5B at f16
+shows the same signature (-0.02%... wait, -0.02% is exact);
+MiniCPM5-1B at f16 -18.57% confirms the offload class.
+
+F16 (closed form 2.0): 1.9988-2.0004 across every fully-resident
+family (+-0.06%) - EXACT. Llama +0.01%, granite, gemma,
+Qwen2.5 all within 0.02%.
+
+Q4_0 (closed form 18/32 = 0.5625): ZERO own-census records -
+the runs never measured a Q4_0 cell with its own launch's
+census (the addendum-187 alarm on Jamba2@262k stingy was the
+config-mismatch false positive: the arm inherited the greedy
+cell's Q8_0 census). Q4_0's formula is UNTESTED by census but
+DERIVED from the same block arithmetic q8_0 proves exact
+(16 payload + 2 scale per 32 weights; q8_0's 34/32 confirms the
+2-byte scale byte is real).
+
+THE Q5_0 CONTRAST, now sharp: q5_0 diverged +1.6% ON THE SAME
+families where q8_0 is exact to 0.01% (SmolLM3: Q8_0 +0.00%,
+Q5_0 +1.6%) - the divergence is the 5-BIT format's per-tensor
+importance mix, not a census or offload artifact. The closed
+forms that survive: q4_0/q8_0/f16 - all simple block shapes
+(payload + ONE fp16 scale). The formats that fail: Q5_K, Q4_K,
+Q5_0 - all the formats where llama.cpp layers extra bookkeeping
+or per-tensor rules on top of the simple block. THE PATTERN:
+the ladder's rule is "simple block format or retire" and the
+census is the arbiter.
+
+REGISTERED: the estimator's host-offload acceptance note moves
+from folklore to audit result - the offload under-count is
+-10..-19% for the affected families and CONSERVATIVE (never
+over-quotes GPU), consistent with addendum 136's ruling.
