@@ -275,7 +275,12 @@ def climb_allocations(
                 out.append(findings[0])
             continue
         feasible = any(
-            (t := _alloc_total(name, p, geom, W_LADDER[0], KV_QUANT_LADDER[0], KV_QUANT_LADDER[0], c)) is not None
+            (
+                t := _alloc_total(
+                    name, p, geom, W_LADDER[0], KV_QUANT_LADDER[0], KV_QUANT_LADDER[0], c
+                )
+            )
+            is not None
             and t <= budget_gib
             for c in ctxs
         )
@@ -294,7 +299,9 @@ def climb_allocations(
                 out.append(findings[0])
             continue
         for ctx in ctxs:
-            wi, ki, vi = 0, 0, 0  # the floor: (W_LADDER[0], q4_0, q4_0) = (Q4_0, q4_0, q4_0) after addendum 172
+            # the floor: (W_LADDER[0], q4_0, q4_0) = (Q4_0, q4_0, q4_0) after
+            # addendum 172
+            wi, ki, vi = 0, 0, 0
             total = _alloc_total(
                 name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
             )

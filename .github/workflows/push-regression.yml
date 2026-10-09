@@ -71,6 +71,25 @@ jobs:
           pip install mutmut
           mutmut run
           mutmut results
+      - name: python compile 3.12 (the syntax gate)
+        id: compile312
+        continue-on-error: true
+        run: python3 -m compileall -q bench infra etc tests *.py
+      - name: answers JSONL validation (the evidence gate)
+        id: jsonl
+        continue-on-error: true
+        run: python3 validate_jsonl.py
+      - name: the dry-run smoke (the orchestrator end-to-end, offline)
+        id: smoke
+        continue-on-error: true
+        run: python3 full_benchmark.py --task v7 --v7-families 16 --dry-run --no-git
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: python compile 3.13 (the study target)
+        id: compile313
+        continue-on-error: true
+        run: python3 -m compileall -q bench infra etc tests *.py
       - name: the aggregate verdict (any tool red = the run is red)
         if: always()
         run: |
@@ -85,6 +104,10 @@ jobs:
           if [ "${{ steps.coverage.outcome }}" = "failure" ]; then echo "coverage: FAILURE"; RED=1; else echo "coverage: ${{ steps.coverage.outcome }}"; fi
           if [ "${{ steps.vulture.outcome }}" = "failure" ]; then echo "vulture: FAILURE"; RED=1; else echo "vulture: ${{ steps.vulture.outcome }}"; fi
           if [ "${{ steps.mutmut.outcome }}" = "failure" ]; then echo "mutmut: FAILURE"; RED=1; else echo "mutmut: ${{ steps.mutmut.outcome }}"; fi
+          if [ "${{ steps.compile312.outcome }}" = "failure" ]; then echo "compile312: FAILURE"; RED=1; else echo "compile312: ${{ steps.compile312.outcome }}"; fi
+          if [ "${{ steps.jsonl.outcome }}" = "failure" ]; then echo "jsonl: FAILURE"; RED=1; else echo "jsonl: ${{ steps.jsonl.outcome }}"; fi
+          if [ "${{ steps.smoke.outcome }}" = "failure" ]; then echo "smoke: FAILURE"; RED=1; else echo "smoke: ${{ steps.smoke.outcome }}"; fi
+          if [ "${{ steps.compile313.outcome }}" = "failure" ]; then echo "compile313: FAILURE"; RED=1; else echo "compile313: ${{ steps.compile313.outcome }}"; fi
           if [ "$RED" = "1" ]; then
             echo "AGGREGATE: RED - at least one tool failed"
             exit 1
