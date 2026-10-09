@@ -17,11 +17,13 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 
 - **Integrated GPU (iGPU)** — the model runs from system RAM:
   - System RAM needed: **4 GB**
-  - Memory bandwidth needed: **51 GB/s**. Configurations that match exactly:
-    - DDR4-3200 dual channel (51.2 GB/s)
+  - Memory bandwidth needed: **51 GB/s or faster**. The lowest
+    configuration that meets it, and others that match it exactly:
+    - DDR4-3200 dual channel (51.2 GB/s) - the lowest match
     - DDR5-3200 dual channel (51.2 GB/s)
     - DDR5-6400 single channel (51.2 GB/s)
     - DDR4-1600 quad channel (51.2 GB/s)
+    - Anything faster also works.
 - **Dedicated GPU** — the model runs from the card's VRAM:
   - VRAM needed: **4 GB**. Any dedicated GPU has high enough bandwidth.
 
@@ -49,4 +51,4 @@ Models that scored zero are left out of the table: two granite hybrids answer th
 
 **Memory numbers are the GPU footprint** — llama-server's own measured breakdown of weights + context + compute on the graphics side. The whole-machine figure is a little higher (the host keeps a small share); budget roughly half a GB more when planning system RAM.
 
-**Bandwidth numbers** come from the study's measured law (`1/t = size/76.5 + 1/74`, fitted on the benchmark machine): they are what a system needs to feed each model at a comfortable reading speed (300 words per minute). A dedicated GPU meets them by default — the requirement only bites integrated graphics, which serve from system RAM.
+**Bandwidth numbers** are the minimum: your system needs at least this much, or faster. They come from the study's measured law (`1/t = size/76.5 + 1/74`, fitted on the benchmark machine): they are what a system needs to feed each model at a comfortable reading speed (300 words per minute). A dedicated GPU meets them by default — the requirement only bites integrated graphics, which serve from system RAM.
