@@ -178,7 +178,6 @@ W_QUANT_BPB = {
     # the census (SmolLM3-3B measured 0.6987 bpB at Q5_0) - the format-theorem
     # held for q4_0/q8_0 (2-block scales are exact) but the 5-bit blocks carry
     # padding the simple form misses; the register takes the measured upper bound
-    # (addendum 170: an under-estimate is an error)
     "Q8_0": 1.0625,  # 34 bytes: 8-bit payload + scale (census-confirmed)
     "F16": 2.0,
 }
@@ -211,9 +210,7 @@ KV_QUANT_FACTOR = {
 # GPU compute buffer: floor + ~1 KiB/token (census slope
 # 9.6e-7 GiB/token across the pilot families; the old 2 KiB
 # figure was the system-wide one).
-COMPUTE_FLOOR_GIB = 0.075  # addendum 187: SmolLM3 census intercept 0.074;
-                         # an under-estimate is an error (addendum 170)  # addendum 171: the census shows ~0.055 GPU compute floor;
-                            # 0.03 under-counted - an under-estimate is an error
+COMPUTE_FLOOR_GIB = 0.075  # addendum 187: SmolLM3 census intercept 0.074
 COMPUTE_KIB_PER_TOKEN = 1.0
 
 
