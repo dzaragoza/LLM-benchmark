@@ -79,7 +79,7 @@ def test_stingy_diverges_from_greedy():
 
 def test_unknown_policy_rejected():
     try:
-        v7.climb_allocations(4.0, policy="random")
+        v7.climb_allocations(4.0, policy="bogus")
     except ValueError:
         return
     raise AssertionError("unknown policy must raise")

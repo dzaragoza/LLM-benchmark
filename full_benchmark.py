@@ -501,9 +501,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--v7-alloc",
         default="greedy",
-        choices=["greedy", "stingy"],
-        help="v7: the allocation climb policy (addendum 144) - greedy takes "
-        "the largest-fitting single-axis upgrade (R-18), stingy the smallest",
+        choices=["greedy", "stingy", "random"],
+        help="v7: the allocation climb policy (addendum 144/150) - greedy takes "
+        "the largest-fitting single-axis upgrade (R-18), stingy the smallest, "
+        "random a seeded random one (reproducible)",
     )
     ap.add_argument("--kv-quant-k", default=None, choices=_KV_CHOICES)
     ap.add_argument("--kv-quant-v", default=None, choices=_KV_CHOICES)
