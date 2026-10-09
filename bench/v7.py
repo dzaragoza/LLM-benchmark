@@ -615,7 +615,13 @@ def certify_v7(
     pending_fam = None
 
     def _flush_model_commit() -> None:
-        if on_model_commit is not None and pending:
+        # addendum 147: the commit fires only when something RAN - a
+        # fully-skipped family (resume, all cells already measured)
+        # commits nothing; re-pushing evaluated artifacts is noise.
+        # The batch still carries the whole family picture (the
+        # skipped cells included) when at least one cell measured.
+        ran = [e for e in pending if e.get("skipped") is None]
+        if on_model_commit is not None and ran:
             try:
                 on_model_commit(list(pending))
             except Exception as e:

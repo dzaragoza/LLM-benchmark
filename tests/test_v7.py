@@ -324,3 +324,60 @@ def test_certify_v7_commits_per_model(tmp_path, monkeypatch):
     assert res[0]["score"] == 0.5
     assert "skipped" in res[1]
     assert res[2]["score"] == 0.5
+
+
+def test_certify_v7_no_commit_when_nothing_ran(tmp_path, monkeypatch):
+    """Pins: R-24 (addendum 147): a fully-skipped family commits NOTHING.
+    The commit fires when at least one cell RAN; resume re-measuring
+    nothing must not re-push already-evaluated artifacts."""
+    import bench.v7 as v7m
+
+    committed = []
+
+    def fake_alloc(budget, limit=4, policy="greedy"):
+        def cell(fam, ctx, est):
+            return {
+                "family": fam,
+                "params_b": 0.3,
+                "ctx": ctx,
+                "wq": "F16",
+                "kq": "f16",
+                "vq": "f16",
+                "est_gib": est,
+            }
+
+        return [cell("famA", 4096, 1.0), cell("famB", 4096, 1.1)]
+
+    monkeypatch.setattr(v7m, "climb_allocations", fake_alloc)
+    monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: "/tmp/x.gguf")
+    monkeypatch.setattr(
+        v7m, "corpus_from_artifact", lambda port: {"questions": [], "cuts": {}, "sentences": []}
+    )
+    monkeypatch.setattr(v7m.llama_server, "start_server", lambda *a, **k: (object(), True))
+    monkeypatch.setattr(v7m.llama_server, "wait_healthy", lambda *a, **k: True)
+    monkeypatch.setattr(v7m.llama_server, "stop_server", lambda *a, **k: None)
+    monkeypatch.setattr(v7m, "preflight_reachable_grades", lambda port, c, w: {})
+    monkeypatch.setattr(v7m, "preflight_template_sanity", lambda port: None)
+    monkeypatch.setattr(
+        v7m,
+        "run_cell",
+        lambda port, corpus, window, answers_path=None: {"score": 0.5, "max_score": 3},
+    )
+    monkeypatch.setattr(v7m, "save_state", lambda *a: None)
+    # BOTH families fully measured already: nothing may fire
+    state = {
+        "families": {
+            "famA": {"v7": {"4096": {"score": 0.1, "wq": "F16", "kq": "f16", "vq": "f16"}}},
+            "famB": {"v7": {"4096": {"score": 0.2, "wq": "F16", "kq": "f16", "vq": "f16"}}},
+        }
+    }
+    res = v7m.certify_v7(
+        str(tmp_path),
+        state,
+        str(tmp_path / "st.json"),
+        8210,
+        False,
+        on_model_commit=lambda entries: committed.append(entries),
+    )
+    assert committed == [], "a fully-skipped family must not fire the model commit"
+    assert all("skipped" in e for e in res)

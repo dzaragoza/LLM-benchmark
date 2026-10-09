@@ -1,9 +1,12 @@
 name: push regression run
-# R-25 final form (session 44): the commit hook stays <=5s (ruff,
-# ruff-format, ty, md, requirements - NO pytest); the FULL pytest
-# suite (deterministic pins + the 21 hypothesis properties) runs
-# HERE on every push. The workflow's verdict is checked before the
-# next push - a red run blocks the next delivery, not the commit.
+
+# R-25/R-31 final form (addendum 147): the commit hook stays <=5s
+# (ruff, format-wrapper, ty, md, requirements, testmon-affected);
+# EVERYTHING ELSE - the full pytest suite, crosshair contracts,
+# coverage, vulture, the pre-commit drift report (the former
+# daily-quality content, absorbed here) - runs on EVERY PUSH.
+# The verdict is checked on every pull (R-27): a red run blocks the
+# next delivery, not the commit.
 
 on:
   push:
@@ -24,12 +27,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install coverage pre-commit
-      - name: pytest (the full suite - 255 tests incl. hypothesis properties)
+          pip install coverage vulture pre-commit
+      - name: pytest (the full suite - deterministic pins + hypothesis properties)
         run: python3 -m pytest tests -q
       - name: crosshair (the contract proofs)
         run: crosshair check tests/contracts.py
-      - name: coverage (the missing-test map)
+      - name: coverage (the missing-test map - a discovery helper, never a metric)
         run: |
           coverage run -m pytest tests -q
           coverage report -m
+      - name: vulture (dead code)
+        run: vulture . --min-confidence 80 --exclude .git,.venv,__pycache__,models,llama-b10964-gpu
+      - name: pre-commit hook versions (the drift report)
+        run: |
+          pre-commit autoupdate || true
+          git diff --exit-code -- .pre-commit-config.yaml || echo "HOOK DRIFT: pre-commit versions have newer tags - review and pin"

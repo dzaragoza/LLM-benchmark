@@ -195,3 +195,41 @@ Pinned by tests/test_format_hook.py (Pins: R-25): style delta ->
 format + restage + exit 0; clean file -> silent pass; broken file
 -> non-zero; exactly one ruff-format entry in the hook config (the
 wrapper - the stock aborting entry is gone).
+
+
+## Addendum 147 - the commit fires only when something ran; the CI strategy reworked (local-fast vs CI-complete)
+
+Two rulings. First: "let's improve the commits after model
+completion, make it push results only when something ran. now is
+committing and pushing the models that we already evaluated..."
+Correct - the addendum-132 per-model commit fired on the family
+boundary even when every cell was skipped (the resume case): a
+no-op re-push of already-evaluated artifacts. Fix: _flush_model_commit
+fires only when at least one cell in the batch RAN (no "skipped"
+key); a fully-skipped family commits nothing. The batch still
+carries the whole family picture when at least one cell measured.
+R-24 reworded; pinned by test_certify_v7_no_commit_when_nothing_ran.
+
+Second: "Let's rework our ci strategy: we don't need the daily. we
+run locally as much as we can under the 5s time to commit rule and
+leave the rest to github ci to handle, including what was in the
+daily. since we always check the latest results during pull, we
+will catch any errors there. this is a wow requirement."
+
+The strategy is now LOCAL-FAST vs CI-COMPLETE, with NO scheduled
+runs: the commit hook owns everything that fits the 5s rule
+(ruff, the format wrapper, ty, md, requirements, testmon-affected
+pins); GitHub CI owns everything else on EVERY PUSH -
+push-regression.yml absorbs the former daily steps (the full
+pytest suite, crosshair contracts, coverage, vulture, the
+pre-commit drift report). daily-quality.yml is DELETED (the
+weekly predecessor was already gone - addendum 145's daily lived
+exactly one session). The safety net is the pull check (R-27):
+the latest COMPLETED push-regression verdict is checked on every
+pull, so anything the fast hook missed is caught before the next
+delivery. R-31 reworded to the final form; pins updated
+(test_r31_layers_have_their_homes, test_r31_no_scheduled_workflows).
+
+Note: the never-abort format wrapper (addendum 146) is part of the
+local-fast side - formatting changes apply and re-stage without
+aborting, keeping the 5s loop friction-free.

@@ -1,13 +1,14 @@
-"""Pins: R-30, R-31 (session 45, addendum 145).
+"""Pins: R-30, R-31 (session 45, addenda 145/147).
 
 R-30 - the tool environment is explicit and complete: every hook/test/CI
 dependency is declared in requirements.txt, and the working environment
 imports them (the test_precommit_env pins carry the installed-side check).
 
-R-31 - the test strategy is layered, each layer with a registered home:
-deterministic pins in the commit hook via testmon, hypothesis properties
-marked hypothesis_props never in the hook, crosshair contracts, the full
-suite on every push and daily in CI.
+R-31 - the verification split is LOCAL-FAST vs CI-COMPLETE (addendum
+147): the commit hook runs what fits the 5s rule; GitHub CI owns
+everything else on every push (the full suite, crosshair, coverage,
+vulture, the drift report); no scheduled runs; the pull check (R-27)
+is the safety net.
 """
 
 import os
@@ -63,14 +64,22 @@ def test_r31_layers_have_their_homes():
     assert (ROOT / "tests" / "contracts.py").exists()
     assert (ROOT / "tests" / "test_properties.py").exists()
     push = (ROOT / ".github" / "workflows" / "push-regression.yml").read_text(encoding="utf-8")
-    assert "pytest tests -q" in push and "crosshair check" in push
-    daily = (ROOT / ".github" / "workflows" / "daily-quality.yml").read_text(encoding="utf-8")
-    assert "pytest tests -q" in daily and "crosshair check" in daily
-    assert 'cron: "0 0 * * *"' in daily, "the quality run is DAILY (addendum 145)"
+    for needle in (
+        "pytest tests -q",
+        "crosshair check",
+        "coverage run",
+        "vulture",
+        "autoupdate",
+    ):
+        assert needle in push, f"push-regression must own the former daily step: {needle}"
+    assert "schedule:" not in push, "no scheduled runs (addendum 147)"
 
 
-def test_r31_weekly_workflow_is_gone():
-    """Pins: R-31. The weekly-quality workflow is retired - the quality
-    cadence is daily (addendum 145, the author's ruling); no stale weekly
-    schedule survives to double-run the same checks."""
+def test_r31_no_scheduled_workflows():
+    """Pins: R-31. No daily/weekly scheduled CI survives (addendum 147):
+    local-fast under the 5s rule, CI-complete on every push, the pull
+    check (R-27) is the safety net."""
+    for wf in (ROOT / ".github" / "workflows").glob("*.yml"):
+        assert "schedule:" not in wf.read_text(encoding="utf-8"), f"{wf.name} is scheduled"
+    assert not (ROOT / ".github" / "workflows" / "daily-quality.yml").exists()
     assert not (ROOT / ".github" / "workflows" / "weekly-quality.yml").exists()
