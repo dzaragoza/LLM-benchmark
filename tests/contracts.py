@@ -307,7 +307,7 @@ def spans_ascending_ref() -> bool:
     """
     from bench.v7 import SPANS
 
-    return all(a < b for a, b in zip(SPANS, SPANS[1:]))
+    return all(a < b for a, b in zip(SPANS, SPANS[1:], strict=False))
 
 
 def ctx_grid_ascending_ref() -> bool:
@@ -316,7 +316,7 @@ def ctx_grid_ascending_ref() -> bool:
     """
     from bench.v7 import CTX_GRID
 
-    return all(a < b for a, b in zip(CTX_GRID, CTX_GRID[1:]))
+    return all(a < b for a, b in zip(CTX_GRID, CTX_GRID[1:], strict=False))
 
 
 def format_theorem_q4_ref(params_b: float) -> bool:
