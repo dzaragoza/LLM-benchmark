@@ -24,17 +24,14 @@ Vibe reads this section FIRST, every prompt, and follows it in order:
    asks for one, or before a pull when a run is known to have
    been dispatched. No every-prompt checks, no every-push runs,
    no result-hunting - the emails stop, the runs are on demand.
-2. **Nothing runs locally - ever** (R-38): no tests, no linter, no
-   formatter, no type check, on no file, under no circumstance. Do
-   NOT run pytest, ruff, ty, coverage, vulture, mutmut, or any other
-   verification tool locally - not "just to be sure", not on one
-   file, not even a syntax check beyond what code_edit itself does.
-   HABITS DO NOT OVERRIDE THIS RULE: if Vibe notices the impulse to
-   verify locally ("let me just check this one test"), that impulse
-   is the rule being broken - stop, commit, push, let CI judge.
-   Verification of every kind is CI's job (push-regression.yml). The
-   local loop is: code_edit -> commit -> push -> CI judges -> fix on
-   the next cycle.
+2. **Nothing runs locally - ever (R-38), and no test updates
+   either (addendum 191)**: no tests, no linter, no formatter,
+   no type check on any file, and NO writing or updating test
+   files - the suite is frozen at its current green state
+   (253 tests). New code ships without new pins; the weekly
+   CI cron (addendum 190) is the standing verification. If a
+   test breaks against new code, the author rules on it - not
+   the agent silently editing the suite.
 3. **Commands to Daniela are handed over immediately** when the code
    is written - no waiting for green CI, no waiting for in-flight
    verdicts. Bugs are fixed as they come, from the CI evidence.
