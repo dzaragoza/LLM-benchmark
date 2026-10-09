@@ -128,3 +128,43 @@ def test_convert_quant_deletes_tensors_after_f16(tmp_path, monkeypatch):
     got = convert_quant.create("fam", str(famdir), "Q4_K_M")
     assert got == str(out_q)
     assert not (famdir / "safetensors-source").exists(), "tensors deleted after f16"
+
+
+def test_memory_breakdown_gib(tmp_path):
+    import infra.llama_server as ls
+
+    """Addendum 11: llama's own memory-breakdown table replaces the smaps
+    census. Both row shapes (paren'd GPU line, flat Host line), the
+    hybrid placeholder quirk (0.00 first, summed over all occurrences),
+    and per-device model/context/compute extraction."""
+
+    log = tmp_path / "lv5.log"
+    log.write_text(
+        "0.00.474.193 I load_tensors:      Vulkan0 model buffer size =     0.00 MiB\n"
+        "0.00.474.193 I load_tensors:  Vulkan_Host model buffer size =     0.00 MiB\n"
+        "0.00.960.078 I load_tensors:      Vulkan0 model buffer size =   763.78 MiB\n"
+        "0.00.960.079 I load_tensors:  Vulkan_Host model buffer size =   257.66 MiB\n"
+        "0.00.501.944 I common_memory_breakdown_print: | memory breakdown [MiB]"
+        "                     | total    free    self   model   context   compute"
+        "    unaccounted |\n"
+        "0.00.501.945 I common_memory_breakdown_print: |   - Vulkan0 (780M Graphics"
+        " (RADV PHOENIX)) | 16383 = 14998 + ( 935 =   763 +     125 +      46)"
+        " +         450 |\n"
+        "0.00.501.945 I common_memory_breakdown_print: |   - Host"
+        "                                   |"
+        "                   265 =   257 +       0 +       8                |\n",
+        encoding="utf-8",
+    )
+    out = ls.memory_breakdown_gib(str(log))
+    assert out is not None
+    assert out["source"] == "llama-server (memory breakdown)"
+    assert abs(out["weights_gib"] - 1021.44 / 1024) < 0.001
+    assert abs(out["model_gib"] - (763 + 257) / 1024) < 0.001
+    assert abs(out["context_gib"] - 125 / 1024) < 0.001
+    assert abs(out["compute_gib"] - (46 + 8) / 1024) < 0.001
+    assert set(out["devices"]) == {"Vulkan0", "Host"}
+    assert abs(out["devices"]["Host"]["model_gib"] - 257 / 1024) < 0.001
+
+    empty = tmp_path / "empty.log"
+    empty.write_text("nothing here\n", encoding="utf-8")
+    assert ls.memory_breakdown_gib(str(empty)) is None

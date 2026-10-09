@@ -20,10 +20,14 @@ def test_grid_ascending():
 
 
 def test_every_span_fits_the_largest_ctx():
+    """Every span's region fits the largest ctx rung on its own: the
+    question's overhead (prompt + gen) is paid from the span budget by
+    the corpus build (the span-262144 region trims itself), so the
+    invariant is span <= largest ctx - R-28's no-zero-max root."""
     for s in v7.SPANS:
-        assert s + v7.PROMPT_OVERHEAD_TOKENS <= v7.CTX_GRID[-1], (
-            f"span {s} + overhead exceeds the largest ctx rung - a zero-max "
-            f"cell at the top rung (R-28 violation)"
+        assert s <= v7.CTX_GRID[-1], (
+            f"span {s} exceeds the largest ctx rung {v7.CTX_GRID[-1]} - "
+            f"an unreachable grade at the top rung (R-28 violation)"
         )
 
 

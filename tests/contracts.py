@@ -328,7 +328,7 @@ def format_theorem_q4_ref(params_b: float) -> bool:
     """
     import math
 
-    from bench.v7 import W_QUANT_BPB, weights_gib
+    from bench.v7 import weights_gib
 
     expected = params_b * 1e9 * (18 / 32) / (1 << 30)
     return math.isclose(weights_gib(params_b, "Q4_0"), expected, rel_tol=1e-12)
@@ -342,7 +342,7 @@ def format_theorem_q8_ref(params_b: float) -> bool:
     """
     import math
 
-    from bench.v7 import W_QUANT_BPB, weights_gib
+    from bench.v7 import weights_gib
 
     expected = params_b * 1e9 * (34 / 32) / (1 << 30)
     return math.isclose(weights_gib(params_b, "Q8_0"), expected, rel_tol=1e-12)
