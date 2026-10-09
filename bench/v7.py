@@ -709,7 +709,9 @@ def certify_v7(
     alt_plans: dict[str, dict[tuple[str, int], dict]] = {}
     if multi_arm:
         for pol in ("stingy", "random"):
-            plan = [r for r in climb_allocations(budget_gib, roster_limit, pol) if "reason" not in r]
+            plan = [
+                r for r in climb_allocations(budget_gib, roster_limit, pol) if "reason" not in r
+            ]
             alt_plans[pol] = {(r["family"], r["ctx"]): r for r in plan}
     # addendum 154: the unplaceable are FINDINGS, reported before the
     # run - the measured count is honest by construction
@@ -907,7 +909,10 @@ def certify_v7(
                         }
                 for pol, a in arms.items():
                     if "score" in a:
-                        print(f"  arm {pol}: {a['wq']}/{a['kq']}/{a['vq']} -> {a['score']}/{a['max_score']}")
+                        print(
+                            f"  arm {pol}: {a['wq']}/{a['kq']}/{a['vq']} "
+                            f"-> {a['score']}/{a['max_score']}"
+                        )
             v7[key] = {**cell, **rec, **({"arms": arms} if multi_arm else {})}
             entry.update(rec)
             if multi_arm:
