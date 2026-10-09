@@ -105,8 +105,11 @@ PILOT_FAMILIES = 4
 # (exact, census-confirmed). Q8_0 -> F16 is the climb; nothing between
 # exists on the ladder. R-18's "k encoding below q8" clause is retired.
 W_QUANT_BPB = {
-    "Q4_0": 0.5625,
-    "Q8_0": 1.0625,
+    "Q4_0": 0.5625,  # 18 bytes / 32 weights (4-bit payload + fp16 scale)
+    "Q4_1": 0.6250,  # 20 bytes: + the min-offset byte pair
+    "Q5_0": 0.6875,  # 22 bytes: 5-bit payload + scale
+    "Q5_1": 0.7500,  # 24 bytes: + the min-offset
+    "Q8_0": 1.0625,  # 34 bytes: 8-bit payload + scale (census-confirmed)
     "F16": 2.0,
 }
 W_LADDER = list(W_QUANT_BPB)
@@ -115,7 +118,10 @@ W_LADDER = list(W_QUANT_BPB)
 # --cache-type-k/v values (q2_K/q4_K crashed the live run at the
 # 131072/262144 cells - "Unsupported cache type"); the set matches
 # full_benchmark's _KV_CHOICES. Top is f16.
-KV_QUANT_LADDER = ["q4_0", "q5_0", "q8_0", "f16"]
+# addendum 173: the ladders are EQUAL - the same _0 family for weights
+# and KV cache (the author's ruling); every size is the exact structural
+# constant, no calibration, no K-quant bookkeeping (R-40).
+KV_QUANT_LADDER = ["q4_0", "q4_1", "q5_0", "q5_1", "q8_0", "f16"]
 KV_QUANT_FACTOR = {
     "q4_0": 0.28125,
     "q5_0": 0.34375,
