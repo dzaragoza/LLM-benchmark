@@ -1,5 +1,7 @@
 # Pick your model
 
+*These results are from the v7.1 benchmark run in progress — the 32-model field is still being measured. The rankings below reflect the models measured so far and are **not a final ruling**.*
+
 Pick the **largest context size that fits your machine** from the list below. Bigger context means the model can work with longer documents — more pages, more code, longer conversations — without losing track of what was said at the beginning. A model certified at 16k handles a 16k-token document reliably; when in doubt, go bigger if your machine allows.
 
 **You need ONE of the two options in each section — never both.** An integrated GPU (iGPU) uses your system RAM; a dedicated GPU uses its own VRAM. If your machine has only an iGPU (most laptops), read the RAM lines. If it has a dedicated graphics card, read the VRAM line and ignore the bandwidth requirement.
