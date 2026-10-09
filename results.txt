@@ -66179,3 +66179,21 @@ UnboundLocalError: cannot access local variable 'entry' where it is not associat
   granite-3.1-2b-instruct ctx=65536: score 2.139/20
   granite-3.1-2b-instruct ctx=131072: cell not selected (--v7-cells)
 [2026-10-09T13:23:39] V7 ARGMAX at 4 GiB: Qwen3.5-2B ctx=262144 (Q6_K, k=q8_0, v=q8_0) score 5.645/30
+
+===== 2026-10-09T13:31:07 | full_benchmark.py --task v7 --v7-families 16 --v7-multi-arm =====
+  [0] no stale llama-server found
+
+2 of the first 16 candidates cannot earn a cell (findings, addendum 154):
+  MiniCPM-1B-sft: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  phi-1: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+=== gemma-3-1b-it ctx=8192 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4401, '4096x32': 4402}
+  census: weights 2.42 GiB, context 0.05 GiB -> total 2.55 GiB (est 2.1)
+  score 0.0 / 5
+  arm stingy: same config as a measured arm - skipped
+  arm random: same config as a measured arm - skipped
+  arm greedy: F16/f16/f16 -> 0.0/5
+=== gemma-3-1b-it ctx=16384 wq=F16 k=f16 v=f16
+  preflight: {'4096x2': 4401, '8192x32': 7804}
+[2026-10-09T13:32:00] SIGINT - shutting down cleanly (addendum 8)
+[2026-10-09T13:32:00] llama-server stopped
