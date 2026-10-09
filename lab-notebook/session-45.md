@@ -906,3 +906,30 @@ _0 ladders, structural sizes, the measured budget gate
 the mandatory candidate count, the findings report. The v7.0
 tables stand as history; the v7.1 table is the first fully-honest
 one (no format risk, no estimate-only verdicts).
+
+
+## Addendum 176 - three new CI gates: python compile, JSONL validation, the dry-run smoke
+
+The author's ruling: "do 3 and 6. add too python compile" - the
+CI gates extend:
+
+1. PYTHON COMPILE, both versions: compileall over bench/infra/etc/
+   tests/*.py on the workflow's 3.12 AND on 3.13 (the study's
+   target, README: "Python 3.13+ required") via a second
+   setup-python - version-specific syntax breakage caught at push.
+2. ANSWERS JSONL VALIDATION: every committed *-answers.jsonl line
+   parses and carries the required keys (window/grade/expected/
+   value/found/ok/answer) - the mid-write crash class caught at
+   push (validate_jsonl.py; the R-34 evidence contract as a gate).
+3. THE DRY-RUN SMOKE: full_benchmark --task v7 --v7-families 16
+   --dry-run --no-git runs the whole orchestrator end-to-end
+   offline - the plan, the findings report, the summary. The exact
+   class today's live crashes were (the --v7-cells
+   UnboundLocalError, the dry-run tail bug) would have died HERE,
+   at push, instead of on the author's machine.
+
+Also this delivery: the aggregate gate reads four more outcomes;
+the E501 pair from the ladder-refs fix; and the addendum-176
+lesson from the crosshair miss - the check protocol now reads the
+FULL TOOL VERDICTS block, every red named and fixed before any
+push (no fixing the loud red while the quiet one sits).
