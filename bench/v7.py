@@ -730,14 +730,6 @@ def certify_v7(
 
     for cell in cells:
         fam = cell["family"]
-        # addendum 162: the cell selector - measure ONLY the cells whose
-        # (family, ctx) is listed; everything else is reported as skipped
-        # (selector), never measured. Comparison arms re-measure only the
-        # diverging cells - no sense re-measuring what cannot change.
-        if only_cells is not None and (fam, cell["ctx"]) not in only_cells:
-            entry["skipped"] = "cell not selected (--v7-cells)"
-            results.append(entry)
-            continue
         if pending_fam is not None and fam != pending_fam:
             _flush_model_commit()
             pending.clear()
@@ -747,6 +739,16 @@ def certify_v7(
         v7 = fst.setdefault("v7", {})
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
+        # addendum 162: the cell selector - measure ONLY the cells whose
+        # (family, ctx) is listed; everything else is reported as skipped
+        # (selector), never measured. Comparison arms re-measure only the
+        # diverging cells - no sense re-measuring what cannot change.
+        # (The check lives AFTER entry exists - the first delivery put it
+        # before and crashed the author's run; the crash rail caught it.)
+        if only_cells is not None and (fam, cell["ctx"]) not in only_cells:
+            entry["skipped"] = "cell not selected (--v7-cells)"
+            results.append(entry)
+            continue
         if (
             done.get("score") is not None
             and done.get("wq") == cell["wq"]
