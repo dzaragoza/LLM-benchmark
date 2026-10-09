@@ -79,7 +79,7 @@ def test_malfunction_labels_cell_not_score(tmp_path, monkeypatch):
         v7m, "corpus_from_artifact", lambda port: {"questions": [], "cuts": {}, "sentences": []}
     )
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert "template_malfunction" in res[0]["error"]
     assert res[0].get("score") is None
     assert "v7" not in state["families"]["famA"] or not state["families"]["famA"]["v7"]

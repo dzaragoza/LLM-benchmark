@@ -1,12 +1,12 @@
 name: push regression run
 
-# R-25/R-31 final form (addendum 147): the commit hook stays <=5s
-# (ruff, format-wrapper, ty, md, requirements, testmon-affected);
-# EVERYTHING ELSE - the full pytest suite, crosshair contracts,
-# coverage, vulture, the pre-commit drift report (the former
-# daily-quality content, absorbed here) - runs on EVERY PUSH.
-# The verdict is checked on every pull (R-27): a red run blocks the
-# next delivery, not the commit.
+# Addendum 158 (the author's ruling: "let's go nuclear. abolish the
+# pre commit hook. run everything only in ci. If something fails we
+# learn about it next pull and you fix"): THE hook is abolished; this
+# workflow is the ONLY verification gate. It runs everything the hook
+# used to run (ruff, format check, ty, md, requirements) plus the full
+# suite, crosshair, coverage, vulture and mutmut. A red verdict is
+# caught on the next pull (R-27) and fixed - nothing is skipped.
 
 on:
   push:
@@ -27,15 +27,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install coverage vulture pre-commit
-      - name: pytest with testmon (the full suite - deterministic pins + hypothesis
-          properties - the map seeds itself for any local clones)
-        run: python3 -m pytest tests -q --testmon
-      - name: mutmut (the mutation trial - session 40 addendum; too slow locally, CI owns it)
-        run: |
-          pip install mutmut
-          mutmut run || true
-          mutmut results || true
+          pip install coverage vulture
+      - name: ruff (lint)
+        run: python3 -m ruff check .
+      - name: ruff format (the format contract, checked not applied)
+        run: python3 -m ruff format --check .
+      - name: ty (type check)
+        run: python3 ty_check.py
+      - name: markdown check (GFM compliance)
+        run: python3 AI_tools/md_check.py
+      - name: requirements check (R-xx traceability)
+        run: python3 requirements_check.py
+      - name: pytest (the full suite - deterministic pins + hypothesis properties)
+        run: python3 -m pytest tests -q
       - name: crosshair (the contract proofs)
         run: crosshair check tests/contracts.py
       - name: coverage (the missing-test map - a discovery helper, never a metric)
@@ -44,7 +48,8 @@ jobs:
           coverage report -m
       - name: vulture (dead code)
         run: vulture . --min-confidence 80 --exclude .git,.venv,__pycache__,models,llama-b10964-gpu,mutants,.testmondata
-      - name: pre-commit hook versions (the drift report)
+      - name: mutmut (the mutation trial - non-gating, the tally lands in the log)
         run: |
-          pre-commit autoupdate || true
-          git diff --exit-code -- .pre-commit-config.yaml || echo "HOOK DRIFT: pre-commit versions have newer tags - review and pin"
+          pip install mutmut
+          mutmut run || true
+          mutmut results || true

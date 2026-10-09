@@ -97,7 +97,7 @@ def test_happy_loop_with_census(tmp_path, monkeypatch):
     to each record, state written per cell, both servers stopped."""
     calls = _install(monkeypatch, tmp_path)
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert len(res) == 2
     assert all(e["score"] == 0.5 for e in res)
     assert all(e.get("mem_census") == FAKE_CENSUS for e in res)
@@ -136,7 +136,7 @@ def test_server_never_comes_up(tmp_path, monkeypatch):
     monkeypatch.setattr(v7m.llama_server, "stop_server", lambda proc, port: None)
     monkeypatch.setattr(v7m, "save_state", lambda *a: None)
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert res[0]["error"] == "server did not come up"
     assert res[0].get("score") is None
 
@@ -146,7 +146,7 @@ def test_template_malfunction_labels_cell(tmp_path, monkeypatch):
     is labelled and skipped, never scored 0."""
     _install(monkeypatch, tmp_path, probe=v7m.TemplateMalfunction("echo loop"))
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert "template_malfunction" in res[0]["error"]
     assert res[0].get("score") is None
 
@@ -156,7 +156,7 @@ def test_preflight_overflow_labels_cell(tmp_path, monkeypatch):
     the loop continues - reported per cell, never a crash."""
     _install(monkeypatch, tmp_path, probe=v7m.PreflightError("prompt exceeds window"))
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert "preflight" in res[0]["error"]
 
 
@@ -169,7 +169,7 @@ def test_run_cell_failure_isolated(tmp_path, monkeypatch):
 
     _install(monkeypatch, tmp_path, run_cell=boom)
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert "run_cell failed" in res[0]["error"]
 
 
@@ -193,7 +193,7 @@ def test_acquire_failure_labels_cell(tmp_path, monkeypatch):
     monkeypatch.setattr(v7m, "_acquire_missing_model", lambda *a, **k: None)
     monkeypatch.setattr(v7m, "save_state", lambda *a: None)
     state = {"families": {}}
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert res[0]["error"] == "could not acquire the quant"
 
 
@@ -206,6 +206,6 @@ def test_config_drift_remeasures(tmp_path, monkeypatch):
             "famA": {"v7": {"4096": {"score": 9.9, "wq": "Q2_K", "kq": "q4_0", "vq": "q4_0"}}}
         }
     }
-    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, False)
+    res = v7m.certify_v7(str(tmp_path), state, str(tmp_path / "st.json"), 8210, 4, False)
     assert res[0]["score"] == 0.5, "the drifted cell re-measured"
     assert state["families"]["famA"]["v7"]["4096"]["score"] == 0.5

@@ -489,8 +489,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--v7-families",
         type=int,
-        default=None,
-        help="v7: the first N families param-ascending (default 4, the pilot)",
+        required=True,
+        help="v7: MANDATORY (addendum 156) - the first N candidates param-ascending; "
+        "unplaceable candidates are reported as findings, the measured count is "
+        "honest by construction (addendum 154)",
     )
     ap.add_argument(
         "--clean",
@@ -598,7 +600,7 @@ def _run(args: argparse.Namespace) -> None:
     else:
         rung_list = list(TOURNAMENT_DEPTHS)
     if args.task == "v7":
-        from bench.v7 import BUDGET_GIB, PILOT_FAMILIES
+        from bench.v7 import BUDGET_GIB
 
         results = certify_v7(
             args.models_dir,
@@ -607,7 +609,7 @@ def _run(args: argparse.Namespace) -> None:
             state.get("ladder_port", 8210),
             args.dry_run,
             args.v7_budget_gib or BUDGET_GIB,
-            args.v7_families or PILOT_FAMILIES,
+            args.v7_families,
             on_model_commit=None
             if (args.no_git or args.dry_run)
             else partial(v7_model_commit, args),

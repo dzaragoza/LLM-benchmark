@@ -1,4 +1,4 @@
-"""Pins: R-25 (session 44, addendum 124). No wall-clock ceiling.
+"""Pins: R-37 (session 44, addendum 124). No wall-clock ceiling.
 
 The author: "Remove the ceiling. Adjusting the number of questions
 is the correct fix." A budget stop would truncate a cell and hide
