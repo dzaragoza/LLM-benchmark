@@ -73,6 +73,9 @@ HOPS = [2, 4, 8, 16, 32]
 # runs comes from RE-RUNNING with corpus n+1: the nth corpus has
 # seed n (CORPUS_SEED). This run is n=1.
 CORPUS_SEED = 1
+# addendum 150: the random climb's rng seed - registered so the
+# policy is reproducible. Seeded per (family, ctx) via params.
+ALLOC_RANDOM_SEED = 7
 # (upstream). Session 44 addenda 120/122/123/143: the author
 # rulings - 10x easier (K 20 -> 2), prefill-matched counts, the
 # 2k span dropped, then K removed outright. A cell is
@@ -209,9 +212,13 @@ def climb_allocations(
     without exceeding it, until no upgrade fits (the maximal config).
     Policy (addendum 144): "greedy" takes the LARGEST-fitting upgrade
     each step (R-18); "stingy" takes the SMALLEST - the paths diverge,
-    the maximality contract is identical. Output: the maximal config
+    the maximality contract is identical. "random" (addendum 150) takes
+    a RANDOM fitting upgrade, seeded for reproducibility - the truly
+    assumption-free climb: no ordering over the axes, no step
+    preference, maximality still guaranteed by the no-upgrade-fits
+    stop. Output: the maximal config
     <= budget per (family, ctx), param-ascending."""
-    if policy not in ("greedy", "stingy"):
+    if policy not in ("greedy", "stingy", "random"):
         raise ValueError(f"unknown allocation policy: {policy!r}")
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
     out = []
@@ -229,7 +236,35 @@ def climb_allocations(
             )
             if total is None or total > budget_gib:
                 continue
+            rng = random.Random(ALLOC_RANDOM_SEED + p) if policy == "random" else None
             while True:
+                if rng is not None:
+                    options = []
+                    for axis in range(3):
+                        cand = (
+                            (min(wi + 1, len(W_LADDER) - 1), ki, vi)
+                            if axis == 0
+                            else (wi, min(ki + 1, len(KV_QUANT_LADDER) - 1), vi)
+                            if axis == 1
+                            else (wi, ki, min(vi + 1, len(KV_QUANT_LADDER) - 1))
+                        )
+                        if cand == (wi, ki, vi):
+                            continue
+                        t = _alloc_total(
+                            name,
+                            p,
+                            geom,
+                            W_LADDER[cand[0]],
+                            KV_QUANT_LADDER[cand[1]],
+                            KV_QUANT_LADDER[cand[2]],
+                            ctx,
+                        )
+                        if t is not None and t <= budget_gib:
+                            options.append((t, cand))
+                    if not options:
+                        break
+                    total, (wi, ki, vi) = rng.choice(options)
+                    continue
                 best = None
                 for axis in range(3):
                     cand = (

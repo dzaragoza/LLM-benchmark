@@ -296,3 +296,37 @@ probes + the session-45 shapes), the guards regression-tested
 (truncated code, broken triple-quote, quote opened in code still
 block), and pinned by tests/test_code_edit_robustness.py (8
 tests, Pins: R-26).
+
+
+## Addendum 150 - the fakes land; the random climb replaces the fidelity ceiling
+
+Two rulings. First: "Do the fakes" - tests/test_v7_fakes.py covers
+the certify_v7 loop offline (the addendum-108 coverage hole): the
+happy loop with census, server-never-comes-up, template-malfunction
+labelling, preflight overflow, run_cell isolation, acquire failure,
+config drift - every branch of the loop, no GPU. The addendum-112
+discipline holds: fakes cover CONTROL FLOW, never the measurement
+contract; production preflight keeps its live /tokenize call.
+
+Second: "Fidelity sounds interesting. I don't like the
+lexicographic order though, it inadvertently assigns importance to
+the order the parameters are defined. What about random climb? One
+step at a time in a random parameter. Stops when no parameter can
+be risen. Always the same seed to allow reproduction."
+
+CORRECT on the flaw: the lexicographic order of addendum 144b
+(F16 weights, then f16 K, then f16 V) assigns importance by
+definition order - exactly what a blind baseline must not do.
+SUPERSEDED: the fidelity ceiling is retired, replaced by the
+RANDOM climb (policy="random"): each step gathers every fitting
+single-axis one-notch upgrade and a SEEDED rng (ALLOC_RANDOM_SEED,
+registered; seeded per family via params) picks one; the stop is
+the shared maximality contract (no upgrade fits). No ordering, no
+step preference, reproducible - the assumption-free arm. Shipped
+in climb_allocations + the --v7-alloc CLI choice; pinned by
+tests/test_v7_random.py (maximal, under budget, reproducible,
+diverges from greedy).
+
+The three-way comparison (greedy vs stingy vs random at the same
+budget) is the allocation-sensitivity evidence for the addendum-138
+open question once the full-roster data is in.
