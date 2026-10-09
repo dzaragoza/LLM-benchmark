@@ -11,7 +11,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "AI_tools"))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
-import code_edit  # noqa: E402  (path setup above must precede it)
+import code_edit  # noqa: E402
 import full_benchmark as fb  # noqa: E402
 import infra.hf_download as hf_download  # noqa: E402
 import ruler_gate  # noqa: E402

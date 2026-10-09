@@ -1,26 +1,49 @@
 #!/usr/bin/env python3
 """validate_jsonl.py - the CI gate form of the R-34 evidence check
 (addendum 176): every committed answers JSONL parses and carries
-the required keys. Exit 1 names the first offenders.
+the required keys. Exit 1 names the first offenders. The validate
+logic is inlined (not imported from the test file) - ty resolves
+statically, and the test imports THIS module so the logic is
+single-sourced (the test's pin covers this file too).
 """
+import json
 import sys
 from pathlib import Path
 
-_HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(_HERE / "tests"))
-sys.path.insert(0, str(_HERE))
+REQUIRED = ("window", "grade", "expected", "value", "found", "ok", "answer")
 
-import test_answers_jsonl as _taj  # noqa: E402
 
-validate = _taj.validate
+def validate(path: Path) -> list:
+    bad = []
+    with open(path, encoding="utf-8") as f:
+        for i, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError as e:
+                bad.append(f"{path.name}:{i} unparseable: {e}")
+                continue
+            missing = [k for k in REQUIRED if k not in rec]
+            if missing:
+                bad.append(f"{path.name}:{i} missing keys: {missing}")
+    return bad
 
-ROOT = Path(__file__).resolve().parent
-files = list((ROOT / "models" / "tournament-results").rglob("*-answers.jsonl"))
-offenders = []
-for p in files:
-    offenders.extend(validate(p))
-if offenders:
-    for o in offenders[:20]:
-        print(f"CORRUPT: {o}")
-    sys.exit(1)
-print(f"validate_jsonl: {len(files)} answers files, all lines valid")
+
+def main() -> int:
+    root = Path(__file__).resolve().parent
+    files = list((root / "models" / "tournament-results").rglob("*-answers.jsonl"))
+    offenders = []
+    for p in files:
+        offenders.extend(validate(p))
+    if offenders:
+        for o in offenders[:20]:
+            print(f"CORRUPT: {o}")
+        return 1
+    print(f"validate_jsonl: {len(files)} answers files, all lines valid")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
