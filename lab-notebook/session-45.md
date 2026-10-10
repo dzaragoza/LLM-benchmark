@@ -1468,3 +1468,45 @@ ranking's deep end re-derives from clean configs. No config-
 drift re-measures fire (the off-ladder cells are deleted, not
 stored); the run measures exactly the missing clean cells plus
 the never-measured newcomers.
+
+## Addendum 194 - the clean-ladder run graded (addenda 180/186 pre-registrations)
+
+THE FIELD: 23 families, 94 cells, 131 arm records, 36 multi-arm
+cells - the single-era, single-ladder table. Every config
+closed-form ([Q4_0, Q8_0, F16] / [q4_0, q8_0, f16]).
+
+THE CHAMPION: Qwen3.5-2B, peak 6.79 @131k (Q8_0/f16/f16) -
+with the stingy arm at 262k scoring 6.81 (Q4_0/f16/q8_0). THE
+ARGMAX IS INTERIOR on the multi-arm record: 128k 6.79 -> 256k
+6.40 (greedy) / 6.81 (stingy) - the reach curve peaks at 131k
+and the deepest rung is a wash between the arms. The old
+Q5_0-era champion cell (6.878 @262k q5_0-V) is superseded by
+clean-ladder configs within 1%.
+
+THE ADDENDUM-180 VERDICT, graded on the clean data: (b) - A
+PATTERN, now with the full field. The per-axis deltas:
+- WEIGHTS-GEOMETRY families (deep KV): greedy/Q8_0-weights wins
+  (Qwen3.5-0.8B@262k F16/f16/q4_0 5.92 >> stingy 4.76; Llama@
+  65536 F16/f16/q8_0 1.00 > 0.73; SmolLM3@16k Q8_0 1.52 > 1.36;
+  granite-4.0-micro/4.1-3b at Q8_0 rungs).
+- THIN-KV/CACHE-GEOMETRY families: the cache axis pays (Llama@
+  131k stingy q8_0-KV 1.47 >> greedy 0.89; Jamba2 both deep
+  cells stingy wins; Qwen3.5-2B@262k stingy 6.81 > 6.40 - the
+  Q4_0/f16/q8_0 shape outperforms Q8_0/q8_0/q4_0).
+- RANDOM: 5 outright wins (phi-4-mini both cells, MiniCPM5-2B@
+  131k, granite-4.0-micro 2 cells, granite-4.1@32k) - no longer
+  "never the candidate" (addendum 186's prediction FAILS on
+  the clean ladders: the coarser ladder makes the random path
+  occasionally the best maximal config). Registered as a failed
+  prediction, not bent.
+
+THE ADDENDUM-186 SKIP RULES, graded:
+- "below ~0.5 at its best rung -> cut the family": HOLDS (the
+  desert is flat: the sub-0.5 families never jumped).
+- "start deep": HOLDS (the top-3 all measured deepest-first;
+  the separating cells are the budget-binding ones).
+
+THE NEWCOMERS: phi-4-mini-instruct debuts at #4 (2.98, Q4_0
+config) - the first Q4_0-weights family to place top-5;
+granite-4.1/4.2-3b and the micros land in the desert-to-mid
+band. The granite MoE micros do NOT clear 0.5.
