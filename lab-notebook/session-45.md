@@ -2300,3 +2300,33 @@ quant effects, not capability, become the failure source again.
 Verified on seeds 11/12/13: all 35 questions' chains+gates
 in-prefix, arithmetic exact, cuts monotone, link text shows
 "VAR PQGLP = VAR RXQRI - D3" shape.
+
+
+## Addendum 217 - the interactive tier confirmed: the champion is fine, the serving topology was the cost
+
+THE AUTHOR'S CONFIRMATION (2026-10-10, T14s interactive use, Open
+WebUI + llama-server): "follow up suggestion and smaller context
+fixed the issue." Two symptoms, two causes, both fixed without
+touching the model or the config that won:
+- REFUSAL-TO-SEARCH on some topics: the fetch pipeline returning
+  empty content on JS-heavy pages (weather) while plain-HTML pages
+  (news) fetch fine - a serving-stack artifact, not model behavior.
+- SPEED DEGRADATION AFTER TURNS: Open WebUI's background tasks
+  (title/follow-up generation) replaying history on the single
+  slot, evicting the cached prompt -> full re-prefill per turn;
+  plus the 131k context making each re-prefill expensive. Killing
+  the background tasks and dropping the interactive ctx to ~32k
+  fixed it.
+
+THE CONFIRMATION, on record: the T14s runs the champion at
+"reasonable speed" (the author's words) - the Tiny's struggle
+(addendum 214) was the weak-GPU tier's reality, NOT the
+recommendation's failure. And the interactive lesson generalizes:
+the max-reach config (131k, the benchmark's winner) and the
+interactive config (~32k + no background replays) are DIFFERENT
+serving choices on the SAME model - the tier split is not only
+across machines (addendum 214) but across USE PATTERNS on the
+reference machine. The practitioner page's guidance inherits
+this: recommend the reach-max config for reach workloads, and
+an interactive profile (smaller ctx, no background history
+replays) for chat use.
