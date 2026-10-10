@@ -2240,3 +2240,40 @@ practitioner page's single recommendation must become BW-conditional:
 the reach-max config and the interactive config differ per tier.
 The prefill curve per tier is the missing measurement - the
 author's ctx sweep (addendum 213's plan) supplies it.
+
+
+## Addendum 215 - the gated-chain pilot graded: the mechanism works, the arithmetic is the failure
+
+THE THREE CELLS (champion @131k, seeds 11/12/13, gatedchain):
+- Q8_0/q4_0/q4_0: 4.127  [4.097, 4.927, 3.357]
+- Q8_0/q8_0/q8_0: 3.759  [3.838, 3.498, 3.942]
+- Q8_0/f16/f16:   3.500  [3.616, 3.609, 3.276]
+
+VERDICT ON THE KV QUESTION (addendum 212's prediction): the deltas
+are q4_0 +0.63 and q8_0 +0.26 over f16 - the ORDERING is inverted
+vs chainarith's flat read and the spread is wide (per-seed ranges
+overlap heavily). NOT a clean separation: graded as WEAK EVIDENCE
+at best. The KV axes remain unseparated in any decisive way; the
+robustness result (addendum 211) stands for now.
+
+THE REAL FINDING, from the answers: the gated chain WORKS as a
+mechanism - the model anchors the right chain, finds the right
+gates, resolves the riddles (the D values in its answers match),
+and shows its work. THE FAILURE IS THE ARITHMETIC ITSELF:
+- mul x gate products in the 5-digit x 2-digit range (769 x 63)
+  are computed WRONG in most chains (e.g. 15072 - 857*60 reported
+  as -51437; true -36348). The work-shown chains cascade the error
+  (first wrong product poisons every downstream pair, exactly the
+  addendum-208 cascade).
+- A second failure mode: some answers leave the product
+  UNCOMPUTED ("83929 - 514 x 10" as the pair value) - the scorer
+  takes the literal number and fails the pair.
+IMPLICATION FOR THE DESIGN: the gates are fine (209's easy
+calibration held - the riddles resolve); the ARITHMETIC CARRIER
+is too hard at 3-digit x 2-digit products for a 2B model at any
+quant (it failed at f16 too - this is a WEIGHTS capability limit,
+not a quant effect; the w-axis -0.80 from the probe shows the
+weights axis is the one that matters and the gates now overload
+it). v7.3's carrier needs smaller products (mul x gate <= ~2000)
+so the arithmetic is inside the model's reliable range and the
+QUANT effects become the dominant failure source again.
