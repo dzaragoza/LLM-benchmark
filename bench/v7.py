@@ -570,24 +570,30 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
     planted adjacent to the real links. The model must select the
     right chain among decoys (K), find and resolve each gate
     (K + weights), then compute (weights) - the cascade amplifies
-    whichever stage breaks."""
+    whichever stage breaks.
+
+    PLACEMENT (the crash's lesson): spans are built as ISOLATED,
+    NESTED BANDS - every span's plants live inside its own sentence
+    band (sized to the span's token budget), deeper spans append
+    AFTER shallower ones, and each span's cut is simply its band's
+    end. No cross-span shifts, no per-question position surgery;
+    a span-s question's prefix contains its band and every
+    shallower band, the same nested-cut semantics as v7.1."""
     rng = random.Random(seed)
     budget = s_max - ruler_gate.ANSWER_HEADROOM
     probe = ruler_gate.VT_HAYSTACK * 20
     probe_n = len(llama_server.tokenize(port, probe))
     tokens_per_sent = max(1.0, probe_n / 20.0)
-    num_noises = int(budget / tokens_per_sent)
-    sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
     questions: list[dict] = []
     for s in SPANS:
         for h in HOPS:
             questions.append({"span": s, "hops": h})
-    cuts: dict[int, int] = {s: 0 for s in SPANS}
+    # pass 1: generate every question's plants as TEXT BLOBS (chain
+    # links, decoy chain, gate sentences), per question, per span
     d_counter = 0
+    span_blobs: dict[int, list[list[str]]] = {s: [] for s in SPANS}
     for qi, q in enumerate(questions):
         s = q["span"]
-        limit = max(ruler_gate.VT_NAME_LEN, int(s / tokens_per_sent))
-        sub = min(limit, len(sentences))
         chain_len = q["hops"] + 1
         names: list[str] = []
         while len(names) < chain_len:
@@ -608,64 +614,65 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
             delta = mul * gate_val * rng.choice((1, -1))
             values.append(values[-1] + delta)
             sign = "+" if delta >= 0 else "-"
-            chain.append(
-                f"VAR {names[j + 1]} = VAR {names[j]} {sign} {mul} x {dname}"
-            )
+            chain.append(f"VAR {names[j + 1]} = VAR {names[j]} {sign} {mul} x {dname}")
             gate_specs.append(
-                {
-                    "dname": dname,
-                    "riddle": riddle.format(n=n_small),
-                    "gate_val": gate_val,
-                    "mul": mul,
-                    "sign": sign,
-                }
+                {"dname": dname, "riddle": riddle.format(n=n_small),
+                 "gate_val": gate_val, "mul": mul, "sign": sign}
             )
-        positions = sorted(rng.sample(range(sub), chain_len))
-        for pi, j in zip(positions, range(chain_len), strict=True):
-            sentences.insert(pi + j, chain[j])
-        # decoy chain: same-length, edit-distance-1 names, plausible
-        # values, planted right AFTER the real chain's LAST link (adjacent
-        # by construction - the near-miss K-stressor). Anchored at the
-        # DEEPEST link so the decoy never lands beyond the region.
         decoy_names = [_edit_distance_one(n, rng) for n in names]
         dv = rng.randint(10000, 99999)
         decoy = [f"VAR {decoy_names[0]} = {dv}"]
         for j in range(q["hops"]):
             dmul = rng.randint(100, 999)
-            decoy.append(
-                f"VAR {decoy_names[j + 1]} = VAR {decoy_names[j]} + {dmul}"
-            )
-        base_pos = positions[-1] + chain_len
-        for j in range(chain_len):
-            sentences.insert(base_pos + j, decoy[j])
-        # gates: one riddle sentence per link, scattered AFTER the decoy
-        # but INSIDE the cut the question will present (found by position,
-        # not adjacency - selection under distance)
-        gate_end = base_pos + chain_len
-        for gspec in gate_specs:
-            gpos = gate_end + rng.randint(1, max(2, sub // 8))
-            gpos = min(gpos, len(sentences))
-            sentences.insert(
-                gpos,
-                f"{gspec['dname']} is {gspec['riddle']}, which is "
-                f"{gspec['gate_val']}",
-            )
-            gate_end = gpos + 1
-        # the cut must cover EVERYTHING this question planted: chain,
-        # decoy, gates - the deepest insertion plus margin, or the
-        # prefix would orphan the gates (the v7.2 question bug's
-        # corpus-side twin, caught by the invariant check before burn)
-        deepest = gate_end + 1
-        cuts[s] = max(cuts[s], deepest + 4)
+            decoy.append(f"VAR {decoy_names[j + 1]} = VAR {decoy_names[j]} + {dmul}")
+        gates_text = [
+            f"{g['dname']} is {g['riddle']}, which is {g['gate_val']}"
+            for g in gate_specs
+        ]
+        # the blob: chain links spread with noise gaps, then the decoy
+        # adjacent, then the gates scattered with small noise gaps -
+        # one question's complete plant, in reading order
+        blob: list[str] = []
+        for j, link in enumerate(chain):
+            blob.append(link)
+            blob.append(ruler_gate.VT_HAYSTACK)
+        for link in decoy:
+            blob.append(link)
+        blob.append(ruler_gate.VT_HAYSTACK)
+        for g in gates_text:
+            blob.append(g)
+            blob.append(ruler_gate.VT_HAYSTACK)
+        span_blobs[s].append(blob)
         questions[qi] = {
-            **q,
-            "names": names,
-            "value": str(value),
-            "values": [str(v) for v in values],
-            "gates": gate_specs,
+            **q, "names": names, "value": str(value),
+            "values": [str(v) for v in values], "gates": gate_specs,
         }
-    for s in SPANS:
-        cuts[s] = min(cuts[s] + 16, len(sentences))
+    # pass 2: compose the corpus - per span, the band holds noise +
+    # every question's blob interleaved with noise; deeper spans
+    # append after shallower (nested cuts by construction)
+    sentences: list[str] = []
+    cuts: dict[int, int] = {}
+    for s in sorted(SPANS):
+        target = max(int(s / tokens_per_sent), 1)
+        band: list[str] = []
+        for blob in span_blobs[s]:
+            band.extend(blob)
+        # pad the band with noise to the span's sentence budget
+        while len(band) < target:
+            band.append(ruler_gate.VT_HAYSTACK)
+        # interleave: shuffle noise positions but keep each blob's
+        # internal order (chains read in order, decoys adjacent, gates
+        # scattered by the blob's noise gaps) - place blobs at seeded
+        # positions inside the band
+        composed: list[str] = [ruler_gate.VT_HAYSTACK] * max(target, len(band))
+        cursor = 0
+        for blob in span_blobs[s]:
+            gap = rng.randint(1, max(2, (len(composed) - len(band)) // max(len(span_blobs[s]), 1)))
+            cursor = min(cursor + gap, max(len(composed) - len(blob), 0))
+            composed[cursor : cursor + len(blob)] = blob
+            cursor += len(blob)
+        sentences.extend(composed)
+        cuts[s] = len(sentences)
     return {
         "sentences": sentences,
         "questions": questions,
