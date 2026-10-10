@@ -2390,3 +2390,37 @@ RUN CONVENTIONS: fresh state (the v7.1 convention) - state/
 benchmark-state-v8-2gib.json - so the 4-GiB table stands as its
 tier's historical answer; --v7-multi-arm (greedy/stingy/random
 in one cell record); BUDGET_GIB = 2.0 does the re-planning.
+
+
+## Addendum 220 - the thinking discovery; the 2-GiB study holds; the speed picture completes
+
+THE AUTHOR'S DIAGNOSIS (2026-10-11): "I think the issue is thinking!
+Some thinking takes thousands of tokens while the answers are
+normal sized. We didn't disable thinking in Open WebUI." The
+interactive slowdown (217) is REATTRIBUTED: the dominant per-turn
+cost was HIDDEN REASONING TOKENS - generated at full depth cost
+(each reading the whole KV), growing the cache for later turns,
+and inflating the re-prefill risk, all invisible in the UI.
+
+THE RULINGS, registered:
+- INTERACTIVE: thinking stays ENABLED in Open WebUI but CAPPED
+(the author: "set reasoning to a few tokens"), the cap sized by
+the measured t/s-at-context from llama-bench - the thinking budget
+buys quality at the depth-priced token rate, and the user sees
+exactly what that costs.
+- BENCHMARK: v7.2 runs THINKING DISABLED - the cells measure reach
+per answer token; hidden reasoning is the interactive tier's
+informed choice (the session-45 speed-gate ruling: thinking is
+measured via reasoning_content, never gated).
+- THE 2-GiB STUDY HOLDS (the author: "Let's hold the 2gb study") -
+the gated-chain field run waits until the thinking confound is
+understood; the pilot's KV verdict is unaffected (its answers are
+logged raw; thinking would appear in them).
+
+THE SPEED PICTURE, complete (the author's "1 tok/s at 128k reads
+128k tok/s" insight): a session pays THREE depth-scaled terms -
+prefill (quadratic, cold-start), generation (linear per token,
+the full-cache read), and now THINKING (a multiplier on
+generation: N hidden tokens, each at full depth cost). The
+llama-bench sweep (pp and tg vs -p context) measures the first
+two on the T14s; the thinking multiplier is set by the cap.
