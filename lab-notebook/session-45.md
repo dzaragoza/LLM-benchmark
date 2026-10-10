@@ -2165,3 +2165,42 @@ under distance makes the cache quality visible. If STILL flat,
 the finding is that KV quantization on this model is robust even
 under adversarial selection - a strong negative result, published
 as such.
+
+
+## Addendum 213 - the speed gate's blind spot found: prefill, not t/s
+
+THE AUTHOR'S DISCOVERY (2026-10-10, from manual Open WebUI use of the
+champion on a different machine): "with large context t/s doesn't
+matter. Our speed gate is very wrong. We need to focus on prefill
+time. The champion is unusable in the recommended machine BW!"
+
+THE ANALYSIS, on record: the speed gate (protocol v2, session 27)
+measures WORST-TURN w/s against the reader anchor - a GENERATION
+metric. The depth-prefill blob rides INSIDE the history with
+cache_prompt retention, so the blob's prefill cost is paid ONCE and
+never re-measured; the gate never sees a COLD prefill at depth. But
+a real user's first message at 131k context pays the full prefill
+bill: on the 4-GiB-class recommendation (the ~75%-efficiency BW,
+~76.5 GiB/s effective), prefilling 131,072 tokens is BANDWIDTH-
+BOUND: 131072 tok x ~1 byte/tok (Q8_0-ish mixed) / 76.5 GiB/s is
+seconds - but the REAL number the author observed is far worse,
+consistent with compute-bound prefill on an iGPU with modest TOPS
+plus attention passes. THE GATE'S VERDICT IS UNMOORED FROM THE
+USER'S FIRST LATENCY: a config can pass the reader guarantee and
+still take an unusable wall time to first token at depth.
+
+THE RULING, registered: the gate must measure and gate COLD PREFILL
+TIME AT DEPTH - the first-token latency a real user pays when the
+prompt cache is empty - alongside the existing reader guarantee.
+The author is measuring lower-ctx points now to map the prefill
+curve; the gate's new parameter(s) (a first-token time line at the
+recommended depth) are pending those measurements.
+
+CAVEAT, honestly registered: the author's slow observation was on
+a DIFFERENT machine (the Windows box, possibly CPU-offloaded or
+different BW class) - the champion's own certification on the
+reference machine measured it pass; the reference-machine prefill
+number at 131k is the one that decides whether the RECOMMENDATION
+is wrong or the author's test box is. The measurement plan: prefill
+wall time vs ctx (8k/16k/32k/65k/131k) on the reference machine,
+cold cache, same config as the champion cell.
