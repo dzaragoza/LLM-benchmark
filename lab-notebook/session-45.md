@@ -1808,3 +1808,55 @@ magnitude (small, keeping values in 5-6 digits); (4) the credit rule
 calibration - the difficulty-collapse risk the author flagged for D
 applies to B too; a pilot cell on the champion grades it before the
 field rerun.
+
+
+## Addendum 203 - option B's design spec (the author's five rulings)
+
+THE FIVE RULINGS, registered verbatim in substance:
+1. DENSITY: every link. "Each gain is independent. We ensure that
+   the answer was correct both by arithmetic and chain following."
+2. OP SET: addition only - "plus and minus are addition of
+   positive and negative numbers, so I prefer that" - deltas carry
+   BOTH SIGNS, expressed as additions of signed numbers. No
+   multiplication.
+3. DELTA MAGNITUDE: "larger numbers is better so the quant
+   precision is exercised harder. But I don't have a clear
+   criteria." PROPOSAL (registered, graded at the pilot): root
+   value 5 digits as now; deltas drawn 3-4 digits with both signs
+   - large enough that intermediate values stay 5-6 digits and a
+   q4_0 rounding error moves a value by more than the scoring
+   tolerance, small enough that the arithmetic stays exact in
+   fp16 range.
+4. CREDIT: PARTIAL. "Can we score partial values? Expecting the
+   chain to be followed to the end is too hard." The credit is the
+   fraction of the chain's (name, value) pairs reported with the
+   CORRECT value - a wrong value on a correctly-named variable
+   earns nothing for that pair (arithmetic is part of the reach
+   now, addendum 202).
+5. PILOT: yes - one champion cell before the field rerun, grading
+   the difficulty shift; density/delta dialed back if the score
+   collapses.
+
+THE CORPUS CHANGE (breaks seed-1 and 11/12/13, deliberately -
+addendum 202's compatibility overrule): the chain's links stop
+being aliases. VAR A = <root>; each subsequent link is
+VAR B = VAR A + <delta> with delta a seeded signed number. Every
+variable in a chain now holds a DISTINCT value.
+
+THE QUESTION/ANSWER FORMAT (the one open decision, presented for
+confirmation): with distinct per-link values the "who holds
+{query}" question degenerates (each name has a unique value - a
+lookup, not a trace). The proposed shape: the prompt presents the
+chain region as now and asks for the chain's variables WITH their
+values - "Report each variable in the chain and the value it
+holds, as NAME = VALUE pairs, in order." The answer format widens
+from names-only to pairs; partial credit per ruling 4 counts a
+pair only when the value is exact (which forces the model to
+trace and compute through every link - the quant stress the
+design wants). The scorer grades name-located, value-exact pairs.
+
+WHAT STAYS: the span-band structure, the per-grade averaging, the
+single score, the seeding discipline, the closed-form budget
+gates, the arms, the descending-stop rule. What changes is the
+chain grammar, the question, the answer pattern, and the credit
+rule - a v7.2 corpus, run under the same machinery.
