@@ -2011,3 +2011,27 @@ synthesized - seeded, closed-form, no external corpus - vs real ARC
 extracts); gate difficulty calibration (pilot-first, addendum 203's
 discipline); chain lengths (the cascade needs long chains to
 amplify - the hops ladder already runs to 32).
+
+
+## Addendum 209 - the gated chain's first two rulings
+
+RULING 1 (gate source): SYNTHETIC, ARC-inspired, not ARC directly -
+procedurally generated, seeded, closed-form, no external corpus or
+licensing dependency. The corpus discipline (byte-stable, citable,
+reproducible) carries over unchanged.
+
+RULING 2 (gate difficulty): agreed with the geometric-difficulty
+framing, with the author's ARC observation on record: "the
+difficulty is geometric, every step of the chain is harder to
+reach, we observed it in ARC, the score is not linear but
+exponential. So easy questions in a chain should not degrade the
+final score." DESIGN CONSEQUENCE: the gates must be EASY enough that
+a healthy model resolves them near-perfectly - the cascade should
+attribute failure to the CONFIG (quant noise), not to gate
+difficulty. A gate pass rate of ~100% at f16 is the calibration
+target; separation then comes only from quant degradation breaking
+gates that healthy configs pass. If gates are hard enough to fail
+at f16, they must be simplified (the difficulty lives in the chain
+depth, never in the gate).
+
+RULING 3 (chain lengths): still to be determined.
