@@ -1897,3 +1897,28 @@ THE VALUE TABLE, FINAL (addendum 199's deliverable):
 PRACTITIONER CONFIG (Q1, final pending the speed gate): Qwen3.5-2B
 @131k, Q8_0 weights, KV at whatever fits - q8_0 by convention;
 the freed budget vs the f16 KV cell is real headroom.
+
+
+## Addendum 205 - the Q3 finding (the benchmark cannot see K/V) and the crash fix
+
+THE AUTHOR'S READING, registered: "In v7 the collapse of kv cache
+indicates we need a better benchmark that can differentiate better
+k and v quants." This is Q3's headline finding, now on record: the
+v7.1 reach task is KV-quant-blind (addendum 204) not because K/V
+quants do not matter, but because THE TASK cannot see them - value
+tracing tolerates cache quantization at every rung. The chainarith
+grammar (v7.2, addendum 202/203) is the first purpose-built answer:
+carrying exact 5-6 digit values through degraded caches into exact
+pair answers is precisely the sensitivity the reach task lacks. The
+v7.2 pilot now doubles as the Q3 calibration: if the pair task
+restores a K/V signal on the same cells where v7.1 read ~0, the
+benchmark improvement is measured, not assumed.
+
+THE CRASH, root-caused: the probe-summary print loop unpacked every
+probe_spec entry as a 2-tuple (fam, ctx); the explicit-config spec
+shape is a 3-tuple (fam, ctx, cfg) - the pilot command with
+:Q8_0-q8_0-q8_0 crashed the summary AFTER the run completed.
+Consequence: the pilot's measurements may exist on disk even
+though the crash fired (the per-config record saves before the
+summary). Fixed: the summary unpacks positionally. The pilot rerun
+resumes - any already-measured (config, seed) records are kept.

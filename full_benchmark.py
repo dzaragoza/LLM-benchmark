@@ -605,7 +605,8 @@ def _run(args: argparse.Namespace) -> None:
             print()
             print("=" * 60)
             stamp("V7 AXIS PROBE SUMMARY")
-            for fam, ctx in probe_spec:
+            for spec_cell in probe_spec:
+                fam, ctx = spec_cell[0], spec_cell[1]
                 pdir = ((state["families"].get(fam) or {}).get("probe") or {}).get(str(ctx)) or {}
                 if not pdir:
                     continue
