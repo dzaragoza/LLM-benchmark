@@ -461,6 +461,22 @@ def build_parser() -> argparse.ArgumentParser:
         "arm's config and score stored in the same cell record",
     )
     ap.add_argument(
+        "--v7-multi-arm",
+        action="store_true",
+        help="v7: measure all three allocation policies per cell (addendum 166) - "
+        "greedy first, then stingy/random only where their config differs; every "
+        "arm's config and score stored in the same cell record",
+    )
+    ap.add_argument(
+        "--v7-probe-axes",
+        default=None,
+        help="v7: the axis probe (addendum 196) - measure the config neighborhood "
+        "(base + each axis one rung down + the pairwise downs) with n=3 repeat "
+        "corpora on these cells, comma-separated family:ctx pairs. Results land "
+        "under families/<fam>/probe/<ctx>/, apart from the v7 table. "
+        "E.g. --v7-probe-axes Qwen3.5-2B:131072",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -554,6 +570,47 @@ def _run(args: argparse.Namespace) -> None:
                 fam, ctx = pair.rsplit(":", 1)
                 out.append((fam.strip(), int(ctx)))
             return out
+
+        if args.v7_probe_axes:
+            from bench.v7 import probe_axes
+
+            probe_spec = []
+            for pair in args.v7_probe_axes.split(","):
+                fam, ctx = pair.rsplit(":", 1)
+                probe_spec.append((fam.strip(), int(ctx)))
+            probe_results = probe_axes(
+                args.models_dir,
+                state,
+                args.state_file,
+                state.get("ladder_port", 8210),
+                probe_spec,
+                dry_run=args.dry_run,
+                budget_gib=args.v7_budget_gib or BUDGET_GIB,
+                on_model_commit=None
+                if (args.no_git or args.dry_run)
+                else partial(v7_model_commit, args),
+            )
+            state["probe"] = probe_results
+            save_state(args.state_file, state)
+            print()
+            print("=" * 60)
+            stamp("V7 AXIS PROBE SUMMARY")
+            for fam, ctx in probe_spec:
+                pdir = ((state["families"].get(fam) or {}).get("probe") or {}).get(str(ctx)) or {}
+                if not pdir:
+                    continue
+                print(f"  {fam} ctx={ctx}:")
+                for key, rec in sorted(pdir.items(), key=lambda kv: -(kv[1].get("mean_score") or 0)):
+                    if "mean_score" in rec:
+                        print(
+                            f"    {key}: mean {rec['mean_score']} "
+                            f"(per-seed {rec.get('scores')}) est {rec.get('est_gib')} GiB"
+                        )
+            if not args.no_git:
+                tee_output.uninstall()
+                git_tail(args)
+            stamp("probe complete")
+            return
 
         results = certify_v7(
             args.models_dir,

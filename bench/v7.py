@@ -144,6 +144,35 @@ CORPUS_SEED = 1
 # addendum 150: the random climb's rng seed - registered so the
 # policy is reproducible. Seeded per (family, ctx) via params.
 ALLOC_RANDOM_SEED = 7
+# addendum 150: the random climb's rng seed - registered so the
+# policy is reproducible. Seeded per (family, ctx) via params.
+ALLOC_RANDOM_SEED = 7
+
+# addendum 196: the axis probe's repeat corpora - three seeds, one
+# corpus each, so a probe score is the mean over n=3 (the n=1 noise
+# confession is the thing the probe exists to kill). The seeds are
+# registered constants, not run-time choices.
+PROBE_CORPUS_SEEDS = [1, 2, 3]
+
+# addendum 196: the probe's config set, derived per cell - the base
+# (measured) config plus each axis stepped ONE rung down the ladder,
+# plus the pairwise down-steps. For the champion @131k (base
+# Q8_0/f16/f16) this yields exactly the pre-registered six:
+# base, w-down, K-down, V-down, KV-down, w+KV-down.
+def probe_configs(wq: str, kq: str, vq: str) -> list[tuple[str, str, str]]:
+    wl = W_LADDER
+    kl = KV_QUANT_LADDER
+    wi = wl.index(wq)
+    ki = kl.index(kq)
+    vi = kl.index(vq)
+    cfgs = [(wq, kq, vq)]
+    w1 = wl[max(wi - 1, 0)]
+    k1 = kl[max(ki - 1, 0)]
+    v1 = kl[max(vi - 1, 0)]
+    for c in ((w1, kq, vq), (wq, k1, vq), (wq, kq, v1), (wq, k1, v1), (w1, k1, v1)):
+        if c not in cfgs:
+            cfgs.append(c)
+    return cfgs
 # (upstream). Session 44 addenda 120/122/123/143: the author
 # rulings - 10x easier (K 20 -> 2), prefill-matched counts, the
 # 2k span dropped, then K removed outright. A cell is
@@ -745,6 +774,144 @@ def corpus_from_artifact(port: int) -> dict:
     with open(CORPUS_ARTIFACT, "w", encoding="utf-8") as f:
         json.dump({"grid": grid, "corpus": corpus}, f)
     return corpus
+
+
+def probe_axes(
+    models_dir: str,
+    state: dict[str, Any],
+    state_path: str,
+    port: int,
+    probe_cells: list[tuple[str, int]],
+    dry_run: bool = False,
+    budget_gib: float = BUDGET_GIB,
+    on_model_commit: Any = None,
+) -> list[dict[str, Any]]:
+    """Addendum 196: the axis probe - one family/cell measured across
+    its config neighborhood: the base (measured) config plus each axis
+    stepped one rung down, plus the pairwise down-steps, on n=3 repeat
+    corpora (PROBE_CORPUS_SEEDS). Results land under
+    families/<fam>/probe/<ctx>/<wq-kq-vq> - a NAMESPACE APART from v7,
+    so the v7.1 table is never contaminated by probe records. The
+    probe is the expensive experiment; it runs only on cells the
+    author names (--v7-probe-axes family:ctx,...)."""
+    from bench.state_store import save_state
+
+    results: list[dict[str, Any]] = []
+    corpora: dict[int, dict] = {}
+    for fam, ctx in probe_cells:
+        fst = state["families"].setdefault(fam, {})
+        base = (fst.get("v7") or {}).get(str(ctx)) or {}
+        if base.get("score") is None:
+            print(f"probe: {fam} ctx={ctx}: no measured base cell - skipped")
+            continue
+        cfgs = probe_configs(base["wq"], base["kq"], base["vq"])
+        print(
+            f"=== probe {fam} ctx={ctx}: base {base['wq']}/{base['kq']}/"
+            f"{base['vq']} (score {base['score']}), {len(cfgs)} configs x "
+            f"{len(PROBE_CORPUS_SEEDS)} repeats"
+        )
+        if dry_run:
+            for wq, kq, vq in cfgs:
+                print(f"  plan: probe {fam} ctx={ctx} {wq}/{kq}/{vq}")
+            results.append({"family": fam, "ctx": ctx, "probe": [list(c) for c in cfgs]})
+            continue
+        repo = registry_data.ROSTER.get(fam, fam)
+        famdir = os.path.join(models_dir, fam)
+        results_dir = os.path.join(models_dir, "tournament-results", fam)
+        os.makedirs(results_dir, exist_ok=True)
+        pdir = fst.setdefault("probe", {})
+        for wq, kq, vq in cfgs:
+            key = f"{wq}-{kq}-{vq}"
+            stored = (pdir.get(str(ctx)) or {}).get(key)
+            if stored is not None and stored.get("mean_score") is not None:
+                print(f"  {key}: already probed (mean {stored['mean_score']})")
+                results.append({"family": fam, "ctx": ctx, "cfg": key, **stored})
+                continue
+            gguf = _acquire_missing_model(repo, fam, famdir, wq, state, False)
+            if not gguf:
+                results.append({"family": fam, "ctx": ctx, "cfg": key, "error": "acquire"})
+                continue
+            log_path = os.path.join(
+                results_dir, f"{fam}-ctx{ctx}-probe-{key}-server.log"
+            )
+            extra = ["-c", str(ctx), "--parallel", "1"]
+            if kq != "f16" or vq != "f16":
+                extra += ["-fa", "on", "--cache-type-k", kq, "--cache-type-v", vq]
+            proc, healthy = llama_server.start_server(
+                gguf, port=port, extra_args=extra, log_path=log_path
+            )
+            try:
+                if not healthy or not llama_server.wait_healthy(port, proc=proc):
+                    results.append(
+                        {"family": fam, "ctx": ctx, "cfg": key, "error": "server"}
+                    )
+                    continue
+                breakdown = llama_server.memory_breakdown_gib(log_path)
+                scores = []
+                per_seed = {}
+                for seed in PROBE_CORPUS_SEEDS:
+                    if seed not in corpora:
+                        corpora[seed] = build_corpus(port, seed=seed)
+                    corpus = corpora[seed]
+                    try:
+                        preflight_template_sanity(port)
+                    except TemplateMalfunction as e:
+                        results.append(
+                            {"family": fam, "ctx": ctx, "cfg": key,
+                             "error": f"template_malfunction: {e}"}
+                        )
+                        break
+                    answers_path = os.path.join(
+                        results_dir,
+                        f"{fam}-ctx{ctx}-probe-{key}-seed{seed}-answers.jsonl",
+                    )
+                    try:
+                        rec = run_cell(port, corpus, ctx, answers_path=answers_path)
+                    except BudgetExceeded as e:
+                        results.append(
+                            {"family": fam, "ctx": ctx, "cfg": key, "error": f"budget: {e}"}
+                        )
+                        break
+                    scores.append(rec["score"])
+                    per_seed[seed] = rec
+                if len(scores) < len(PROBE_CORPUS_SEEDS):
+                    continue
+                mean = round(sum(scores) / len(scores), 3)
+                if breakdown is not None:
+                    devs = breakdown.get("devices") or {}
+                    v = devs.get("Vulkan0") or {}
+                    gpu_gib = (
+                        (v.get("model_gib") or 0)
+                        + (v.get("context_gib") or 0)
+                        + (v.get("compute_gib") or 0)
+                    ) if v else breakdown.get("total_gib")
+                    if gpu_gib is not None and gpu_gib > budget_gib:
+                        results.append(
+                            {"family": fam, "ctx": ctx, "cfg": key,
+                             "error": f"budget: measured GPU {gpu_gib:.2f} GiB"}
+                        )
+                        continue
+                rec_out = {
+                    "wq": wq, "kq": kq, "vq": vq,
+                    "mean_score": mean,
+                    "scores": scores,
+                    "est_gib": round(_alloc_total(
+                        fam, registry_data.params_b(fam) or 0.0, family_geometry(fam),
+                        wq, kq, vq, ctx
+                    ) or 0.0, 2),
+                }
+                print(f"  {key}: mean {mean} (per-seed {scores})")
+                pdir[str(ctx)] = {**(pdir.get(str(ctx)) or {}), key: rec_out}
+                save_state(state_path, state)
+                results.append({"family": fam, "ctx": ctx, "cfg": key, **rec_out})
+            finally:
+                llama_server.stop_server(proc, port)
+        if on_model_commit is not None:
+            try:
+                on_model_commit(results)
+            except Exception as e:
+                print(f"  model-commit failed (ignored): {e}")
+    return results
 
 
 def certify_v7(
