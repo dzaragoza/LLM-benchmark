@@ -1748,3 +1748,26 @@ sensitivity (does the benchmark exercise every parameter - the
 weights axis is exercised hard, the KV axes are exercised at all
 only because reach is KV-insensitive), Q4 the optimal ctx (the
 current per-band scoring already answers it; sharper from Q2+Q3).
+
+
+## Addendum 201 - the deep-drop prediction and the ladder-collapse proposal
+
+THE AUTHOR'S PREDICTION, registered before the four deep-drop cells
+(2026-10-10, in flight): "q8 vs f16 minimal for kv too, as predicted
+by the shape of the benchmark and the conclusion for model quants.
+We maybe see a difference in q8 and q4, but probably minimal too."
+
+GRADED AGAINST: the four explicit probe cells (Q8_0/q4_0/f16,
+Q8_0/f16/q4_0, Q8_0/q4_0/q8_0, Q8_0/q8_0/q4_0) vs the six already
+measured, on the paired seeds 11/12/13. "Minimal" = inside the
+base spread (0.507).
+
+THE LADDER-COLLAPSE PROPOSAL, pre-registered contingent: if BOTH
+halves hold (f16->q8_0 ~0 AND q8_0->q4_0 ~0), the KV ladder's f16
+tier is DEAD WEIGHT for this benchmark - the collapse is to
+[Q4_0, Q8_0] weights x [q4_0, q8_0] KV, FOUR configs per cell
+(K=V always, the swap pairs are the only reason to split them).
+Search consequence: the config lattice per cell drops from 18 to
+4, and the climb's KV axis becomes a single binary choice. The
+champion search then reduces to (weights x ctx) - a 2D grid.
+NOT EXECUTED until the four cells land and are graded.
