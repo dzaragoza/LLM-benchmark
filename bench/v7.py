@@ -148,11 +148,14 @@ ALLOC_RANDOM_SEED = 7
 # policy is reproducible. Seeded per (family, ctx) via params.
 ALLOC_RANDOM_SEED = 7
 
-# addendum 196: the axis probe's repeat corpora - three seeds, one
-# corpus each, so a probe score is the mean over n=3 (the n=1 noise
-# confession is the thing the probe exists to kill). The seeds are
-# registered constants, not run-time choices.
-PROBE_CORPUS_SEEDS = [1, 2, 3]
+# addendum 196/197: the axis probe's repeat corpora - three DIFFERENT
+# corpora (one per seed), so a probe score is the mean over n=3 and
+# the luck factor is eliminated (the author's ruling: no re-measures
+# - seed 1, the field corpus, is EXCLUDED so every probe number comes
+# from chains never measured before; the base config is measured on
+# the new corpora as the baseline, not re-measured on the old one).
+# Registered constants, not run-time choices.
+PROBE_CORPUS_SEEDS = [11, 12, 13]
 
 # addendum 196: the probe's config set, derived per cell - the base
 # (measured) config plus each axis stepped ONE rung down the ladder,
