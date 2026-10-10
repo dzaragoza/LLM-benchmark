@@ -2077,3 +2077,33 @@ pilot at the KV-floor config (Q8_0-q4_0-q4_0) and the f16-KV
 config (Q8_0-f16-f16) under chainarith. If the pair task separates
 them where v7.1 read ~0, the benchmark now sees K/V; if still flat,
 the gated chain (208/209) is the v7.3 build.
+
+
+## Addendum 211 - the K/V sensitivity check graded: chainarith still flat on K/V; the gated chain is GO
+
+THE THREE CELLS (champion @131k, seeds 11/12/13, chainarith):
+- Q8_0/f16/f16:  4.394  [4.143, 4.023, 5.016]
+- Q8_0/q8_0/q8_0: 4.394  [4.343, 4.023, 4.816]
+- Q8_0/q4_0/q4_0: 4.262  [4.378, 4.302, 4.105]
+
+VERDICT: STILL FLAT. The full KV span (f16 -> q4_0) costs -0.13,
+inside the per-seed spread (the f16 and q8_0 cells are IDENTICAL
+to three decimals). Even exact 5-6 digit value transport through
+the caches does not separate the quants on this model at this
+cell. The cascade cannot amplify what the per-link stage cannot
+see: the value-transport stage is KV-robust on Qwen3.5-2B.
+
+THE IMPLICATION, registered: the Q/K/V separation cannot come from
+the transport stage alone - the missing sensitivity is in the
+SELECTION and RESOLUTION stages. The gated chain (208/209) is GO
+as the v7.3 build: its K-stressors (near-miss decoy chains,
+position-scattered delta references) attack the selection stage,
+its reasoning gates attack the resolution stage, and the cascade
+amplifies whichever stage breaks. chainarith (the transport stage)
+is confirmed as the SUBSTRATE, calibrated at the sensitive band
+(4.39/10).
+
+ALSO ON RECORD: the noise-cancellation observation - the f16 and
+q8_0 cells landing on the SAME mean (4.394) with overlapping
+per-seed ranges is a strong paired-corpus validation (the seeds
+dominate the variance, the config does not).
