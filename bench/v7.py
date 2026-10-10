@@ -553,7 +553,12 @@ def build_corpus_v72(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
 def question_prompt_v72(corpus: dict, q: dict) -> str:
     cut = corpus["cuts"][q["span"]]
     context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
-    return CHAINARITH_TEMPLATE.format(context=context, num_v=q["hops"] + 1)
+    return CHAINARITH_TEMPLATE.format(
+        context=context,
+        root=q["names"][0],
+        rootval=q["values"][0],
+        num_v=q["hops"] + 1,
+    )
 
 
 def build_corpus(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
@@ -828,8 +833,10 @@ CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
 # stays the default; the frozen suite pins it.
 CHAINARITH_TEMPLATE = (
     "[INST] Memorize and track the chain(s) of variable assignment "
-    "hidden in the following text.\n\n{context}\nQuestion: Report "
-    "each variable in the chain and the value it holds, in chain "
+    "hidden in the following text.\n\n{context}\nQuestion: One "
+    "chain begins with the assignment VAR {root} = {rootval}. "
+    "Follow that chain - and only that chain - link by link, and "
+    "report each variable in it and the value it holds, in chain "
     "order. [/INST] Answer ONLY with the {num_v} pairs as "
     "NAME = VALUE, comma-separated, and nothing else. "
 )
