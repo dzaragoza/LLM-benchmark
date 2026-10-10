@@ -2035,3 +2035,45 @@ at f16, they must be simplified (the difficulty lives in the chain
 depth, never in the gate).
 
 RULING 3 (chain lengths): still to be determined.
+
+
+## Addendum 210 - the chainarith pilot measured for real (after three plumbing bugs)
+
+THE RESULT (champion @131k, Q8_0/q8_0/q8_0, seeds 11/12/13, the
+anchored question): mean 4.394, per-seed [4.343, 4.023, 4.816].
+vs the v7.1 same-cell 6.452: the pair task costs -2.06 points.
+vs the broken eras: 0.456 (truncation+base-number scoring),
+1.096 (unanchored question, wrong-chain recitation).
+
+THE THREE BUGS, all Vibe's, on record: (1) names-sized max_tokens
+truncated pair answers mid-chain; (2) score_pairs took the base
+number in work-shown form instead of the final; (3) the question
+did not say WHICH chain - 35 chains share the corpus, so the model
+recited whatever assignments it found (its recitations were REAL
+corpus chains - retrieval worked throughout). The author's run
+patience through three broken pilots is noted with regret.
+
+WHAT THE REAL MEASUREMENT SAYS:
+- THE MODEL DOES THE ARITHMETIC. The anchored answers show exact
+  work-shown chains (TDGCB = 73402 + 9513 = 82915...), every
+  visible link computed correctly. The weights circuit carries
+  the task.
+- THE CASCADE IS REAL. found-counts fall with chain length: ~1/3
+  pairs at hops=2, 2/9 at hops=8, 1/17, 1/33 - the first-error
+  depth statistic is measurable and it degrades geometrically,
+  exactly the addendum-208 cascade argument.
+- THE DIFFICULTY IS RIGHT FOR THE GATED CHAIN: 4.394/10 (the pair
+  task halves the v7.1 score at the same cell) sits in the
+  sensitive band - hard enough that degradation has room to show,
+  easy enough that the champion still earns half the points. The
+  easy-gates ruling (209) plus this calibration means chainarith
+  is the right substrate; the gates add the reasoning stage on
+  top without re-tuning the arithmetic.
+- NOISE: per-seed spread 0.79 on a 4.39 mean (18%) - tighter than
+  v7.1's relative spread. The paired-corpus design holds.
+
+NEXT (the author's sequence): the K/V sensitivity check - the same
+pilot at the KV-floor config (Q8_0-q4_0-q4_0) and the f16-KV
+config (Q8_0-f16-f16) under chainarith. If the pair task separates
+them where v7.1 read ~0, the benchmark now sees K/V; if still flat,
+the gated chain (208/209) is the v7.3 build.
