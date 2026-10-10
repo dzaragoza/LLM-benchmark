@@ -1561,3 +1561,68 @@ at 262k scores 6.81 - the deepest rung is arm-dependent, so the
 champion's certification and the page's final argmax wait on the
 author's tie-break between the 131k greedy peak and the stingy 256k
 arm.
+
+
+## Addendum 196 - the quant cost-benefit rule scoped, the probe design pre-registered, and the 8-hour budget plan
+
+THE TAU RULE, SCOPED (from the addendum-195 discussion): a cost-benefit
+rule for a climb rung - benefit = the new band's score (band
+decomposition), cost = the GiB-equivalent of bits shaved per axis
+(closed-form ladder constants: Q4_0=4.5, Q8_0=8.5, f16=16 bpw), accept
+while benefit > tau x cost. The FIELD VERDICT from the 35 multi-arm
+pairs: NO GLOBAL TAU EXPLAINS EVERY ARM. The arms never isolate one
+axis (zero single-axis pairs in 94 cells); the same-size multi-axis
+drop produces every sign of delta-score across families (champion
+stingy +0.41 at 262k, Qwen3.5-0.8B stingy -1.16, Llama-3.2-1B stingy
++0.58, granite-3.3 stingy -1.16). RULING: the rule is a PER-FAMILY
+STOPPING RULE for a single climb (the champion's 131k stop holds for
+any tau >= 0.19), NOT a cross-arm or cross-family law. Registered as
+scoped; overfitting to the champion is the failure mode it guards.
+
+THE NOISE CONFESSION, on record: every cell asks 1 sample per grade
+(5 questions per cell). At n=1, arm deltas inside roughly +-0.2 are
+unattributable to physics vs sampling. Part of the tau rule's
+unexplained residual is MEASUREMENT, not quant effect.
+
+THE PROBE, PRE-REGISTERED (the author's ruling: "Let's try the probe
+on the champion"): a --v7-probe-axes mode that measures one cell's
+axis-down variants on the SAME corpus - base config plus w-only-down,
+K-only-down, V-only-down, then the pairwise drops - giving the main
+effects and interaction table for one family. Champion @131k target
+set: Q8_0/f16/f16 (base), Q4_0/f16/f16 (w), Q8_0/q8_0/f16 (K),
+Q8_0/f16/q8_0 (V), Q8_0/q8_0/q8_0 (KV), Q4_0/q8_0/q8_0 (w+KV).
+REPEATS: n=3 per grade inside probe cells (seeded, registered) -
+without this no quant conclusion is measurable; the paired same-corpus
+questions partially cancel the noise. A QUANT-SENSITIVE SIDE TASK
+(arithmetic woven into the chain) is registered as design intent
+(below); no probe result is graded until it exists and runs beside
+the reach score.
+
+THE DESCENDING-STOP SKIP RULE, PRE-REGISTERED: reach curves are
+monotone up to the peak (champion: +1.03/+1.33/+1.26/+1.11 then
+-0.39), so a descending traversal (largest ctx first) may STOP at the
+first substantial decrease - the rungs below the peak only re-confirm
+what the descent already established. CAVEAT registered: at n=1 a
+single noisy decrease can trigger a false stop; the descent uses the
+same noise band (+-0.2) as the arm comparison before stopping.
+
+THE 8-HOUR BUDGET (the author's allocation ruling): the full 23-family
+run cost 6.19 h wall (94 cells, 122 timed arm-records, ~4 min/cell
+mean; champion cells: 131k ~5 min, 262k ~9.6 min/arm). Allocation plan:
+(1) champion probe, ~2.0-2.5 h (6 configs x n=3 at 131k, plus the
+262k probe cells for the stingy anomaly); (2) n=3 re-measure of the
+champion's curve, ~0.5 h; (3) the arithmetic side-task build and probe
+integration, ~1 h of measurements; (4) reserve ~4 h for the field-level
+follow-up the probe results point at. NO full-field re-run inside this
+budget.
+
+THE ARITHMETIC INTEGRATION, design ruling sought: the author wants the
+quant-sensitive side task INSIDE the existing benchmark, one-dimensional
+(a single fused score). Sketch registered: the reach chain's found
+facts feed an arithmetic step (the value chain carries a small sum -
+"VAR A = 75640 ... what is A + B?"), so the reach chain search doubles
+as the quant-sensitive probe; the fused score reports reach credit and
+arithmetic credit with a registered weight. ONE-DIMENSIONALITY NOTE:
+fusing costs the ability to read the two effects separately in the
+headline number; the per-grade records keep the decomposition. The
+exact weight and corpus changes are Daniela's ruling before build.
