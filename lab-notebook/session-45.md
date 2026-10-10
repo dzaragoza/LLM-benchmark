@@ -2107,3 +2107,61 @@ ALSO ON RECORD: the noise-cancellation observation - the f16 and
 q8_0 cells landing on the SAME mean (4.394) with overlapping
 per-seed ranges is a strong paired-corpus validation (the seeds
 dominate the variance, the config does not).
+
+
+## Addendum 212 - v7.3 pre-registered: the gated chain (gatedchain)
+
+THE BUILD, pre-registered per the pre-register-before-measuring
+discipline (addenda 208/209/211: the transport stage is KV-robust;
+the separation must come from selection + resolution):
+
+CORPUS (build_corpus_v73, seeded, closed-form, byte-stable):
+- Chains: as chainarith (anchored root, links), but each link's
+  delta is a REFERENCE: VAR B = VAR A + D<i>, NOT a literal.
+- GATES: each D<i> is defined by ONE seeded sentence elsewhere in
+  the context: "D<i> is <riddle>" where the riddle is an easy
+  ARC-inspired template with a closed-form answer (the delta):
+  e.g. "D3 is the number of legs on three spiders" (= 24),
+  "D5 is two dozen minus five" (= 19), "D9 is four quarters in
+  dollars" (= 4)... small set of seeded templates, easy by
+  construction (addendum 209: near-100% at f16; the difficulty
+  lives in the chain depth, never the gate). Deltas keep chainarith
+  magnitudes: the riddle's answer scales by a seeded multiplier
+  (x100..x999) so values stay 4-6 digits - WAIT, scaling breaks
+  easy. RESOLVED: riddle answers are the raw small number; the
+  link applies it with a seeded factor in plain text:
+  "VAR B = VAR A + D3 hundred" is ambiguous - instead the link
+  reads "VAR B = VAR A + 100 x D3" (explicit, closed-form,
+  still one reference to resolve). Gate answer stays small and
+  easy; the arithmetic carries the magnitude.
+- DECOYS (the K-stressor): for each chain, a near-miss decoy chain
+  whose names differ from the real ones by one character (edit
+  distance 1), with its own plausible values, planted within a
+  few sentences of the real links. Softmax competition becomes
+  close by construction - K-quantization noise decides.
+- GATE PLACEMENT: each gate sentence is position-scattered away
+  from its link (the model must FIND the definition - selection
+  under distance), but inside the same span region (reachable).
+
+QUESTION: the v7.2 anchored form ("One chain begins with VAR
+{root} = {rootval}. Follow that chain - and only that chain,
+resolving each D reference - and report each variable and the
+value it holds, in chain order"). Answer format: NAME = VALUE
+pairs, work-shown tolerated, scored by score_pairs (unchanged,
+FINAL-number logic).
+
+SCORING: unchanged from chainarith - pairs correct / chain
+length, per-grade averaging, single score, no constants. The
+cascade amplifies whichever stage breaks: selection (decoys +
+scattered gates), resolution (the riddles), arithmetic, transport.
+
+PROTOCOL: the same probe machinery (--v7-grammar gatedchain),
+champion @131k pilot first: base config + the KV-floor and f16
+arms, seeds 11/12/13, graded against addendum 211's flat table
+(4.39/4.26). PREDICTION, pre-registered: the gated chain separates
+KV configs where chainarith could not - the decoy stage makes K
+matter (mis-selection -> wrong D -> cascade), and gate lookup
+under distance makes the cache quality visible. If STILL flat,
+the finding is that KV quantization on this model is robust even
+under adversarial selection - a strong negative result, published
+as such.
