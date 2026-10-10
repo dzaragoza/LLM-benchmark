@@ -1699,3 +1699,52 @@ the one-rung neighborhood. The deep drops (q8_0 -> q4_0), if added
 later, extend the table one rung down the same way. Registered as the
 probe's primary readout - the per-axis value table IS the probe's
 deliverable, not a by-product.
+
+
+## Addendum 200 - the champion probe graded (addenda 198/199)
+
+THE RESULTS (Qwen3.5-2B @131k, seeds 11/12/13, means over n=3):
+
+- Q8_0/f16/q8_0 (V-down):   6.721  [6.624, 6.030, 7.508]
+- Q8_0/q8_0/q8_0 (KV-down): 6.452  [6.881, 5.642, 6.834]
+- Q8_0/q8_0/f16 (K-down):   6.451  [6.538, 5.852, 6.962]
+- Q8_0/f16/f16 (base):      6.415  [6.715, 6.208, 6.323]
+- Q4_0/q8_0/q8_0 (w+KV):    5.778  [5.572, 6.162, 5.599]
+- Q4_0/f16/f16 (w-down):    5.611  [5.467, 5.143, 6.223]
+
+ADDENDUM 198 GRADED:
+- "f16 -> q8_0 minimal": HOLDS. K -0.036, KV -0.037, both far inside
+  the base spread (0.507); the V-down delta (+0.306) is also within
+  the band. The climb's KV-f16 purchases bought nothing measurable.
+- "q8_0 -> q4_0 greater": OPEN - not in the first six (the deep-drop
+  cells were deferred by the scope ruling); the w-axis analogue
+  already shows the pattern: Q8_0 -> Q4_0 weights costs -0.80, way
+  outside the band. The weights rung is where the reach lives.
+
+THE VALUE TABLE (addendum 199), the probe inside-out:
+- weights Q4_0 -> Q8_0: +0.80 score for 0.57 est GiB = the only
+  upgrade with unambiguous value; ~1.4 points/GiB.
+- K q8_0 -> f16: -0.04 for 0.35 GiB = worthless (prediction confirmed).
+- V q8_0 -> f16: -0.31 for 0.35 GiB = worse than worthless on this
+  corpus draw (inside the band, but consistently non-positive).
+- KV pair vs singles: the interaction is ~0 - K and V effects are
+  additive and both ~0.
+
+PRACTITIONER READ (Q1): the 128k best-config answer is Q8_0 WEIGHTS
++ q8_0 KV - the f16 KV purchases are dead weight at 131k; the freed
+0.35 GiB is real headroom. The formal argmax cell (Q8_0/f16/f16) was
+a measurement artifact of the corpus draw, not a config advantage.
+
+MEASUREMENT READ (Q2/Q3): the n=3 noise is LARGE (per-config spreads
+0.5-1.5 points) - the n=1 field table's close calls (champion 6.787
+vs stingy 6.812 at different cells) were never resolvable at n=1,
+and some arm "wins" in addendum 194 are corpus luck. The paired
+three-corpus design is what makes even these calls gradeable.
+
+THE FOUR STUDY QUESTIONS, registered (the author's framing): Q1
+practical (best config for the 4 GiB class), Q2 searching (fastest
+route to the winner - arms and n=1 were the first shortcuts), Q3
+sensitivity (does the benchmark exercise every parameter - the
+weights axis is exercised hard, the KV axes are exercised at all
+only because reach is KV-insensitive), Q4 the optimal ctx (the
+current per-band scoring already answers it; sharper from Q2+Q3).
