@@ -569,8 +569,14 @@ def _run(args: argparse.Namespace) -> None:
 
             probe_spec = []
             for pair in args.v7_probe_axes.split(","):
-                fam, ctx = pair.rsplit(":", 1)
-                probe_spec.append((fam.strip(), int(ctx)))
+                parts = pair.split(":")
+                if len(parts) == 3 and "-" in parts[2]:
+                    fam, ctx, cfg = parts
+                    wq, kq, vq = cfg.split("-")
+                    probe_spec.append((fam.strip(), int(ctx), (wq, kq, vq)))
+                else:
+                    fam, ctx = pair.rsplit(":", 1)
+                    probe_spec.append((fam.strip(), int(ctx)))
             probe_results = probe_axes(
                 args.models_dir,
                 state,

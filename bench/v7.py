@@ -784,7 +784,7 @@ def probe_axes(
     state: dict[str, Any],
     state_path: str,
     port: int,
-    probe_cells: list[tuple[str, int]],
+    probe_cells: list[tuple[str, int]] | list[tuple[str, int, tuple[str, str, str]]],
     dry_run: bool = False,
     budget_gib: float = BUDGET_GIB,
     on_model_commit: Any = None,
@@ -801,13 +801,20 @@ def probe_axes(
 
     results: list[dict[str, Any]] = []
     corpora: dict[int, dict] = {}
-    for fam, ctx in probe_cells:
+    for spec_cell in probe_cells:
+        if len(spec_cell) == 3:
+            fam, ctx, explicit_cfgs = spec_cell
+        else:
+            fam, ctx = spec_cell
+            explicit_cfgs = None
         fst = state["families"].setdefault(fam, {})
         base = (fst.get("v7") or {}).get(str(ctx)) or {}
         if base.get("score") is None:
             print(f"probe: {fam} ctx={ctx}: no measured base cell - skipped")
             continue
-        cfgs = probe_configs(base["wq"], base["kq"], base["vq"])
+        cfgs = (
+            [tuple(explicit_cfgs)] if explicit_cfgs else probe_configs(base["wq"], base["kq"], base["vq"])
+        )
         print(
             f"=== probe {fam} ctx={ctx}: base {base['wq']}/{base['kq']}/"
             f"{base['vq']} (score {base['score']}), {len(cfgs)} configs x "
