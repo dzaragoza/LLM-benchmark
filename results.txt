@@ -68066,3 +68066,95 @@ Traceback (most recent call last):
     raise ValueError(f"HTTP {e.code} from the server: {body.decode('utf-8', 'replace')}") from e
 ValueError: HTTP 400 from the server: {"error":{"code":400,"message":"request (133762 tokens) exceeds the available context size (131072 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":133762,"n_ctx":131072}}
 
+
+===== 2026-10-10T20:30:44 | full_benchmark.py --task v7 --v7-families 23 --v7-probe-axes Qwen3.5-2B:131072:Q8_0-q8_0-q8_0,Qwen3.5-2B:131072:Q8_0-q4_0-q4_0,Qwen3.5-2B:131072:Q8_0-f16-f16 --v7-grammar gatedchain =====
+=== probe Qwen3.5-2B ctx=131072: base Q8_0/f16/f16 (score 6.787), 1 configs x n=3 corpora
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/ruler_gate.py", line 307, in ask
+    data = llama_server.post_json(port, "/v1/chat/completions", payload)
+  File "/home/daniela/technical_reports/LLM-benchmark/infra/llama_server.py", line 250, in post_json
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 495, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.13/urllib/request.py", line 604, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.13/urllib/request.py", line 533, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 466, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.13/urllib/request.py", line 613, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 521, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 590, in _run
+    probe_results = probe_axes(
+        args.models_dir,
+    ...<9 lines>...
+        else partial(v7_model_commit, args),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 1200, in probe_axes
+    rec = run_cell(port, corpus, ctx, answers_path=answers_path)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 901, in run_cell
+    answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
+  File "/home/daniela/technical_reports/LLM-benchmark/ruler_gate.py", line 314, in ask
+    raise ValueError(f"HTTP {e.code} from the server: {body.decode('utf-8', 'replace')}") from e
+ValueError: HTTP 400 from the server: {"error":{"code":400,"message":"request (132482 tokens) exceeds the available context size (131072 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":132482,"n_ctx":131072}}
+
+[2026-10-10T20:36:51] CRASH DETECTED - committing artifacts before exit
+
+===== CRASH 2026-10-10T20:36:51 =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/ruler_gate.py", line 307, in ask
+    data = llama_server.post_json(port, "/v1/chat/completions", payload)
+  File "/home/daniela/technical_reports/LLM-benchmark/infra/llama_server.py", line 250, in post_json
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 495, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.13/urllib/request.py", line 604, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.13/urllib/request.py", line 533, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/lib64/python3.13/urllib/request.py", line 466, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.13/urllib/request.py", line 613, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 400: Bad Request
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 521, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 590, in _run
+    probe_results = probe_axes(
+        args.models_dir,
+    ...<9 lines>...
+        else partial(v7_model_commit, args),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 1200, in probe_axes
+    rec = run_cell(port, corpus, ctx, answers_path=answers_path)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 901, in run_cell
+    answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
+  File "/home/daniela/technical_reports/LLM-benchmark/ruler_gate.py", line 314, in ask
+    raise ValueError(f"HTTP {e.code} from the server: {body.decode('utf-8', 'replace')}") from e
+ValueError: HTTP 400 from the server: {"error":{"code":400,"message":"request (132482 tokens) exceeds the available context size (131072 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":132482,"n_ctx":131072}}
+
