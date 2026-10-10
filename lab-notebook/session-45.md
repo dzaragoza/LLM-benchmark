@@ -1922,3 +1922,31 @@ Consequence: the pilot's measurements may exist on disk even
 though the crash fired (the per-config record saves before the
 summary). Fixed: the summary unpacks positionally. The pilot rerun
 resumes - any already-measured (config, seed) records are kept.
+
+
+## Addendum 206 - the V-discriminant ruling (dynamic range and the 4/8-bit frontier)
+
+THE AUTHOR'S RULING on the V-stressor design: "for V, high dynamic
+range is better, interesting points are the crossover from 4 and 8
+bit precision. Testing in the region and the frontiers should be a
+good discriminant."
+
+REGISTERED DESIGN CONSEQUENCES (pre-registered for the v7.3 battery,
+contingent on the pilot):
+- The V-grade's values deliberately span the q4_0/q8_0 precision
+  frontier: q4_0 carries a 16-level payload per block with a shared
+  fp16 scale, q8_0 carries 256 levels. The discriminant region is
+  where 16 levels stop sufficing but 256 do: values whose blocks mix
+  magnitudes (the crossover band).
+- Concrete shape (proposal, graded at the pilot): roots drawn wide
+  (4-7 digits), deltas crossing magnitude boundaries, so chain
+  blocks straddle the frontier instead of sitting in a comfortable
+  narrow band (v7.2's 5-6 digit values are deliberately kind to
+  quantization - the battery's V-grade removes the kindness).
+- The readout grades BOTH crossovers: f16 vs q8_0 (does even the
+  256-level cache lose anything on frontier values?) and q8_0 vs
+  q4_0 (does the 16-level cache collapse?).
+
+K-axis: the author asked for the detailed mechanism - delivered in
+conversation, to be registered as a design once the pilot lands and
+the battery's shape is ruled on.
