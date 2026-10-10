@@ -1642,3 +1642,29 @@ mean is NOT directly comparable to the v7 table's 6.787 (different
 corpora); the comparison that matters is WITHIN the probe (all six
 configs on the same three corpora, paired). The field table stays
 frozen as the field's own measurement.
+
+
+## Addendum 198 - the probe prediction pre-registered, and the scope ruling
+
+THE AUTHOR'S PREDICTION, registered verbatim before any probe result:
+"My prediction is the effect of going f16 to q8 will be minimal, as
+almost nobody is running f16 models. But we will see greater impact
+on q8 vs q4."
+
+GRADED AGAINST: the champion probe @131k (six configs, seeds 11/12/13,
+addenda 196/197). The prediction is quantitative in direction:
+- f16 -> q8_0 on K and/or V (the K-down, V-down, KV-down cells):
+  MINIMAL deltas vs the base - the model was never tuned for f16
+  cache precision, so losing it costs little.
+- q8_0 -> q4_0 (the deep drops, NOT in the first six - the follow-up
+  cells if the first six come back clean): GREATER impact.
+GRADING CRITERION: "minimal" = the K/V/KV one-rung deltas within the
+probe's own noise band (the per-seed spread of the base cell); if
+they clear the band, the prediction FAILS.
+
+THE SCOPE RULING, also registered: the probe runs SIX configs first -
+the neighborhood, not the full 18-cell lattice (the two-rung mixed
+drops wait). More cells are added ONLY if the six say they are needed:
+strong interactions, or clean one-rung effects that make the deep
+drops the most useful next measurement. The measurement budget goes
+to the most useful data, per the author's 8-hour allocation.
