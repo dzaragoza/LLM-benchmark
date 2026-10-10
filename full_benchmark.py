@@ -470,6 +470,16 @@ def build_parser() -> argparse.ArgumentParser:
         "E.g. --v7-probe-axes Qwen3.5-2B:131072",
     )
     ap.add_argument(
+        "--v7-grammar",
+        default="v71",
+        choices=["v71", "chainarith"],
+        help="v7: the corpus grammar (addenda 202/203) - v71 is the alias-chain "
+        "lookup (the field grammar, the frozen suite's default); chainarith is "
+        "the v7.2 grammar: every link carries a signed delta, distinct "
+        "per-link values, NAME = VALUE pair answers with exact-value partial "
+        "credit (quant-sensitive by design). Applies to the probe cells.",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -585,6 +595,7 @@ def _run(args: argparse.Namespace) -> None:
                 probe_spec,
                 dry_run=args.dry_run,
                 budget_gib=args.v7_budget_gib or BUDGET_GIB,
+                grammar=args.v7_grammar,
                 on_model_commit=None
                 if (args.no_git or args.dry_run)
                 else partial(v7_model_commit, args),
