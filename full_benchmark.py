@@ -607,7 +607,8 @@ def _run(args: argparse.Namespace) -> None:
             stamp("V7 AXIS PROBE SUMMARY")
             for spec_cell in probe_spec:
                 fam, ctx = spec_cell[0], spec_cell[1]
-                pdir = ((state["families"].get(fam) or {}).get("probe") or {}).get(str(ctx)) or {}
+                ns = "probe" if args.v7_grammar == "v71" else f"probe_{args.v7_grammar}"
+                pdir = ((state["families"].get(fam) or {}).get(ns) or {}).get(str(ctx)) or {}
                 if not pdir:
                     continue
                 print(f"  {fam} ctx={ctx}:")

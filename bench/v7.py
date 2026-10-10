@@ -918,6 +918,12 @@ def probe_axes(
         cfgs = (
             [tuple(explicit_cfgs)] if explicit_cfgs else probe_configs(base["wq"], base["kq"], base["vq"])
         )
+        # addendum 205: the probe namespace is grammar-scoped - a chainarith
+        # record is NOT the v7.1 record for the same config (the pilot run
+        # silently skipped everything because the v7.1 means were on file)
+        pdir = fst.setdefault("probe", {})
+        if grammar != "v71":
+            pdir = fst.setdefault(f"probe_{grammar}", {})
         print(
             f"=== probe {fam} ctx={ctx}: base {base['wq']}/{base['kq']}/"
             f"{base['vq']} (score {base['score']}), {len(cfgs)} configs x "
@@ -932,7 +938,6 @@ def probe_axes(
         famdir = os.path.join(models_dir, fam)
         results_dir = os.path.join(models_dir, "tournament-results", fam)
         os.makedirs(results_dir, exist_ok=True)
-        pdir = fst.setdefault("probe", {})
         for wq, kq, vq in cfgs:
             key = f"{wq}-{kq}-{vq}"
             stored = (pdir.get(str(ctx)) or {}).get(key)
