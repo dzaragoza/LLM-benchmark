@@ -1860,3 +1860,40 @@ single score, the seeding discipline, the closed-form budget
 gates, the arms, the descending-stop rule. What changes is the
 chain grammar, the question, the answer pattern, and the credit
 rule - a v7.2 corpus, run under the same machinery.
+
+
+## Addendum 204 - the deep drops graded: addendum 201 HOLDS, the ladder collapse is GO
+
+THE FOUR CELLS (champion @131k, seeds 11/12/13, vs base 6.415):
+- Q8_0/q4_0/f16:  6.332  delta -0.083   (K q8_0 -> q4_0)
+- Q8_0/f16/q4_0:  6.493  delta +0.078   (V q8_0 -> q4_0)
+- Q8_0/q4_0/q8_0: 6.767  delta +0.352   (K deep, V raised)
+- Q8_0/q8_0/q4_0: 6.655  delta +0.240   (V deep, K raised)
+
+ADDENDUM 201 GRADED: HOLDS COMPLETELY. Every KV deep-drop delta
+is inside the base spread (0.507) - q8_0 -> q4_0 on K costs -0.08,
+on V it GAINS +0.08; the deep-swap cells land at +0.24/+0.35,
+within the band on this corpus draw. Both halves of the prediction
+now measured: f16 -> q8_0 ~0 AND q8_0 -> q4_0 ~0. The reach task
+is KV-quant-BLIND on the champion at 131k, across the entire
+ladder.
+
+THE LADDER COLLAPSE (201's contingent): GO. For this benchmark the
+KV ladder's f16 tier and the K/V distinction are dead weight:
+- the config lattice per cell collapses to 4: (Q4_0|Q8_0) weights
+  x (q4_0|q8_0) KV, K=V always - the K/V swap cells never separated
+  (the field's split verdicts in addendum 194 were corpus luck).
+- the search collapses to (weights x ctx) - a 2D grid.
+CAVEAT, registered: the collapse is measured on ONE family at ONE
+ctx (the champion @131k). It is the best-measured cell in the
+study, and the champion is where the practitioner answer lives,
+but extending the collapse ruling to the whole field waits for the
+v7.2 rerun's confirmation.
+
+THE VALUE TABLE, FINAL (addendum 199's deliverable):
+- weights Q4_0 -> Q8_0: +0.80 (the only axis that matters)
+- K or V, any rung: ~0 (all ten configs' deltas inside the band,
+  except the weights runs)
+PRACTITIONER CONFIG (Q1, final pending the speed gate): Qwen3.5-2B
+@131k, Q8_0 weights, KV at whatever fits - q8_0 by convention;
+the freed budget vs the f16 KV cell is real headroom.
