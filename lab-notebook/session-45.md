@@ -1968,3 +1968,46 @@ cache in llama.cpp. The query projection is a WEIGHT MATRIX, part of
 the model weights, quantized by wq alongside every other projection.
 Its noise character is distinct from K/V cache noise and is
 detailed in conversation for the v7.3 design.
+
+
+## Addendum 208 - the gated chain (v7.3 direction): the study's goal met, the separator is next
+
+THE AUTHOR'S RULINGS: (1) the study's primary goal is MET - the
+champion (Qwen3.5-2B @131k) and the search answer (a 2D q8-vs-q4
+weights x ctx grid suffices) are in hand; (2) the wanted extension
+is "a good chain task that measures q, k, v. At least a decent
+separator"; (3) the scoring should be MORE NUANCED than v7's flat
+KV read; (4) speculation welcomed.
+
+THE GATED CHAIN, design sketch (pre-registered, not yet built):
+chainarith's links stop carrying literal deltas. Each link's delta
+is a REFERENCE the model must resolve: VAR B = VAR A + D1, where
+D1 is defined elsewhere in the context by a small ARC-like question
+(the delta IS the question's answer). To produce the correct pair
+value the model must: locate the chain link (K), read its operands
+exactly (V), locate the delta definition (K), RESOLVE the definition
+- reasoning over the weights (wq, the Q projections included) -
+then add (weights). One task, three axes, one score.
+
+THE CASCADE ARGUMENT (why chains beat independent questions for
+nuance, the author's "more nuanced" answered structurally): a wrong
+resolution at link i propagates - every downstream value is wrong.
+Score becomes a FIRST-ERROR-DEPTH statistic. Per-link reliability p
+scores ~p^L on a chain of length L vs ~p on L independent questions:
+a 5% per-link degradation costs 5% on independent items but ~80% on
+a 32-link chain. Configs that read FLAT on v7's independent grades
+separate EXPONENTIALLY on chains - the nuance is free, no fusion
+constants, partial credit = pairs correct / chain length (unchanged
+shape from chainarith).
+
+SENSITIVITY MAP (the separator's targeting):
+- wq: the delta-resolution gates + the arithmetic (the -0.80 weights
+  effect becomes a cascade cliff).
+- K: near-miss decoy chains + position-dependent delta references
+  (mis-attend -> wrong delta -> cascade).
+- V: exact value transport, frontier dynamic range (addendum 206).
+OPEN DESIGN RULINGS, pending: gate question type (procedurally
+synthesized - seeded, closed-form, no external corpus - vs real ARC
+extracts); gate difficulty calibration (pilot-first, addendum 203's
+discipline); chain lengths (the cascade needs long chains to
+amplify - the hops ladder already runs to 32).
