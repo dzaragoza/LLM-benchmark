@@ -1950,3 +1950,21 @@ contingent on the pilot):
 K-axis: the author asked for the detailed mechanism - delivered in
 conversation, to be registered as a design once the pilot lands and
 the battery's shape is ruled on.
+
+
+## Addendum 207 - the no-manual-git ruling
+
+THE AUTHOR'S RULING: "You should stop giving me no-git commands, it's
+just extra work for me to manually do git operations." Every command
+handed to the author runs WITH the git rail on (the addendum-78
+auto-commit pushes state and artifacts after each model) unless the
+author asks otherwise; --no-git is for the agent's own dry runs, not
+the author's commands. State surgery commands are a last resort and
+must come with their push included.
+
+THE Q-AXIS DISCUSSION (for the record, the author's question: "no
+idea how q affects the model"): Q is not a cache - there is no query
+cache in llama.cpp. The query projection is a WEIGHT MATRIX, part of
+the model weights, quantized by wq alongside every other projection.
+Its noise character is distinct from K/V cache noise and is
+detailed in conversation for the v7.3 design.
