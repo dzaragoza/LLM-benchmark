@@ -610,14 +610,13 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
             riddle, fn = RIDDLE_TEMPLATES[rng.randrange(len(RIDDLE_TEMPLATES))]
             n_small = rng.randint(2, 9)
             gate_val = fn(n_small)
-            mul = rng.randint(100, 999)
-            delta = mul * gate_val * rng.choice((1, -1))
+            delta = gate_val * rng.choice((1, -1))
             values.append(values[-1] + delta)
             sign = "+" if delta >= 0 else "-"
-            chain.append(f"VAR {names[j + 1]} = VAR {names[j]} {sign} {mul} x {dname}")
+            chain.append(f"VAR {names[j + 1]} = VAR {names[j]} {sign} {dname}")
             gate_specs.append(
                 {"dname": dname, "riddle": riddle.format(n=n_small),
-                 "gate_val": gate_val, "mul": mul, "sign": sign}
+                 "gate_val": gate_val, "mul": 1, "sign": sign}
             )
         decoy_names = [_edit_distance_one(n, rng) for n in names]
         dv = rng.randint(10000, 99999)
@@ -1005,14 +1004,14 @@ GATED_TEMPLATE = (
 # easy, closed-form riddle templates (addendum 209: near-100% at f16);
 # (template, answer) - the riddle's ANSWER is the D value's small core
 RIDDLE_TEMPLATES = [
-    ("the number of legs on {n} spiders", lambda n: 8 * n),
-    ("the number of wheels on {n} cars", lambda n: 4 * n),
-    ("the number of sides on {n} hexagons", lambda n: 6 * n),
-    ("the number of fingers on {n} hands", lambda n: 5 * n),
-    ("the number of eggs in {n} dozen", lambda n: 12 * n),
     ("the number of minutes in {n} hours", lambda n: 60 * n),
-    ("the number of days in {n} weeks", lambda n: 7 * n),
-    ("the number of quarters in {n} dollars", lambda n: 4 * n),
+    ("the number of seconds in {n} minutes", lambda n: 60 * n),
+    ("the number of days in {n} years", lambda n: 365 * n),
+    ("the number of seconds in {n} hours", lambda n: 3600 * n),
+    ("the number of minutes in {n} days", lambda n: 1440 * n),
+    ("the number of hours in {n} weeks", lambda n: 168 * n),
+    ("the number of seconds in {n} days", lambda n: 8640 * n),
+    ("the number of weeks in {n} years", lambda n: 52 * n),
 ]
 
 

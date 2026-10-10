@@ -2277,3 +2277,26 @@ weights axis is the one that matters and the gates now overload
 it). v7.3's carrier needs smaller products (mul x gate <= ~2000)
 so the arithmetic is inside the model's reliable range and the
 QUANT effects become the dominant failure source again.
+
+
+## Addendum 216 - the addition-only ruling enforced in the gated chain
+
+THE AUTHOR'S CATCH: "didn't we agree on addition only?" - YES,
+addendum 203: "plus and minus are addition of positive and negative
+numbers... not multiplication." The gated chain's mul x D carrier
+VIOLATED the ruling, and the violation was the bug: 3-digit x
+2-digit products (plus a 5-digit subtraction) broke the 2B model's
+arithmetic at every quant including f16 (addendum 215). The design
+failure and the ruling violation were the same defect.
+
+THE FIX, shipped: the link is now VAR B = VAR A + D3 / VAR B =
+VAR A - D4 - pure addition of the gate's (signed) value; the
+multiplier is gone. The riddle templates produce 3-5 digit answers
+natively (minutes in N hours, seconds in N days, etc.) so the
+deltas keep meaningful magnitude (median ~1,200, range 104-77,760)
+with ZERO multiplication anywhere in the corpus. The arithmetic is
+a single addition - inside the 2B model's reliable range - so
+quant effects, not capability, become the failure source again.
+Verified on seeds 11/12/13: all 35 questions' chains+gates
+in-prefix, arithmetic exact, cuts monotone, link text shows
+"VAR PQGLP = VAR RXQRI - D3" shape.
