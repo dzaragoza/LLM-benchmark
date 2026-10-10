@@ -653,7 +653,13 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
     sentences: list[str] = []
     cuts: dict[int, int] = {}
     for s in sorted(SPANS):
-        target = max(int(s / tokens_per_sent), 1)
+        # the band is sized to the span's token budget MINUS the request
+        # overhead (template + generation headroom, the constants the
+        # reachability check reserves) - a band sized to the full span
+        # overflows the window once the question rides on top (the
+        # 133,762-vs-131,072 crash)
+        usable = max(int((s - PROMPT_OVERHEAD_TOKENS - GEN_HEADROOM_TOKENS) / tokens_per_sent), 1)
+        target = usable
         band: list[str] = []
         for blob in span_blobs[s]:
             band.extend(blob)
@@ -814,9 +820,17 @@ def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str
     seen: dict[tuple[int, int], int] = {}
     for span, hops in (probes[0], probes[-1]):
         q = next(x for x in corpus["questions"] if x["span"] == span and x["hops"] == hops)
-        toks = len(llama_server.tokenize(port, question_prompt(corpus, q)))
+        g = corpus.get("grammar")
+        renderer = (
+            question_prompt_v73
+            if g == "gatedchain"
+            else question_prompt_v72
+            if g in ("chainarith",)
+            else question_prompt
+        )
+        toks = len(llama_server.tokenize(port, renderer(corpus, q)))
         seen[(span, hops)] = toks
-        gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 12)
+        gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 26 if corpus.get("grammar") in ("chainarith", "gatedchain") else (hops + 1) * 12)
         if toks + gen > window:
             raise PreflightError(
                 f"grade {span}x{hops}: rendered prompt is {toks} tokens + {gen} gen "
