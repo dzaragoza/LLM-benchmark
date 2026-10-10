@@ -1668,3 +1668,34 @@ drops wait). More cells are added ONLY if the six say they are needed:
 strong interactions, or clean one-rung effects that make the deep
 drops the most useful next measurement. The measurement budget goes
 to the most useful data, per the author's 8-hour allocation.
+
+
+## Addendum 199 - the climb-value table: pricing each ladder upgrade
+
+THE DESIGN, pre-registered (the author's ruling: "To measure how worth
+is the different climbs in each config parameter. That would be
+excellent guidance."): the probe's paired corpora give the Marginal
+VALUE of each single-rung upgrade, not just the cost - the readout the
+allocation policies never had. For the champion's neighborhood the
+table is the probe run inside-out:
+
+- w Q4_0 -> Q8_0: probe base minus w-down (Q8_0/f16/f16 - Q4_0/f16/f16)
+- K q8_0 -> f16: base minus K-down (Q8_0/f16/f16 - Q8_0/q8_0/f16)
+- V q8_0 -> f16: base minus V-down
+- KV q8_0 -> f16: base minus KV-down (the pair price; the gap to the
+  sum of singles = the interaction)
+
+Each entry is a SCORE DELTA per closed-form GiB spent (addendum 196's
+tau units), with the base cell's per-seed spread as the significance
+band. THE GUIDANCE IT GIVES: (1) the climb's greedy rule (largest
+fitting upgrade) can be re-ranked by measured value per GiB - upgrades
+priced ~0 (addendum 198's f16->q8_0 prediction) should be SKIPPED and
+the budget moved to the next axis; (2) the stingy-vs-greedy divergence
+becomes predictable instead of empirical; (3) the tau rule's cost side
+gets measured constants instead of bits-shaved assumptions.
+
+REQUIRES NO NEW RUNS: the six in-flight cells are the whole table for
+the one-rung neighborhood. The deep drops (q8_0 -> q4_0), if added
+later, extend the table one rung down the same way. Registered as the
+probe's primary readout - the per-axis value table IS the probe's
+deliverable, not a by-product.
