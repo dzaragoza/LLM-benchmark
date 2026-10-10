@@ -1510,3 +1510,54 @@ THE NEWCOMERS: phi-4-mini-instruct debuts at #4 (2.98, Q4_0
 config) - the first Q4_0-weights family to place top-5;
 granite-4.1/4.2-3b and the micros land in the desert-to-mid
 band. The granite MoE micros do NOT clear 0.5.
+
+
+## Addendum 195 - the champion's per-ctx marginal analysis (the author's three-regime framework)
+
+The author's ruling on reading a reach curve, registered verbatim in
+substance: "An substantial increase in score between rungs indicates
+that the model clearly benefits from a larger context as it can solve
+larger problems. A minimal change means the model doesn't get affected
+by the context size, but cannot take advantage of it. So adding extra
+context at some point is detrimental, specially as it means a decrease
+in quants, that doesn't affect this task, but may affect others."
+
+Three regimes: (1) substantial rung-to-rung gain = the model converts
+context into solved problems; (2) flat = context-agnostic; (3) PAST
+THE USEFUL POINT the extra context is DETRIMENTAL - the climb pays for
+it with quant drops that damage tasks outside this benchmark even when
+the reach task itself survives.
+
+THE CHAMPION DECOMPOSED (Qwen3.5-2B, greedy arm, score by span band):
+
+- ctx=8192:   total=2.06  (4k: 2.06)
+- ctx=16384:  total=3.09  (4k: 2.06 | 8k: 1.03)
+- ctx=32768:  total=4.42  (4k: 2.06 | 8k: 1.03 | 16k: 1.33)
+- ctx=65536:  total=5.67  (4k: 2.06 | 8k: 1.03 | 16k: 1.33 | 32k: 1.26)
+- ctx=131072: total=6.79  (4k: 2.06 | 8k: 1.03 | 16k: 1.33 | 32k: 1.26 | 64k: 1.11)
+- ctx=262144: total=6.40  (4k: 1.92 | 8k: 1.03 | 16k: 1.20 | 32k: 0.94 | 64k: 0.90 | 128k: 0.40)
+
+REGIME 1 holds through 131k: the rung deltas +1.03, +1.33, +1.26,
++1.11 are substantial rung after rung - the model keeps converting new
+context into found facts, and each new band's score says so directly
+(no band re-measures; the old bands are constant, the gain is the new
+band).
+
+REGIME 3 begins at 262k, and the decomposition shows the mechanism
+exactly as the author predicted: the kept bands pay the quant tax
+(4k: -0.14, 16k: -0.13, 32k: -0.32, 64k: -0.21 = -0.80 total across
+the climb's quant drops) while the new 128k band earns only +0.40.
+Net rung delta: -0.39. The extra context costs MORE in degraded
+encoding on the old bands than the new band pays back - the reach
+task itself absorbs the drop, but a task sensitive to the quant would
+not. This is the interpretive framework for the paper's discussion of
+the scoring system: the marginal rung delta is the readout, and the
+band-level decomposition separates "new band earns" from "old bands
+pay" - the delta alone cannot tell a stall from a tax.
+
+CAVEAT, registered: the 262k greedy cell pays the tax; the stingy arm
+at 262k scores 6.81 - the deepest rung is arm-dependent, so the
+"useful point" ruling (131k) is the GREEDY curve's ruling. The
+champion's certification and the page's final argmax wait on the
+author's tie-break between the 131k greedy peak and the stingy 256k
+arm.
