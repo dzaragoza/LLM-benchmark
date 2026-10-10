@@ -472,7 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--v7-grammar",
         default="v71",
-        choices=["v71", "chainarith"],
+        choices=["v71", "chainarith", "gatedchain"],
         help="v7: the corpus grammar (addenda 202/203) - v71 is the alias-chain "
         "lookup (the field grammar, the frozen suite's default); chainarith is "
         "the v7.2 grammar: every link carries a signed delta, distinct "

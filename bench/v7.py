@@ -561,6 +561,131 @@ def question_prompt_v72(corpus: dict, q: dict) -> str:
     )
 
 
+def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
+    """The gated-chain corpus (addendum 212): chainarith's structure
+    with each link's delta replaced by a REFERENCE - VAR B = VAR A +
+    <mul> x D<i> - where D<i> is defined by ONE easy seeded riddle
+    sentence planted elsewhere in the same span region, and each
+    chain gets a near-miss decoy chain (edit-distance-1 names)
+    planted adjacent to the real links. The model must select the
+    right chain among decoys (K), find and resolve each gate
+    (K + weights), then compute (weights) - the cascade amplifies
+    whichever stage breaks."""
+    rng = random.Random(seed)
+    budget = s_max - ruler_gate.ANSWER_HEADROOM
+    probe = ruler_gate.VT_HAYSTACK * 20
+    probe_n = len(llama_server.tokenize(port, probe))
+    tokens_per_sent = max(1.0, probe_n / 20.0)
+    num_noises = int(budget / tokens_per_sent)
+    sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
+    questions: list[dict] = []
+    for s in SPANS:
+        for h in HOPS:
+            questions.append({"span": s, "hops": h})
+    cuts: dict[int, int] = {s: 0 for s in SPANS}
+    d_counter = 0
+    for qi, q in enumerate(questions):
+        s = q["span"]
+        limit = max(ruler_gate.VT_NAME_LEN, int(s / tokens_per_sent))
+        sub = min(limit, len(sentences))
+        chain_len = q["hops"] + 1
+        names: list[str] = []
+        while len(names) < chain_len:
+            n = gen_name(rng)
+            if n not in names:
+                names.append(n)
+        value = rng.randint(10000, 99999)
+        values = [value]
+        chain = [f"VAR {names[0]} = {value}"]
+        gate_specs = []
+        for j in range(q["hops"]):
+            d_counter += 1
+            dname = f"D{d_counter}"
+            riddle, fn = RIDDLE_TEMPLATES[rng.randrange(len(RIDDLE_TEMPLATES))]
+            n_small = rng.randint(2, 9)
+            gate_val = fn(n_small)
+            mul = rng.randint(100, 999)
+            delta = mul * gate_val * rng.choice((1, -1))
+            values.append(values[-1] + delta)
+            sign = "+" if delta >= 0 else "-"
+            chain.append(
+                f"VAR {names[j + 1]} = VAR {names[j]} {sign} {mul} x {dname}"
+            )
+            gate_specs.append(
+                {
+                    "dname": dname,
+                    "riddle": riddle.format(n=n_small),
+                    "gate_val": gate_val,
+                    "mul": mul,
+                    "sign": sign,
+                }
+            )
+        positions = sorted(rng.sample(range(sub), chain_len))
+        for pi, j in zip(positions, range(chain_len), strict=True):
+            sentences.insert(pi + j, chain[j])
+        # decoy chain: same-length, edit-distance-1 names, plausible
+        # values, planted right AFTER the real chain's LAST link (adjacent
+        # by construction - the near-miss K-stressor). Anchored at the
+        # DEEPEST link so the decoy never lands beyond the region.
+        decoy_names = [_edit_distance_one(n, rng) for n in names]
+        dv = rng.randint(10000, 99999)
+        decoy = [f"VAR {decoy_names[0]} = {dv}"]
+        for j in range(q["hops"]):
+            dmul = rng.randint(100, 999)
+            decoy.append(
+                f"VAR {decoy_names[j + 1]} = VAR {decoy_names[j]} + {dmul}"
+            )
+        base_pos = positions[-1] + chain_len
+        for j in range(chain_len):
+            sentences.insert(base_pos + j, decoy[j])
+        # gates: one riddle sentence per link, scattered AFTER the decoy
+        # but INSIDE the cut the question will present (found by position,
+        # not adjacency - selection under distance)
+        gate_end = base_pos + chain_len
+        for gspec in gate_specs:
+            gpos = gate_end + rng.randint(1, max(2, sub // 8))
+            gpos = min(gpos, len(sentences))
+            sentences.insert(
+                gpos,
+                f"{gspec['dname']} is {gspec['riddle']}, which is "
+                f"{gspec['gate_val']}",
+            )
+            gate_end = gpos + 1
+        # the cut must cover EVERYTHING this question planted: chain,
+        # decoy, gates - the deepest insertion plus margin, or the
+        # prefix would orphan the gates (the v7.2 question bug's
+        # corpus-side twin, caught by the invariant check before burn)
+        deepest = gate_end + 1
+        cuts[s] = max(cuts[s], deepest + 4)
+        questions[qi] = {
+            **q,
+            "names": names,
+            "value": str(value),
+            "values": [str(v) for v in values],
+            "gates": gate_specs,
+        }
+    for s in SPANS:
+        cuts[s] = min(cuts[s] + 16, len(sentences))
+    return {
+        "sentences": sentences,
+        "questions": questions,
+        "cuts": cuts,
+        "s_max": s_max,
+        "grammar": "gatedchain",
+    }
+
+
+def question_prompt_v73(corpus: dict, q: dict) -> str:
+    cut = corpus["cuts"][q["span"]]
+    context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
+    return GATED_TEMPLATE.format(
+        context=context,
+        root=q["names"][0],
+        rootval=q["values"][0],
+        num_v=q["hops"] + 1,
+    )
+
+
 def build_corpus(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
     """One fixed VT corpus, identical bytes every run. The corpus is a
     sentence list (noise + every question's chain embedded); a chain
@@ -740,8 +865,15 @@ def run_cell(
             g = per_grade.setdefault(
                 key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0, "format_ok": 0}
             )
-            is_v72 = corpus.get("grammar") == "chainarith"
-            prompt = question_prompt_v72(corpus, q) if is_v72 else question_prompt(corpus, q)
+            g = corpus.get("grammar")
+            is_v72 = g in ("chainarith", "gatedchain")
+            prompt = (
+                question_prompt_v73(corpus, q)
+                if g == "gatedchain"
+                else question_prompt_v72(corpus, q)
+                if is_v72
+                else question_prompt(corpus, q)
+            )
             per_q = (q["hops"] + 1) * (26 if is_v72 else 12)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, per_q)
             t0 = time.monotonic()
@@ -825,6 +957,45 @@ def run_cell(
 
 CORPUS_ARTIFACT = "state/v7-corpus.json"
 CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
+CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
+
+# addendum 212: the gated-chain grammar (v7.3) - each link's delta is a
+# REFERENCE (VAR B = VAR A + 100 x D3), each D defined by an easy seeded
+# riddle sentence planted elsewhere in the region; near-miss decoy chains
+# (edit-distance-1 names) make the selection competitive.
+GATED_TEMPLATE = (
+    "[INST] Memorize and track the chain(s) of variable assignment "
+    "hidden in the following text.\n\n{context}\nQuestion: One "
+    "chain begins with the assignment VAR {root} = {rootval}. "
+    "Follow that chain - and only that chain - link by link, resolving "
+    "each D reference to its defined value, and report each variable "
+    "in it and the value it holds, in chain order. [/INST] Answer ONLY "
+    "with the {num_v} pairs as NAME = VALUE, comma-separated, and "
+    "nothing else. "
+)
+
+# easy, closed-form riddle templates (addendum 209: near-100% at f16);
+# (template, answer) - the riddle's ANSWER is the D value's small core
+RIDDLE_TEMPLATES = [
+    ("the number of legs on {n} spiders", lambda n: 8 * n),
+    ("the number of wheels on {n} cars", lambda n: 4 * n),
+    ("the number of sides on {n} hexagons", lambda n: 6 * n),
+    ("the number of fingers on {n} hands", lambda n: 5 * n),
+    ("the number of eggs in {n} dozen", lambda n: 12 * n),
+    ("the number of minutes in {n} hours", lambda n: 60 * n),
+    ("the number of days in {n} weeks", lambda n: 7 * n),
+    ("the number of quarters in {n} dollars", lambda n: 4 * n),
+]
+
+
+def _edit_distance_one(name: str, rng: random.Random) -> str:
+    """A decoy name differing from the real one by exactly one "
+    "substituted character (edit distance 1) - the near-miss "
+    "K-stressor (addendum 212)."""
+    alphabet = [c for c in string.ascii_uppercase if c != name[0]]
+    i = rng.randrange(len(name))
+    c = rng.choice(alphabet)
+    return name[:i] + c + name[i + 1 :]
 
 # addendum 202/203: the chain-arith grammar (v7.2) - every link carries
 # an independent signed delta (VAR B = VAR A + -1234), so every
@@ -917,7 +1088,13 @@ def probe_axes(
 
     results: list[dict[str, Any]] = []
     corpora: dict[int, dict] = {}
-    builder = build_corpus_v72 if grammar == "chainarith" else build_corpus
+    builder = (
+        build_corpus_v73
+        if grammar == "gatedchain"
+        else build_corpus_v72
+        if grammar == "chainarith"
+        else build_corpus
+    )
     for spec_cell in probe_cells:
         if len(spec_cell) == 3:
             fam, ctx, explicit_cfgs = spec_cell
