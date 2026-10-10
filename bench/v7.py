@@ -658,7 +658,14 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
         # reachability check reserves) - a band sized to the full span
         # overflows the window once the question rides on top (the
         # 133,762-vs-131,072 crash)
-        usable = max(int((s - PROMPT_OVERHEAD_TOKENS - GEN_HEADROOM_TOKENS) / tokens_per_sent), 1)
+        # 5% conservative margin on top of the reserved overhead: the
+        # per-sentence token estimate drifts across a ~7.5k-sentence band
+        # (the 132,482 crash was ~1% drift); the preflight is the measured
+        # backstop, this margin keeps it from firing on every run
+        usable = max(
+            int((s - PROMPT_OVERHEAD_TOKENS - GEN_HEADROOM_TOKENS) / tokens_per_sent * 0.95),
+            1,
+        )
         target = usable
         band: list[str] = []
         for blob in span_blobs[s]:
@@ -1185,6 +1192,15 @@ def probe_axes(
                     corpus = corpora[seed]
                     try:
                         preflight_template_sanity(port)
+                        probe_toks = preflight_reachable_grades(port, corpus, ctx)
+                        if probe_toks:
+                            print(f"  preflight: {probe_toks}")
+                    except PreflightError as e:
+                        results.append(
+                            {"family": fam, "ctx": ctx, "cfg": key,
+                             "error": f"preflight: {e}"}
+                        )
+                        break
                     except TemplateMalfunction as e:
                         results.append(
                             {"family": fam, "ctx": ctx, "cfg": key,
