@@ -984,7 +984,7 @@ def run_cell(
 
 CORPUS_ARTIFACT = "state/v7-corpus.json"
 CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
-CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
+CORPUS_ARTIFACT_V73 = "state/v7-3-corpus.json"
 
 # addendum 212: the gated-chain grammar (v7.3) - each link's delta is a
 # REFERENCE (VAR B = VAR A + 100 x D3), each D defined by an easy seeded
@@ -1058,23 +1058,30 @@ def score_pairs(answer: str, expected_names: list[str], expected_values: list[st
     return correct == len(expected_names), correct
 
 
-def corpus_from_artifact(port: int) -> dict:
+def corpus_from_artifact(port: int, grammar: str = "v71") -> dict:
     """The corpus as a repo artifact (the author's session-43 ruling):
-    load state/v7-corpus.json when it matches the current grid
+    load the grammar's artifact when it matches the current grid
     constants; otherwise build once and write it. The artifact makes
     the corpus citable and byte-stable across machines - every
     contender runs on the exact same chains, and a rebuild is
-    verifiable against the committed file."""
-    # JSON stringifies int dict keys, so the artifact's k_per_span
-    # comes back with str keys - compare on str or every load misses
+    verifiable against the committed file. Addendum 219: the grammar
+    scopes the artifact (state/v7-corpus.json for v71,
+    state/v7-2-corpus.json for chainarith, state/v7-3-corpus.json for
+    gatedchain) - one era's chains never load as another's."""
+    builder, artifact = {
+        "v71": (build_corpus, CORPUS_ARTIFACT),
+        "chainarith": (build_corpus_v72, CORPUS_ARTIFACT_V72),
+        "gatedchain": (build_corpus_v73, CORPUS_ARTIFACT_V73),
+    }[grammar]
     grid = {
         "spans": SPANS,
         "hops": HOPS,
         "seed": CORPUS_SEED,
         "s_max": S_MAX,
+        "grammar": grammar,
     }
-    if os.path.exists(CORPUS_ARTIFACT):
-        with open(CORPUS_ARTIFACT, encoding="utf-8") as f:
+    if os.path.exists(artifact):
+        with open(artifact, encoding="utf-8") as f:
             art = json.load(f)
         stored = art.get("grid") or {}
         if all(stored.get(k_) == v for k_, v in grid.items()) and art.get("corpus"):
@@ -1085,9 +1092,9 @@ def corpus_from_artifact(port: int) -> dict:
             # load path actually worked - session 43)
             corpus["cuts"] = {int(k_): v for k_, v in (corpus.get("cuts") or {}).items()}
             return corpus
-    corpus = build_corpus(port)
-    os.makedirs(os.path.dirname(CORPUS_ARTIFACT), exist_ok=True)
-    with open(CORPUS_ARTIFACT, "w", encoding="utf-8") as f:
+    corpus = builder(port)
+    os.makedirs(os.path.dirname(artifact), exist_ok=True)
+    with open(artifact, "w", encoding="utf-8") as f:
         json.dump({"grid": grid, "corpus": corpus}, f)
     return corpus
 
@@ -1273,6 +1280,7 @@ def certify_v7(
     alloc_policy: str = "greedy",
     only_cells: list[tuple[str, int]] | None = None,
     multi_arm: bool = False,
+    grammar: str = "v71",
 ) -> list[dict[str, Any]]:
     """Addendum 166: multi_arm mode - all three allocation policies
     measured TOGETHER, in one cell record: greedy goes first, then
@@ -1476,7 +1484,7 @@ def certify_v7(
                 continue
             breakdown = llama_server.memory_breakdown_gib(log_path)
             if corpus is None:
-                corpus = corpus_from_artifact(port)
+                corpus = corpus_from_artifact(port, grammar)
             try:
                 preflight_template_sanity(port)
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])

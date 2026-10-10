@@ -639,6 +639,7 @@ def _run(args: argparse.Namespace) -> None:
             alloc_policy=args.v7_alloc,
             only_cells=parse_v7_cells(args.v7_cells),
             multi_arm=args.v7_multi_arm,
+            grammar=args.v7_grammar,
         )
         state["v7"] = results
         save_state(args.state_file, state)
