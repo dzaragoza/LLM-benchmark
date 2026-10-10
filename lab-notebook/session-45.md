@@ -1626,3 +1626,19 @@ arithmetic credit with a registered weight. ONE-DIMENSIONALITY NOTE:
 fusing costs the ability to read the two effects separately in the
 headline number; the per-grade records keep the decomposition. The
 exact weight and corpus changes are Daniela's ruling before build.
+
+
+## Addendum 197 - the probe's corpora ruling: three fresh corpora, no re-measures
+
+The author overruled the seed-1-included probe design: "I don't agree
+with the re-measure approach. I would go with 3 different corpus.
+That way we eliminate the luck factor. That bit us already in the
+past." RULING: PROBE_CORPUS_SEEDS = [11, 12, 13] - three corpora
+never used by the field run (the field corpus is seed 1); the probe's
+base config is MEASURED on the new corpora as its baseline, never
+re-measured on the field corpus. Every probe number - base included -
+comes from chains the field never saw. Consequence: the probe's base
+mean is NOT directly comparable to the v7 table's 6.787 (different
+corpora); the comparison that matters is WITHIN the probe (all six
+configs on the same three corpora, paired). The field table stays
+frozen as the field's own measurement.
