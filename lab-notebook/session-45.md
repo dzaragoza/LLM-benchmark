@@ -2204,3 +2204,39 @@ number at 131k is the one that decides whether the RECOMMENDATION
 is wrong or the author's test box is. The measurement plan: prefill
 wall time vs ctx (8k/16k/32k/65k/131k) on the reference machine,
 cold cache, same config as the champion cell.
+
+
+## Addendum 214 - the champion's prefill reality confirmed on weak-GPU hardware
+
+THE AUTHOR'S MEASUREMENT (2026-10-10, Lenovo Tiny, GPU offload
+CONFIRMED active): generation 17.11 t/s, prefill 164.59 t/s (267
+prompt tokens, 1.6 s) - and the author's verdict: "the lenovo tiny
+gpu is useless :(."
+
+WHAT THIS ESTABLISHES: the prefill blind spot (addendum 213) is not
+an artifact of CPU - a real, GPU-offloaded, weak-GPU machine reads
+17 t/s generation / 165 t/s prefill on the champion's config. THE
+COLD-PREFILL ARITHMETIC at 131k: at 165 t/s prefill, a full 131,072-
+token context takes ~795 s = 13+ MINUTES to first token. Even at
+32k it is ~3 minutes. THE RECOMMENDATION'S REACH-LADDER IS
+UNUSABLE FOR FIRST LATENCY ON THIS MACHINE CLASS - the author's
+"the champion is unusable in the recommended machine BW" is
+CONFIRMED as a prefill problem, not a t/s problem.
+
+THE GATE'S MISSING PARAMETER, now concrete: the cold-prefill t/s
+(or equivalently first-token time at depth) must be a second
+verdict axis. A config passes the FULL gate iff (a) worst-turn
+w/s >= the reader line (existing, generation-side) AND (b) cold
+prefill at the recommended ctx is under an interactivity line
+(ruling pending: the author's "unusable" suggests tens of seconds,
+not minutes - the number is the author's to set).
+
+THE STUDY'S REFRAMING, registered: the 4-GiB-class recommendation
+splits by machine BW into (at least) two tiers - the reference
+iGPU class (~76.5 GiB/s effective) where the champion's cells
+certified, and the weak-dGPU class (the Lenovo Tiny) where 131k
+reach is technically feasible but interactively dead. The
+practitioner page's single recommendation must become BW-conditional:
+the reach-max config and the interactive config differ per tier.
+The prefill curve per tier is the missing measurement - the
+author's ctx sweep (addendum 213's plan) supplies it.
