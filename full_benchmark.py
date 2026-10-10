@@ -461,13 +461,6 @@ def build_parser() -> argparse.ArgumentParser:
         "arm's config and score stored in the same cell record",
     )
     ap.add_argument(
-        "--v7-multi-arm",
-        action="store_true",
-        help="v7: measure all three allocation policies per cell (addendum 166) - "
-        "greedy first, then stingy/random only where their config differs; every "
-        "arm's config and score stored in the same cell record",
-    )
-    ap.add_argument(
         "--v7-probe-axes",
         default=None,
         help="v7: the axis probe (addendum 196) - measure the config neighborhood "
