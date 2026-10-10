@@ -865,11 +865,11 @@ def run_cell(
             g = per_grade.setdefault(
                 key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0, "format_ok": 0}
             )
-            g = corpus.get("grammar")
-            is_v72 = g in ("chainarith", "gatedchain")
+            grammar = corpus.get("grammar")
+            is_v72 = grammar in ("chainarith", "gatedchain")
             prompt = (
                 question_prompt_v73(corpus, q)
-                if g == "gatedchain"
+                if grammar == "gatedchain"
                 else question_prompt_v72(corpus, q)
                 if is_v72
                 else question_prompt(corpus, q)
