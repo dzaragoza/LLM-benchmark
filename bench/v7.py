@@ -927,7 +927,7 @@ def probe_axes(
         print(
             f"=== probe {fam} ctx={ctx}: base {base['wq']}/{base['kq']}/"
             f"{base['vq']} (score {base['score']}), {len(cfgs)} configs x "
-            f"{len(PROBE_CORPUS_SEEDS)} repeats"
+            f"n={len(PROBE_CORPUS_SEEDS)} corpora"
         )
         if dry_run:
             for wq, kq, vq in cfgs:

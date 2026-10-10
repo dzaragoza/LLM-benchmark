@@ -464,8 +464,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--v7-probe-axes",
         default=None,
         help="v7: the axis probe (addendum 196) - measure the config neighborhood "
-        "(base + each axis one rung down + the pairwise downs) with n=3 repeat "
-        "corpora on these cells, comma-separated family:ctx pairs. Results land "
+        "(base + each axis one rung down + the pairwise downs) with n=3 "
+        "different corpora on these cells, comma-separated family:ctx pairs. Results land "
         "under families/<fam>/probe/<ctx>/, apart from the v7 table. "
         "E.g. --v7-probe-axes Qwen3.5-2B:131072",
     )
