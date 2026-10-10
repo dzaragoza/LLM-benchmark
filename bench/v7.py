@@ -52,6 +52,9 @@ from __future__ import annotations
 import json
 import os
 import random
+import os
+import random
+import re
 import string
 import sys
 import time
@@ -486,6 +489,73 @@ def gen_name(rng: random.Random) -> str:
     return "".join(rng.choices(string.ascii_uppercase, k=ruler_gate.VT_NAME_LEN))
 
 
+def build_corpus_v72(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
+    """The chain-arith corpus (addenda 202/203): identical structure to
+    build_corpus - the same noise sentences, the same span/hops grid,
+    the same seeded placement - except every link after the root
+    carries an independent signed delta: VAR B = VAR A + <delta>,
+    deltas 3-4 digits both signs (the author's magnitude ruling: large
+    enough that a q4_0 rounding error moves a value past exact match,
+    small enough to stay integer-exact). Every variable holds a
+    DISTINCT value; each question records the names AND the exact
+    per-link values (the scorer's ground truth)."""
+    rng = random.Random(seed)
+    budget = s_max - ruler_gate.ANSWER_HEADROOM
+    probe = ruler_gate.VT_HAYSTACK * 20
+    probe_n = len(llama_server.tokenize(port, probe))
+    tokens_per_sent = max(1.0, probe_n / 20.0)
+    num_noises = int(budget / tokens_per_sent)
+    sentences: list[str] = [ruler_gate.VT_HAYSTACK] * num_noises
+    questions: list[dict] = []
+    for s in SPANS:
+        for h in HOPS:
+            questions.append({"span": s, "hops": h})
+    cuts: dict[int, int] = {s: 0 for s in SPANS}
+    for qi, q in enumerate(questions):
+        s = q["span"]
+        limit = max(ruler_gate.VT_NAME_LEN, int(s / tokens_per_sent))
+        sub = min(limit, len(sentences))
+        chain_len = q["hops"] + 1
+        names: list[str] = []
+        while len(names) < chain_len:
+            n = gen_name(rng)
+            if n not in names:
+                names.append(n)
+        value = rng.randint(10000, 99999)
+        values = [value]
+        chain = [f"VAR {names[0]} = {value}"]
+        for j in range(q["hops"]):
+            delta = rng.randint(100, 9999) * rng.choice((1, -1))
+            values.append(values[-1] + delta)
+            chain.append(f"VAR {names[j + 1]} = VAR {names[j]} + {delta}")
+        positions = sorted(rng.sample(range(sub), chain_len))
+        for pi, j in zip(positions, range(chain_len), strict=True):
+            sentences.insert(pi + j, chain[j])
+        cuts[s] = max(cuts[s], positions[-1] + 2 * chain_len)
+        questions[qi] = {
+            **q,
+            "names": names,
+            "value": str(value),
+            "values": [str(v) for v in values],
+            "deltas": [0] + [int(v) - int(u) for u, v in zip(values, values[1:])],
+        }
+    for s in SPANS:
+        cuts[s] = min(cuts[s] + 8, len(sentences))
+    return {
+        "sentences": sentences,
+        "questions": questions,
+        "cuts": cuts,
+        "s_max": s_max,
+        "grammar": "chainarith",
+    }
+
+
+def question_prompt_v72(corpus: dict, q: dict) -> str:
+    cut = corpus["cuts"][q["span"]]
+    context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
+    return CHAINARITH_TEMPLATE.format(context=context, num_v=q["hops"] + 1)
+
+
 def build_corpus(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
     """One fixed VT corpus, identical bytes every run. The corpus is a
     sentence list (noise + every question's chain embedded); a chain
@@ -665,13 +735,18 @@ def run_cell(
             g = per_grade.setdefault(
                 key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0, "format_ok": 0}
             )
-            prompt = question_prompt(corpus, q)
+            is_v72 = corpus.get("grammar") == "chainarith"
+            prompt = question_prompt_v72(corpus, q) if is_v72 else question_prompt(corpus, q)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
             t0 = time.monotonic()
             answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
             elapsed = round(time.monotonic() - t0, 3)
-            ok, found = ruler_gate.score_vt(answer, q["names"])
-            fmt_ok = ruler_gate.format_ok_vt(answer)
+            if is_v72:
+                ok, found = score_pairs(answer, q["names"], q["values"])
+                fmt_ok = ok
+            else:
+                ok, found = ruler_gate.score_vt(answer, q["names"])
+                fmt_ok = ruler_gate.format_ok_vt(answer)
             g["asked"] += 1
             g["format_ok"] += 1 if fmt_ok else 0
             g["pass"] += 1 if ok else 0
@@ -680,7 +755,7 @@ def run_cell(
             # The strict all-names rule left every pilot cell at 0 while
             # models traced parts of the chain (44/400 answers had >=1
             # name, 0/400 had all); credit prices the partial trace.
-            g["credit"] += found / len(q["names"])
+            g["credit"] += found / len(q["values"]) if is_v72 else found / len(q["names"])
             if answers_fh is not None:
                 answers_fh.write(
                     json.dumps(
@@ -743,6 +818,32 @@ def run_cell(
 
 
 CORPUS_ARTIFACT = "state/v7-corpus.json"
+CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
+
+# addendum 202/203: the chain-arith grammar (v7.2) - every link carries
+# an independent signed delta (VAR B = VAR A + -1234), so every
+# variable holds a DISTINCT value and the question asks for
+# NAME = VALUE pairs. The v7.1 grammar (aliases, lookup question)
+# stays the default; the frozen suite pins it.
+CHAINARITH_TEMPLATE = (
+    "[INST] Memorize and track the chain(s) of variable assignment "
+    "hidden in the following text.\n\n{context}\nQuestion: Report "
+    "each variable in the chain and the value it holds, in chain "
+    "order. [/INST] Answer ONLY with the {num_v} pairs as "
+    "NAME = VALUE, comma-separated, and nothing else. "
+)
+PAIR_RE = re.compile(r"([A-Z]{%d})\s*=\s*(-?\d+)" % ruler_gate.VT_NAME_LEN)
+
+
+def score_pairs(answer: str, expected_names: list[str], expected_values: list[str]) -> tuple[bool, int]:
+    clean = ruler_gate.strip_template_debris(answer or "").upper()
+    found = dict(PAIR_RE.findall(clean))
+    correct = sum(
+        1
+        for n, v in zip(expected_names, expected_values, strict=True)
+        if found.get(n) == v
+    )
+    return correct == len(expected_names), correct
 
 
 def corpus_from_artifact(port: int) -> dict:
@@ -788,6 +889,7 @@ def probe_axes(
     dry_run: bool = False,
     budget_gib: float = BUDGET_GIB,
     on_model_commit: Any = None,
+    grammar: str = "v71",
 ) -> list[dict[str, Any]]:
     """Addendum 196: the axis probe - one family/cell measured across
     its config neighborhood: the base (measured) config plus each axis
@@ -801,6 +903,7 @@ def probe_axes(
 
     results: list[dict[str, Any]] = []
     corpora: dict[int, dict] = {}
+    builder = build_corpus_v72 if grammar == "chainarith" else build_corpus
     for spec_cell in probe_cells:
         if len(spec_cell) == 3:
             fam, ctx, explicit_cfgs = spec_cell
@@ -861,7 +964,7 @@ def probe_axes(
                 per_seed = {}
                 for seed in PROBE_CORPUS_SEEDS:
                     if seed not in corpora:
-                        corpora[seed] = build_corpus(port, seed=seed)
+                        corpora[seed] = builder(port, seed=seed)
                     corpus = corpora[seed]
                     try:
                         preflight_template_sanity(port)
