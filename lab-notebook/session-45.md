@@ -2356,3 +2356,37 @@ CONSEQUENCES, all named:
   the 4-GiB ceiling) stays VALID for the KV question - the probe
   tests configs, not the ceiling; when the 2-GiB run finds a new
   champion, the gated-chain probe follows it.
+
+
+## Addendum 219 - v7.2 finishes at 2 GiB, on the gated-chain grammar
+
+THE AUTHOR'S RULING (2026-10-11): "Let's finish the gated chain
+benchmark and use it for the 2 gib search." The v7.2 era's corpus
+grammar IS the gated chain (addenda 212/216: addition-only deltas,
+riddle gates, decoys, anchored question) - the field rerun under
+the 2-GiB ceiling (addendum 218) uses gatedchain as THE grammar,
+not v7.1's alias lookup. The scoring is the exact-pair partial
+credit (203/216); the single score is unchanged in shape.
+
+PRE-REGISTERED, before the run:
+- THE 2-GiB CHAMPION PREDICTION: a SMALLER family takes it -
+Qwen3.5-0.8B or the MiniCPM5-1B class - because the weights axis
+is the value axis (204) and only small params afford Q8_0 at this
+budget (Qwen3.5-2B's Q8_0 weights alone are 2.25 GiB; its maximal
+2-GiB config is Q4_0/q4_0/q4_0@32k, priced at most of its reach).
+FALSIFIABLE: the run's argmax family and its wq decide it.
+- THE COMPUTE-FLOOR CHECK: the 0.075 GiB + ~1 KiB/token floor is
+a larger fraction at 2 GiB; the estimator must not over-admit
+cells (the measured gate erases over-budget results either way,
+but a floor miss would waste the night). The first cells' est vs
+census agreement is the check - a repeat of the addendum-187
+calibration discipline at the new budget.
+- THE GRADING for the gated-chain KV question (216's rerun, in
+flight) is UNCHANGED: flat = the robustness negative result is
+airtight; separated = the benchmark sees K/V. Its verdict carries
+into the 2-GiB era's interpretation unchanged.
+
+RUN CONVENTIONS: fresh state (the v7.1 convention) - state/
+benchmark-state-v8-2gib.json - so the 4-GiB table stands as its
+tier's historical answer; --v7-multi-arm (greedy/stingy/random
+in one cell record); BUDGET_GIB = 2.0 does the re-planning.
