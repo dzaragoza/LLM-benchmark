@@ -1771,3 +1771,40 @@ Search consequence: the config lattice per cell drops from 18 to
 4, and the climb's KV axis becomes a single binary choice. The
 champion search then reduces to (weights x ctx) - a 2D grid.
 NOT EXECUTED until the four cells land and are graded.
+
+
+## Addendum 202 - the arithmetic design ruling (option B) and the criteria post-mortem
+
+THE AUTHOR'S VOTES on the five options: A no (confounded risk too
+high), B YES, C no (keep single score), D yes BUT "may degrade
+score too much - difficulty collapse risk", E no (single score).
+COMPATIBILITY OVERRULED: "Breaking compatibility is not an issue,
+we are going to rerun the benchmark anyway."
+
+THE CONCLUSION FROM THE CRITERIA COLLISION: Vibe's recommendation
+ranked options by preservation of the existing measurement
+investment (comparability, no corpus rebuild, historical validity);
+the author ranks by design cleanliness (single score, parameter
+exercise, willingness to re-baseline). The overlap: single score,
+quant sensitivity, search efficiency, low wall cost. The divergence:
+continuity vs. cleanliness - and with a rerun planned, continuity
+is worthless. Recommendation FLIPS to B.
+
+THE TECHNICAL DECIDER, on record: option D is DEGENERATE on the
+current corpus - every variable in a chain is an alias holding the
+SAME root value (VAR B = VAR A), so a "sum of found values" is just
+found x root-value, computable without carrying anything through
+the context. Meaningful arithmetic REQUIRES B's per-link values.
+But B+D compose: once B's chains carry distinct per-link values,
+D's checksum gate becomes a SCORING RULE on logged answers - it can
+be graded post-hoc, toggled without re-measuring. So the roadmap is
+B first, D as an optional stricter scorer layered on the same data.
+
+DESIGN PARAMETERS for B, rulings pending (pre-registered before
+build): (1) arithmetic density - which links carry ops (every link
+vs a fraction); (2) the op set (addition only vs +/-); (3) delta
+magnitude (small, keeping values in 5-6 digits); (4) the credit rule
+(names as now, with the chain traced through ops); (5) difficulty
+calibration - the difficulty-collapse risk the author flagged for D
+applies to B too; a pilot cell on the champion grades it before the
+field rerun.
