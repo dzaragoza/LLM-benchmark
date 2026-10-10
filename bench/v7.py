@@ -737,7 +737,8 @@ def run_cell(
             )
             is_v72 = corpus.get("grammar") == "chainarith"
             prompt = question_prompt_v72(corpus, q) if is_v72 else question_prompt(corpus, q)
-            max_tokens = max(ruler_gate.VT_GEN_TOKENS, (q["hops"] + 1) * 12)
+            per_q = (q["hops"] + 1) * (26 if is_v72 else 12)
+            max_tokens = max(ruler_gate.VT_GEN_TOKENS, per_q)
             t0 = time.monotonic()
             answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
             elapsed = round(time.monotonic() - t0, 3)
@@ -832,17 +833,23 @@ CHAINARITH_TEMPLATE = (
     "order. [/INST] Answer ONLY with the {num_v} pairs as "
     "NAME = VALUE, comma-separated, and nothing else. "
 )
-PAIR_RE = re.compile(r"([A-Z]{%d})\s*=\s*(-?\d+)" % ruler_gate.VT_NAME_LEN)
+PAIR_RE = re.compile(
+    r"([A-Z]{%d})\s*=\s*(-?\d+)(?:\s*\+\s*-?\d+\s*=\s*(-?\d+))?" % ruler_gate.VT_NAME_LEN
+)
 
 
 def score_pairs(answer: str, expected_names: list[str], expected_values: list[str]) -> tuple[bool, int]:
+    """Addendum 203 partial credit per (name, value) pair, tolerant of
+    work-shown: the pilot answers came back as NAME = base + delta =
+    FINAL (the model computes in the answer), so the FINAL number is
+    taken when present, the first number otherwise."""
     clean = ruler_gate.strip_template_debris(answer or "").upper()
-    found = dict(PAIR_RE.findall(clean))
-    correct = sum(
-        1
-        for n, v in zip(expected_names, expected_values, strict=True)
-        if found.get(n) == v
-    )
+    correct = 0
+    for match in PAIR_RE.finditer(clean):
+        name, first, final = match.group(1), match.group(2), match.group(3)
+        val = final if final is not None else first
+        if name in expected_names and val == expected_values[expected_names.index(name)]:
+            correct += 1
     return correct == len(expected_names), correct
 
 
@@ -979,9 +986,10 @@ def probe_axes(
                              "error": f"template_malfunction: {e}"}
                         )
                         break
+                    g_suffix = "" if grammar == "v71" else f"-{grammar}"
                     answers_path = os.path.join(
                         results_dir,
-                        f"{fam}-ctx{ctx}-probe-{key}-seed{seed}-answers.jsonl",
+                        f"{fam}-ctx{ctx}-probe-{key}{g_suffix}-seed{seed}-answers.jsonl",
                     )
                     try:
                         rec = run_cell(port, corpus, ctx, answers_path=answers_path)
