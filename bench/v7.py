@@ -190,7 +190,7 @@ def probe_configs(wq: str, kq: str, vq: str) -> list[tuple[str, str, str]]:
 # calibration data).
 
 
-BUDGET_GIB = 4.0
+BUDGET_GIB = 2.0  # addendum 218: the author's ruling - 4 GiB is too slow on the T14s; the study ceiling drops to 2 GiB
 CTX_GRID = [8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
 

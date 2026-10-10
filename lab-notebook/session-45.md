@@ -2330,3 +2330,29 @@ reference machine. The practitioner page's guidance inherits
 this: recommend the reach-max config for reach workloads, and
 an interactive profile (smaller ctx, no background history
 replays) for chat use.
+
+
+## Addendum 218 - the budget ceiling drops: 4 GiB -> 2 GiB
+
+THE AUTHOR'S RULING (2026-10-11): "we need to change the 4gib
+ceiling to 2 gib. 4 gib is too slow in the t14s." The study's
+fixed budget - the constraint the whole v7 allocation problem was
+posed under - is REDEFINED: 2 GiB is the new ceiling, motivated by
+the interactive experience (addendum 217) and the prefill economics
+(213/214) - the 4-GiB-class configs pay too much on the reference
+machine.
+
+CONSEQUENCES, all named:
+- BUDGET_GIB = 2.0; every climb, gate, and estimate re-derives
+  from it on the next run.
+- The OLD RESULTS are NOT invalid - they are the 4-GiB tier's
+  answer, kept as the historical table. The 2-GiB tier is a NEW
+  allocation problem: Qwen3.5-2B @131k needs ~3.3 GiB and will
+  NOT fit - the 2-GiB climb will find new maximal configs
+  (smaller ctx, harder quants, or a smaller champion).
+- The practitioner page becomes TWO-TIER: the 2-GiB recommendation
+  is the new headline; the 4-GiB results become the second tier.
+- The overnight gated-chain pilot (216's rerun, launched under
+  the 4-GiB ceiling) stays VALID for the KV question - the probe
+  tests configs, not the ceiling; when the 2-GiB run finds a new
+  champion, the gated-chain probe follows it.
