@@ -2640,3 +2640,19 @@ THE FIX, pre-registered for v7.4.1:
 - THE MARGINS still unread (state block empty): once the state write is fixed, margins from a NON-floored instrument are the sensitive read
 
 THE SILVER LINING, on record: the 4-of-8 retrieval pattern is itself depth-stable (same shape at 32k and 131k, same across KV configs) - consistent with 225 architecture reading (the retrieval bottleneck is capability-shaped, not cache-shaped) and with the 221/226 flats. And the state-write failure is caught cheap: the answers were on disk, so nothing is lost.
+
+## Addendum 232 - the correction to 231: the cells were budget-erased, not just floored; the probe must move to a 2-GiB family
+
+THE MISSING FILES (the author pushed the state; the picture completes): the top-level probe list shows ALL SIX cells errored with "budget: measured GPU 2.06-3.55 GiB" - the addendum-170 measured-census gate erased every cell BEFORE any score persisted. The 231 state-write suspicion is CORRECTED: the write never happened because the cells were rejected, never scored-then-lost. The empty probe_gatedchain-agg block is the gate working as designed (170/219).
+
+THE BUDGET REALITY (218 made it law, the probe felt it): BUDGET_GIB = 2.0. Qwen3.5-2B at Q8_0 weights does not fit 2 GiB at ANY KV config - the census read 2.06 GiB even at q4_0/q4_0 and 32k, and 3.55 GiB at f16/f16 and 131k. The 2B was never a 2-GiB citizen; 219 predicted it (Q8_0 weights alone are 2.25 GiB).
+
+WHAT REMAINS TRUE from 231 (graded from the raw answers, which were logged before the gate erased the cells): the aggregation carrier still floored - ~4-of-8 retrieval, packed-placement confusion, truncated work-shown answers. Those cells ran OUT of budget (the gate is post-run), so their scores are informative as capability data, but they carry NO weight as KV evidence (the cells are not part of any admitted table).
+
+THE RE-PLAN, pre-registered (v7.4.1 moves to the 2-GiB champion class):
+1. FAMILY: Qwen3.5-0.8B (the 219 prediction, the only class that affords Q8_0 weights at 2 GiB) - same hybrid architecture (225), so the mechanism reading carries.
+2. THE THREE CARRIER FIXES from 231 stand: AGG_CHAIN_COUNT 8 -> 4; scattered placement (225 packing reverted); gen budget sized for work-shown answers.
+3. AXES: 0.8B at its top admitting rung (the quick planner already shows 262144 at Q8_0/q8_0/q8_0 = 2.78 GiB est... over 2 GiB - so the ladder steps to Q4_0/q4_0/q4_0 @ 262144 = 1.63 GiB; the KV axis then compares q4_0 vs q8_0 KV at whatever weights fit).
+4. THE CENSUS-vs-EST calibration repeats at the new family (219s compute-floor check).
+
+THE STANDING VERDICT STRUCTURE unchanged: floor = fix the carrier; flat = the negative strengthens; separated = the contribution.
