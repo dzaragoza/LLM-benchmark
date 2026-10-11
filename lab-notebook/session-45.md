@@ -2721,3 +2721,20 @@ THE COMMANDS, fish-form (run after the ranking, not during - one server at a tim
   python3 depth_gen.py --gguf models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf --ctx 131072
   python3 depth_gen.py --gguf models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf --ctx 131072 --kv q4_0
 The second arm pairs with 236: if the KV-ordering signal is real, generation speed at depth may carry it too.
+
+## Addendum 238 - the roofline reads clean: generation is bandwidth-bound (71 GB/s hit), prefill is compute-bound; the crossover is the MODEL, not a point
+
+THE QUESTION (the author): what can compute-vs-BW determination and the crossover point take from the Qwen measurements? ANSWER: both regimes close to analytic, from the numbers already on file - no new measurement needed.
+
+GENERATION = BANDWIDTH-BOUND, EXACTLY. tg128 = 34.52 t/s x 2.06 GB weights/token = 71.1 GB/s - the T14s LPDDR5 dual-channel peak (measured effective, not spec). The roofline is SATURATED at batch 1: generation cannot go faster without more bandwidth, on any model of any size. The KV term predicts the depth falloff: t/s(d) = BW / (W + d x KV/token), KV/token ~ 12 KB (f16 KV, ~7 attention layers x 20 KV heads x 256-d x 2B). Predicted 19.5 t/s at 131k vs 214s measured 17 - within 15 percent from FIRST PRINCIPLES. THE 214 SLOWDOWN IS EXPLAINED: the KV read rides the same saturated bus.
+
+PREFILL = COMPUTE-BOUND, ONE PARAMETER. The whole pp curve fits t/s(d) = T0 / (1 + d/d*) with T0 = 1422 t/s (the linear layer flops rate) and d* = 37k tokens (the depth where attention flops double the linear work): residuals +1.5/-2.6 percent at all five depths. Effective compute ~4.9 TFLOPS at 4k (the 780M iGPU vector rate, attention-dominated portion scaling with d). Prefills bandwidth need is <1 GB/s - the bus is idle; the wall is flops.
+
+THE CROSSOVER, STATED PRECISELY: there is no depth where prefill becomes bandwidth-bound (its BW need FALLS with depth - fewer passes x more flops each). The regimes split by TASK, not by depth: prefill = flops (T0 x (1 + d/d*) model), generation = bytes (BW / (W + d x KV)). The crossover that MATTERS is the interaction line: depth x (prefill time + tokens/BW) = patience - already measured as ~28k for a 30s tolerance (226).
+
+THE PREDICTIONS, falsifiable and cheap to check with depth_gen (237):
+1. tg at depth: 28.9 t/s at 32k, 24.9 at 64k, ~19.5 at 131k (the BW+KV model above). If depth_gen reads these within 15 percent, the model is CONFIRMED and the thinking-cap arithmetic becomes exact.
+2. The KV-QUANT ARM gains a prediction from the model: q4_0 KV halves the KV term (6 KB/token) - t/s at 131k predicted ~21.9 vs f16 19.5, a ~12 percent speed gap. NOTE: this is the OPPOSITE sign of a KV-quality effect (236: q4 < f16 in score) - a small speed gain for a small score cost, the exact trade the budget study prices.
+3. ANY batch>1 or CPU-offload config changes W read per token; the model extends but the constants refit.
+
+THE PRACTICAL CLAIM, sharpened: at batch 1 the machine is bandwidth-saturated the instant it generates - model SIZE (bytes) is the generation speed, and only attention-layer flops make depth expensive in prefill. The weights axis (204) is the value axis AND the speed axis; KV rides both buses cheaply on this hybrid.
