@@ -642,7 +642,13 @@ def _run(args: argparse.Namespace) -> None:
         # Each seed is a FULL certify run on its own corpus; the state
         # namespace is seed-scoped (v7_quick_s<seed>), so cells never
         # collide and the sudden-death n=1 result becomes a best-of-n.
-        seeds = [int(s) for s in (args.v7_corpus_seed or "").split(",") if s.strip()]
+        # addendum 252: seed 1 IS the base pass (it just ran above) - a
+        # listed seed 1 is dropped from the replicate loop, never re-run
+        seeds = [
+            int(s)
+            for s in (args.v7_corpus_seed or "").split(",")
+            if s.strip() and int(s) != 1
+        ]
         for seed in seeds:
             print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
             rep = certify_v7(

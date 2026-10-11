@@ -2858,3 +2858,15 @@ THE PRE-CARD CHECKLIST, all green after the fix:
 - inheritance seed-scoped (this addendum)
 - budget-scoped blocks and planner inheritance verified (250)
 - the tier commands unchanged and ready; the 4 GiB card needs seed 3 re-run first
+
+## Addendum 252 - the 0.5 GiB card: the double-run catch; the featherweight results
+
+THE AUTHOR CATCH: "0.5 is doing an extra run." Confirmed - the user invoked --v7-corpus-seed 1,2,3 and the replicate loop ran seed 1 as a FULL pass after the base pass had ALREADY measured it (the base pass IS seed 1). The loop now drops seed 1 from the list (the base pass is seed 1 by definition); --v7-corpus-seed 2,3 remains the canonical form and 1,2,3 costs nothing extra.
+
+THE 0.5 GIB CARD RESULTS (the featherweight bout, all three seeds measured): 29 of 32 unplaceable (findings - the honest floor of the 512M class); the three contenders measured:
+- MiniCPM4-0.5B @ 32k Q4_0/q4_0/q4_0: census 0.41 GiB, score 0.261/15
+- granite-4.0-h-350m @ 32k Q8_0/q4_0/q4_0: census 0.45 GiB, score 0.229/15
+- granite-4.0-350m @ 16k Q4_0/q4_0/q4_0: census 0.36 GiB, score 0.0/10
+THE FEATHERWEIGHT CHAMPION: MiniCPM4-0.5B - 0.261/15 at 0.41 GiB. The cut cost it dearly vs its 1 GB belt (1.42/15 at q8/q8/q8): the q4 weights cut hurts the tiny families much more than the q4 KV cut - consistent with the weights-are-the-value-axis law at the bottom of the roster.
+
+NOTE: the double-run means seed 1s featherweight cells were measured twice (identical scores, as expected - same corpus). No data harm; the state carries the real measurements; only time was wasted (minutes at this tier).
