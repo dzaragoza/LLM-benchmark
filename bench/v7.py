@@ -1226,7 +1226,7 @@ def score_pairs(answer: str, expected_names: list[str], expected_values: list[st
     return correct == len(expected_names), correct
 
 
-def corpus_from_artifact(port: int, grammar: str = "v71") -> dict:
+def corpus_from_artifact(port: int, grammar: str = "v71", seed: int | None = None) -> dict:
     """The corpus as a repo artifact (the author's session-43 ruling):
     load the grammar's artifact when it matches the current grid
     constants; otherwise build once and write it. The artifact makes
@@ -1245,7 +1245,7 @@ def corpus_from_artifact(port: int, grammar: str = "v71") -> dict:
     grid = {
         "spans": SPANS,
         "hops": HOPS,
-        "seed": CORPUS_SEED,
+        "seed": CORPUS_SEED if seed is None else seed,
         "s_max": S_MAX,
         "grammar": grammar,
     }
@@ -1261,7 +1261,7 @@ def corpus_from_artifact(port: int, grammar: str = "v71") -> dict:
             # load path actually worked - session 43)
             corpus["cuts"] = {int(k_): v for k_, v in (corpus.get("cuts") or {}).items()}
             return corpus
-    corpus = builder(port)
+    corpus = builder(port, seed=seed) if seed is not None else builder(port)
     os.makedirs(os.path.dirname(artifact), exist_ok=True)
     with open(artifact, "w", encoding="utf-8") as f:
         json.dump({"grid": grid, "corpus": corpus}, f)
@@ -1450,6 +1450,7 @@ def certify_v7(
     clean: bool = False,
     only_cells: list[tuple[str, int]] | None = None,
     grammar: str = "v71",
+    corpus_seed: int | None = None,
 ) -> list[dict[str, Any]]:
     """The v7 controller, in the certify shape: for each quick cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
@@ -1592,7 +1593,7 @@ def certify_v7(
                 continue
             breakdown = llama_server.memory_breakdown_gib(log_path)
             if corpus is None:
-                corpus = corpus_from_artifact(port, grammar)
+                corpus = corpus_from_artifact(port, grammar, seed=corpus_seed)
             try:
                 preflight_template_sanity(port)
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])

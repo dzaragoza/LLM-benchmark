@@ -474,6 +474,15 @@ def build_parser() -> argparse.ArgumentParser:
         "amplifier). Applies to the probe cells.",
     )
     ap.add_argument(
+        "--v7-corpus-seed",
+        type=int,
+        default=None,
+        help="v7: the field corpus seed (addendum 239: n=4 replicates - "
+        "the n=1 run used seed 1, the default; pass 2/3/4 for the "
+        "remaining replicates; each seed builds and artifacts its own "
+        "corpus, never loading another seed's)",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -624,6 +633,7 @@ def _run(args: argparse.Namespace) -> None:
             clean=args.clean,
             only_cells=parse_v7_cells(args.v7_cells),
             grammar=args.v7_grammar,
+            corpus_seed=args.v7_corpus_seed,
         )
         state["v7"] = results
         save_state(args.state_file, state)
