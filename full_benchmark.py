@@ -642,13 +642,13 @@ def _run(args: argparse.Namespace) -> None:
         # Each seed is a FULL certify run on its own corpus; the state
         # namespace is seed-scoped (v7_quick_s<seed>), so cells never
         # collide and the sudden-death n=1 result becomes a best-of-n.
-        # addendum 252: seed 1 IS the base pass (it just ran above) - a
-        # listed seed 1 is dropped from the replicate loop, never re-run
-        seeds = [
-            int(s)
-            for s in (args.v7_corpus_seed or "").split(",")
-            if s.strip() and int(s) != 1
-        ]
+        # addendum 253 (the author's ruling, reverting 252's dedup):
+        # a listed seed 1 RUNS - a model that is new at a config needs
+        # its seed 1 measurement, and the loop guarantees it regardless
+        # of what the base pass skipped or inherited. The pass is a
+        # cheap no-op when every cell is already measured (skips are
+        # instant), so 1,2,3 is always safe to request.
+        seeds = [int(s) for s in (args.v7_corpus_seed or "").split(",") if s.strip()]
         for seed in seeds:
             print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
             rep = certify_v7(

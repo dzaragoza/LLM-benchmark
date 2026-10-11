@@ -2870,3 +2870,7 @@ THE 0.5 GIB CARD RESULTS (the featherweight bout, all three seeds measured): 29 
 THE FEATHERWEIGHT CHAMPION: MiniCPM4-0.5B - 0.261/15 at 0.41 GiB. The cut cost it dearly vs its 1 GB belt (1.42/15 at q8/q8/q8): the q4 weights cut hurts the tiny families much more than the q4 KV cut - consistent with the weights-are-the-value-axis law at the bottom of the roster.
 
 NOTE: the double-run means seed 1s featherweight cells were measured twice (identical scores, as expected - same corpus). No data harm; the state carries the real measurements; only time was wasted (minutes at this tier).
+
+## Addendum 253 - seed 1 runs in the loop (the author reverts 252s dedup)
+
+THE AUTHOR RULING: "No. I want to run seed 1 too. There could be models that are new at a config and they need seed 1." CORRECT - the base pass and the loop serve different guarantees: the base pass measures seed 1 for the cells it plans, but a listed seed 1 in the loop is DEFENSE IN DEPTH - any cell new at a config gets its seed 1 measurement no matter what was inherited or skipped, and the pass costs nothing when everything is already measured (measured cells skip instantly). The dedup is reverted; 1,2,3 is the canonical full-match form again: base pass + three replicate passes, each skipping what is done and measuring only what is new.
