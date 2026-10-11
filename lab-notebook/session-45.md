@@ -2670,3 +2670,16 @@ THE CONSEQUENCES, registered:
 4. The addendum-224 depth arms (32k and 131k) stand unchanged.
 
 THE INSTRUMENT LINE, restated: v7.4.1 = gatedchain-agg with 4 values, scattered plants, work-shown budget, on Qwen3.5-2B at 32k AND 131k, three KV configs each (q4_0/q4_0, q8_0/q8_0, f16/f16 at Q8_0 weights), n=3 seeds. The margins (222 A1) are the sensitive read; the verdict structure unchanged (floor = fix the carrier; flat = the negative strengthens; separated = the contribution).
+
+## Addendum 234 - the closure ruling: this is the LAST v7.4 probe; then findings are recorded and the study moves to the ranking
+
+THE AUTHOR RULING: "This is the last probe for 7.4, if we cannot find anything we record our findings and move to the pending ranking."
+
+THE PRE-REGISTERED EXIT, so there is no post-hoc drift:
+- SEPARATED (any instrument - exact-sum score, margins, or per-hop curves - orders the KV configs consistently across seeds): the hunt SUCCEEDS; the separator is the original contribution (223); the finding is registered and the ranking follows with the instrument in hand.
+- FLAT (all instruments agree within seed spread, both depths): THE NEGATIVE IS THE CONTRIBUTION. The recorded finding: on Qwen3.5-2B (hybrid, ~6-7 attention layers of 25), KV quantization below q8_0 is invisible to exact aggregation, token-level confidence, AND depth-decay curves at 32k and 131k, adding to the transport (211), selection/resolution (221), and speed (226) flats - six independent instruments across three mechanisms and two depths. The practical claim: the memory budget spends on WEIGHTS, KV is free at reach on this class. The KV axis closes for the era.
+- FLOOR again (the carrier still breaks): the findings are recorded as-is (the capability boundary of the 2B is itself data), the KV axis closes UNRESOLVED-BY-INSTRUMENT (weaker than flat, honestly labeled), and the study moves on regardless.
+
+THE MOVE, in all three cases: the PENDING RANKING - the v7.1 field run under the quick strategy (227/229), 4 GiB, 23 families, one cell per family, early exit. The ranking was always the deliverable; the probe line was the detour for the KV question. The field command stands fish-form: python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar v71
+
+THE WRAP-UP, when the verdict lands: the findings registered as the closing addendum of the probe line (221-234); the ranking run starts fresh; the write-up takes the tier tables + the KV negative/positive + the speed picture (226) as its three results.
