@@ -705,6 +705,125 @@ def question_prompt_v73(corpus: dict, q: dict) -> str:
     )
 
 
+# addendum 222 (B5): the aggregation grammar (gatedchain-agg) - the
+# V-error amplifier. The gated chain failed to separate KV quants
+# (addendum 221: flat, ordering inverted) because a single-retrieval
+# question samples the KV error once; an aggregation question forces
+# attention mass split over MANY positions and any per-position V
+# error corrupts the sum. Per (span, hops) grade: AGG_CHAIN_COUNT
+# short one-link chains with DISTINCT names and 4-digit values (the
+# sum stays in the 5-digit native band, addendum 216's lesson - no
+# carrier the 2B cannot carry), one edit-distance-1 decoy assignment
+# per real one (the K-stressor stays), and the question asks for the
+# SUM of the named variables' values.
+AGG_CHAIN_COUNT = 8
+AGG_TEMPLATE = (
+    "[INST] Memorize the variable assignments hidden in the "
+    "following text.\n\n{context}\nQuestion: Report the sum of "
+    "the values held by these variables: {names}. [/INST] Answer "
+    "ONLY with the single integer sum and nothing else. "
+)
+AGG_ANSWER_RE = re.compile(r"-?\d+")
+
+
+def build_corpus_v73_agg(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
+    """The aggregation corpus (addendum 222): same nested-band placement
+    discipline as build_corpus_v73 - every span's plants live inside
+    its own sentence band, deeper spans append after shallower ones,
+    each span's cut is its band's end. Per question: AGG_CHAIN_COUNT
+    real assignments with distinct names, one decoy assignment per
+    real (edit-distance-1 name, plausible value), scattered across
+    the band with noise gaps."""
+    rng = random.Random(seed)
+    probe = ruler_gate.VT_HAYSTACK * 20
+    probe_n = len(llama_server.tokenize(port, probe))
+    tokens_per_sent = max(1.0, probe_n / 20.0)
+    questions: list[dict] = []
+    for s in SPANS:
+        for h in HOPS:
+            questions.append({"span": s, "hops": h})
+    span_blobs: dict[int, list[list[str]]] = {s: [] for s in SPANS}
+    for qi, q in enumerate(questions):
+        s = q["span"]
+        names: list[str] = []
+        while len(names) < AGG_CHAIN_COUNT:
+            n = gen_name(rng)
+            if n not in names:
+                names.append(n)
+        values = [rng.randint(1000, 9999) for _ in names]
+        decoy_names = [_edit_distance_one(n, rng) for n in names]
+        # decoys never collide with a real name (the sum list must be
+        # unambiguous or a decoy hit corrupts the question itself)
+        for i, dn in enumerate(decoy_names):
+            while dn in names or dn in decoy_names[:i]:
+                dn = _edit_distance_one(dn, rng)
+            decoy_names[i] = dn
+        decoy_values = [rng.randint(1000, 9999) for _ in decoy_names]
+        blob: list[str] = []
+        for i, (n, v) in enumerate(zip(names, values)):
+            blob.append(f"VAR {n} = {v}")
+            blob.append(ruler_gate.VT_HAYSTACK)
+            blob.append(f"VAR {decoy_names[i]} = {decoy_values[i]}")
+            blob.append(ruler_gate.VT_HAYSTACK)
+        span_blobs[s].append(blob)
+        questions[qi] = {
+            **q,
+            "names": names,
+            "values": [str(v) for v in values],
+            "sum": str(sum(values)),
+        }
+    sentences: list[str] = []
+    cuts: dict[int, int] = {}
+    for s in sorted(SPANS):
+        usable = max(
+            int((s - PROMPT_OVERHEAD_TOKENS - GEN_HEADROOM_TOKENS) / tokens_per_sent * 0.95),
+            1,
+        )
+        target = usable
+        band: list[str] = []
+        for blob in span_blobs[s]:
+            band.extend(blob)
+        while len(band) < target:
+            band.append(ruler_gate.VT_HAYSTACK)
+        composed: list[str] = [ruler_gate.VT_HAYSTACK] * max(target, len(band))
+        cursor = 0
+        for blob in span_blobs[s]:
+            gap = rng.randint(1, max(2, (len(composed) - len(band)) // max(len(span_blobs[s]), 1)))
+            cursor = min(cursor + gap, max(len(composed) - len(blob), 0))
+            composed[cursor : cursor + len(blob)] = blob
+            cursor += len(blob)
+        sentences.extend(composed)
+        cuts[s] = len(sentences)
+    return {
+        "sentences": sentences,
+        "questions": questions,
+        "cuts": cuts,
+        "s_max": s_max,
+        "grammar": "gatedchain-agg",
+    }
+
+
+def question_prompt_v73_agg(corpus: dict, q: dict) -> str:
+    cut = corpus["cuts"][q["span"]]
+    context = "\n".join(corpus["sentences"][:cut]).replace(". \n", ".\n")
+    return AGG_TEMPLATE.format(
+        context=context,
+        names=", ".join(f"VAR {n}" for n in q["names"]),
+    )
+
+
+def score_agg(answer: str, expected_sum: str) -> tuple[bool, int]:
+    """One number, one verdict: the sum is exact or it is not (any
+    single-position V error corrupts the total - the whole point of
+    the aggregation readout). Work-shown tolerated: the LAST integer
+    in the answer is taken (models may show the additions)."""
+    clean = ruler_gate.strip_template_debris(answer or "")
+    nums = AGG_ANSWER_RE.findall(clean.replace(",", ""))
+    if not nums:
+        return False, 0
+    return nums[-1] == expected_sum, 1
+
+
 def build_corpus(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> dict:
     """One fixed VT corpus, identical bytes every run. The corpus is a
     sentence list (noise + every question's chain embedded); a chain
@@ -828,7 +947,9 @@ def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str
         q = next(x for x in corpus["questions"] if x["span"] == span and x["hops"] == hops)
         g = corpus.get("grammar")
         renderer = (
-            question_prompt_v73
+            question_prompt_v73_agg
+            if g == "gatedchain-agg"
+            else question_prompt_v73
             if g == "gatedchain"
             else question_prompt_v72
             if g in ("chainarith",)
@@ -882,6 +1003,8 @@ def run_cell(
     and lands in the family's results dir next to the server log."""
     per_grade: dict[tuple[int, int], dict] = {}
     samples: list[dict] = []
+    per_hop_curves: dict[str, list[list[int]]] = {}
+    margin_ledger: dict[str, list[float | None]] = {}
     answers_fh = open(answers_path, "a", encoding="utf-8") if answers_path else None
     started = time.monotonic()
     try:
@@ -893,9 +1016,12 @@ def run_cell(
                 key, {"pass": 0, "asked": 0, "found": 0, "credit": 0.0, "format_ok": 0}
             )
             grammar = corpus.get("grammar")
+            is_agg = grammar == "gatedchain-agg"
             is_v72 = grammar in ("chainarith", "gatedchain")
             prompt = (
-                question_prompt_v73(corpus, q)
+                question_prompt_v73_agg(corpus, q)
+                if is_agg
+                else question_prompt_v73(corpus, q)
                 if grammar == "gatedchain"
                 else question_prompt_v72(corpus, q)
                 if is_v72
@@ -904,14 +1030,54 @@ def run_cell(
             per_q = (q["hops"] + 1) * (26 if is_v72 else 12)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, per_q)
             t0 = time.monotonic()
-            answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
+            # addendum 222 (A1): the margin readout - the same answer
+            # arrives with its top-k logprobs; the score is unchanged,
+            # the margins are the new sensitive instrument. A server
+            # without logprobs support falls back to plain ask() -
+            # the margins come back empty, the scoring is unaffected
+            # (the instrument is optional, the score never is).
+            per_token: list[dict[str, Any]] = []
+            try:
+                answer, per_token = ruler_gate.ask_with_logprobs(
+                    port, prompt, max_tokens=max_tokens
+                )
+            except Exception:
+                answer = ruler_gate.ask(port, prompt, max_tokens=max_tokens)
             elapsed = round(time.monotonic() - t0, 3)
-            if is_v72:
+            if is_agg:
+                ok, found = score_agg(answer, q["sum"])
+                fmt_ok = found == 1
+                per_hop = [int(ok)]
+            elif is_v72:
                 ok, found = score_pairs(answer, q["names"], q["values"])
                 fmt_ok = ok
+                per_hop = score_pairs_per_hop(answer, q["names"], q["values"])
             else:
                 ok, found = ruler_gate.score_vt(answer, q["names"])
                 fmt_ok = ruler_gate.format_ok_vt(answer)
+                per_hop = [int(ok)]
+            # addendum 222 (A3): the per-hop ledger - hop-position credit
+            # per grade, so the depth-decay curve is a first-class view.
+            hop_ledger = per_hop_curves.setdefault(
+                f"{q['span']}x{q['hops']}", []
+            )
+            hop_ledger.append(per_hop)
+            # addendum 222 (A1): the mean answer-token margin (logprob of
+            # the emitted token minus the best NON-emitted competitor);
+            # quant damage shows here before exact scores move.
+            margins = []
+            for entry in per_token:
+                lp = entry.get("logprob")
+                top = entry.get("top") or []
+                competitor = max(
+                    (c[1] for c in top if c[1] is not None and c[0] != entry.get("token")),
+                    default=None,
+                )
+                if lp is not None and competitor is not None:
+                    margins.append(lp - competitor)
+            margin_ledger.setdefault(f"{q['span']}x{q['hops']}", []).append(
+                round(sum(margins) / len(margins), 4) if margins else None
+            )
             g["asked"] += 1
             g["format_ok"] += 1 if fmt_ok else 0
             g["pass"] += 1 if ok else 0
@@ -920,7 +1086,9 @@ def run_cell(
             # The strict all-names rule left every pilot cell at 0 while
             # models traced parts of the chain (44/400 answers had >=1
             # name, 0/400 had all); credit prices the partial trace.
-            g["credit"] += found / len(q["values"]) if is_v72 else found / len(q["names"])
+            g["credit"] += (
+                found / len(q["values"]) if is_v72 else 1.0 if is_agg else found / len(q["names"])
+            )
             if answers_fh is not None:
                 answers_fh.write(
                     json.dumps(
@@ -928,7 +1096,7 @@ def run_cell(
                             "window": window,
                             "grade": f"{q['span']}x{q['hops']}",
                             "expected": q["names"],
-                            "value": q["value"],
+                            "value": q.get("sum") or q.get("value"),
                             "found": found,
                             "ok": ok,
                             "format_ok": fmt_ok,
@@ -962,6 +1130,17 @@ def run_cell(
         if g["asked"]:
             score += g["credit"] / g["asked"]
             asked_grades += 1
+    def _mean_curve(curves: list[list[int]]) -> list[float]:
+        depth = max((len(c) for c in curves), default=0)
+        return [
+            round(sum(c[i] for c in curves if len(c) > i) / max(len([c for c in curves if len(c) > i]), 1), 3)
+            for i in range(depth)
+        ]
+
+    def _mean_margins(vals: list[float | None]) -> float | None:
+        real = [v for v in vals if v is not None]
+        return round(sum(real) / len(real), 4) if real else None
+
     return {
         "window": window,
         "score": round(score, 3),
@@ -970,6 +1149,17 @@ def run_cell(
         "samples": samples,
         "format_ok": sum(g["format_ok"] for g in per_grade.values()),
         "format_ok_asked": sum(g["asked"] for g in per_grade.values()),
+        # addendum 222: the sensitive readouts - per-hop depth-decay
+        # curves (A3) and mean answer-token margins (A1) per grade;
+        # the flat exact-pair view stays as `score`/`per_grade`.
+        "per_hop": {
+            grade: {"curve": _mean_curve(curves), "n": len(curves)}
+            for grade, curves in sorted(per_hop_curves.items())
+        },
+        "margins": {
+            grade: {"mean": _mean_margins(vals), "n": len(vals)}
+            for grade, vals in sorted(margin_ledger.items())
+        },
         "per_grade": {
             f"{s}x{h}": {
                 "pass": g["pass"],
@@ -985,6 +1175,7 @@ def run_cell(
 CORPUS_ARTIFACT = "state/v7-corpus.json"
 CORPUS_ARTIFACT_V72 = "state/v7-2-corpus.json"
 CORPUS_ARTIFACT_V73 = "state/v7-3-corpus.json"
+CORPUS_ARTIFACT_V73_AGG = "state/v7-3-agg-corpus.json"
 
 # addendum 212: the gated-chain grammar (v7.3) - each link's delta is a
 # REFERENCE (VAR B = VAR A + 100 x D3), each D defined by an easy seeded
@@ -1043,6 +1234,21 @@ PAIR_RE = re.compile(
 )
 
 
+def score_pairs_per_hop(answer: str, expected_names: list[str], expected_values: list[str]) -> list[int]:
+    """Addendum 222 (A3): the per-hop view of score_pairs - a 0/1 per
+    chain position, so the depth-decay curve is graded directly. If
+    quant damage accumulates with depth it shows as a steeper per-hop
+    falloff at cheap KV, invisible in the single mean."""
+    clean = ruler_gate.strip_template_debris(answer or "").upper()
+    per_hop = [0] * len(expected_names)
+    for match in PAIR_RE.finditer(clean):
+        name, first, final = match.group(1), match.group(2), match.group(3)
+        val = final if final is not None else first
+        if name in expected_names and val == expected_values[expected_names.index(name)]:
+            per_hop[expected_names.index(name)] = 1
+    return per_hop
+
+
 def score_pairs(answer: str, expected_names: list[str], expected_values: list[str]) -> tuple[bool, int]:
     """Addendum 203 partial credit per (name, value) pair, tolerant of
     work-shown: the pilot answers came back as NAME = base + delta =
@@ -1072,6 +1278,7 @@ def corpus_from_artifact(port: int, grammar: str = "v71") -> dict:
         "v71": (build_corpus, CORPUS_ARTIFACT),
         "chainarith": (build_corpus_v72, CORPUS_ARTIFACT_V72),
         "gatedchain": (build_corpus_v73, CORPUS_ARTIFACT_V73),
+        "gatedchain-agg": (build_corpus_v73_agg, CORPUS_ARTIFACT_V73_AGG),
     }[grammar]
     grid = {
         "spans": SPANS,
@@ -1123,7 +1330,9 @@ def probe_axes(
     results: list[dict[str, Any]] = []
     corpora: dict[int, dict] = {}
     builder = (
-        build_corpus_v73
+        build_corpus_v73_agg
+        if grammar == "gatedchain-agg"
+        else build_corpus_v73
         if grammar == "gatedchain"
         else build_corpus_v72
         if grammar == "chainarith"
