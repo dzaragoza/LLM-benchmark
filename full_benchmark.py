@@ -490,11 +490,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--v7-alloc",
-        default="greedy",
-        choices=["greedy", "stingy", "random"],
-        help="v7: the allocation climb policy (addendum 144/150) - greedy takes "
-        "the largest-fitting single-axis upgrade (R-18), stingy the smallest, "
-        "random a seeded random one (reproducible)",
+        default="quick",
+        choices=["quick", "greedy", "stingy", "random"],
+        help="v7: the allocation policy (addendum 227) - quick is the "
+        "field strategy: highest ctx rung first, the fit ladder "
+        "(q8,q8,q8) -> (q8,q4,q4) -> (q4,q4,q4), ONE cell per family, "
+        "early exit as soon as the top config fits (the KV steps are "
+        "fit-only: free per addenda 211/221/226; the q4 weights step "
+        "is the expensive one). greedy/stingy/random (addenda 144/150) "
+        "are DEPRECATED - historical tables only, never the default",
     )
     ap.add_argument(
         "--dry-run",
@@ -627,6 +631,11 @@ def _run(args: argparse.Namespace) -> None:
             stamp("probe complete")
             return
 
+        if args.v7_alloc in ("greedy", "stingy", "random"):
+            print(
+                f"WARNING: --v7-alloc {args.v7_alloc} is DEPRECATED (addendum 227) - "
+                "historical tables only; the field strategy is quick (the default)"
+            )
         results = certify_v7(
             args.models_dir,
             state,

@@ -2584,3 +2584,18 @@ THE STRATEGY:
 WHY THIS IS FAST: the old sweep measured every config at every rung; this strategy measures AT MOST ONE cell per rung and exits after ONE measurement in the expected case (the champion family is small enough that (q8,q8,q8) fits at top reach - the 223 prediction). The seed-spread caveat (221: spread dwarfs config gaps) is accepted: the field table ranks by the single-seed score first, and n grows only with time to spare.
 
 INTERACTION WITH THE RUNNING v7.4 PROBE: none - the probe (gatedchain-agg, 224s axes) is the instrument line; this strategy governs the FIELD line. The v7.4 verdict may yet add a KV separator, in which case the ladder order here gains a quality meaning; until then the ladder is fit-only.
+
+## Addendum 228 - the strategy lands in the code: --v7-alloc quick; greedy/stingy/random deprecated
+
+IMPLEMENTED (227 registered as a run plan; this addendum lands it in the machinery):
+- climb_allocations gains the "quick" policy: per family, the rungs walk from the HIGHEST down; the fit ladder (q8,q8,q8) -> (q8,q4,q4) -> (q4,q4,q4) tries IN ORDER at each rung; the first fitting config at the first admitting rung is the ONE cell; a family with no fitting config anywhere is a FINDING (the 154 discipline holds).
+- --v7-alloc default flips to quick; greedy/stingy/random stay as choices but print a DEPRECATION warning - they exist for the historical tables, never the field run.
+- multi_arm under quick is REFUSED (quick has one cell per family; there are no arms to measure).
+- quick cells persist in the state under families/<name>/v7_quick - the greedy/stingy/random historical tables stay untouched; a quick re-run never reads a greedy cell as done.
+- answers files carry the .quick suffix - same separation on disk.
+
+VERIFIED, planner dry-runs (no server):
+- at 4 GiB: every family lands (q8,q8,q8) at its top admitting rung - early exit fires everywhere; Qwen3.5-0.8B reaches ctx 262144 (2.78 GiB), MiniCPM5-1B ctx 131072 (2.86 GiB).
+- at 2 GiB: the ladder steps show - Qwen3.5-0.8B drops to (Q4_0,q4,q4) @ 262144 (1.63 GiB), MiniCPM5-1B to (Q4_0,q4,q4) @ 131072 (1.61 GiB) - THE 219 PREDICTION CONFIRMED BY THE PLANNER: at 2 GiB the champion class is the smaller family, and the q4 weights step is the one that fires (the KV steps alone never close a 2-GiB gap).
+
+THE SPEED, as registered: the old greedy sweep measured ~6 cells per family; quick measures ONE - at most one server launch, one corpus pass per family. The 8-hour budget (227) covers the field with n-growth to spare.

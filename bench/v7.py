@@ -339,7 +339,7 @@ def climb_allocations(
     plan's findings list (family, params, reason) so the run reports
     them - the count of MEASURED families is then honest by
     construction."""
-    if policy not in ("greedy", "stingy", "random"):
+    if policy not in ("quick", "greedy", "stingy", "random"):
         raise ValueError(f"unknown allocation policy: {policy!r}")
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
     out = []
@@ -398,7 +398,38 @@ def climb_allocations(
             if report_unplaceable:
                 out.append(findings[0])
             continue
-        for ctx in ctxs:
+        quick_cell = None
+        for ctx in reversed(ctxs):
+            # addendum 227: the QUICK strategy - highest rung first, the
+            # fit ladder in order, ONE cell per family, early exit. The
+            # first rung (from the TOP) that admits a config takes it;
+            # the first fitting config in ladder order is the cell. The
+            # greedy/stingy/random climbs are DEPRECATED (kept for the
+            # historical tables, never the default). The KV steps are
+            # fit-only (free per 211/221/226); the q4 weights step is
+            # the expensive one (204).
+            if policy == "quick":
+                ladder = (
+                    ("Q8_0", "q8_0", "q8_0"),
+                    ("Q8_0", "q4_0", "q4_0"),
+                    ("Q4_0", "q4_0", "q4_0"),
+                )
+                for wq, kq, vq in ladder:
+                    total = _alloc_total(name, p, geom, wq, kq, vq, ctx)
+                    if total is not None and total <= budget_gib:
+                        quick_cell = {
+                            "family": name,
+                            "params_b": p,
+                            "ctx": ctx,
+                            "wq": wq,
+                            "kq": kq,
+                            "vq": vq,
+                            "est_gib": round(total, 2),
+                        }
+                        break
+                if quick_cell is not None:
+                    break
+                continue
             # the floor: (W_LADDER[0], q4_0, q4_0) = (Q4_0, q4_0, q4_0) after
             # addendum 172
             wi, ki, vi = 0, 0, 0
@@ -482,6 +513,22 @@ def climb_allocations(
                     "est_gib": round(final, 2),
                 }
             )
+        if policy == "quick":
+            if quick_cell is not None:
+                out.append(quick_cell)
+            elif report_unplaceable:
+                out.append(
+                    {
+                        "family": name,
+                        "params_b": p,
+                        "reason": (
+                            f"unplaceable: no config in the quick ladder "
+                            f"(q8/q8/q8 -> q8/q4/q4 -> q4/q4/q4) fits the "
+                            f"{budget_gib} GiB budget at any reachable ctx"
+                        ),
+                    }
+                )
+            continue
     return out
 
 
@@ -1532,7 +1579,14 @@ def certify_v7(
         save_state(state_path, state)
     cells = climb_allocations(budget_gib, roster_limit, alloc_policy, report_unplaceable=True)
     # addendum 166: the multi-arm plans - stingy/random configs per cell,
-    # measured only where they diverge from the arms already measured
+    # measured only where they diverge from the arms already measured.
+    # addendum 227: multi_arm is meaningless under quick (one cell per
+    # family, no climb) - it is refused rather than silently ignored
+    if multi_arm and alloc_policy == "quick":
+        raise ValueError(
+            "--v7-multi-arm requires a climb policy (greedy/stingy/random); "
+            "quick (addendum 227) measures one cell per family and has no arms"
+        )
     alt_plans: dict[str, dict[tuple[str, int], dict]] = {}
     if multi_arm:
         for pol in ("stingy", "random"):
@@ -1589,7 +1643,14 @@ def certify_v7(
         pending_fam = fam
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
-        v7 = fst.setdefault("v7", {})
+        # addendum 227: quick cells land in their OWN namespace - the
+        # greedy/stingy/random historical tables (and their arms) stay
+        # untouched; a quick re-run never reads a greedy cell as done
+        v7 = (
+            fst.setdefault("v7_quick", {})
+            if alloc_policy == "quick"
+            else fst.setdefault("v7", {})
+        )
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
         # addendum 162: the cell selector - measure ONLY the cells whose
@@ -1705,7 +1766,9 @@ def certify_v7(
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
                 if probe_toks:
                     print(f"  preflight: {probe_toks}")
-                suffix = "" if alloc_policy == "greedy" else f".{alloc_policy}"
+                suffix = (
+                    "" if alloc_policy == "greedy" else f".{alloc_policy}"
+                )
                 answers_path = os.path.join(
                     results_dir, f"{fam}-ctx{cell['ctx']}-v7{suffix}-answers.jsonl"
                 )
