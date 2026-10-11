@@ -85,6 +85,77 @@ registered follow-up and will fill this tier properly: it steps each
 family down its fit ladder (q8/q4/q4, then q4/q4/q4) until it fits
 2 GB, and the tier winner is the argmax of those measured cells.
 
+## The weight classes 🥊
+
+A model competes **in its memory class only** — the class is decided by
+the cell's own measured footprint, and a model can **cut weight** to
+fight in a lower class: smaller weights quantization, cheaper KV
+caches, or a shorter context window all drop pounds. The picks below
+are measured cells, one champion per class.
+
+### 512 MB — the featherweights
+
+Three models can make this weight by cutting to (q4,q4,q4). The cells
+are **not yet measured** — this is the registered next bout:
+
+| contender | planned cut | est. weight |
+|---|---|---|
+| MiniCPM4-0.5B | 32k ctx, q4/q4/q4 | 0.44 GB |
+| granite-4.0-h-350m | 32k ctx, q4/q4/q4 | 0.48 GB |
+| granite-4.0-350m | 16k ctx, q4/q4/q4 | 0.40 GB |
+
+**256 MB: no contenders.** Even the smallest family's floor
+configuration exceeds a quarter GiB — the class stays empty; there is
+no honest 256 MB long-context pick at this corpus.
+
+### 1 GB — the lightweights
+
+Measured cells, champion crowned:
+
+| model | context | GPU memory | bandwidth (spec) | score |
+|---|---|---|---|---|
+| **MiniCPM4-0.5B** | 32k | 0.8 GB | 6 GB/s | **1.42/15** — the champion |
+| Qwen3.5-0.8B | 64k | 0.8 GB* | 9 GB/s | *unmeasured cut — the 1 GB run settles it* |
+| granite-4.0-350m | 32k | 1.0 GB | 8 GB/s | 0.21/15 |
+| granite-4.0-h-350m | 32k | 0.6 GB | 4 GB/s | 0.06/15 |
+
+The champion retains its belt from the field run — but Qwen3.5-0.8B's
+cut to (q4,q4,q4) at 64k makes it the **challenger**: the 1 GB-budget
+run measures that bout.
+
+### 2 GB — the welterweights
+
+| model | context | GPU memory | bandwidth (spec) | score |
+|---|---|---|---|---|
+| MiniCPM4-0.5B (F16 weights) | 32k | 1.4 GB | 11 GB/s | 1.13/10 — the best measured cell in-class |
+| gemma-3-1b-it | 32k | 1.5 GB | 13 GB/s | 0.11/15 |
+
+The class is thin in the measured data; the 2 GB-budget run is the
+registered fill — every family cuts to its best 2 GB config and the
+argmax of those cells takes the belt.
+
+### 4 GB — the middleweights
+
+| model | context | GPU memory | bandwidth (spec) | score |
+|---|---|---|---|---|
+| **Qwen3.5-2B** | 256k | 2.6 GB | 29 GB/s | **6.9/30** — the champion |
+| Qwen3.5-0.8B | 256k | 2.8 GB | 23 GB/s | 4.5/30 |
+| phi-4-mini-instruct | 32k | 3.9 GB | 29 GB/s | 3.4/15 |
+
+The full bracket is the field table below.
+
+### 8 GB — the heavyweights
+
+| model | context | GPU memory | bandwidth (spec) | score |
+|---|---|---|---|---|
+| **Qwen3.5-2B (F16 KV)** | 128k | 4.2 GB | 33 GB/s | **6.8/25** — the best measured cell in-class |
+| Qwen3.5-2B | 256k | 4.2 GB | 30 GB/s | 6.4/30 |
+| Qwen3.5-0.8B (F16 weights) | 256k | 4.4 GB | 24 GB/s | 5.9/30 |
+
+The heavyweight data comes from the earlier uncapped sweeps. The
+8 GB-budget run is the registered fill: the big families get their
+(q8,q8,q8) shot at top rung — the Jamba 3Bs first in line.
+
 ### How we ranked the field
 
 One command measured the whole roster — each family at the highest

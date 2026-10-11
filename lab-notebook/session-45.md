@@ -2816,3 +2816,20 @@ THE SEQUENCE, after the current run finishes: THE TIER SURVEY - which of 1/2/4/8
 Each fill uses the quick strategy unchanged - the budget is the planner input; the tier assignment is by the CELLS OWN census, never by the budget.
 
 THE PAGE SHAPE, when the fills land: four weight classes, each with its champion, its command line, and its table - a practitioner picks their memory class first, then reads ONE table.
+
+## Addendum 248 - the full bracket: models cut weight to drop classes; 512M has contenders; 256M honestly empty
+
+THE AUTHOR: "We are being unfair. Some models can lose some weight and still fight on the lower categories! Fill the tiers with the data we already have. Can we even go 512m, 256m? We need to get ready to rumble."
+
+THE SURVEY (305 measured cells across all state files - the field run plus every historical sweep):
+- THE CUTTING RULE, now explicit: a model drops a class by cutting weights quant (Q8->Q4), KV (q8->q4), or context (256k->64k->32k->16k). The ladder rungs ARE the weight cuts.
+- 512 MB: THREE CONTENDERS by the planner (MiniCPM4-0.5B 0.44, granite-4.0-h-350m 0.48, granite-4.0-350m 0.40 est) - the cells are NOT yet measured; the 512M bout is the registered fill: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 0.5
+- 256 MB: HONESTLY EMPTY - no family floor configuration fits a quarter GiB; the class stays empty (no honest 256M long-context pick at this corpus)
+- 1 GB: MiniCPM4-0.5B the measured champion (1.42/15); THE CHALLENGER: Qwen3.5-0.8B cuts to (q4,q4,q4) at 64k = 0.81 est - it enters the lightweight class and the 1 GB-budget run settles the bout
+- 2 GB: thin (MiniCPM4-0.5B F16@32k 1.13/10 the best measured in-class cell; gemma-3-1b-it the only other); the 2 GB run fills it
+- 4 GB: the field table stands - Qwen3.5-2B the champion
+- 8 GB: 56 measured cells from the uncapped-era sweeps; Qwen3.5-2B F16-KV@128k (6.79/25) holds the belt provisionally; the 8 GB run gives the Jambas their q8/q8/q8 shot
+
+THE PAGE: the weight-classes section covers 512M through 8G with champions, challengers, and cuts; every measured number is a real cell; unmeasured cuts are explicitly labeled (the 0.8B lightweight entry marked unmeasured).
+
+THE CARD, after the current run: the 512M bout, the 1 GB bout (the 0.8B challenger), the 2 GB fill, the 8 GB fill - four short runs at 0.5/1/2/8 budgets, then every belt is settled by measurement. Get ready to rumble.
