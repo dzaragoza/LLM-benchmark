@@ -1528,7 +1528,16 @@ def certify_v7(
         pending_fam = fam
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
-        v7 = fst.setdefault("v7_quick", {})
+        # addendum 239: the namespace is SEED-SCOPED - v7_quick for the
+        # default (seed 1, the historical n=1 run), v7_quick_s<seed> for
+        # explicit replicate seeds. A replicate run never reads another
+        # seed's cells as done (the "doing nothing" bug: seed 2's run
+        # saw seed 1's cells and skipped everything).
+        v7 = (
+            fst.setdefault("v7_quick", {})
+            if corpus_seed is None
+            else fst.setdefault(f"v7_quick_s{corpus_seed}", {})
+        )
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
         # addendum 162: the cell selector - measure ONLY the cells whose
