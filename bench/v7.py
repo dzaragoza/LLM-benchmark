@@ -1528,17 +1528,42 @@ def certify_v7(
         pending_fam = fam
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
-        # addendum 239: the namespace is SEED-SCOPED - v7_quick for the
-        # default (seed 1, the historical n=1 run), v7_quick_s<seed> for
-        # explicit replicate seeds. A replicate run never reads another
-        # seed's cells as done (the "doing nothing" bug: seed 2's run
-        # saw seed 1's cells and skipped everything).
-        v7 = (
-            fst.setdefault("v7_quick", {})
-            if corpus_seed is None
-            else fst.setdefault(f"v7_quick_s{corpus_seed}", {})
-        )
+        # addendum 239/250: the namespace is SEED- and BUDGET-SCOPED.
+        # Seed scope: v7_quick for the default (seed 1), v7_quick_s<n>
+        # for replicates - a replicate never reads another seed's cells
+        # as done (the "doing nothing" bug). Budget scope: v7_quick_b<n>
+        # when an explicit budget differs from the era default - an 8 GiB
+        # run measuring a family at the SAME ctx with a BIGGER config
+        # must never overwrite the 4 GiB cell (the drift check would
+        # replace it); tiers accumulate in their own blocks and the
+        # tier tables read ACROSS budgets by each cell's own census.
+        suffix = ""
+        if corpus_seed is not None:
+            suffix = f"_s{corpus_seed}"
+        if budget_gib != BUDGET_GIB:
+            suffix = f"_b{budget_gib:g}" + suffix
+        v7 = fst.setdefault(f"v7_quick{suffix}", {})
         done = v7.get(key) or {}
+        # addendum 250: the cross-tier skip - if THIS (ctx, wq, kq, vq)
+        # was already measured under ANY budget's block, the tier run
+        # reads it as done (the small families plan the same top-rung
+        # cell at every budget; the 8 GiB run inherits every <=4 GiB
+        # cell it does not improve on). The copy carries the original
+        # census - the tier assignment is by the cell's own footprint.
+        if done.get("score") is None:
+            for other_ns, blk in fst.items():
+                if not other_ns.startswith("v7_quick") or not isinstance(blk, dict):
+                    continue
+                cand = blk.get(key)
+                if (
+                    cand
+                    and cand.get("score") is not None
+                    and (cand.get("wq"), cand.get("kq"), cand.get("vq"))
+                    == (cell["wq"], cell["kq"], cell["vq"])
+                ):
+                    v7[key] = {**cand, "family": fam, "ctx": int(key), "inherited": True}
+                    done = v7[key]
+                    break
         entry = {**cell, "family": fam}
         # addendum 162: the cell selector - measure ONLY the cells whose
         # (family, ctx) is listed; everything else is reported as skipped
