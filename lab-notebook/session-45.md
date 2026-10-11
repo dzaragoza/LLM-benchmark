@@ -2656,3 +2656,17 @@ THE RE-PLAN, pre-registered (v7.4.1 moves to the 2-GiB champion class):
 4. THE CENSUS-vs-EST calibration repeats at the new family (219s compute-floor check).
 
 THE STANDING VERDICT STRUCTURE unchanged: floor = fix the carrier; flat = the negative strengthens; separated = the contribution.
+
+## Addendum 233 - 218 retracted: the 2-GiB ceiling was the thinking confound; ALL tests at 4 GiB
+
+THE AUTHOR RULING: "Forget the 2 gib probe. It was me misunderstanding the performance due to having thinking enabled in my perception test. ALL THE TEST IN 4 GIB."
+
+THE RETRACTION: addendum 218 dropped the ceiling to 2 GiB because 4 GiB "was too slow on the T14s" - the slowdown was THE THINKING CONFOUND (220) again, this time in the author own perception test, not the config. The ceiling returns to 4.0 GiB (BUDGET_GIB = 4.0 in the code, this addendum). The 2-GiB tier study (219) is CLOSED - its prediction (smaller families take the 2-GiB crown) remains registered but untested; the 4-GiB tier is the only tier.
+
+THE CONSEQUENCES, registered:
+1. The Qwen3.5-2B fits 4 GiB at every probe config (the 232 census reads 2.06-3.55 GiB) - the 232 re-plan onto the 0.8B is RETRACTED; the probe family returns to the 2B (the v7.1 field champion class).
+2. The budget-erasure of the v7.4 probe (232) is moot at 4 GiB - the same axes run clean.
+3. The v7.4.1 carrier fixes (231) land with the budget change: AGG_CHAIN_COUNT 8 -> 4 (inside the demonstrated ~4-of-8 retrieval range); scattered placement RESTORED (the 225 packing made selection ambiguous - the same salient four grabbed regardless of question); agg gen budget 256 tokens (the floor run showed work-shown reasoning cut at the cap).
+4. The addendum-224 depth arms (32k and 131k) stand unchanged.
+
+THE INSTRUMENT LINE, restated: v7.4.1 = gatedchain-agg with 4 values, scattered plants, work-shown budget, on Qwen3.5-2B at 32k AND 131k, three KV configs each (q4_0/q4_0, q8_0/q8_0, f16/f16 at Q8_0 weights), n=3 seeds. The margins (222 A1) are the sensitive read; the verdict structure unchanged (floor = fix the carrier; flat = the negative strengthens; separated = the contribution).
