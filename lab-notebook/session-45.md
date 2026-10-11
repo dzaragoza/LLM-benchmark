@@ -2833,3 +2833,15 @@ THE SURVEY (305 measured cells across all state files - the field run plus every
 THE PAGE: the weight-classes section covers 512M through 8G with champions, challengers, and cuts; every measured number is a real cell; unmeasured cuts are explicitly labeled (the 0.8B lightweight entry marked unmeasured).
 
 THE CARD, after the current run: the 512M bout, the 1 GB bout (the 0.8B challenger), the 2 GB fill, the 8 GB fill - four short runs at 0.5/1/2/8 budgets, then every belt is settled by measurement. Get ready to rumble.
+
+## Addendum 250 - the tier semantics confirmed and landed: budget-scoped blocks + cross-tier inheritance
+
+THE AUTHOR CONFIRMS THE SEMANTICS (two points): (1) corpus seeds may be a single number per run - the n=1 base pass skips already-measured cells, so replicate runs start at the new seed immediately; (2) each run skips measured configurations and only optimizes toward the budget given - the 8 GiB run carries all <=4 GiB results forward. TWO GAPS THIS EXPOSED, both fixed in the code:
+
+1. BUDGET-SCOPED BLOCKS: the state namespace was seed-scoped only - an 8 GiB run would have OVERWRITTEN the 4 GiB cells (same family, same ctx, bigger config, the drift check replaces). Now: v7_quick_b<n> suffixed blocks for explicit non-default budgets; every tiers cells accumulate separately; the tier tables read across blocks by each cells own census.
+
+2. CROSS-TIER INHERITANCE: a family whose planned (ctx, config) is IDENTICAL to an already-measured cell (any budget block) is read as done - inherited: true, the original census carried. The small families plan the same (q8,q8,q8) top-rung cell at every budget; the 8 GiB run inherits every <=4 GiB cell it does not improve on, and only measures the genuinely bigger configs.
+
+THE TIER CARD, final form (each: base pass skips the measured, replicates fill n=3):
+python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 0.5 --v7-corpus-seed 2,3
+(same for 1.0, 2.0, 4.0, 8.0)
