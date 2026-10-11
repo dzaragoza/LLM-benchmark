@@ -2546,3 +2546,25 @@ REGISTERED IMPLICATIONS:
 - The tiny KV footprint is WHY this family affords 131k in ~2-3 GiB: the budget recommendation and the flat KV axis are the same fact seen twice.
 - If v7.4-with-packed-plants still reads flat, the negative is stronger still: even maximal-gap retrieval through the few attention layers does not see q4_0 KV at 131k on this class.
 - OPEN (only if v7.4 stays flat): a dense-attention control family (e.g. Qwen3-1.7B, 28 dense layers) on the same grammar - if the dense model separates, the KV axis exists but is a DENSE-model axis; the hybrid flatness is the class finding.
+
+## Addendum 226 - the llama-bench sweep lands: the pp curve prices depth; tg was a flag artifact; KV-quant is speed-free
+
+THE ARTIFACTS: state/llama-bench-qwen35-2b-q8_0-t14s-2026-10-11.txt (main sweep) and state/llama-bench-qwen35-2b-q8_0-kvq4_0-t14s-2026-10-11.txt (q4_0 KV variant), Qwen3.5-2B Q8_0, Vulkan, ngl 99, fa on, T14s.
+
+THE FLAG LESSON (the author caught it): the -n 128 flag sizes GENERATION, not the tg prompt - llamas-bench tg tests a FIXED small prompt, so tg128 came back 34.52 +/- 0.00 t/s regardless of -p. The depth-scaled generation term (addendum 220 term 2) is NOT measured by this sweep; it would need an explicit long-prompt generation test (llama-server with a deep prompt, generate, read t/s - or llama-bench -p with a generation-heavy -n and manual reading). What the sweep DOES give, cleanly:
+
+THE PP CURVE (the depth-priced prefill term, cold-start):
+- pp4096: 1269 t/s -> 3.2 s cold
+- pp8192: 1117 t/s -> 7.3 s cold
+- pp16384: 972 t/s -> 17 s cold
+- pp32768: 775 t/s -> 42 s cold
+- pp65536: 510 t/s -> 128 s cold
+- pp131072: 313 t/s -> 418 s cold (7 min)
+READINGS, REGISTERED:
+1. THE INTERACTIVITY LINE, now measured: the 30-second cold-prefill tolerance sits at ~28k depth (between pp16384 17 s and pp32768 42 s); the 60-second line sits near ~40k. Addendum 217 ruling (interactive ctx ~32k) is now MEASURED, not argued: 32k buys a 42 s worst-case cold start, borderline acceptable; 16k is comfortable (17 s).
+2. THE RE-PREFILL PENALTY: evicting the prompt cache at 131k costs 7 minutes of re-prefill - the addendum-217 diagnosis (background tasks evicting the cache -> per-turn re-prefill) is priced: at interactive depths, KEEP THE CACHE WARM outranks every other serving recommendation.
+3. THE FALL IS SUPER-LINEAR in depth: 1269 -> 313 t/s is 4.05x for 32x depth - roughly t/s ~ depth^-0.63, bandwidth-bound on the 780M (consistent with the addendum-214 reality but now as a curve, not a point).
+4. KV-QUANT IS SPEED-FREE, DOUBLY CONFIRMED: the q4_0-KV variant reads pp131072 318.5 vs f16-KV 313.4 t/s - within run noise, and the whole curve matches within ~2-7 percent. KV quantization below q8_0 is free on BOTH axes now: score (211/221 flat) AND speed (226 flat). The interactive tier can run q4_0 KV at depth for zero cost.
+5. THE THINKING CAP, re-derived: with tg-at-depth unmeasured by this sweep, the cap arithmetic (220) uses the product-side bound instead: the per-turn budget the user feels is DOMINATED by prefill at cold-start (seconds to first token); the thinking multiplier rides on generation whose absolute rate we now know is ~34.5 t/s at this cell (the tg128 number, at least at shallow prompt). A "few tokens" cap (the author ruling) costs ~0.1-0.3 s per turn at 34 t/s - negligible; a 1000-token reasoning burst costs ~29 s - comparable to the entire 32k cold prefill. The cap discipline is: think in hundreds of tokens, never thousands.
+
+THE 220 HOLD, REVISITED: the sweep DID its confound-guard job - the speed picture (three depth-scaled terms: prefill now a curve, generation a rate + depth multiplier pending a deep-prompt tg test, thinking the multiplier on generation) is on file; v7.4 is CLEARED to run. Follow-up registered: a deep-prompt generation test to fill term 2 (llama-server at 131k prompt, single completion, read t/s - the 17 t/s point of addendum 214 suggests ~2x degradation at depth, to be measured once).
