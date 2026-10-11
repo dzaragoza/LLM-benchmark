@@ -2795,3 +2795,24 @@ THE AUTHOR: "Lets create more gib tiers. From the results we see some models in 
 THE PAGE: a Smaller machines section carries both tiers with measured numbers and the 1 GB pick command (MiniCPM4-0.5B, the budget recommendation). The 2 GB tier is honestly labeled THIN - one cell - and the fill is registered:
 
 THE FOLLOW-UP, pre-registered: the dedicated 2 GB-budget field run - the same quick strategy with --v7-budget-gib 2.0 - steps each family down its fit ladder (q8/q4/q4 then q4/q4/q4) at the top rung that fits 2 GiB, and the tier winner is the argmax of THOSE measured cells. The 219 prediction (smaller families take the 2-GiB crown) gets its real test here, with Qwen3.5-0.8B the presumptive favorite. Command, fish-form: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 2.0 (the cells land under v7_quick keyed by ctx; the budget is the planner input, the namespace is shared - the tier table reads the same cells with census <= 2).
+
+## Addendum 247 - the weight classes: tiers 1/2/4/8 GB; n reduced to 3; the tier survey after the current run
+
+THE AUTHOR: "Like boxing, we need to class them by weight." THE TIER STRUCTURE, registered: 1 / 2 / 4 / 8 GB - a model competes IN ITS CENSUS TIER ONLY (the measured GPU footprint decides the class, not the budget it was planned under). The (q8,q8,q8) cells already measured are top-of-the-ladder results - the best weights quality - so they define each models NATURAL class: a family whose 8,8,8 cell lands at 0.8 GiB is a featherweight forever; it makes no sense for it to fight the 3.4 GiB champion.
+
+THE TIERS, from the measured census (246 extended):
+- 1 GB: MiniCPM4-0.5B (winner), granite-4.0-350m, granite-4.0-h-350m
+- 2 GB: gemma-3-1b-it (thin - the 2 GB-budget run fills it)
+- 4 GB: the current field table - Qwen3.5-2B the champion
+- 8 GB: EMPTY - no cell measured above 4 GiB (the field ran at the 4 GiB budget); the 8 GB-budget run fills it: at 8 GiB the ladder admits (q8,q8,q8) at top rung for the BIG families that could not fit 4 (the Jambas at 262k already at 2.4-2.9 GiB in q4/q4/q4 get their q8/q8/q8 shot; larger roster families become placeable)
+
+THE N REDUCTION: n=3, not 4 (the author ruling - the replicate budget shrinks; seed 1 is done, seeds 2/3 complete the set; seed 4 cancelled).
+
+THE SEQUENCE, after the current run finishes: THE TIER SURVEY - which of 1/2/4/8 need filling, then the fills in order:
+1. the 2 GB-budget run (246): python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 2.0
+2. the 8 GB-budget run: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 8.0
+3. the 1 GB tier is ALREADY measured (three cells, a winner); only a census re-sort if a 2 GB run lands a cell under 1
+4. the 4 GB tier stands as-is (the completed field)
+Each fill uses the quick strategy unchanged - the budget is the planner input; the tier assignment is by the CELLS OWN census, never by the budget.
+
+THE PAGE SHAPE, when the fills land: four weight classes, each with its champion, its command line, and its table - a practitioner picks their memory class first, then reads ONE table.
