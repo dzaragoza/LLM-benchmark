@@ -2784,3 +2784,14 @@ THE AUTHOR CHALLENGE: "Are you sure the BW recommendation is OK? How did you com
 THE CORRECTED DERIVATION (the validated 238 roofline): bytes/token = weights + ctx x KV; requirement = reader-line t/s x bytes/token / 0.75 efficiency. The champion (2.06 GB Q8_0 weights + 0.9 GB q4_0 KV at 262k) needs ~22 GiB/s EFFECTIVE -> ~29 GB/s SPEC at full depth (~22 GB/s spec at 131k). Even a DDR5-4800 single-stick laptop meets it. The whole table recomputed per-cell (MiniCPM4-0.5B: 6 GB/s; Qwen3-1.7B: 36 GB/s - the dense-attention families pay more per token, the hybrids less).
 
 THE PAGE: the champion block reads ~29 GB/s with honest lowest-match configs; the table carries per-cell spec numbers; the explanation paragraph derives the number from the roofline (weights + KV per token, reader line, 75 percent efficiency) with the T14s as the sanity anchor (sustains the champion at 24 t/s at full depth, ~4x the line). The old 1/t = size/76.5 + 1/74 law retires from the page - it was the previous era size-only law; the roofline is the current model and it carries depth.
+
+## Addendum 246 - the tier expansion: 1 GB and 2 GB tiers from the measured cells
+
+THE AUTHOR: "Lets create more gib tiers. From the results we see some models in config 8,8,8 that may fit in 2 gib. Or even 1 gib? Put them in the correct tier." THE MEASURED CELLS SORT CLEANLY BY THEIR OWN CENSUS:
+
+- THE 1 GB TIER (census <= 1.0 GiB): MiniCPM4-0.5B @ 32k Q8_0/q8_0/q8_0 census 0.80 GiB score 1.42/15 - THE TIER WINNER (84 percent of the champions per-grade rate at a fifth of the memory); granite-4.0-350m @ 32k census 1.00 score 0.21; granite-4.0-h-350m @ 32k census 0.59 score 0.059.
+- THE 2 GB TIER (1.0 < census <= 2.0): gemma-3-1b-it @ 32k Q8_0/q8_0/q8_0 census 1.48 score 0.111 - the only measured cell in this tier; the rest of the field lands either under 1 GB or just over 2.
+
+THE PAGE: a Smaller machines section carries both tiers with measured numbers and the 1 GB pick command (MiniCPM4-0.5B, the budget recommendation). The 2 GB tier is honestly labeled THIN - one cell - and the fill is registered:
+
+THE FOLLOW-UP, pre-registered: the dedicated 2 GB-budget field run - the same quick strategy with --v7-budget-gib 2.0 - steps each family down its fit ladder (q8/q4/q4 then q4/q4/q4) at the top rung that fits 2 GiB, and the tier winner is the argmax of THOSE measured cells. The 219 prediction (smaller families take the 2-GiB crown) gets its real test here, with Qwen3.5-0.8B the presumptive favorite. Command, fish-form: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 2.0 (the cells land under v7_quick keyed by ctx; the budget is the planner input, the namespace is shared - the tier table reads the same cells with census <= 2).
