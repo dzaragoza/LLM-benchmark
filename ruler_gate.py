@@ -289,6 +289,54 @@ def report_server_ctx(log_path: str, wanted: int) -> int | None:
     return actual
 
 
+def ask_with_logprobs(
+    port: int,
+    prompt: str,
+    max_tokens: int = 64,
+    top_logprobs: int = 10,
+    no_thinking: bool = True,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Addendum 222 (A1): the same completion as ask(), but with
+    logprobs: true + top_logprobs so every generated token carries
+    its own logprob and the top-k alternatives. Returns (answer_text,
+    per_token) where per_token is a list of {token, logprob, top:
+    [(tok, lp), ...]}. The margin readout - the answer-token evidence
+    exact-pair scoring discards - without changing the answer path
+    (same endpoint, same payload, two extra keys)."""
+    payload: dict[str, Any] = {
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0,
+        "stream": False,
+        "logprobs": True,
+        "top_logprobs": top_logprobs,
+    }
+    if no_thinking:
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    try:
+        data = llama_server.post_json(port, "/v1/chat/completions", payload)
+    except urllib.error.HTTPError as e:
+        body = b""
+        try:
+            body = e.read()[:500]
+        except Exception:
+            pass
+        raise ValueError(f"HTTP {e.code} from the server: {body.decode('utf-8', 'replace')}") from e
+    msg = data["choices"][0]["message"]
+    text = msg.get("content") or msg.get("reasoning_content") or ""
+    per_token: list[dict[str, Any]] = []
+    info = data["choices"][0].get("logprobs") or {}
+    for entry in info.get("content") or []:
+        top = [
+            (c.get("token"), c.get("logprob"))
+            for c in (entry.get("top_logprobs") or [])
+        ]
+        per_token.append(
+            {"token": entry.get("token"), "logprob": entry.get("logprob"), "top": top}
+        )
+    return text, per_token
+
+
 def ask(port: int, prompt: str, max_tokens: int = 64, no_thinking: bool = True) -> str:
     """One completion through the same endpoint the speed gate uses.
     Default no_thinking=True: hybrid models (qwen3/3.5-class) burn the

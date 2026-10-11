@@ -472,12 +472,15 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--v7-grammar",
         default="v71",
-        choices=["v71", "chainarith", "gatedchain"],
-        help="v7: the corpus grammar (addenda 202/203) - v71 is the alias-chain "
+        choices=["v71", "chainarith", "gatedchain", "gatedchain-agg"],
+        help="v7: the corpus grammar (addenda 202/203/222) - v71 is the alias-chain "
         "lookup (the field grammar, the frozen suite's default); chainarith is "
         "the v7.2 grammar: every link carries a signed delta, distinct "
         "per-link values, NAME = VALUE pair answers with exact-value partial "
-        "credit (quant-sensitive by design). Applies to the probe cells.",
+        "credit (quant-sensitive by design); gatedchain is the v7.3 grammar "
+        "(riddle gates + decoy chains); gatedchain-agg is the v7.4 grammar "
+        "(addendum 222: sum-of-values aggregation questions, the V-error "
+        "amplifier). Applies to the probe cells.",
     )
     ap.add_argument(
         "--clean",
