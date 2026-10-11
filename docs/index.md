@@ -1,6 +1,6 @@
 # Pick your model
 
-*These results are from the v7.1 benchmark run in progress — the 32-model field is still being measured. The rankings below reflect the models measured so far and are **not a final ruling**.*
+*Results from the completed v7.1 field run (2026-10-11): the 32-model roster ranked under the quick strategy — one measured cell per family, 4 GB budget. This is the final ruling of the 4 GB tier.*
 
 Pick the **largest context size that fits your machine** from the list below. Bigger context means the model can work with longer documents — more pages, more code, longer conversations — without losing track of what was said at the beginning. A model certified at 16k handles a 16k-token document reliably; when in doubt, go bigger if your machine allows.
 
@@ -12,8 +12,9 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 
 ### The reach winner at 4 GB
 
-- **Model**: Qwen3.5-2B — Q8_0 weights, q8_0 K cache, q5_0 V cache
+- **Model**: Qwen3.5-2B — Q8_0 weights, q4_0 K cache, q4_0 V cache
 - **Context**: 262,144 tokens (256k) — the deepest context we measure
+- **Score**: 6.9/30 — the highest of the field, still improving at its deepest context
 
 **Pick ONE — you do not need both:**
 
@@ -31,9 +32,59 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 
 **llama.cpp command line:**
 
-```bash
-llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q8_0 --cache-type-v q5_0 -fa on --parallel 1
 ```
+llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1
+```
+
+**What each argument does:**
+
+- `-m Qwen3.5-2B-Q8_0.gguf` — the model file. `Q8_0` is the weights
+  quantization: 8-bit weights (1.92 GB for this model). The study's
+  central finding is that **weights are the value axis** — spend your
+  memory budget on the highest weights quality that fits, before
+  anything else.
+- `-c 262144` — the context window: how many tokens of conversation
+  and documents the model can hold at once. This is 256k, the deepest
+  the benchmark measures. A bigger window is only worth it if the
+  model actually uses it — the score certifies that it does.
+- `--cache-type-k q4_0 --cache-type-v q4_0` — quantize the K and V
+  attention caches to 4 bits. The caches grow with context (they hold
+  every token's attention state); at 256k they would cost ~3 GB
+  unquantized. At q4_0 they cost a fraction of that, and the study
+  measured the quality cost of doing so as **undetectable** across six
+  independent instruments (score, margins, depth curves, speed) —
+  the memory goes further and the model does not notice.
+- `-fa on` — flash attention. A faster, more memory-efficient attention
+  implementation. Required when quantizing the caches on llama-server.
+- `--parallel 1` — one request slot. The whole memory budget serves a
+  single conversation; more slots split the context window between them.
+
+### How we ranked the field
+
+One command measured the whole roster — each family at the highest
+context its budget admits, the highest weights/KV configuration that
+fits, one cell per family:
+
+```
+python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71
+```
+
+- `--task v7` — the reach benchmark: one fixed corpus, questions
+  graded by (span, hops) — how deep a fact sits and how many links
+  must be followed to recover it.
+- `--v7-families 32` — the roster: the first 32 families by ascending
+  parameter count. Every family that could not earn a cell is a
+  reported finding, never a silent drop.
+- `--v7-grammar v71` — the field corpus grammar (alias-chain lookup),
+  the same fixed corpus for every model: identical bytes, identical
+  questions, so scores compare directly.
+
+The quick strategy inside the run: for each family, walk context
+rungs from the highest down; at the first rung that fits, try
+configurations in the order (q8,q8,q8) → (q8,q4,q4) → (q4,q4,q4);
+the first that fits is **the one cell** — measure it, done. One
+server launch per family instead of a sweep; the full 32-family
+field measured in ~2 hours.
 
 ## All results (all measured within the 4 GB budget)
 
@@ -41,13 +92,16 @@ Every model below was measured under the same constraint: a fixed 4 GB GPU memor
 
 | model | best context | GPU memory | iGPU bandwidth needed | score | how to read it |
 |---|---|---|---|---|---|
-| Qwen3.5-2B | 256k | 3.5 GB | 51 GB/s | 6.9/30 | the reach winner — still improving at its deepest context |
-| Qwen3.5-0.8B | 128k | 3.9 GB | 56 GB/s | 4.5/25 | peaks at 128k, then the cache cost overtakes it |
-| Qwen3-1.7B | 32k | 3.9 GB | 51 GB/s | 2.5/15 | its 40k trained window is the limit |
-| granite-3.1-2b | 32k | 3.9 GB | 57 GB/s | 2.3/15 | peaks at 32k, declines deeper |
-| Qwen2.5-1.5B | 32k | 3.8 GB | 56 GB/s | 1.7/15 | its 32k trained window is the limit |
+| Qwen3.5-2B | 256k | 2.6 GB | 51 GB/s | 6.9/30 | the reach winner — still improving at its deepest context |
+| Qwen3.5-0.8B | 256k | 2.8 GB | 56 GB/s | 4.5/30 | the runner-up at the same depth — half the size, two-thirds the score |
+| phi-4-mini-instruct | 32k | 3.9 GB | 51 GB/s | 3.4/15 | strong at short reach |
+| AI21-Jamba2-3B | 256k | 2.9 GB | 54 GB/s | 2.8/30 | reaches deep but earns little there |
+| Qwen3-1.7B | 32k | 3.9 GB | 51 GB/s | 2.4/15 | its 40k trained window is the limit |
+| granite-3.3-2b-instruct | 64k | 3.9 GB | 57 GB/s | 2.0/20 | |
+| SmolLM3-3B | 64k | 3.9 GB | 57 GB/s | 1.8/20 | |
+| Qwen2.5-1.5B | 32k | 3.8 GB | 56 GB/s | 1.5/15 | its 32k trained window is the limit |
 | MiniCPM4-0.5B | 32k | 1.2 GB | 18 GB/s | 1.4/15 | the budget pick — fits in half the memory, half the bandwidth |
-| MiniCPM5-2B | 128k | 3.7 GB | 54 GB/s | 1.2/25 | |
+| MiniCPM5-2B | 128k | 3.7 GB | 54 GB/s | 0.9/25 | |
 
 Models that scored zero are left out of the table: two granite hybrids answer the wrong thing (the value instead of the variable names) and two models could not run the benchmark at all — their full answer logs are in the repository for inspection.
 

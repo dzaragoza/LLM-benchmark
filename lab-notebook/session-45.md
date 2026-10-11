@@ -2738,3 +2738,9 @@ THE PREDICTIONS, falsifiable and cheap to check with depth_gen (237):
 3. ANY batch>1 or CPU-offload config changes W read per token; the model extends but the constants refit.
 
 THE PRACTICAL CLAIM, sharpened: at batch 1 the machine is bandwidth-saturated the instant it generates - model SIZE (bytes) is the generation speed, and only attention-layer flops make depth expensive in prefill. The weights axis (204) is the value axis AND the speed axis; KV rides both buses cheaply on this hybrid.
+
+## Addendum 239 - the webpage updated with the crowned champion; n=4 for the benchmark
+
+THE WEBPAGE (docs/index.md): the stale in-progress banner and the stale champion (q5_0 V cache, retired 188) are replaced by the completed ranking: the champion cell Qwen3.5-2B @ 262144 Q8_0/q4_0/q4_0 score 6.906/30; the llama-server command line updated to the real config; a WHAT EACH ARGUMENT DOES section added (-m weights-are-the-value-axis, -c the reach, --cache-type-k/v the KV-is-free finding with the six-instrument evidence, -fa, --parallel); a HOW WE RANKED THE FIELD section with the field command and argument meanings plus the quick strategy explained; the results table refreshed from the 236-era run.
+
+THE REPLICATES RULING (the author): n=4 for the benchmark - we already have n=1 (the field run, seed 1); three more seeds complete the replicate set. The seed axis lives in PROBE_CORPUS_SEEDS (11/12/13) for probes and CORPUS_SEED=1 for the field; the n=4 ruling means the field run repeats on seeds 2/3/4 (the corpus seed parameter), the four per-family cells then report their mean and spread. Time budget: the n=1 field took ~2.1h, so the remaining three seeds fit the 8-hour envelope (227) in one pass - or run seed-by-seed as time allows; the table reports per-family means once all four land.
