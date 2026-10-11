@@ -48,6 +48,43 @@ llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-
   It is a patience constant, not a quality constant — scale it to
   your tolerance.
 
+## Smaller machines — the 1 GB and 2 GB tiers
+
+The same field run also measured smaller cells directly: several families'
+best-fitting configuration lands under 1 GB or 2 GB. These are measured
+results, not extrapolations — each pick below is the family's actual
+benchmarked cell with its own memory census.
+
+### The 1 GB tier
+
+| model | context | GPU memory | bandwidth needed (spec) | score |
+|---|---|---|---|---|
+| **MiniCPM4-0.5B** | 32k | 0.8 GB | 6 GB/s | **1.4/15** — the tier winner |
+| granite-4.0-350m | 32k | 1.0 GB | 8 GB/s | 0.2/15 |
+| granite-4.0-h-350m | 32k | 0.6 GB | 4 GB/s | 0.06/15 |
+
+**The 1 GB pick — MiniCPM4-0.5B** (Q8_0 weights, q8_0 KV, 32k context):
+it earns 84% of the champion's per-grade rate at a fifth of the memory —
+the small-budget recommendation for machines that cannot spare more.
+
+```
+llama-server -m MiniCPM4-0.5B-Q8_0.gguf -c 32768 --cache-type-k q8_0 --cache-type-v q8_0 -fa on --parallel 1 --reasoning-budget 150
+```
+
+### The 2 GB tier
+
+| model | context | GPU memory | bandwidth needed (spec) | score |
+|---|---|---|---|---|
+| **gemma-3-1b-it** | 32k | 1.5 GB | 13 GB/s | 0.1/15 — the only measured cell in this tier |
+
+The 2 GB tier is thin in this field run: most families' best cell
+lands either under 1 GB (the tiny families above) or just over 2 GB
+(their ladder step at higher context). A dedicated 2 GB-budget field
+run — the same quick strategy with the budget set to 2 — is the
+registered follow-up and will fill this tier properly: it steps each
+family down its fit ladder (q8/q4/q4, then q4/q4/q4) until it fits
+2 GB, and the tier winner is the argmax of those measured cells.
+
 ### How we ranked the field
 
 One command measured the whole roster — each family at the highest
