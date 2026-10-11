@@ -2708,3 +2708,16 @@ TWO BUGS FOUND, registered (both mine, both honest finds):
 THE 234 EXIT FIRES: this was the last probe. FINDINGS RECORDED - the probe line (221-236) closes with: six flats/negatives (transport 211, selection/resolution 221, speed 226, and now aggregation at two depths reading suggestive-not-separated), one architecture find (225: the hybrid explains the weakness of the KV axis), one capability boundary (231: the 2B retrieves ~4 values), one weak directional signal (236: q4 < f16 < q8 at both depths). The practical claim stands as the eras answer: THE BUDGET SPENDS ON WEIGHTS; KV below q8_0 is at worst a fraction of a grade at reach, undetectable at n=3.
 
 THE MOVE: the pending v7.1 ranking (235) - the first 32 families, quick strategy, 4 GiB. The probe line is closed.
+
+## Addendum 237 - the term-2 instrument: depth_gen.py (we design it ourselves)
+
+THE QUESTION (the author, while the ranking runs): can llama-bench measure tg AT CONTEXT? NO - the tg test generates off a fixed small prompt; -p sizes only the pp test (the authors own run proved it: tg128 = 34.52 +/- 0.00 at every depth). So the study builds its own: depth_gen.py.
+
+THE INSTRUMENT: one llama-server; per depth (4k/16k/32k/64k/131k) and per gen length (64/128/256), ONE /completion request with depth tokens of VT_HAYSTACK filler and n_predict generation. The servers OWN timings block is the read: prompt_eval -> prefill seconds at depth; eval -> generation seconds; t/s-at-depth = n_predict / eval. Both speed-picture terms fall out of the same request, server-measured, no client stopwatch drift. cache_prompt: false - every request pays the cold prefill honestly.
+
+THE EXPECTED READING (falsifiable): the addendum-214 point (17 t/s gen at 131k vs 34.5 shallow) says the tg curve should fall to roughly HALF at reach - the depth-scaled KV read per generated token. If tg stays flat vs depth on this hybrid, that is ITSELF the 225 architecture reading confirmed on the speed axis: the recurrent layers (75 percent of the model) have no KV to read, so generation cost is nearly depth-free.
+
+THE COMMANDS, fish-form (run after the ranking, not during - one server at a time):
+  python3 depth_gen.py --gguf models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf --ctx 131072
+  python3 depth_gen.py --gguf models/Qwen3.5-2B/Qwen3.5-2B-Q8_0.gguf --ctx 131072 --kv q4_0
+The second arm pairs with 236: if the KV-ordering signal is real, generation speed at depth may carry it too.
