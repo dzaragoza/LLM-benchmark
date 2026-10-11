@@ -2496,3 +2496,35 @@ THE STANDING STATE:
 THE ORDER OF OPERATIONS (unchanged by this ruling): the llama-bench
 sweep (220's hold) -> v7.4 probe on the 221 axes -> margins read
 -> verdict by 222's pre-registered grading.
+
+## Addendum 224 - v7.4 gains the depth-interaction arm (the author adds instrument 3)
+
+THE AUTHOR'S RULING (2026-10-11): "OK, add 3 in 7.4" - the third
+untried instrument (223's list), the depth interaction, joins the
+v7.4 probe as a first-class arm, not a follow-up.
+
+THE DESIGN: the same probe runs at ctx=32768 AND ctx=131072 - the
+same questions on the same seeds (the 32k reachable grades are a
+strict SUBSET of the 131k ones: 15 of 25, verified against
+grade_reachable; the shallow spans and every hops grade are
+identical), so the shallow-band scores are PAIRED across the two
+runs. Only the deep bands (65536, 131072 spans) exist at 131k.
+
+THE PRE-REGISTERED READINGS (added to 222's grading):
+- LENGTH-CONDITIONAL SEPARATION = the KV configs order consistently
+  at 131k but NOT at 32k (or vice versa) on the same questions - the
+  KV axis exists but only opens at reach. THE most interesting
+  verdict: it would tie the KV axis to the depth axis, which is
+  this benchmark's home turf.
+- DEPTH-ONLY DECAY = both runs flat but the per-hop/per-grade curves
+  fall steeper at 131k than 32k for ALL configs equally - a reach
+  effect, not a KV effect; the KV axis still closes.
+- NO INTERACTION = flat at both depths - 223's all-flat negative
+  gains a fourth agreement (the same instrument, two depths).
+
+RUN CONVENTIONS (extends 222's): probe axes
+Qwen3.5-2B:32768:... and Qwen3.5-2B:131072:... with the same three
+KV configs per depth (q4_0-q4_0, q8_0-q8_0, f16-f16 at Q8_0
+weights), n=3 seeds, grammar gatedchain-agg. The 32k arm is cheap
+(the bands are smaller); the 131k arm matches the 221 axes exactly.
+The est-vs-census compute-floor check (219) repeats at BOTH budgets.
