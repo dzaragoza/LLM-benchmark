@@ -31,10 +31,10 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
   - VRAM needed: **4 GB**. Any dedicated GPU has high enough bandwidth.
 
 **To serve it yourself interactively, take the benchmark's command and
-add the thinking cap** (the benchmark disables thinking; interactive
-use wants it on but bounded — Qwen3.5 is a hybrid reasoning model, and
-uncapped it burns thousands of invisible tokens per turn, each reading
-the whole context):
+add a thinking budget** (the benchmark disables thinking with
+`--reasoning-budget 0`; interactive use wants it on but bounded —
+Qwen3.5 is a hybrid reasoning model, and uncapped it burns thousands
+of invisible tokens per turn, each reading the whole context):
 
 ```
 llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 512
@@ -78,7 +78,7 @@ champion's cell (reconstructed from the run's server log and launch
 code):
 
 ```
-llama-server -m Qwen3.5-2B-Q8_0.gguf --port 8210 -lv 5 -c 262144 --parallel 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0
+llama-server -m Qwen3.5-2B-Q8_0.gguf --port 8210 -lv 5 -c 262144 --parallel 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --reasoning-budget 0
 ```
 
 - `-m Qwen3.5-2B-Q8_0.gguf` — the model file: Q8_0 weights (8-bit,
@@ -103,10 +103,14 @@ llama-server -m Qwen3.5-2B-Q8_0.gguf --port 8210 -lv 5 -c 262144 --parallel 1 -f
   study measured the quality cost of doing so as **undetectable**
   across six independent instruments (score, margins, depth curves,
   speed) — the memory goes further and the model does not notice.
-- Thinking is **disabled** in every benchmark request (`enable_thinking:
-  false` at the API layer): the scores measure pure reach per answer
-  token, with no hidden reasoning tokens confounding the timing or
-  the memory census.
+- `--reasoning-budget 0` — disables the model's hidden thinking
+  entirely: zero reasoning tokens are generated. Qwen3.5 is a hybrid
+  reasoning model; without this, it can spend thousands of invisible
+  tokens before every answer, each reading the whole context. The
+  benchmark also passes `enable_thinking: false` on every request
+  (belt and suspenders): the scores measure pure reach per answer
+  token, with no hidden reasoning confounding the timing or the
+  memory census.
 
 ## All results (all measured within the 4 GB budget)
 
