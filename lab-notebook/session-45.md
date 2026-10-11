@@ -2454,3 +2454,45 @@ CARRY-FORWARD:
 - The 2-GiB field run (addendum 219) remains HELD per addendum
   220 until the thinking confound is understood; this verdict
   carries into the 2-GiB era's interpretation unchanged.
+
+## Addendum 223 - the standing ruling: V7.1 is the field grammar until a separator exists; the hunt is the contribution
+
+THE AUTHOR'S RULING (2026-10-11): "Until we find a separator we
+stick with V7.1" - and the KV-sensitivity hunt is now an explicit
+RESEARCH GOAL: an original contribution. The bar: a task design
+whose score (or margin, or depth curve) ORDERS the KV cache types
+consistently across seeds on this hardware/class of model.
+
+THE STANDING STATE:
+- V7.1 (alias lookup) remains THE field grammar - every table,
+  every tier recommendation, the argmax machinery. A challenger
+  grammar only replaces it by separating the KV axis first.
+- The v7.x line (chainarith -> gatedchain -> gatedchain-agg) is the
+  INSTRUMENT line: each era exists to answer one mechanism question,
+  not to rank models.
+- The evidence so far (211, 221): exact value transport, decoy
+  selection, and riddle resolution are all KV-robust at 131k on
+  the 2B. The instruments that remain untried, in order of the
+  mechanism argument:
+  1. v7.4 exact aggregation (built, pre-registered 222) - V-error
+     accumulates over 8 attended positions; RULER has no exact-
+     aggregation task (checked 2026-10-11 against upstream's 13
+     tasks), so a positive is a genuinely new instrument.
+  2. Margins (built, 222) - the model's own token confidence may
+     separate where exact scores do not; even a margins-only
+     separation is a publishable observation.
+  3. Depth interaction - the same question at 32k vs 131k: KV
+     error should grow with table size; a length-conditional
+     effect is a finding even if the per-length effects are flat.
+- THE NEGATIVE'S VALUE, on record: if all instruments land flat,
+  the result is stronger than any single grammar - the practical
+  claim "KV quantization below q8_0 is free at reach on 2B-class
+  models, across retrieval, selection, resolution, AND exact
+  aggregation" is itself the contribution (the memory-budget
+  implications for small-RAM machines are the whole point of this
+  project), and it would close the KV axis with three independent
+  instruments agreeing.
+
+THE ORDER OF OPERATIONS (unchanged by this ruling): the llama-bench
+sweep (220's hold) -> v7.4 probe on the 221 axes -> margins read
+-> verdict by 222's pre-registered grading.
