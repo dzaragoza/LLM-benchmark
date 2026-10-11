@@ -2760,3 +2760,17 @@ THE AUTHOR: "Can you actually pass a flag to llama to disable thinking? That wou
 ## Addendum 243 - the interactive thinking budget set to ~5 seconds: --reasoning-budget 150
 
 THE AUTHOR: "For the thinking line give a reasoning budget of around 5 seconds." At the champions measured generation rate (~30 t/s, 226/238), 5 seconds ~ 150 thinking tokens. THE PAGE: the interactive command reads --reasoning-budget 150, explained as a ~5-second thinking budget - a patience constant, not a quality constant.
+
+## Addendum 244 - term-2 falls out of the benchmark logs for free: the generation-at-depth curve, first reading
+
+THE AUTHOR NOTICES: "Now I notice we get the tg/s at full context for free by running the benchmark." Correct - every benchmark request makes llama-server print_timing its own eval block; the server log IS the term-2 instrument. depth_gen (237) becomes a CONVENIENCE, not a necessity: the field run at n=4 will produce per-family generation-at-depth curves as a byproduct.
+
+THE FIRST READING (the champions 262144 cell log, q4_0 KV, tasks paired with their prefill sizes):
+- gen at ~0-8k prompt depth: n=27, mean 26.4 t/s (min 19, max 32.4)
+- gen at ~8-32k: n=2, mean 27.2 t/s
+- gen at ~32-65k: n=1, 23.8 t/s
+- gen at ~65-131k: n=1, 19.1 t/s
+
+THE READING AGAINST THE ROOFLINE (238): the ~67k-depth point reads 19.1 t/s against the models 24.9 prediction at 64k - the curve FALLS with depth as predicted, though the sparse deep samples (n=1 per bucket - most questions prefill only their delta thanks to the prompt cache) mean these are first-look numbers. Two caveats registered: (a) this cell runs q4_0 KV, where the model predicts ~12 percent FASTER than f16 - the observed fall is nonetheless real and roughly roofline-consistent; (b) the shallow mean (26.4) sits below the llama-bench tg128 (34.5) because benchmark answers are short (12-26 tokens) and per-token timing includes batch warmup - short gens average lower.
+
+THE CONSEQUENCE, registered: the n=4 replicate runs will each carry their full timing logs; the per-family term-2 curves extract in one pass over the server logs (the parser exists in this addendums analysis). The depth_gen sweep (237) stays registered as the CLEAN instrument (fixed gen lengths, cache_prompt false) for the champion only; the field logs give the broad picture for free.
