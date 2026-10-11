@@ -2424,3 +2424,33 @@ the full-cache read), and now THINKING (a multiplier on
 generation: N hidden tokens, each at full depth cost). The
 llama-bench sweep (pp and tg vs -p context) measures the first
 two on the T14s; the thinking multiplier is set by the cap.
+
+## Addendum 221 - the gated-chain KV probe grades FLAT: the negative result is airtight
+
+THE RUN (2026-10-11, resumed across three blocks - addendum 8's
+SIGINT/resume discipline held; each block re-verified preflight):
+the Qwen3.5-2B ctx=131072 gated-chain axis probe, three KV
+configs at base Q8_0 weights, n=3 seeds each, thinking disabled
+(addendum 220). Base reference score 6.787 at f16 KV / 4k ctx;
+the probe cells run the full 131k reach.
+
+THE RESULT (all cells scored):
+- Q8_0-q4_0-q4_0: mean 4.127 (per-seed [4.097, 4.927, 3.357]) est 2.87 GiB
+- Q8_0-q8_0-q8_0: mean 3.759 (per-seed [3.838, 3.498, 3.942]) est 3.25 GiB
+- Q8_0-f16-f16:  mean 3.500 (per-seed [3.616, 3.609, 3.276]) est 3.95 GiB
+
+THE VERDICT, by addendum 219's pre-registered grading: FLAT. The
+ordering is INVERTED against KV cost - the cheapest KV scores
+highest - and the per-seed spread (3.357-4.927) dwarfs the
+between-config gap (0.63). There is NO separation: the benchmark
+does not see K/V at this cell. The robustness negative result is
+AIRTIGHT: KV quantization at 131k on the 2B is free at worst,
+noise at best; no KV axis exists for the ladder to climb.
+
+CARRY-FORWARD:
+- The KV question (216's rerun) is CLOSED for the v7.2 era: KV
+  stays at whatever the budget estimator admits; it is not a
+  value axis (204's weights axis ruling stands unchallenged).
+- The 2-GiB field run (addendum 219) remains HELD per addendum
+  220 until the thinking confound is understood; this verdict
+  carries into the 2-GiB era's interpretation unchanged.
