@@ -2683,3 +2683,11 @@ THE PRE-REGISTERED EXIT, so there is no post-hoc drift:
 THE MOVE, in all three cases: the PENDING RANKING - the v7.1 field run under the quick strategy (227/229), 4 GiB, 23 families, one cell per family, early exit. The ranking was always the deliverable; the probe line was the detour for the KV question. The field command stands fish-form: python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar v71
 
 THE WRAP-UP, when the verdict lands: the findings registered as the closing addendum of the probe line (221-234); the ranking run starts fresh; the write-up takes the tier tables + the KV negative/positive + the speed picture (226) as its three results.
+
+## Addendum 235 - the ranking roster confirmed: the FIRST 32 families by parameter order
+
+THE AUTHOR CONFIRMS: the v7.1 ranking run takes the first 32 roster families by ascending parameter count (the 154 selection rule) - not 23. The quick strategy (227/229) applies per family as registered: highest admitting rung, fit ladder, one cell, early exit.
+
+THE COMMAND, fish-form: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71
+
+THE BUDGET: 4 GiB (233). The TIME BUDGET: 8 hours (227), n=1 seed start, n grows with time to spare. The deliverable: the ranked table - 32 families, one argmax cell each, the champion crowned.
