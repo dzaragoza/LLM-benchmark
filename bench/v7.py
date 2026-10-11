@@ -1550,9 +1550,20 @@ def certify_v7(
         # cell at every budget; the 8 GiB run inherits every <=4 GiB
         # cell it does not improve on). The copy carries the original
         # census - the tier assignment is by the cell's own footprint.
+        # the inheritance is BUDGET-crossing but SEED-scoped: a different
+        # corpus seed is a different MEASUREMENT (the 250 bug - seed 3
+        # inherited seed 1's cells wholesale because (ctx, config) match;
+        # s3 read identical to s1 for all 22 families). Only blocks whose
+        # seed suffix equals ours are candidates.
         if done.get("score") is None:
+            own_seed_sfx = f"_s{corpus_seed}" if corpus_seed is not None else ""
             for other_ns, blk in fst.items():
                 if not other_ns.startswith("v7_quick") or not isinstance(blk, dict):
+                    continue
+                if own_seed_sfx:
+                    if not other_ns.endswith(own_seed_sfx):
+                        continue
+                elif "_s" in other_ns[len("v7_quick"):]:
                     continue
                 cand = blk.get(key)
                 if (

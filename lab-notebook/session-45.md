@@ -2845,3 +2845,16 @@ THE AUTHOR CONFIRMS THE SEMANTICS (two points): (1) corpus seeds may be a single
 THE TIER CARD, final form (each: base pass skips the measured, replicates fill n=3):
 python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 0.5 --v7-corpus-seed 2,3
 (same for 1.0, 2.0, 4.0, 8.0)
+
+## Addendum 251 - the seed-3 catch: cross-seed inheritance bug, found and fixed before the tier card
+
+THE N=3 TABLE LANDED (4 GiB, seeds 1/2/3) and the pre-card check caught a bug of mine: SEED 3 READ IDENTICAL TO SEED 1 for all 22 families - the addendum-250 cross-tier inheritance matched on (ctx, config) alone, so seed 3 inherited seed 1s cells instead of measuring its own corpus. Seed 2 ran before that commit and is REAL; seed 3 never measured (only 22 answer files exist, the seed-1 base).
+
+THE FIX: the inheritance is BUDGET-crossing but SEED-SCOPED - only blocks whose seed suffix equals the runs own are candidates; cross-seed inheritance never happens (a different corpus is a different measurement by definition). The seed-3 block is WIPED from the state; the next 4 GiB replicate run re-measures it honestly.
+
+THE HONEST N=2 TABLE (seeds 1+2, pending seed 3s re-run): the champion HOLDS - Qwen3.5-2B mean 6.73 (6.906/6.557), spread 0.35, far clear of the runner-up 0.8B mean 5.17. The seed spread is real but the ordering is stable at the top: the 0.8B vs phi-4-mini gap (5.17 vs 3.36) and the champion margin both survive. granite-3.1-2b shows the biggest seed sensitivity (0.73 vs 2.512) - the field-table lesson (221: spread can rival gaps in the mid-table) repeats here.
+
+THE PRE-CARD CHECKLIST, all green after the fix:
+- inheritance seed-scoped (this addendum)
+- budget-scoped blocks and planner inheritance verified (250)
+- the tier commands unchanged and ready; the 4 GiB card needs seed 3 re-run first
