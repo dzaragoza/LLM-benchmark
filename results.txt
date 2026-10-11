@@ -69659,3 +69659,43 @@ replicate seed 3: the full field on corpus seed 3
   census: GPU 1.51 GiB (est 1.61) - weights 0.51, context 0.84, compute 0.16
   score 0.0 / 25
 [2026-10-11T20:49:24] v7 model done: MiniCPM5-1B (1/1 cells scored) - committing artifacts
+
+===== 2026-10-11T20:49:29 | full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 2.0 --v7-corpus-seed 1,2,3 =====
+=== Llama-3.2-1B-Instruct (model 7 of 20) ctx=131072 wq=Q4_0 k=q4_0 v=q4_0
+  preflight: {'4096x2': 4059, '65536x32': 61556}
+  census: GPU 2.02 GiB (est 1.97) - weights 0.71, context 1.12, compute 0.18
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 516, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 622, in _run
+    results = certify_v7(
+        args.models_dir,
+    ...<12 lines>...
+        corpus_seed=None,
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 1696, in certify_v7
+    raise BudgetExceeded(
+    ...<3 lines>...
+    )
+bench.v7.BudgetExceeded: measured GPU 2.02 GiB exceeds the 2.0 GiB budget (est was 1.97) - the cell is erased, never scored
+
+[2026-10-11T20:54:47] CRASH DETECTED - committing artifacts before exit
+
+===== CRASH 2026-10-11T20:54:47 =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 516, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 622, in _run
+    results = certify_v7(
+        args.models_dir,
+    ...<12 lines>...
+        corpus_seed=None,
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/v7.py", line 1696, in certify_v7
+    raise BudgetExceeded(
+    ...<3 lines>...
+    )
+bench.v7.BudgetExceeded: measured GPU 2.02 GiB exceeds the 2.0 GiB budget (est was 1.97) - the cell is erased, never scored
+
