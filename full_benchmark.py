@@ -425,12 +425,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--task",
         default="v7",
         choices=["v7"],
-        help="the certify task; 'all' is the combined controller "
-        "(speed + vt per cell, measured only if missing); 'v7' is the "
-        "fixed-budget reach benchmark (session 42/43: greedy (q,k,v) "
-        "cells, one fixed 256k corpus, graded (span, hops)). ARC and "
-        "FWE are retired (session 43: v7 sharpened the focus to reach "
-        "vs reasoning; the corpus carries both axes)",
+        help="the certify task; 'v7' is the fixed-budget reach benchmark "
+        "(session 42/43, addendum 227/229: the quick fit-ladder cell per "
+        "family, one fixed corpus, graded (span, hops)); ARC and FWE are "
+        "retired (session 43)",
     )
     ap.add_argument(
         "--v7-budget-gib",
@@ -452,13 +450,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="v7: measure ONLY these cells, comma-separated family:ctx "
         "pairs (addendum 162) - everything else reports as skipped, never "
         "measured. E.g. --v7-cells Qwen3.5-2B:262144,granite-4.0-1b:16384",
-    )
-    ap.add_argument(
-        "--v7-multi-arm",
-        action="store_true",
-        help="v7: measure all three allocation policies per cell (addendum 166) - "
-        "greedy first, then stingy/random only where their config differs; every "
-        "arm's config and score stored in the same cell record",
     )
     ap.add_argument(
         "--v7-probe-axes",
@@ -487,18 +478,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
         "measure - never leave mixed-era results in the table (addendum 129)",
-    )
-    ap.add_argument(
-        "--v7-alloc",
-        default="quick",
-        choices=["quick", "greedy", "stingy", "random"],
-        help="v7: the allocation policy (addendum 227) - quick is the "
-        "field strategy: highest ctx rung first, the fit ladder "
-        "(q8,q8,q8) -> (q8,q4,q4) -> (q4,q4,q4), ONE cell per family, "
-        "early exit as soon as the top config fits (the KV steps are "
-        "fit-only: free per addenda 211/221/226; the q4 weights step "
-        "is the expensive one). greedy/stingy/random (addenda 144/150) "
-        "are DEPRECATED - historical tables only, never the default",
     )
     ap.add_argument(
         "--dry-run",
@@ -631,11 +610,6 @@ def _run(args: argparse.Namespace) -> None:
             stamp("probe complete")
             return
 
-        if args.v7_alloc in ("greedy", "stingy", "random"):
-            print(
-                f"WARNING: --v7-alloc {args.v7_alloc} is DEPRECATED (addendum 227) - "
-                "historical tables only; the field strategy is quick (the default)"
-            )
         results = certify_v7(
             args.models_dir,
             state,
@@ -648,9 +622,7 @@ def _run(args: argparse.Namespace) -> None:
             if (args.no_git or args.dry_run)
             else partial(v7_model_commit, args),
             clean=args.clean,
-            alloc_policy=args.v7_alloc,
             only_cells=parse_v7_cells(args.v7_cells),
-            multi_arm=args.v7_multi_arm,
             grammar=args.v7_grammar,
         )
         state["v7"] = results
