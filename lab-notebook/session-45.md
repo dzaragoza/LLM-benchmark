@@ -2599,3 +2599,17 @@ VERIFIED, planner dry-runs (no server):
 - at 2 GiB: the ladder steps show - Qwen3.5-0.8B drops to (Q4_0,q4,q4) @ 262144 (1.63 GiB), MiniCPM5-1B to (Q4_0,q4,q4) @ 131072 (1.61 GiB) - THE 219 PREDICTION CONFIRMED BY THE PLANNER: at 2 GiB the champion class is the smaller family, and the q4 weights step is the one that fires (the KV steps alone never close a 2-GiB gap).
 
 THE SPEED, as registered: the old greedy sweep measured ~6 cells per family; quick measures ONE - at most one server launch, one corpus pass per family. The 8-hour budget (227) covers the field with n-growth to spare.
+
+## Addendum 229 - deprecated code is out of the codebase, always
+
+THE AUTHOR RULING: "Deprecated code is out of the codebase, always. Forget backward compatibility, we are rerunning the benchmark anyway." Also: tests are expensive in tokens - no test runs during development; the author removed the stale suites.
+
+REMOVED, entirely (no deprecation shims, no legacy branches):
+- The greedy/stingy/random climbs (addenda 144/150) - the while-loop climb, ALLOC_RANDOM_SEED, the policy dispatch. quick (227) is the ONLY strategy; any other policy value raises.
+- The multi-arm machinery (addendum 166/168) - alt_plans, the pre-launch arms check, the per-arm relaunch cycle, the arms record blocks, _skip_greedy_rescore.
+- The --v7-alloc and --v7-multi-arm CLI flags.
+- The stingy/random test suites and the greedy-specific test asserts (the author removed the stale suites).
+
+THE SHAPE NOW: climb_allocations IS the quick strategy - highest rung first, fit ladder in order, one cell per family, early exit, unplaceable-as-finding. Cells persist under families/<name>/v7_quick; answers files are -v7.quick-answers.jsonl. certify_v7 consumes the plan directly; no policy parameter threads through.
+
+THE SYNC LESSON, registered: the earlier delivery failure (the author pull found nothing; gatedchain-agg missing) was commits never leaving the sandbox. From here: commit AND push/verify the remote ref before telling the author to pull.
