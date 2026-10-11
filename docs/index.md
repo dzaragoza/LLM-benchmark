@@ -20,12 +20,13 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 
 - **Integrated GPU (iGPU)** — the model runs from system RAM:
   - System RAM needed: **4 GB**
-  - Memory bandwidth needed: **51 GB/s or faster**. The lowest
-    configuration that meets it, and others that match it exactly:
-    - DDR4-3200 dual channel (51.2 GB/s) - the lowest match
-    - DDR5-3200 dual channel (51.2 GB/s)
-    - DDR5-6400 single channel (51.2 GB/s)
-    - DDR4-1600 quad channel (51.2 GB/s)
+  - Memory bandwidth needed: **about 29 GB/s or faster** (rated spec).
+    This is what feeding the model at a comfortable reading speed
+    (300 words per minute) takes at the champion's full 256k depth.
+    The lowest configurations that meet it:
+    - DDR4-2666 dual channel (42.6 GB/s) - the lowest sensible match
+    - DDR4-3200 dual channel (51.2 GB/s)
+    - DDR5-4800 single channel (38.4 GB/s)
     - Anything faster also works.
 - **Dedicated GPU** — the model runs from the card's VRAM:
   - VRAM needed: **4 GB**. Any dedicated GPU has high enough bandwidth.
@@ -117,21 +118,21 @@ llama-server -m Qwen3.5-2B-Q8_0.gguf --port 8210 -lv 5 -c 262144 --parallel 1 -f
 
 Every model below was measured under the same constraint: a fixed 4 GB GPU memory budget, one fixed test corpus, each model scored on how many facts it still finds when they live deep in its context window. The score is credit — partial recall earns partial credit, so a bigger window only pays when the model actually uses it. The iGPU bandwidth column shows what your system memory needs to feed the model at a comfortable reading speed.
 
-| model | best context | GPU memory | iGPU bandwidth needed | score | how to read it |
+| model | best context | GPU memory | bandwidth needed (spec) | score | how to read it |
 |---|---|---|---|---|---|
-| Qwen3.5-2B | 256k | 2.6 GB | 51 GB/s | 6.9/30 | the reach winner — still improving at its deepest context |
-| Qwen3.5-0.8B | 256k | 2.8 GB | 56 GB/s | 4.5/30 | the runner-up at the same depth — half the size, two-thirds the score |
-| phi-4-mini-instruct | 32k | 3.9 GB | 51 GB/s | 3.4/15 | strong at short reach |
-| AI21-Jamba2-3B | 256k | 2.9 GB | 54 GB/s | 2.8/30 | reaches deep but earns little there |
-| Qwen3-1.7B | 32k | 3.9 GB | 51 GB/s | 2.4/15 | its 40k trained window is the limit |
-| granite-3.3-2b-instruct | 64k | 3.9 GB | 57 GB/s | 2.0/20 | |
-| SmolLM3-3B | 64k | 3.9 GB | 57 GB/s | 1.8/20 | |
-| Qwen2.5-1.5B | 32k | 3.8 GB | 56 GB/s | 1.5/15 | its 32k trained window is the limit |
-| MiniCPM4-0.5B | 32k | 1.2 GB | 18 GB/s | 1.4/15 | the budget pick — fits in half the memory, half the bandwidth |
-| MiniCPM5-2B | 128k | 3.7 GB | 54 GB/s | 0.9/25 | |
+| Qwen3.5-2B | 256k | 2.6 GB | 29 GB/s | 6.9/30 | the reach winner — still improving at its deepest context |
+| Qwen3.5-0.8B | 256k | 2.8 GB | 23 GB/s | 4.5/30 | the runner-up at the same depth — half the size, two-thirds the score |
+| phi-4-mini-instruct | 32k | 3.9 GB | 29 GB/s | 3.4/15 | strong at short reach |
+| AI21-Jamba2-3B | 256k | 2.9 GB | 24 GB/s | 2.8/30 | reaches deep but earns little there |
+| Qwen3-1.7B | 32k | 3.9 GB | 36 GB/s | 2.4/15 | its 40k trained window is the limit |
+| granite-3.3-2b-instruct | 64k | 3.9 GB | 25 GB/s | 2.0/20 | |
+| SmolLM3-3B | 64k | 3.9 GB | 27 GB/s | 1.8/20 | |
+| Qwen2.5-1.5B | 32k | 3.8 GB | 19 GB/s | 1.5/15 | its 32k trained window is the limit |
+| MiniCPM4-0.5B | 32k | 1.2 GB | 6 GB/s | 1.4/15 | the budget pick — fits in half the memory, a third of the bandwidth |
+| MiniCPM5-2B | 128k | 3.7 GB | 26 GB/s | 0.9/25 | |
 
 Models that scored zero are left out of the table: two granite hybrids answer the wrong thing (the value instead of the variable names) and two models could not run the benchmark at all — their full answer logs are in the repository for inspection.
 
 **Memory numbers are the GPU footprint** — llama-server's own measured breakdown of weights + context + compute on the graphics side. The whole-machine figure is a little higher (the host keeps a small share); budget roughly half a GB more when planning system RAM.
 
-**Bandwidth numbers** are the minimum: your system needs at least this much, or faster. They come from the study's measured law, expressed in *effective* bandwidth — `1/t = size/76.5 + 1/74` — where **76.5 GiB/s is the measured efficiency of real decoding: about 75% of the memory's spec bandwidth**. A GPU never streams at spec — kernel overhead, cache misses, and driver costs eat about a quarter of it — so do not compare these numbers against your RAM's rated speed: compare against about 75% of it. These are what a system needs to feed each model at a comfortable reading speed (300 words per minute). A dedicated GPU meets the requirement by default — it only bites integrated graphics, which serve from system RAM.
+**Bandwidth numbers** are the minimum *rated spec* your system needs to feed the model at a comfortable reading speed (300 words per minute ≈ 6.5 tokens/s). They come from the study's measured roofline: at batch 1, every generated token must read the model's **weights plus its KV cache** from memory — `bytes/token = weights + context × KV-size` — so the requirement grows with context depth. The champion needs 29 GB/s spec: 2.06 GB of Q8_0 weights plus 0.9 GB of q4_0 KV per token, times 6.5 tokens/s, divided by the measured ~75% efficiency of real decoding (a GPU never streams at spec — kernel overhead, cache misses, and driver costs eat about a quarter of it). A dedicated GPU meets the requirement by default — it only bites integrated graphics, which serve from system RAM. As a sanity anchor: the benchmark machine (LPDDR5-7467 dual channel) sustains the champion at ~24 tokens/s at full depth — nearly four times the reading-speed line.
