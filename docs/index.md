@@ -33,7 +33,7 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 **llama.cpp command line:**
 
 ```
-llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1
+llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 512
 ```
 
 **What each argument does:**
@@ -58,6 +58,15 @@ llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-
   implementation. Required when quantizing the caches on llama-server.
 - `--parallel 1` — one request slot. The whole memory budget serves a
   single conversation; more slots split the context window between them.
+- `--reasoning-budget 512` — caps the model's hidden thinking. Qwen3.5 is
+  a hybrid reasoning model: without a cap it can spend thousands of
+  invisible tokens before every answer, each one reading the whole
+  context — at 256k depth that is minutes of silence per turn. The
+  benchmark itself runs with thinking disabled; for interactive use
+  the study's measured rule is: **think in hundreds of tokens, never
+  thousands**. Set the cap to what your patience allows — at this
+  model's measured ~30 tokens/s, 512 thinking tokens cost about 17
+  seconds before the answer starts.
 
 ### How we ranked the field
 
