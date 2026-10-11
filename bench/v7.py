@@ -786,10 +786,16 @@ def build_corpus_v73_agg(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED)
         while len(band) < target:
             band.append(ruler_gate.VT_HAYSTACK)
         composed: list[str] = [ruler_gate.VT_HAYSTACK] * max(target, len(band))
+        # addendum 225: the placement tuning for the hybrid architecture
+        # - ALL plants pack at the START of the band and the query rides
+        # after the FULL cut, so every plant-to-query distance is maximal.
+        # The ~6-7 attention layers (full_attention_interval=4) are the only
+        # random-access path across that gap; the recurrent layers carry a
+        # continuously-transformed state, not verbatim values. The scattered
+        # placement diluted the load across mechanisms; this concentrates it
+        # on the layers the KV cache actually lives in.
         cursor = 0
         for blob in span_blobs[s]:
-            gap = rng.randint(1, max(2, (len(composed) - len(band)) // max(len(span_blobs[s]), 1)))
-            cursor = min(cursor + gap, max(len(composed) - len(blob), 0))
             composed[cursor : cursor + len(blob)] = blob
             cursor += len(blob)
         sentences.extend(composed)
