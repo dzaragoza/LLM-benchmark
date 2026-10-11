@@ -2874,3 +2874,16 @@ NOTE: the double-run means seed 1s featherweight cells were measured twice (iden
 ## Addendum 253 - seed 1 runs in the loop (the author reverts 252s dedup)
 
 THE AUTHOR RULING: "No. I want to run seed 1 too. There could be models that are new at a config and they need seed 1." CORRECT - the base pass and the loop serve different guarantees: the base pass measures seed 1 for the cells it plans, but a listed seed 1 in the loop is DEFENSE IN DEPTH - any cell new at a config gets its seed 1 measurement no matter what was inherited or skipped, and the pass costs nothing when everything is already measured (measured cells skip instantly). The dedup is reverted; 1,2,3 is the canonical full-match form again: base pass + three replicate passes, each skipping what is done and measuring only what is new.
+
+## Addendum 254 - the featherweight bout flips on n=3: granite-4.0-h-350m takes the belt
+
+THE N=3 GRADE (all three seeds real and independent - s2/s3 differ from s1; the base==s1 duplicate excluded):
+- granite-4.0-h-350m (Q8_0/q4_0/q4_0 @32k, census 0.555): mean 0.411 [0.229, 0.550, 0.455] - THE CHAMPION
+- MiniCPM4-0.5B (Q4_0/q4_0/q4_0 @32k, census 0.501): mean 0.302 [0.261, 0.318, 0.326]
+- granite-4.0-350m (Q4_0/q4_0/q4_0 @16k): mean 0.030 [0.0, 0.091, 0.0]
+
+THE SUDDEN-DEATH LESSON, confirmed: the n=1 reading crowned MiniCPM4-0.5B (0.261 vs 0.229); the n=3 mean flips the belt to granite-h-350m by 0.11 - inside the seed spread (granite-h reads 0.23 to 0.55 across seeds). The 247 replicate ruling exists for exactly this; the 512M belt is decided on means, not single bouts.
+
+THE MECHANISM READING: granite-h-350m keeps Q8_0 WEIGHTS (0.34 GB) while MiniCPM cuts to Q4_0 - and the Q8 weights carry the bout. The weights law (204) holds at the very bottom of the roster, and the KV cut both take costs nothing (both q4, the flats hold). The featherweight bout IS the weights-are-the-value-axis finding in its purest form.
+
+THE PAGE: the 512M section corrected - the champion, the n=3 table with per-seed spreads, the command line, and the weights-law reading. The 256M class stays honestly empty.

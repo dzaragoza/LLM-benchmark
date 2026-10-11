@@ -95,14 +95,25 @@ are measured cells, one champion per class.
 
 ### 512 MB — the featherweights
 
-Three models can make this weight by cutting to (q4,q4,q4). The cells
-are **not yet measured** — this is the registered next bout:
+Measured across three corpora each (n=3, addendum 247–253). 29 of the
+32 roster families cannot make this weight — the class floor is real.
+The three that did, in their measured cuts:
 
-| contender | planned cut | est. weight |
-|---|---|---|
-| MiniCPM4-0.5B | 32k ctx, q4/q4/q4 | 0.44 GB |
-| granite-4.0-h-350m | 32k ctx, q4/q4/q4 | 0.48 GB |
-| granite-4.0-350m | 16k ctx, q4/q4/q4 | 0.40 GB |
+| model | cut | memory | n=3 score | per-seed |
+|---|---|---|---|---|
+| **granite-4.0-h-350m** 🏆 | Q8_0 weights, 32k | 0.56 GB | **0.41/15** | 0.23, 0.55, 0.46 |
+| MiniCPM4-0.5B | Q4_0 weights, 32k | 0.50 GB | 0.30/15 | 0.26, 0.32, 0.33 |
+| granite-4.0-350m | Q4_0 weights, 16k | 0.46 GB | 0.03/10 | 0.00, 0.09, 0.00 |
+
+**The featherweight champion: granite-4.0-h-350m** — and the bout is
+the study's weights law in miniature: it keeps **Q8_0 weights** (0.34
+GB) while MiniCPM4-0.5B cuts to Q4_0, and the Q8 weights carry the
+belt. At the bottom of the roster the weights quant is nearly the
+whole game; the KV cut (both run q4) costs nothing, as ever.
+
+```
+llama-server -m granite-4.0-h-350m-Q8_0.gguf -c 32768 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 150
+```
 
 **256 MB: no contenders.** Even the smallest family's floor
 configuration exceeds a quarter GiB — the class stays empty; there is
