@@ -2528,3 +2528,21 @@ KV configs per depth (q4_0-q4_0, q8_0-q8_0, f16-f16 at Q8_0
 weights), n=3 seeds, grammar gatedchain-agg. The 32k arm is cheap
 (the bands are smaller); the 131k arm matches the 221 axes exactly.
 The est-vs-census compute-floor check (219) repeats at BOTH budgets.
+
+## Addendum 225 - the architecture find: Qwen3.5-2B is a hybrid; the KV cache lives in ~6-7 of 25 layers
+
+THE EVIDENCE (the author asks: what does the llama.cpp load dump tell us?): the rung-131072 server log carries the full GGUF metadata dump. THE MODEL IS NOT A DENSE TRANSFORMER:
+- qwen35.attention.recurrent_layers arr[bool,25] = mostly true - the 25 layers are ~24 recurrent (SSM/Mamba-style)
+- qwen35.full_attention_interval = 4 - only every 4th layer is full attention (~6-7 layers)
+- qwen35.attention.head_count_kv = 20 (vs 80 Q heads, 4:1 GQA), key_length = value_length = 256
+- qwen35.ssm.* keys (conv 4, state 128, groups 16, inner 2048): the recurrent layers carry their own state, never quantized by --cache-type-k/v
+
+THE MECHANISM READING: the KV cache of this model is small (few attention layers x GQA x 256-dim), so q4_0 touches a small parameter budget - a first-principles reason the KV axis reads flat (211/221). Most long-context propagation happens in the recurrent state, untouched by KV quantization. The separator must load the ONE mechanism the KV cache serves: random-access verbatim retrieval across a long gap, which only the sparse attention layers can do.
+
+THE PLACEMENT TUNING (v7.4, implemented): plants pack at the START of each span band; the query rides after the FULL cut - every plant-to-query distance is MAXIMAL. The scattered placement (222) diluted the load across mechanisms (short gaps could ride the recurrent state); the packed placement concentrates it on the attention layers. Everything else stands: exact-sum verdict, decoys, n=3, the 224 depth arms.
+
+REGISTERED IMPLICATIONS:
+- The flat results so far are measured on a HYBRID model; the KV axis may be genuinely weak in this class (hybrid SSM/attention small models) - which sharpens the practical claim: the budget-favored families spend their bytes on weights, KV is nearly free.
+- The tiny KV footprint is WHY this family affords 131k in ~2-3 GiB: the budget recommendation and the flat KV axis are the same fact seen twice.
+- If v7.4-with-packed-plants still reads flat, the negative is stronger still: even maximal-gap retrieval through the few attention layers does not see q4_0 KV at 131k on this class.
+- OPEN (only if v7.4 stays flat): a dense-attention control family (e.g. Qwen3-1.7B, 28 dense layers) on the same grammar - if the dense model separates, the KV axis exists but is a DENSE-model axis; the hybrid flatness is the class finding.
