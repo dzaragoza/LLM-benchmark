@@ -2691,3 +2691,20 @@ THE AUTHOR CONFIRMS: the v7.1 ranking run takes the first 32 roster families by 
 THE COMMAND, fish-form: python3 full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71
 
 THE BUDGET: 4 GiB (233). The TIME BUDGET: 8 hours (227), n=1 seed start, n grows with time to spare. The deliverable: the ranked table - 32 families, one argmax cell each, the champion crowned.
+
+## Addendum 236 - the last v7.4 probe grades: SUGGESTIVE, NOT SEPARATED; findings recorded; the study moves to the ranking
+
+THE RUN: all 18 cells admitted and persisted at 4 GiB (233 fix confirmed); the carrier fixes (233) lifted the instrument off the floor - 4-value exact-sum pass rates 41-56 percent (was ~0). The raw answers carry both eras (the old 8-value files append before the rebuild); the NEW-era-only grades are the verdict.
+
+THE RESULT (new era, per-config means over n=3 seeds):
+- ctx 32768: q4_0/q4_0 0.489, q8_0/q8_0 0.556, f16/f16 0.533
+- ctx 131072: q4_0/q4_0 0.413, q8_0/q8_0 0.480, f16/f16 0.453
+THE ORDERING IS CONSISTENT AT BOTH DEPTHS: q4_0 < f16 < q8_0 - the first KV-monotone-ish signal of the whole hunt, repeated across both depth arms. BUT per-seed ranges OVERLAP (n=3; e.g. 131k seed13 reads 0.32-0.48 across all three configs), so by 222s pre-registered standard (consistent ordering ACROSS SEEDS) this is NOT SEPARATED. Honest label: SUGGESTIVE - a weak directional signal that would need more seeds (the axis 2 rejected as too expensive) or margins to confirm.
+
+TWO BUGS FOUND, registered (both mine, both honest finds):
+1. THE AGG CREDIT BUG: run_cell credits agg cells by FORMAT (found=1 for any numeric answer), not CORRECTNESS (ok) - the state means (25.0/15.0) are format rates, not pass rates; the true rates are in the answers (graded above). One-line fix follows this addendum.
+2. MARGINS NOT CAPTURED: the state records carry no margins block - the ask_with_logprobs path fell back (server build lacks logprobs support or the HTTP shape differed); the sensitive instrument never engaged. Registered as a known gap, not re-run per 234.
+
+THE 234 EXIT FIRES: this was the last probe. FINDINGS RECORDED - the probe line (221-236) closes with: six flats/negatives (transport 211, selection/resolution 221, speed 226, and now aggregation at two depths reading suggestive-not-separated), one architecture find (225: the hybrid explains the weakness of the KV axis), one capability boundary (231: the 2B retrieves ~4 values), one weak directional signal (236: q4 < f16 < q8 at both depths). The practical claim stands as the eras answer: THE BUDGET SPENDS ON WEIGHTS; KV below q8_0 is at worst a fraction of a grade at reach, undetectable at n=3.
+
+THE MOVE: the pending v7.1 ranking (235) - the first 32 families, quick strategy, 4 GiB. The probe line is closed.

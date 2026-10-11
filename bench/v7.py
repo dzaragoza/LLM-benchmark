@@ -1046,8 +1046,10 @@ def run_cell(
             # The strict all-names rule left every pilot cell at 0 while
             # models traced parts of the chain (44/400 answers had >=1
             # name, 0/400 had all); credit prices the partial trace.
+            # addendum 236 fix: agg credit is CORRECTNESS (ok), not
+            # format (found) - the floor-era state means were format rates
             g["credit"] += (
-                found / len(q["values"]) if is_v72 else 1.0 if is_agg else found / len(q["names"])
+                found / len(q["values"]) if is_v72 else ok if is_agg else found / len(q["names"])
             )
             if answers_fh is not None:
                 answers_fh.write(
