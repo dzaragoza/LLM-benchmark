@@ -2756,3 +2756,7 @@ THE AUTHOR CLARIFIES: the page should show the llama-cpp command used IN THE BEN
 ## Addendum 242 - the explicit disable flag: --reasoning-budget 0 on the benchmark command
 
 THE AUTHOR: "Can you actually pass a flag to llama to disable thinking? That would be clearer." YES - the build the benchmark runs (10964, per the run logs) supports --reasoning-budget; the log shows reasoning budget: tokens=-1 (uncapped) and the thinking block injected server-side. --reasoning-budget 0 disables thinking entirely at the server level - the clearest spelling of the 220 benchmark ruling. THE PAGE UPDATED: the benchmark command gains --reasoning-budget 0; the explanation notes the benchmark ALSO passes enable_thinking false per request (belt and suspenders); the interactive command keeps --reasoning-budget 512, now framed as "the benchmark command with a thinking budget instead of the disable."
+
+## Addendum 243 - the interactive thinking budget set to ~5 seconds: --reasoning-budget 150
+
+THE AUTHOR: "For the thinking line give a reasoning budget of around 5 seconds." At the champions measured generation rate (~30 t/s, 226/238), 5 seconds ~ 150 thinking tokens. THE PAGE: the interactive command reads --reasoning-budget 150, explained as a ~5-second thinking budget - a patience constant, not a quality constant.

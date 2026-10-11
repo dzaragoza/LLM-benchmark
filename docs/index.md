@@ -34,17 +34,18 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 add a thinking budget** (the benchmark disables thinking with
 `--reasoning-budget 0`; interactive use wants it on but bounded —
 Qwen3.5 is a hybrid reasoning model, and uncapped it burns thousands
-of invisible tokens per turn, each reading the whole context):
+of invisible tokens per turn, each reading the whole context. The
+budget below buys ~5 seconds of thinking):
 
 ```
-llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 512
+llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 150
 ```
 
-- `--reasoning-budget 512` — caps the hidden thinking. The study's
+- `--reasoning-budget 150` — caps the hidden thinking at ~5 seconds
+  (at this model's measured ~30 tokens/s). The study's
   measured rule: **think in hundreds of tokens, never thousands**.
-  Set the cap to what your patience allows — at this model's measured
-  ~30 tokens/s, 512 thinking tokens cost about 17 seconds before the
-  answer starts. It is a patience constant, not a quality constant.
+  It is a patience constant, not a quality constant — scale it to
+  your tolerance.
 
 ### How we ranked the field
 
