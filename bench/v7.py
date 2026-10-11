@@ -3,14 +3,14 @@
 The design (addendum 98): one fixed VT corpus at 256k tokens serves
 every contender; questions are graded by (span, hops) - span is the
 REACH axis (a window W < span is a structural fail), hops is the
-REASONING axis (degrades gracefully). Model selection is the greedy
-(q, k, v) climb from (2,2,2) toward the fixed memory budget
+REASONING axis (degrades gracefully). Model selection is the quick
+fit-ladder (addendum 227/229) toward the fixed memory budget
 (session 43's ruling; K-encoding below q8, top at 16 bits). The
 deliverable: the argmax cell - one model, one ctx, one
 recommendation - with the speed gate as the certification step.
 
 This module carries the v7 pieces that live in the full_benchmark
-world: the allocation ladders, the greedy climb, the corpus builder,
+world: the fit ladder, the corpus builder,
 the graded scorer, and the per-cell controller (acquire via the
 certify phase-1/2 path, launch in the bench.cells shape, state in
 the families/<name> tree of full_benchmark's state file).
@@ -50,8 +50,6 @@ trustworthy only in the normalized + per-grade views above.
 from __future__ import annotations
 
 import json
-import os
-import random
 import os
 import random
 import re
@@ -144,12 +142,8 @@ HOPS = [2, 4, 8, 16, 32]
 # runs comes from RE-RUNNING with corpus n+1: the nth corpus has
 # seed n (CORPUS_SEED). This run is n=1.
 CORPUS_SEED = 1
-# addendum 150: the random climb's rng seed - registered so the
 # policy is reproducible. Seeded per (family, ctx) via params.
-ALLOC_RANDOM_SEED = 7
-# addendum 150: the random climb's rng seed - registered so the
 # policy is reproducible. Seeded per (family, ctx) via params.
-ALLOC_RANDOM_SEED = 7
 
 # addendum 196/197: the axis probe's repeat corpora - three DIFFERENT
 # corpora (one per seed), so a probe score is the mean over n=3 and
@@ -278,7 +272,7 @@ def kv_per_token_f16(name: str, geom: dict | None) -> float | None:
     over-estimated Qwen3.5-0.8B 4x at 262144 (3.2 GiB predicted vs
     0.86 measured) because all 24 layers were charged at full
     window; with the interval the anchors fit within 5% at every
-    ctx >= 32k. The greedy climb climbs HIGHER without it - wrong
+    ctx >= 32k. A wrong ladder step climbs HIGHER without it - wrong
     quants hurt scores, and wrong VRAM numbers hurt the
     recommendation, so the estimator calibrates against every
     census anchor (wow.md rule 1).
@@ -315,20 +309,18 @@ def _alloc_total(
 def climb_allocations(
     budget_gib: float,
     roster_limit: int = PILOT_FAMILIES,
-    policy: str = "greedy",
+    policy: str = "quick",
     report_unplaceable: bool = False,
 ) -> list[dict]:
-    """For each (family, ctx): start at the (W_LADDER[0], q4_0, q4_0) floor and
-    climb by single-axis one-notch upgrades that land under the budget
-    without exceeding it, until no upgrade fits (the maximal config).
-    Policy (addendum 144): "greedy" takes the LARGEST-fitting upgrade
-    each step (R-18); "stingy" takes the SMALLEST - the paths diverge,
-    the maximality contract is identical. "random" (addendum 150) takes
-    a RANDOM fitting upgrade, seeded for reproducibility - the truly
-    assumption-free climb: no ordering over the axes, no step
-    preference, maximality still guaranteed by the no-upgrade-fits
-    stop. Output: the maximal config
-    <= budget per (family, ctx), param-ascending.
+    """Addendum 227/229: the QUICK field strategy - for each family, the
+    rungs walk from the HIGHEST down; the fit ladder (q8,q8,q8) ->
+    (q8,q4,q4) -> (q4,q4,q4) tries in order at each rung; the first
+    fitting config at the first admitting rung is the family's ONE
+    cell. The KV steps are fit-only (free per addenda 211/221/226);
+    the q4 weights step is the expensive one (204). The greedy/stingy/
+    random climbs (addenda 144/150) are REMOVED (229) - the benchmark
+    is rerun; deprecated code is out of the codebase, always.
+    Output: the one cell per family, param-ascending.
 
     SELECTION (addendum 154, the author's ruling): the candidates are
     ALL roster families, sorted by parameter count ascending; the
@@ -339,8 +331,8 @@ def climb_allocations(
     plan's findings list (family, params, reason) so the run reports
     them - the count of MEASURED families is then honest by
     construction."""
-    if policy not in ("quick", "greedy", "stingy", "random"):
-        raise ValueError(f"unknown allocation policy: {policy!r}")
+    if policy != "quick":
+        raise ValueError(f"unknown allocation policy: {policy!r} (quick is the only strategy, addendum 229)")
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
     out = []
     for p, name in rows[:roster_limit]:
@@ -398,137 +390,46 @@ def climb_allocations(
             if report_unplaceable:
                 out.append(findings[0])
             continue
+        # addendum 227/229: the QUICK field strategy - highest rung
+        # first, the fit ladder in order, ONE cell per family, early
+        # exit. The KV steps are fit-only (free per 211/221/226); the
+        # q4 weights step is the expensive one (204).
         quick_cell = None
+        ladder = (
+            ("Q8_0", "q8_0", "q8_0"),
+            ("Q8_0", "q4_0", "q4_0"),
+            ("Q4_0", "q4_0", "q4_0"),
+        )
         for ctx in reversed(ctxs):
-            # addendum 227: the QUICK strategy - highest rung first, the
-            # fit ladder in order, ONE cell per family, early exit. The
-            # first rung (from the TOP) that admits a config takes it;
-            # the first fitting config in ladder order is the cell. The
-            # greedy/stingy/random climbs are DEPRECATED (kept for the
-            # historical tables, never the default). The KV steps are
-            # fit-only (free per 211/221/226); the q4 weights step is
-            # the expensive one (204).
-            if policy == "quick":
-                ladder = (
-                    ("Q8_0", "q8_0", "q8_0"),
-                    ("Q8_0", "q4_0", "q4_0"),
-                    ("Q4_0", "q4_0", "q4_0"),
-                )
-                for wq, kq, vq in ladder:
-                    total = _alloc_total(name, p, geom, wq, kq, vq, ctx)
-                    if total is not None and total <= budget_gib:
-                        quick_cell = {
-                            "family": name,
-                            "params_b": p,
-                            "ctx": ctx,
-                            "wq": wq,
-                            "kq": kq,
-                            "vq": vq,
-                            "est_gib": round(total, 2),
-                        }
-                        break
-                if quick_cell is not None:
+            for wq, kq, vq in ladder:
+                total = _alloc_total(name, p, geom, wq, kq, vq, ctx)
+                if total is not None and total <= budget_gib:
+                    quick_cell = {
+                        "family": name,
+                        "params_b": p,
+                        "ctx": ctx,
+                        "wq": wq,
+                        "kq": kq,
+                        "vq": vq,
+                        "est_gib": round(total, 2),
+                    }
                     break
-                continue
-            # the floor: (W_LADDER[0], q4_0, q4_0) = (Q4_0, q4_0, q4_0) after
-            # addendum 172
-            wi, ki, vi = 0, 0, 0
-            total = _alloc_total(
-                name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
-            )
-            if total is None or total > budget_gib:
-                continue
-            rng = (
-                random.Random(ALLOC_RANDOM_SEED) if policy == "random" else None
-            )  # addendum 167: ONE fixed seed, the same for every cell -
-            # a fresh rng per (family, ctx) from the registered constant;
-            # no params-dependence, no cross-cell stream coupling
-            while True:
-                if rng is not None:
-                    options = []
-                    for axis in range(3):
-                        cand = (
-                            (min(wi + 1, len(W_LADDER) - 1), ki, vi)
-                            if axis == 0
-                            else (wi, min(ki + 1, len(KV_QUANT_LADDER) - 1), vi)
-                            if axis == 1
-                            else (wi, ki, min(vi + 1, len(KV_QUANT_LADDER) - 1))
-                        )
-                        if cand == (wi, ki, vi):
-                            continue
-                        t = _alloc_total(
-                            name,
-                            p,
-                            geom,
-                            W_LADDER[cand[0]],
-                            KV_QUANT_LADDER[cand[1]],
-                            KV_QUANT_LADDER[cand[2]],
-                            ctx,
-                        )
-                        if t is not None and t <= budget_gib:
-                            options.append((t, cand))
-                    if not options:
-                        break
-                    total, (wi, ki, vi) = rng.choice(options)
-                    continue
-                best = None
-                for axis in range(3):
-                    cand = (
-                        (min(wi + 1, len(W_LADDER) - 1), ki, vi)
-                        if axis == 0
-                        else (wi, min(ki + 1, len(KV_QUANT_LADDER) - 1), vi)
-                        if axis == 1
-                        else (wi, ki, min(vi + 1, len(KV_QUANT_LADDER) - 1))
-                    )
-                    if cand == (wi, ki, vi):
-                        continue
-                    t = _alloc_total(
-                        name,
-                        p,
-                        geom,
-                        W_LADDER[cand[0]],
-                        KV_QUANT_LADDER[cand[1]],
-                        KV_QUANT_LADDER[cand[2]],
-                        ctx,
-                    )
-                    if t is None or t > budget_gib:
-                        continue
-                    if best is None or (t > best[0] if policy == "greedy" else t < best[0]):
-                        best = (t, cand)
-                if best is None:
-                    break
-                total, (wi, ki, vi) = best
-            final = _alloc_total(
-                name, p, geom, W_LADDER[wi], KV_QUANT_LADDER[ki], KV_QUANT_LADDER[vi], ctx
-            )
-            assert final is not None
+            if quick_cell is not None:
+                break
+        if quick_cell is not None:
+            out.append(quick_cell)
+        elif report_unplaceable:
             out.append(
                 {
                     "family": name,
                     "params_b": p,
-                    "ctx": ctx,
-                    "wq": W_LADDER[wi],
-                    "kq": KV_QUANT_LADDER[ki],
-                    "vq": KV_QUANT_LADDER[vi],
-                    "est_gib": round(final, 2),
+                    "reason": (
+                        f"unplaceable: no config in the quick ladder "
+                        f"(q8/q8/q8 -> q8/q4/q4 -> q4/q4/q4) fits the "
+                        f"{budget_gib} GiB budget at any reachable ctx"
+                    ),
                 }
             )
-        if policy == "quick":
-            if quick_cell is not None:
-                out.append(quick_cell)
-            elif report_unplaceable:
-                out.append(
-                    {
-                        "family": name,
-                        "params_b": p,
-                        "reason": (
-                            f"unplaceable: no config in the quick ladder "
-                            f"(q8/q8/q8 -> q8/q4/q4 -> q4/q4/q4) fits the "
-                            f"{budget_gib} GiB budget at any reachable ctx"
-                        ),
-                    }
-                )
-            continue
     return out
 
 
@@ -1539,19 +1440,10 @@ def certify_v7(
     budget_gib: float = BUDGET_GIB,
     on_model_commit: Any = None,
     clean: bool = False,
-    alloc_policy: str = "greedy",
     only_cells: list[tuple[str, int]] | None = None,
-    multi_arm: bool = False,
     grammar: str = "v71",
 ) -> list[dict[str, Any]]:
-    """Addendum 166: multi_arm mode - all three allocation policies
-    measured TOGETHER, in one cell record: greedy goes first, then
-    stingy IFF its config differs from greedy's, then random IFF its
-    config differs from both. Every arm's config and score land in the
-    SAME cell (state[...][ctx]["arms"] = {policy: {wq,kq,vq,score,
-    ...}}), so all the data is in one file. Cells where all three
-    agree measure once (the null arm needs no re-measure)."""
-    """The v7 controller, in the certify shape: for each greedy cell,
+    """The v7 controller, in the certify shape: for each quick cell,
     acquire the wq quant (the certify phase-1/2 path), launch in the
     bench.cells shape (ctx, -fa on, cache types), score the fixed
     corpus on the reachable grid, persist per cell under
@@ -1577,23 +1469,7 @@ def certify_v7(
                     os.remove(os.path.join(models_dir, "tournament-results", fam, f_))
         print(f"clean: wiped v7 blocks from {wiped} famil(y/ies) and all answer logs")
         save_state(state_path, state)
-    cells = climb_allocations(budget_gib, roster_limit, alloc_policy, report_unplaceable=True)
-    # addendum 166: the multi-arm plans - stingy/random configs per cell,
-    # measured only where they diverge from the arms already measured.
-    # addendum 227: multi_arm is meaningless under quick (one cell per
-    # family, no climb) - it is refused rather than silently ignored
-    if multi_arm and alloc_policy == "quick":
-        raise ValueError(
-            "--v7-multi-arm requires a climb policy (greedy/stingy/random); "
-            "quick (addendum 227) measures one cell per family and has no arms"
-        )
-    alt_plans: dict[str, dict[tuple[str, int], dict]] = {}
-    if multi_arm:
-        for pol in ("stingy", "random"):
-            plan = [
-                r for r in climb_allocations(budget_gib, roster_limit, pol) if "reason" not in r
-            ]
-            alt_plans[pol] = {(r["family"], r["ctx"]): r for r in plan}
+    cells = climb_allocations(budget_gib, roster_limit, report_unplaceable=True)
     # addendum 154: the unplaceable are FINDINGS, reported before the
     # run - the measured count is honest by construction
     findings = [c for c in cells if "reason" in c]
@@ -1609,7 +1485,7 @@ def certify_v7(
     corpus = None
     # addendum 132: the commit hook fires once per family, after its
     # LAST cell - not per cell. Cells are ordered family-major (the
-    # greedy output is param-ascending, ctx-ascending per family).
+    # quick output is param-ascending, one cell per family).
     pending: list[dict[str, Any]] = []
     pending_fam = None
 
@@ -1643,76 +1519,24 @@ def certify_v7(
         pending_fam = fam
         fst = state["families"].setdefault(fam, {})
         key = str(cell["ctx"])
-        # addendum 227: quick cells land in their OWN namespace - the
-        # greedy/stingy/random historical tables (and their arms) stay
-        # untouched; a quick re-run never reads a greedy cell as done
-        v7 = (
-            fst.setdefault("v7_quick", {})
-            if alloc_policy == "quick"
-            else fst.setdefault("v7", {})
-        )
+        v7 = fst.setdefault("v7_quick", {})
         done = v7.get(key) or {}
         entry = {**cell, "family": fam}
         # addendum 162: the cell selector - measure ONLY the cells whose
         # (family, ctx) is listed; everything else is reported as skipped
-        # (selector), never measured. Comparison arms re-measure only the
-        # diverging cells - no sense re-measuring what cannot change.
+        # (selector), never measured.
         # (The check lives AFTER entry exists - the first delivery put it
         # before and crashed the author's run; the crash rail caught it.)
         if only_cells is not None and (fam, cell["ctx"]) not in only_cells:
             entry["skipped"] = "cell not selected (--v7-cells)"
             results.append(entry)
             continue
-        # addendum 168: the multi-arm pre-launch check - decide BEFORE the
-        # launch cycle (acquire, start, corpus, preflight) whether ANY arm
-        # needs measuring. Greedy measured + every diverging arm already in
-        # the cell's arms block => nothing to do; the launch cycle is pure
-        # waste in that case (the author's compute-time catch).
-        if (
-            done.get("score") is not None
-            and done.get("wq") == cell["wq"]
-            and done.get("kq") == cell["kq"]
-            and done.get("vq") == cell["vq"]
-        ):
-            if multi_arm:
-                arms_record = done.get("arms") or {}
-                stored_arms = arms_record.get
-                arms_needed = []
-                for pol in ("stingy", "random"):
-                    alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
-                    if alt is None:
-                        continue
-                    if (alt["wq"], alt["kq"], alt["vq"]) == (
-                        cell["wq"],
-                        cell["kq"],
-                        cell["vq"],
-                    ):
-                        continue  # agrees with greedy - already measured
-                    stored = stored_arms(pol)
-                    if stored is not None and stored.get("score") is not None:
-                        continue  # that arm already measured
-                    arms_needed.append(pol)
-                if not arms_needed:
-                    entry["skipped"] = f"already measured (score {done['score']})"
-                    entry["arms"] = done.get("arms") or {}
-                    results.append(entry)
-                    pending.append(entry)
-                    continue
-                print(
-                    f"  greedy measured; arms still needed: {arms_needed} - "
-                    "launching only for them"
-                )
-                cell["_skip_greedy_rescore"] = True
-            else:
-                entry["skipped"] = f"already measured (score {done['score']})"
-                results.append(entry)
-                pending.append(entry)
-                continue
-        if done.get("score") is not None and not cell.get("_skip_greedy_rescore", False):
-            # addendum 168: in the arms-only path the cell IS measured -
-            # no drift re-measure; the flag is consumed here so the scoring
-            # site sees a clean cell (the earlier delivery left the drift
-            # check firing on identical configs in that path)
+        if done.get("score") is not None:
+            entry["skipped"] = f"already measured (score {done['score']})"
+            results.append(entry)
+            pending.append(entry)
+            continue
+        if done.get("score") is not None:
             print(
                 f"  config drift: stored {done.get('wq')}/{done.get('kq')}/"
                 f"{done.get('vq')} != planned {cell['wq']}/{cell['kq']}/"
@@ -1766,11 +1590,8 @@ def certify_v7(
                 probe_toks = preflight_reachable_grades(port, corpus, cell["ctx"])
                 if probe_toks:
                     print(f"  preflight: {probe_toks}")
-                suffix = (
-                    "" if alloc_policy == "greedy" else f".{alloc_policy}"
-                )
                 answers_path = os.path.join(
-                    results_dir, f"{fam}-ctx{cell['ctx']}-v7{suffix}-answers.jsonl"
+                    results_dir, f"{fam}-ctx{cell['ctx']}-v7.quick-answers.jsonl"
                 )
                 rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
             except TemplateMalfunction as e:
@@ -1823,95 +1644,9 @@ def certify_v7(
                         f"budget (est was {cell['est_gib']}) - the cell is erased, "
                         f"never scored"
                     )
-            skip_rescore = cell.pop("_skip_greedy_rescore", False)
-            if skip_rescore:
-                # addendum 168: greedy already measured - this launch exists
-                # only for the arms; keep the stored record, no re-score
-                rec = {k: done[k] for k in ("score", "max_score")}
-                print(
-                    f"  greedy kept (score {done['score']}/{done['max_score']})"
-                    " - measuring arms only"
-                )
-            else:
-                print(f"  score {rec['score']} / {rec['max_score']}")
-            # addendum 166: the multi-arm cell record - every arm's config
-            # and score in the SAME cell, one file; arms that agree with an
-            # already-measured config need no re-measure (they ARE it)
-            greedy_arm = {"wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"], **rec}
-            if skip_rescore:
-                greedy_arm = {**greedy_arm, "score": done["score"], "max_score": done["max_score"]}
-            arms = {"greedy": greedy_arm}
-            if multi_arm:
-                measured_cfgs = {
-                    (cell["wq"], cell["kq"], cell["vq"]),
-                }
-                for pol in ("stingy", "random"):
-                    alt = alt_plans.get(pol, {}).get((fam, cell["ctx"]))
-                    if alt is None:
-                        continue
-                    cfg = (alt["wq"], alt["kq"], alt["vq"])
-                    if cfg in measured_cfgs:
-                        print(f"  arm {pol}: same config as a measured arm - skipped")
-                        continue
-                    print(f"  arm {pol}: {cfg[0]}/{cfg[1]}/{cfg[2]} differs - measuring")
-                    # the arm has its OWN launch cycle: a different weights
-                    # quant is a different GGUF, different cache flags - the
-                    # greedy server cannot serve it. Stop, relaunch, score.
-                    llama_server.stop_server(proc, port)
-                    try:
-                        arm_gguf = _acquire_missing_model(
-                            repo, fam, famdir, alt["wq"], state, False
-                        )
-                        if not arm_gguf:
-                            arms[pol] = {
-                                "wq": alt["wq"],
-                                "kq": alt["kq"],
-                                "vq": alt["vq"],
-                                "error": "arm: could not acquire the quant",
-                            }
-                            continue
-                        arm_extra = ["-c", str(cell["ctx"]), "--parallel", "1"]
-                        if alt["kq"] != "f16" or alt["vq"] != "f16":
-                            arm_extra += [
-                                "-fa", "on", "--cache-type-k", alt["kq"],
-                                "--cache-type-v", alt["vq"],
-                            ]
-                        proc, healthy = llama_server.start_server(
-                            arm_gguf, port=port, extra_args=arm_extra,
-                            log_path=log_path,
-                        )
-                        if not healthy or not llama_server.wait_healthy(port, proc=proc):
-                            arms[pol] = {
-                                "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
-                                "error": "arm: server did not come up",
-                            }
-                            continue
-                        arm_rec = run_cell(port, corpus, cell["ctx"], answers_path=answers_path)
-                        arms[pol] = {"wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"], **arm_rec}
-                        measured_cfgs.add(cfg)
-                    except Exception as e:
-                        arms[pol] = {
-                            "wq": alt["wq"], "kq": alt["kq"], "vq": alt["vq"],
-                            "error": f"arm failed: {e}",
-                        }
-                for pol, a in arms.items():
-                    if "score" in a:
-                        print(
-                            f"  arm {pol}: {a['wq']}/{a['kq']}/{a['vq']} "
-                            f"-> {a['score']}/{a['max_score']}"
-                        )
-            if skip_rescore:
-                # addendum 168: keep the stored record intact - only the
-                # arms block updates (rec here is a stub; overwriting would
-                # drop the stored per_grade/mem_census)
-                stored = dict(done)
-                stored["arms"] = arms
-                v7[key] = stored
-            else:
-                v7[key] = {**cell, **rec, **({"arms": arms} if multi_arm else {})}
+            print(f"  score {rec['score']} / {rec['max_score']}")
+            v7[key] = {**cell, **rec}
             entry.update(rec)
-            if multi_arm:
-                entry["arms"] = arms
         finally:
             llama_server.stop_server(proc, port)
             save_state(state_path, state)
