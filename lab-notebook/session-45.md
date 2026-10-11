@@ -2568,3 +2568,19 @@ READINGS, REGISTERED:
 5. THE THINKING CAP, re-derived: with tg-at-depth unmeasured by this sweep, the cap arithmetic (220) uses the product-side bound instead: the per-turn budget the user feels is DOMINATED by prefill at cold-start (seconds to first token); the thinking multiplier rides on generation whose absolute rate we now know is ~34.5 t/s at this cell (the tg128 number, at least at shallow prompt). A "few tokens" cap (the author ruling) costs ~0.1-0.3 s per turn at 34 t/s - negligible; a 1000-token reasoning burst costs ~29 s - comparable to the entire 32k cold prefill. The cap discipline is: think in hundreds of tokens, never thousands.
 
 THE 220 HOLD, REVISITED: the sweep DID its confound-guard job - the speed picture (three depth-scaled terms: prefill now a curve, generation a rate + depth multiplier pending a deep-prompt tg test, thinking the multiplier on generation) is on file; v7.4 is CLEARED to run. Follow-up registered: a deep-prompt generation test to fill term 2 (llama-server at 131k prompt, single completion, read t/s - the 17 t/s point of addendum 214 suggests ~2x degradation at depth, to be measured once).
+
+## Addendum 227 - the v7.1 search strategy pre-registered: top-rung-first, q8-first, early exit
+
+THE AUTHOR REGISTERS the field-search strategy for the v7.1 grammar (the field table, per 223), to speed the search considerably:
+
+THE STRATEGY:
+1. BUDGET: model weights + KV must fit the 4 GiB budget (the allocation estimator admits the cell).
+2. ORDER: the search works from the HIGHEST ctx rung downward - reach is the value axis (204); the first rung that admits a measurable config is where the argmax lives.
+3. STARTING CONFIG: (Q8_0, q8_0, q8_0) - the weights axis is the value axis, so the most-weights-quality config that fits is the presumptive winner.
+4. THE VARIABILITY LADDER, evaluated IN THIS ORDER: (q8,q8,q8) -> (q8,q4,q4) -> (q4,q4,q4). Each step down only if the previous does not fit the budget. NOTE: the KV steps are justified as FREE by three flats (211/221/226) - the ladder is a FIT ladder, not a quality expectation; the q4 weights step is the expensive one (204).
+5. EARLY EXIT: the search STOPS as soon as (q8,q8,q8) is measured at the top admitting rung - no further configs, no further rungs. If (q8,q8,q8) does not fit, the first fitting config in ladder order is the winner, measured once.
+6. REPLICATES: start the grid at n=1, seed=1; increase n by time remaining. THE BUDGET: 8 hours total.
+
+WHY THIS IS FAST: the old sweep measured every config at every rung; this strategy measures AT MOST ONE cell per rung and exits after ONE measurement in the expected case (the champion family is small enough that (q8,q8,q8) fits at top reach - the 223 prediction). The seed-spread caveat (221: spread dwarfs config gaps) is accepted: the field table ranks by the single-seed score first, and n grows only with time to spare.
+
+INTERACTION WITH THE RUNNING v7.4 PROBE: none - the probe (gatedchain-agg, 224s axes) is the instrument line; this strategy governs the FIELD line. The v7.4 verdict may yet add a KV separator, in which case the ladder order here gains a quality meaning; until then the ladder is fit-only.
