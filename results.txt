@@ -69631,3 +69631,24 @@ replicate seed 3: the full field on corpus seed 3
   granite-4.0-h-1b ctx=32768: template_malfunction: template fragment in sanity probe: 'PINEAPPLE\n<|im_end|>\n<|im_start|>assistant\nPINEAPPLE\n<|im_end|>\n<|im_start'
   Qwen2.5-1.5B-Instruct ctx=8192: score 0.0/5
 [2026-10-11T20:36:44] V7 ARGMAX at 4 GiB: Qwen3.5-0.8B ctx=65536 (Q4_0, k=q4_0, v=q4_0) score 1.42/20
+
+===== 2026-10-11T20:36:50 | full_benchmark.py --task v7 --v7-families 32 --v7-grammar v71 --v7-budget-gib 2.0 --v7-corpus-seed 1,2,3 =====
+
+12 of the first 32 candidates cannot earn a cell (findings, addendum 154):
+  MiniCPM-1B-sft: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  phi-1: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+  granite-3.0-2b-instruct: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  MiniCPM-2B-sft: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  phi-2: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+  RWKV7-World-2.9B: unplaceable: trained window 2048 below the grid's smallest ctx rung 8192 (addendum 123)
+  granite-4.0-micro: unplaceable: floor config (Q4_0, q4_0, q4_0) exceeds the 2.0 GiB budget at every reachable ctx
+  granite-4.1-3b: unplaceable: floor config (Q4_0, q4_0, q4_0) exceeds the 2.0 GiB budget at every reachable ctx
+  granite-4.2-3b: unplaceable: floor config (Q4_0, q4_0, q4_0) exceeds the 2.0 GiB budget at every reachable ctx
+  Phi-3-mini-4k-instruct: unplaceable: trained window 4096 below the grid's smallest ctx rung 8192 (addendum 123)
+  Phi-3.5-mini-instruct: unplaceable: floor config (Q4_0, q4_0, q4_0) exceeds the 2.0 GiB budget at every reachable ctx
+  phi-4-mini-instruct: unplaceable: floor config (Q4_0, q4_0, q4_0) exceeds the 2.0 GiB budget at every reachable ctx
+=== Qwen3.5-0.8B (model 4 of 20) ctx=262144 wq=Q4_0 k=q4_0 v=q4_0
+  preflight: {'4096x2': 4367, '131072x32': 132901}
+  census: GPU 1.61 GiB (est 1.63) - weights 0.46, context 0.86, compute 0.29
+  score 2.997 / 30
+[2026-10-11T20:44:46] v7 model done: Qwen3.5-0.8B (1/1 cells scored) - committing artifacts
