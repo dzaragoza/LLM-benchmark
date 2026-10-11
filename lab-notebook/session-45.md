@@ -2621,3 +2621,22 @@ THE AUTHOR RULING: "Stop giving me bash commands. I use fish." All command deliv
 The standing commands, fish-form:
 - v7.4 probe: python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar gatedchain-agg --v7-probe-axes <axes>
 - field run (quick is the only strategy, 227/229): python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar v71
+
+## Addendum 231 - v7.4 grades FLOOR: the aggregation carrier exceeds the 2B (215 redux); the packed placement backfires; no KV claim earned
+
+THE RUN: all 18 cells completed (2 depths x 3 KV configs x 3 seeds); answers logged raw (18 jsonl files, complete). THE STATE BLOCK IS EMPTY (probe_gatedchain-agg = {}): the per-config records never persisted - the summary printed its header and nothing after; follow-up registered to find the probe-state write failure. The verdict below is graded from the ANSWERS, not the state.
+
+THE VERDICT, by 222 pre-registration: FLOOR, not FLAT. Exact-sum pass rate 0-6.7 percent per cell (one lone pass, 4096x2 seed11 q4_0 KV). A floor result is UNINFORMATIVE on the KV question - nothing at zero can separate - so no negative is earned and none is claimed. The instrument floored; the hunt continues.
+
+THE DIAGNOSIS, from the answer patterns (three findings):
+1. THE 8-VALUE SUM EXCEEDS THE 2B RANGE - addendum 215 redux: the model retrieves ~4 of 8 values per question (answers show exactly ~4 addends, summing to ~1/4 of expected). The aggregation carrier hit a CAPABILITY limit, not a KV limit. AGG_CHAIN_COUNT=8 was too many; 215 ruled the mul carrier the same way.
+2. THE PACKED PLACEMENT (225) BACKFIRED: the same leading values recur across DIFFERENT questions - all questions plants crowd one dense band-start region, and the model grabs the salient four regardless of which question asked. Packing concentrated the attention load but made SELECTION ambiguous. Scattering was load-diluting but selection-clean.
+3. THE GEN BUDGET TRUNCATES WORK-SHOWN ANSWERS: many answers are reasoning text cut at the cap before the number; score_agg takes the last integer - a truncated reasoner scores 0 even knowing the sum. The answer discipline (ONLY the integer) was not followed and the budget did not cover it.
+
+THE FIX, pre-registered for v7.4.1:
+- AGG_CHAIN_COUNT 8 -> 4 (back inside the demonstrated retrieval range; the sum of 4 four-digit values stays 5-digit)
+- SCATTERED placement returns (225 packing reverted for the agg grammar - selection clarity beats gap-maximization; the gap story rides the depth arms instead)
+- GEN BUDGET for agg answers: enough to cover work-shown + the sum (or a stricter template + higher budget)
+- THE MARGINS still unread (state block empty): once the state write is fixed, margins from a NON-floored instrument are the sensitive read
+
+THE SILVER LINING, on record: the 4-of-8 retrieval pattern is itself depth-stable (same shape at 32k and 131k, same across KV configs) - consistent with 225 architecture reading (the retrieval bottleneck is capability-shaped, not cache-shaped) and with the 221/226 flats. And the state-write failure is caught cheap: the answers were on disk, so nothing is lost.
