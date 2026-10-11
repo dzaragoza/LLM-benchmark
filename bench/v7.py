@@ -184,7 +184,7 @@ def probe_configs(wq: str, kq: str, vq: str) -> list[tuple[str, str, str]]:
 # calibration data).
 
 
-BUDGET_GIB = 2.0  # addendum 218: the author's ruling - 4 GiB is too slow on the T14s; the study ceiling drops to 2 GiB
+BUDGET_GIB = 4.0  # addendum 233: 218 retracted - the "too slow" was the thinking confound in the author's own perception test; every test runs at 4 GiB
 CTX_GRID = [8192, 16384, 32768, 65536, 131072, 262144]
 PILOT_FAMILIES = 4
 
@@ -664,7 +664,7 @@ def question_prompt_v73(corpus: dict, q: dict) -> str:
 # carrier the 2B cannot carry), one edit-distance-1 decoy assignment
 # per real one (the K-stressor stays), and the question asks for the
 # SUM of the named variables' values.
-AGG_CHAIN_COUNT = 8
+AGG_CHAIN_COUNT = 4  # addendum 231/233: 8 exceeded the 2Bs retrieval range (~4-of-8); 4 stays inside it
 AGG_TEMPLATE = (
     "[INST] Memorize the variable assignments hidden in the "
     "following text.\n\n{context}\nQuestion: Report the sum of "
@@ -734,16 +734,15 @@ def build_corpus_v73_agg(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED)
         while len(band) < target:
             band.append(ruler_gate.VT_HAYSTACK)
         composed: list[str] = [ruler_gate.VT_HAYSTACK] * max(target, len(band))
-        # addendum 225: the placement tuning for the hybrid architecture
-        # - ALL plants pack at the START of the band and the query rides
-        # after the FULL cut, so every plant-to-query distance is maximal.
-        # The ~6-7 attention layers (full_attention_interval=4) are the only
-        # random-access path across that gap; the recurrent layers carry a
-        # continuously-transformed state, not verbatim values. The scattered
-        # placement diluted the load across mechanisms; this concentrates it
-        # on the layers the KV cache actually lives in.
+        # addendum 231/233: scattered placement RESTORED (225s packing
+        # backfired - all questions plants crowded one band-start region
+        # and the model grabbed the salient four regardless of which
+        # question asked; scatter keeps each question selection-clean.
+        # The attention-gap story rides the depth arms (224) instead.
         cursor = 0
         for blob in span_blobs[s]:
+            gap = rng.randint(1, max(2, (len(composed) - len(band)) // max(len(span_blobs[s]), 1)))
+            cursor = min(cursor + gap, max(len(composed) - len(blob), 0))
             composed[cursor : cursor + len(blob)] = blob
             cursor += len(blob)
         sentences.extend(composed)
@@ -981,7 +980,14 @@ def run_cell(
                 if is_v72
                 else question_prompt(corpus, q)
             )
-            per_q = (q["hops"] + 1) * (26 if is_v72 else 12)
+            # addendum 231/233: agg answers get a WORK-SHOWN budget -
+            # the floor run showed reasoning text cut at the cap before
+            # the number (a truncated reasoner scores 0 knowing the sum)
+            per_q = (
+                256
+                if is_agg
+                else (q["hops"] + 1) * (26 if is_v72 else 12)
+            )
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, per_q)
             t0 = time.monotonic()
             # addendum 222 (A1): the margin readout - the same answer
