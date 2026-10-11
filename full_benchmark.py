@@ -475,12 +475,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument(
         "--v7-corpus-seed",
-        type=int,
         default=None,
-        help="v7: the field corpus seed (addendum 239: n=4 replicates - "
-        "the n=1 run used seed 1, the default; pass 2/3/4 for the "
-        "remaining replicates; each seed builds and artifacts its own "
-        "corpus, never loading another seed's)",
+        help="v7: the corpus seed(s) for replicate runs (addendum 239/249: "
+        "n=1 used seed 1, the default; pass 2 or a comma list 2,3,4 to "
+        "run several replicates in ONE invocation - each seed builds "
+        "and artifacts its own corpus and lands in its own state "
+        "namespace, so the sudden-death n=1 cells get their full match)",
     )
     ap.add_argument(
         "--clean",
@@ -633,10 +633,36 @@ def _run(args: argparse.Namespace) -> None:
             clean=args.clean,
             only_cells=parse_v7_cells(args.v7_cells),
             grammar=args.v7_grammar,
-            corpus_seed=args.v7_corpus_seed,
+            corpus_seed=None,
         )
+
         state["v7"] = results
         save_state(args.state_file, state)
+        # addendum 249: the replicate match - one invocation, n seeds.
+        # Each seed is a FULL certify run on its own corpus; the state
+        # namespace is seed-scoped (v7_quick_s<seed>), so cells never
+        # collide and the sudden-death n=1 result becomes a best-of-n.
+        seeds = [int(s) for s in (args.v7_corpus_seed or "").split(",") if s.strip()]
+        for seed in seeds:
+            print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
+            rep = certify_v7(
+                args.models_dir,
+                state,
+                args.state_file,
+                state.get("ladder_port", 8210),
+                args.v7_families,
+                dry_run=args.dry_run,
+                budget_gib=args.v7_budget_gib or BUDGET_GIB,
+                on_model_commit=None
+                if (args.no_git or args.dry_run)
+                else partial(v7_model_commit, args),
+                clean=False,
+                only_cells=parse_v7_cells(args.v7_cells),
+                grammar=args.v7_grammar,
+                corpus_seed=seed,
+            )
+            state[f"v7_seed_{seed}"] = rep
+            save_state(args.state_file, state)
         print()
         print("=" * 60)
         stamp("V7 REACH BENCHMARK SUMMARY")
