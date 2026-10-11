@@ -30,43 +30,21 @@ Our benchmark ran on a fixed **4 GB memory budget**, and that is the size we rec
 - **Dedicated GPU** — the model runs from the card's VRAM:
   - VRAM needed: **4 GB**. Any dedicated GPU has high enough bandwidth.
 
-**llama.cpp command line:**
+**To serve it yourself interactively, take the benchmark's command and
+add the thinking cap** (the benchmark disables thinking; interactive
+use wants it on but bounded — Qwen3.5 is a hybrid reasoning model, and
+uncapped it burns thousands of invisible tokens per turn, each reading
+the whole context):
 
 ```
 llama-server -m Qwen3.5-2B-Q8_0.gguf -c 262144 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 512
 ```
 
-**What each argument does:**
-
-- `-m Qwen3.5-2B-Q8_0.gguf` — the model file. `Q8_0` is the weights
-  quantization: 8-bit weights (1.92 GB for this model). The study's
-  central finding is that **weights are the value axis** — spend your
-  memory budget on the highest weights quality that fits, before
-  anything else.
-- `-c 262144` — the context window: how many tokens of conversation
-  and documents the model can hold at once. This is 256k, the deepest
-  the benchmark measures. A bigger window is only worth it if the
-  model actually uses it — the score certifies that it does.
-- `--cache-type-k q4_0 --cache-type-v q4_0` — quantize the K and V
-  attention caches to 4 bits. The caches grow with context (they hold
-  every token's attention state); at 256k they would cost ~3 GB
-  unquantized. At q4_0 they cost a fraction of that, and the study
-  measured the quality cost of doing so as **undetectable** across six
-  independent instruments (score, margins, depth curves, speed) —
-  the memory goes further and the model does not notice.
-- `-fa on` — flash attention. A faster, more memory-efficient attention
-  implementation. Required when quantizing the caches on llama-server.
-- `--parallel 1` — one request slot. The whole memory budget serves a
-  single conversation; more slots split the context window between them.
-- `--reasoning-budget 512` — caps the model's hidden thinking. Qwen3.5 is
-  a hybrid reasoning model: without a cap it can spend thousands of
-  invisible tokens before every answer, each one reading the whole
-  context — at 256k depth that is minutes of silence per turn. The
-  benchmark itself runs with thinking disabled; for interactive use
-  the study's measured rule is: **think in hundreds of tokens, never
-  thousands**. Set the cap to what your patience allows — at this
-  model's measured ~30 tokens/s, 512 thinking tokens cost about 17
-  seconds before the answer starts.
+- `--reasoning-budget 512` — caps the hidden thinking. The study's
+  measured rule: **think in hundreds of tokens, never thousands**.
+  Set the cap to what your patience allows — at this model's measured
+  ~30 tokens/s, 512 thinking tokens cost about 17 seconds before the
+  answer starts. It is a patience constant, not a quality constant.
 
 ### How we ranked the field
 
@@ -94,6 +72,41 @@ configurations in the order (q8,q8,q8) → (q8,q4,q4) → (q4,q4,q4);
 the first that fits is **the one cell** — measure it, done. One
 server launch per family instead of a sweep; the full 32-family
 field measured in ~2 hours.
+
+**The llama-server command the benchmark itself launched** for the
+champion's cell (reconstructed from the run's server log and launch
+code):
+
+```
+llama-server -m Qwen3.5-2B-Q8_0.gguf --port 8210 -lv 5 -c 262144 --parallel 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0
+```
+
+- `-m Qwen3.5-2B-Q8_0.gguf` — the model file: Q8_0 weights (8-bit,
+  1.92 GB for this model). The study's central finding is that
+  **weights are the value axis** — spend your memory budget on the
+  highest weights quality that fits, before anything else.
+- `--port 8210` / `-lv 5` — the benchmark's own plumbing: the port
+  it talks to, and llama.cpp's verbose memory accounting in the log
+  (the per-cell memory census is parsed from it — the measured
+  numbers on this page come from there).
+- `-c 262144` — the context window: how many tokens of conversation
+  and documents the model can hold at once. This is 256k, the deepest
+  the benchmark measures. A bigger window is only worth it if the
+  model actually uses it — the score certifies that it does.
+- `--parallel 1` — one request slot: the whole memory budget serves
+  one conversation. The benchmark measures exactly what a single
+  reader gets.
+- `-fa on --cache-type-k q4_0 --cache-type-v q4_0` — flash attention
+  plus 4-bit K and V attention caches. The caches grow with context
+  (they hold every token's attention state); at 256k they would cost
+  ~3 GB unquantized. At q4_0 they cost a fraction of that, and the
+  study measured the quality cost of doing so as **undetectable**
+  across six independent instruments (score, margins, depth curves,
+  speed) — the memory goes further and the model does not notice.
+- Thinking is **disabled** in every benchmark request (`enable_thinking:
+  false` at the API layer): the scores measure pure reach per answer
+  token, with no hidden reasoning tokens confounding the timing or
+  the memory census.
 
 ## All results (all measured within the 4 GB budget)
 
