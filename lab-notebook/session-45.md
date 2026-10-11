@@ -2613,3 +2613,11 @@ REMOVED, entirely (no deprecation shims, no legacy branches):
 THE SHAPE NOW: climb_allocations IS the quick strategy - highest rung first, fit ladder in order, one cell per family, early exit, unplaceable-as-finding. Cells persist under families/<name>/v7_quick; answers files are -v7.quick-answers.jsonl. certify_v7 consumes the plan directly; no policy parameter threads through.
 
 THE SYNC LESSON, registered: the earlier delivery failure (the author pull found nothing; gatedchain-agg missing) was commits never leaving the sandbox. From here: commit AND push/verify the remote ref before telling the author to pull.
+
+## Addendum 230 - the author runs fish: commands are delivered in fish syntax
+
+THE AUTHOR RULING: "Stop giving me bash commands. I use fish." All command deliveries from here are FISH-SAFE: no bash-only syntax; watch the fish differences - () is command substitution (quote any literal parens), $var expands (quote literal dollars), and $(...) bash-isms are invalid. Single-line commands preferred; backslash continuation works when a line must break.
+
+The standing commands, fish-form:
+- v7.4 probe: python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar gatedchain-agg --v7-probe-axes <axes>
+- field run (quick is the only strategy, 227/229): python3 full_benchmark.py --task v7 --v7-families 23 --v7-grammar v71
