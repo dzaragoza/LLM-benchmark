@@ -2906,3 +2906,17 @@ THE FINDINGS the re-sort surfaces:
 4. MiniCPM4-0.5Bs seed 3 dipped to 0.74 (from 1.42/1.79) - the lightweight belt holds but the spread is wide; the tiny families are noisier per seed.
 
 THE PAGE: all five weight-class tables rebuilt on census-corrected n=3 means.
+
+## Addendum 256 - the 1 and 2 GB cards complete: all lower belts settled at n=3
+
+THE CARDS RAN (1.0 and 2.0 budgets, seeds 1/2/3 each; the cross-tier inheritance filling n where cells repeat). THE FINAL LOWER BRACKETS:
+
+512M: granite-4.0-h-350m HOLDS (mean 0.41, three seeds). The class is two cells deep - the honest floor.
+
+1G: MiniCPM4-0.5B HOLDS (mean 1.32 [1.42, 1.79, 0.74] at 0.80 GiB) - but granite-4.0-h-350m closes to mean 0.51 [0.059, 0.869, 0.604] with its q8-KV cell (0.586 GiB), and granite-4.0-350m posts 0.37 [0.21, 0.209, 0.678]. THE ORDERING: MiniCPM by 0.8 over granite-h - the belt holds with real margin, and the 0.8 margin is the same weights law as the featherweight bout (MiniCPM keeps Q8_0 weights AND the only 15-grade corpus rate above 0.08).
+
+2G: Qwen3.5-0.8B HOLDS (mean 2.53 [1.42, 3.85, 2.31] at 1.05 GiB) - the phenom survives its n=3; second place is Llama-3.2-1B at 0.19, THIRTEEN times behind. The welterweight class is a one-model show.
+
+THE ZERO CLUB, honest data: MiniCPM5-1B posts 0.0 across ALL seeds at BOTH its cells (0.93 and 1.75 GiB) - it cannot do the VT task at any measured size; Qwen2.5-1.5B posts 0.0 at its 8k cut (1.18 GiB). The 25-grade reach axis is unforgiving below the capability line - a model either carries the chain grammar or posts zeros.
+
+THE BRACKET STATE: five belts settled by measurement - granite-h-350m (512M), MiniCPM4-0.5B (1G), Qwen3.5-0.8B (2G), Qwen3.5-2B (4G, n=3 mean 6.99), Qwen3.5-2B (8G provisional n=2, replicates pending). The 8G replicates finish the card.
