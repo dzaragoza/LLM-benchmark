@@ -136,14 +136,21 @@ run measures that bout.
 
 ### 2 GB — the welterweights
 
-| model | context | GPU memory | bandwidth (spec) | score |
+| model | cut | GPU memory | n=3 score | per-seed |
 |---|---|---|---|---|
-| MiniCPM4-0.5B (F16 weights) | 32k | 1.4 GB | 11 GB/s | 1.13/10 — the best measured cell in-class |
-| gemma-3-1b-it | 32k | 1.5 GB | 13 GB/s | 0.11/15 |
+| **Qwen3.5-0.8B** | Q4_0 weights, 64k ctx | 1.05 GB | **2.53/20** | 1.42, 3.85, 2.31 |
+| Llama-3.2-1B-Instruct | Q4_0, 16k | 1.14 GB | 0.19/10 | |
+| gemma-3-1b-it | Q8_0, 32k | 1.48 GB | 0.15/15 | |
 
-The class is thin in the measured data; the 2 GB-budget run is the
-registered fill — every family cuts to its best 2 GB config and the
-argmax of those cells takes the belt.
+**The welterweight champion: Qwen3.5-0.8B** — and it is not close: the
+0.8B cut to (Q4_0, q4/q4) at 64k context dominates the class from
+barely over 1 GB, beating every other in-class cell by more than 10x.
+It even outscores several 4 GB cells outright. The seed spread is wide
+(1.42 to 3.85) but the mean clears the class by a mile.
+
+```
+llama-server -m Qwen3.5-0.8B-Q4_0.gguf -c 65536 --cache-type-k q4_0 --cache-type-v q4_0 -fa on --parallel 1 --reasoning-budget 150
+```
 
 ### 4 GB — the middleweights
 
@@ -157,15 +164,23 @@ The full bracket is the field table below.
 
 ### 8 GB — the heavyweights
 
-| model | context | GPU memory | bandwidth (spec) | score |
-|---|---|---|---|---|
-| **Qwen3.5-2B (F16 KV)** | 128k | 4.2 GB | 33 GB/s | **6.8/25** — the best measured cell in-class |
-| Qwen3.5-2B | 256k | 4.2 GB | 30 GB/s | 6.4/30 |
-| Qwen3.5-0.8B (F16 weights) | 256k | 4.4 GB | 24 GB/s | 5.9/30 |
+By actual GPU census this class holds the cells above 4 GB — and the
+reclassification matters: the Jamba 3Bs "8 GB card" cells census at
+just 3.9 GB (their hybrid architecture carries 256k context in a
+0.14 GB KV cache), so they file into the 4 GB class. The true
+heavyweight bracket:
 
-The heavyweight data comes from the earlier uncapped sweeps. The
-8 GB-budget run is the registered fill: the big families get their
-(q8,q8,q8) shot at top rung — the Jamba 3Bs first in line.
+| model | cell | GPU memory | score | per-seed |
+|---|---|---|---|---|
+| **Qwen3.5-2B** | Q8_0 weights, q8 KV, 256k | 4.5 GB | **6.77/30** (n=2) | 6.91, 6.62 |
+| phi-4-mini-instruct | Q4_0, 131k | 7.4 GB | 4.75/25 (n=1) | |
+| Phi-3.5-mini-instruct | Q8_0, 32k | 7.3 GB | 3.22/15 (n=1) | |
+| granite-3.1-2b-instruct | Q8_0, 131k | 5.7 GB | 2.72/25 (n=2) | |
+
+**The heavyweight champion: Qwen3.5-2B** — the q8-KV upgrade at 256k
+censuses at 4.5 GB and matches its 4 GB score (the KV axis is free, as
+ever); the same model holds three belts, each at its own best cut.
+phi-4-mini at 7.4 GB is the first true heavyweight-built contender.
 
 ### How we ranked the field
 
