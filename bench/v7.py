@@ -1712,12 +1712,20 @@ def certify_v7(
                 # estimate; the verdict is llama-server's own GPU census. A cell
                 # over the budget is an ERROR, never a scored result (the author's
                 # ruling; the addendum-135 4.558 GiB cell was the precedent).
+                # addendum 259: the gate OUTGREW its try - the raise sat after
+                # the except clauses, so an over-budget census KILLED the whole
+                # run (the MiniCPM3-4B 9.07-vs-8.0 crash) instead of erasing the
+                # cell. The gate now erases and records, the run continues -
+                # the probe path (1414) always worked this way.
                 if gpu_gib is not None and gpu_gib > budget_gib:
-                    raise BudgetExceeded(
-                        f"measured GPU {gpu_gib:.2f} GiB exceeds the {budget_gib} GiB "
-                        f"budget (est was {cell['est_gib']}) - the cell is erased, "
-                        f"never scored"
+                    entry["error"] = (
+                        f"budget: measured GPU {gpu_gib:.2f} GiB exceeds the "
+                        f"{budget_gib} GiB budget (est was {cell['est_gib']}) - "
+                        f"the cell is erased, never scored"
                     )
+                    v7.pop(key, None)
+                    results.append(entry)
+                    continue
             print(f"  score {rec['score']} / {rec['max_score']}")
             v7[key] = {**cell, **rec}
             entry.update(rec)
