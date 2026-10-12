@@ -619,39 +619,23 @@ def _run(args: argparse.Namespace) -> None:
             stamp("probe complete")
             return
 
-        results = certify_v7(
-            args.models_dir,
-            state,
-            args.state_file,
-            state.get("ladder_port", 8210),
-            args.v7_families,
-            dry_run=args.dry_run,
-            budget_gib=args.v7_budget_gib or BUDGET_GIB,
-            on_model_commit=None
-            if (args.no_git or args.dry_run)
-            else partial(v7_model_commit, args),
-            clean=args.clean,
-            only_cells=parse_v7_cells(args.v7_cells),
-            grammar=args.v7_grammar,
-            corpus_seed=None,
-        )
+        # addendum 261: THE BASE PASS IS REMOVED - it was seed 1 again
+        # by another door (260 doubled it whenever 1 was listed). The
+        # seed passes ARE the run: no --v7-corpus-seed means the default
+        # corpus (seed 1) once; a list means exactly those passes.
+        # Cells persist seed-scoped as before (seed 1 = the base
+        # block; 2/3 = _s<n> blocks).
+        seeds = [
+            int(s)
+            for s in (args.v7_corpus_seed or str(v7.CORPUS_SEED)).split(",")
+            if s.strip()
+        ]
 
-        state["v7"] = results
-        save_state(args.state_file, state)
-        # addendum 249: the replicate match - one invocation, n seeds.
-        # Each seed is a FULL certify run on its own corpus; the state
-        # namespace is seed-scoped (v7_quick_s<seed>), so cells never
-        # collide and the sudden-death n=1 result becomes a best-of-n.
-        # addendum 253 (the author's ruling, reverting 252's dedup):
-        # a listed seed 1 RUNS - a model that is new at a config needs
-        # its seed 1 measurement, and the loop guarantees it regardless
-        # of what the base pass skipped or inherited. The pass is a
-        # cheap no-op when every cell is already measured (skips are
-        # instant), so 1,2,3 is always safe to request.
-        seeds = [int(s) for s in (args.v7_corpus_seed or "").split(",") if s.strip()]
+        results = []
         for seed in seeds:
-            print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
-            rep = certify_v7(
+            if len(seeds) > 1:
+                print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
+            results = certify_v7(
                 args.models_dir,
                 state,
                 args.state_file,
@@ -662,12 +646,13 @@ def _run(args: argparse.Namespace) -> None:
                 on_model_commit=None
                 if (args.no_git or args.dry_run)
                 else partial(v7_model_commit, args),
-                clean=False,
+                clean=args.clean if seed == seeds[0] else False,
                 only_cells=parse_v7_cells(args.v7_cells),
                 grammar=args.v7_grammar,
                 corpus_seed=seed,
             )
-            state[f"v7_seed_{seed}"] = rep
+            state["v7"] = results
+            state[f"v7_seed_{seed}"] = results
             save_state(args.state_file, state)
         print()
         print("=" * 60)

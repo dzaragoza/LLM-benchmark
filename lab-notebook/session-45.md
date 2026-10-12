@@ -2971,3 +2971,7 @@ THE AUTHOR CATCH: "Why there was a run before seed 1 of MiniCPM3-4B?" THE ANSWER
 THE FIX: seed CORPUS_SEED (1) shares the BASE block - the seed-1 loop pass reads and writes v7_quick directly, so measured cells skip and only genuinely-new cells measure. The 253 ruling (seed 1 in the loop as defense in depth) stands: the pass still runs; it just skips what the base already did. Seeds 2/3 keep their own blocks as before. AND the cross-tier inheritance now works for the seed-1 pass too (same-block matching by construction).
 
 THE COST OF THE BUG: one redundant full pass per card that listed seed 1 (the 4 GB and 8 GB cards each paid one no-op-ish re-measure; the scores were identical, nothing was corrupted - the state carries both blocks with equal values; the _s1 blocks are now redundant aliases and may be ignored).
+
+## Addendum 261 - the base pass removed: the seed passes ARE the run
+
+THE AUTHOR: "Whats the point of the base pass? I just want the seed passes." CORRECT - once the seed loop exists, the base pass is seed 1 again by another door (260 exposed the doubling). REMOVED: the v7 task now runs EXACTLY the listed seed passes - no --v7-corpus-seed means the default corpus (seed 1) ONCE; a list means exactly those passes, nothing extra. The --clean flag applies to the first pass only (a wipe before any measuring, never mid-match). Cells persist seed-scoped exactly as before (seed 1 = the base block, 2/3 = _s<n>); the summary prints once at the end from the last pass. One command, one meaning.
