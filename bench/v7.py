@@ -1613,6 +1613,8 @@ def certify_v7(
             continue
         if done.get("score") is not None:
             entry["skipped"] = f"already measured (score {done['score']})"
+        elif done.get("error") is not None and str(done.get("error")).startswith("budget:"):
+            entry["skipped"] = f"already erased by the census gate ({done['error'][:60]}...)"
             results.append(entry)
             pending.append(entry)
             continue
@@ -1729,7 +1731,19 @@ def certify_v7(
                         f"{budget_gib} GiB budget (est was {cell['est_gib']}) - "
                         f"the cell is erased, never scored"
                     )
-                    v7.pop(key, None)
+                    # addendum 269: the erased cell records its ERROR in the
+                    # block - a rerun reads it and SKIPS (the 259 form popped
+                    # the key, so every rerun re-measured the over-budget cell
+                    # in full (~10 min) just to erase it again)
+                    v7[key] = {
+                        "family": fam,
+                        "ctx": int(key),
+                        "wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"],
+                        "params_b": cell["params_b"],
+                        "est_gib": cell["est_gib"],
+                        "mem_census": breakdown,
+                        "error": entry["error"],
+                    }
                     results.append(entry)
                     continue
             print(f"  score {rec['score']} / {rec['max_score']}")

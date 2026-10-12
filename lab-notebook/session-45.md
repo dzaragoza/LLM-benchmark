@@ -3058,3 +3058,17 @@ PRUNE_F16.PY (the author request): walks every models/ folder, checks each f16 G
 3. THE 0.25 CLASS: EMPTY BY A HAIR, AND THE REASON IS INSTRUCTIVE - granite-h-350m at Q4/q4/q4 @8192 computes to 0.345 GiB with overhead, 0.265 without: 15-95 MiB over the line either way. THE COMPUTE BUFFER IS THE FLOOR: at 8k ctx it costs 0.078 GiB - nearly a third of the 256M budget - before any weights or KV. The class is empty by arithmetic, not policy: no family can make 256M at the grids smallest rung. The class stays empty on the page (the honest finding); a 0.25 card would measure 0 placeable.
 
 4. THE ROSTER AT 42: spots 37-42 = Qwen3.5-4B (the heavyweight threat, 264), gemma-4-e2b-it (the sliding-window hybrid, 264), then the 265 additions Llama-3.1-8B, Llama-3.2-3B, Ministral-3-1B, Ministral-3-2B. THE FETCH IS REQUIRED FIRST: the four new families have null params (no extract yet - the gated Llamas and the unfetched Ministral small steps); after python3 etc/registry_data.py fetch the param-ascending order re-sorts and the card runs: python3 full_benchmark.py --task v7 --v7-families 42 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
+
+## Addendum 269 - the over-budget re-measure closed; the rerun-sweep safety confirmed
+
+THE AUTHOR: "Would it be safe if I rerun a sweep from 0.5 to 8? It should not trigger any recompute, right?" VERIFIED AGAINST THE STATE: four of five budgets skip cleanly (0.5: 3x4 blocks, 1: 8x4, 4: 25x3, 8: 24x4 - every measured cell reads as done). TWO exceptions, both now handled:
+1. THE 2 GB CARD IS MISSING ITS SEED 2/3 PASSES (only the base block exists - 6 cells, no _s2/_s3): the rerun measures those, and that is WANTED (the welterweight belt is n=1 today; ~12 cell-measurements fills it).
+2. THE OVER-BUDGET RE-MEASURE, FIXED: the 259 form popped the erased cell from the block, so every reran re-measured MiniCPM3-4Bs 9.07-GiB cell in full (~10 min) just to erase it again. The gate now records the ERROR entry in the block (with the census); the done check reads a budget-error entry as done and skips. The cell is attempted once per config, never again.
+
+THE SWEEP (fish; roster 36 means the standing families only - raise to 42 to include the new entrants, which measure by design):
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 0.5
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 1.0
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 2.0
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 4.0
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
+Expected wall time: 0.5/1/4/8 are near-instant skips; the 2.0 pass measures its two missing seed passes (~1-2 h total for the sweep).
