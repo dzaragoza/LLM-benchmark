@@ -474,13 +474,13 @@ def build_parser() -> argparse.ArgumentParser:
         "amplifier). Applies to the probe cells.",
     )
     ap.add_argument(
-        "--v7-corpus-seed",
-        default=None,
-        help="v7: the corpus seed(s) for replicate runs (addendum 239/249: "
-        "n=1 used seed 1, the default; pass 2 or a comma list 2,3,4 to "
-        "run several replicates in ONE invocation - each seed builds "
-        "and artifacts its own corpus and lands in its own state "
-        "namespace, so the sudden-death n=1 cells get their full match)",
+        "--v7-n",
+        type=int,
+        default=1,
+        help="v7: the replicate count (addendum 262) - run seeds 1..n, "
+        "one full pass per seed on its own corpus. n=1 (the default) is "
+        "the single default-corpus run; n=3 measures every cell on "
+        "three corpora and the belts are decided on means.",
     )
     ap.add_argument(
         "--clean",
@@ -619,17 +619,11 @@ def _run(args: argparse.Namespace) -> None:
             stamp("probe complete")
             return
 
-        # addendum 261: THE BASE PASS IS REMOVED - it was seed 1 again
-        # by another door (260 doubled it whenever 1 was listed). The
-        # seed passes ARE the run: no --v7-corpus-seed means the default
-        # corpus (seed 1) once; a list means exactly those passes.
-        # Cells persist seed-scoped as before (seed 1 = the base
-        # block; 2/3 = _s<n> blocks).
-        seeds = [
-            int(s)
-            for s in (args.v7_corpus_seed or str(v7.CORPUS_SEED)).split(",")
-            if s.strip()
-        ]
+        # addendum 262: the replicate count, not a seed list - run
+        # seeds 1..n, one full pass per seed on its own corpus. The
+        # base pass is gone (261); each pass is seed-scoped as before
+        # (seed 1 = the base block; k>1 = _s<k> blocks).
+        seeds = list(range(1, args.v7_n + 1))
 
         results = []
         for seed in seeds:
