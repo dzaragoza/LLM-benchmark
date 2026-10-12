@@ -3119,3 +3119,15 @@ NOTE: the GGUF acquisition will still need the author gate approval (the model f
 ## Addendum 274 - sweep.fish gains the registry update
 
 THE AUTHOR: "Good, add to sweep.fish the registry update, it will be needed as we add more models." THE SWEEP now: git pull, then python3 etc/registry_data.py fetch (the extract re-pull for every family), then the full budget ladder. A failed fetch WARNS and continues on the checked-in store (a hub outage must not block a resumable sweep); the fetch is the one place new roster additions become planner-visible, so the sweep is now self-syncing on all three axes: code, registry store, and measurements.
+
+## Addendum 275 - the calibration wipe: the fetch regenerates geometry and erases the measured fields
+
+THE AUTHOR: "The estimator needs improvements: the benchmark is running models in the 8 gib tier that even the estimate says belong to 4 gib." THE DIAGNOSIS - TWO PARTS:
+
+1. THE REAL REGRESSION (mine, and 274 made it worse): the registry fetch REGENERATES geometry from the config extract - wiping every census-calibrated field (the Jamba interval 27 -> 1, the weights overheads, the 273 paper geometry). The 258 calibrations lived in the GENERATED file; the sweep.fish 274 change put the fetch in the loop, so every sweep wiped them. The Jamba at 262k: est 5.42 vs census 3.93 - the planner placed it at 8 when it belonged at 4 by its own estimate.
+
+2. THE BY-DESIGN PART (not waste): the 8 GB pass measures every familys TOP-RUNG cell even when the cell fits 4 - that is the quick strategy (one cell per family at its best fit); the 40 duplicate-looking b8 cells are mostly the historical fall-through era (270) measurements, harmless.
+
+THE FIX, structural: the fetch now CARRIES the calibrations - CALIBRATION_FIELDS (full_attention_interval, weights_overhead_gib, interval_census_calibrated, geometry_source) are copied from the existing store into the regenerated entry; a fetch can never again erase a measured fact. The lost calibrations are re-applied to the current store (the overheads refit from census, the Jamba/gemma intervals, the 273 paper geometry); the Jamba est reads 3.79 vs census 3.93 - inside 4 percent again.
+
+THE LESSON, named: MEASURED FACTS MUST NOT LIVE IN GENERATED FILES. The store has two kinds of truth - the hub extract (regenerable) and the census calibrations (measurements, never regenerable); the fetch now treats them differently. The audit trail: 255 calibrated, 258 refit, 273 paper-sourced - all were one fetch away from being lost, and would have been silently.
