@@ -1611,20 +1611,35 @@ def certify_v7(
             entry["skipped"] = "cell not selected (--v7-cells)"
             results.append(entry)
             continue
+        # addendum 270: the resume structure repaired. The 251-era skip set
+        # its message but never CONTINUED - every measured cell fell through
+        # to the drift check below and re-measured anyway (the "config
+        # drift: identical configs" output was this fall-through). The
+        # order is now: measured -> skip; budget-erased -> skip; genuine
+        # config drift (stored config DIFFERS from planned) -> pop the
+        # stored cell and re-measure; anything else -> measure.
         if done.get("score") is not None:
             entry["skipped"] = f"already measured (score {done['score']})"
-        elif done.get("error") is not None and str(done.get("error")).startswith("budget:"):
+            results.append(entry)
+            pending.append(entry)
+            continue
+        if done.get("error") is not None and str(done.get("error")).startswith("budget:"):
             entry["skipped"] = f"already erased by the census gate ({done['error'][:60]}...)"
             results.append(entry)
             pending.append(entry)
             continue
-        if done.get("score") is not None:
+        if (
+            done.get("wq") == cell["wq"]
+            and done.get("kq") == cell["kq"]
+            and done.get("vq") == cell["vq"]
+        ):
+            pass  # identical config with no score: measure (should not happen)
+        elif done:
             print(
                 f"  config drift: stored {done.get('wq')}/{done.get('kq')}/"
                 f"{done.get('vq')} != planned {cell['wq']}/{cell['kq']}/"
                 f"{cell['vq']} - re-measuring"
             )
-            v7 = fst.setdefault("v7", {})
             v7.pop(key, None)
         if dry_run:
             print(

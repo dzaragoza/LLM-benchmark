@@ -3072,3 +3072,11 @@ python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 -
 python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 4.0
 python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
 Expected wall time: 0.5/1/4/8 are near-instant skips; the 2.0 pass measures its two missing seed passes (~1-2 h total for the sweep).
+
+## Addendum 270 - the resume fall-through: the real bug behind "config drift with identical configs"
+
+THE AUTHOR ASKS: "What does config drift mean?" - and the output exposed a REAL BUG of mine: stored Q4_0/q4_0/q4_0 != planned Q4_0/q4_0/q4_0, identical configs re-measuring.
+
+THE ANSWER + THE BUG: config drift means a stored cell at the same (family, ctx) has a DIFFERENT config than planned - the stored measurement cannot be reused, so it re-measures and replaces. But the output showed identical configs re-measuring because the 251-era skip set its message AND NEVER CONTINUED - every already-measured cell fell through to the drift check below and re-measured anyway. The "identical configs" drift message was that fall-through printing planned-vs-planned. THE FIX: the resume structure is now explicit - measured -> skip-and-continue; budget-erased -> skip-and-continue; genuine drift (stored config DIFFERS) -> pop the SCOPED block (the old pop hit a legacy v7 block, erasing nothing) and re-measure; else measure. Consequence: the 0.5 rerun was re-measuring cells that were already done - harmless to data (same corpus, same scores), wasteful of time; the sweep is now pure skip as 269 promised.
+
+WHY Qwen2.5-0.5B WAS NOT THERE BEFORE: it IS the roster growing as designed - 265 added it, the fetch pulled its extract, and the param-ascending 154 order slots it at spot 4-5 (0.5B params); at --v7-families 36 it now enters the 0.5/1/2 GB cards (its Q4 floor at 32k ests ~0.37 GiB - a genuine 512M-class contender against MiniCPM4-0.5B). It is downloading its safetensors for the first conversion because it never ran before - new families acquire on first measurement.
