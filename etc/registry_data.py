@@ -277,6 +277,7 @@ def fetch():
                 "extract": extract,
                 "geometry": geometry(c),
             }
+            _carry_calibrations(old_store, name, entry)
             try:
                 pb, psrc = _params_b_from_hub(repo)
                 if pb:
