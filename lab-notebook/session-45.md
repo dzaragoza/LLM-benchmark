@@ -2920,3 +2920,18 @@ THE CARDS RAN (1.0 and 2.0 budgets, seeds 1/2/3 each; the cross-tier inheritance
 THE ZERO CLUB, honest data: MiniCPM5-1B posts 0.0 across ALL seeds at BOTH its cells (0.93 and 1.75 GiB) - it cannot do the VT task at any measured size; Qwen2.5-1.5B posts 0.0 at its 8k cut (1.18 GiB). The 25-grade reach axis is unforgiving below the capability line - a model either carries the chain grammar or posts zeros.
 
 THE BRACKET STATE: five belts settled by measurement - granite-h-350m (512M), MiniCPM4-0.5B (1G), Qwen3.5-0.8B (2G), Qwen3.5-2B (4G, n=3 mean 6.99), Qwen3.5-2B (8G provisional n=2, replicates pending). The 8G replicates finish the card.
+
+## Addendum 257 - the roster expands to 36: the four new families enter the bracket
+
+THE AUTHOR: "We can afford to run a few more models, increase the roster until 36 on the list." THE ROSTER ORDER (154 ascending-params rule) brings four new fighters at spots 33-36:
+- 33. Ministral-3-3B-Instruct-2512 (3.85B, window 262k): planner places it at 64k Q4/q4/q4 est 3.98 (4 GB tier) and 131k Q8/q4/q4 est 7.67 (8 GB tier) - a genuine both-tier contender
+- 34. Qwen3-4B-Instruct-2507 (4.02B, window 262k): 32k Q4/q4/q4 at 4 GB (est 3.48); 131k Q4/q4/q4 est 7.37 at 8 GB - dense attention (147 KB/tok f16 KV) makes its cells context-starved
+- 35. MiniCPM3-4B (4.07B, window 32k ONLY): 8k Q4/q4/q4 at 4 GB; 32k at 8 GB - the short-window class, reach-limited by training not memory
+- 36. gemma-3-4b-it: UNPLACEABLE until its registry extract is fetched (KV geometry unknown) - run: python3 etc/registry_data.py fetch; if the extract still lacks geometry, it stays a finding (154), never a silent drop
+
+THE COMMANDS (fish; --v7-families 36; the four new cells measure at every budget; the standing 32 skip as measured, the cross-tier inheritance filling n):
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-budget-gib 4.0 --v7-corpus-seed 1,2,3
+python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-budget-gib 8.0 --v7-corpus-seed 1,2,3
+(the lower budgets 0.5/1/2 cannot place any of the four - all exceed 2 GiB at their floor - so no re-run needed there; their classes are unchanged)
+
+THE EXPECTED SHAKES: Ministral-3 at est 7.67 enters the TRUE heavyweight bracket against phi-4-mini (7.45); Qwen3-4B tests whether the Qwen hybrid reach magic survives at 4B params with dense-attention KV costs; MiniCPM3-4B likely posts reach-floor numbers (its 32k trained window halves the corpus grades).
