@@ -64,6 +64,35 @@ ROSTER = {
     "Ministral-3-3B-Instruct-2512": "mistralai/Ministral-3-3B-Instruct-2512",
     "Llama-3.2-1B-Instruct": "meta-llama/Llama-3.2-1B-Instruct",
     "SmolLM3-3B": "HuggingFaceTB/SmolLM3-3B",
+    # addendum 265: the registry extends to 64 - same rules (instruct
+    # tunes only, one per family, config.json on the hub). The 2026
+    # landscape's remaining sub-5B instruct families, param-ascending:
+    "SmolLM2-1.7B-Instruct": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    "Qwen2.5-0.5B-Instruct": "Qwen/Qwen2.5-0.5B-Instruct",
+    "Qwen2.5-3B-Instruct": "Qwen/Qwen2.5-3B-Instruct",
+    "Llama-3.2-3B-Instruct": "meta-llama/Llama-3.2-3B-Instruct",
+    "stablelm-2-1.6b-chat": "stabilityai/stablelm-2-1.6b-chat",
+    "gemma-2-2b-it": "google/gemma-2-2b-it",
+    "Phi-3-mini-128k-instruct": "microsoft/Phi-3-mini-128k-instruct",
+    "Ministral-3-1B-Instruct-2512": "mistralai/Ministral-3-1B-Instruct-2512",
+    "Ministral-3-2B-Instruct-2512": "mistralai/Ministral-3-2B-Instruct-2512",
+    "gemma-4-4b-it": "google/gemma-4-4b-it",
+    "granite-4.0-2b": "ibm-granite/granite-4.0-2b",
+    "Qwen3-2.5B": "Qwen/Qwen3-2.5B",
+    "Qwen3.5-9B": "Qwen/Qwen3.5-9B",
+    "gemma-4-e4b-it": "google/gemma-4-e4b-it",
+    "Ministral-3-8B-Instruct-2512": "mistralai/Ministral-3-8B-Instruct-2512",
+    "SmolLM3-9B": "HuggingFaceTB/SmolLM3-9B",
+    "Qwen3-8B": "Qwen/Qwen3-8B",
+    "gemma-3-12b-it": "google/gemma-3-12b-it",
+    "mistral-7b-instruct-v0.3": "mistralai/Mistral-7B-Instruct-v0.3",
+    "Llama-3.1-8B-Instruct": "meta-llama/Llama-3.1-8B-Instruct",
+    "granite-3.3-8b-instruct": "ibm-granite/granite-3.3-8b-instruct",
+    "Phi-4-14B": "microsoft/phi-4",
+    "Qwen3-14B": "Qwen/Qwen3-14B",
+    "gemma-3-27b-it": "google/gemma-3-27b-it",
+    "Qwen2.5-7B-Instruct": "Qwen/Qwen2.5-7B-Instruct",
+    "OLMo-2-1124-7B-Instruct": "allenai/OLMo-2-1124-7B-Instruct",
 }
 # The roster is CUT at gemma-4-e2b-it (5.12B) - the author's 80 GB
 # disk ruling (session 40, addendum 51): every family above it (from
