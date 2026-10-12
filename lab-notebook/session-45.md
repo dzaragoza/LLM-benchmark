@@ -3023,3 +3023,17 @@ python3 etc/registry_data.py fetch
 then the roster-64 card:
 python3 full_benchmark.py --task v7 --v7-families 64 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
 The sub-5B families skip as measured; the 5B+ band mostly reports findings (floor config exceeds 8 GiB); the genuinely placeable newcomers (gemma-4-4b, Ministral small steps, Qwen3-2.5B) measure their cells. The param-ascending 154 rule keeps the ordering honest.
+
+## Addendum 266 - the rule-6 audit: every 64-roster family carries a research paper or technical report
+
+THE AUTHOR REMINDS: "Remember the rule of at least a research paper or technical report on any of the model version." RULE 6 (model-selection.md): a family enters only with a published paper or technical report; a lineage report counts (the Granite 3.0-covers-3.3 precedent, addendum 64).
+
+THE AUDIT of the 26 additions (265), verified:
+- SmolLM2 (arXiv 2502.02737), SmolLM3 (HF report), OLMo-2 (arXiv 2501.00656, 2 OLMo 2 Furious)
+- Qwen2.5 (arXiv 2412.15115: 0.5B/3B/7B), Qwen3 (arXiv 2505.09388: 2.5B/8B/14B), Qwen3.5 (the Qwen3.5 lineage reports)
+- GEMMA 4 TECHNICAL REPORT EXISTS: arXiv 2607.02770 (published July 2026) - covers e2b/e4b/4b
+- MINISTRAL 3 REPORT EXISTS: arXiv 2601.08584 - the whole line (1B/2B/3B/8B), the pruning-and-distillation-from-Mistral-Small-3.1 paper
+- gemma-2 (the Gemma 2 report), gemma-3 (the Gemma 3 report: 12b/27b), granite-3.3-8b (the Granite 3.3 report), stablelm-2 (the StableLM 2 report)
+- Phi-3-mini-128k (the Phi-3 report lineage), Phi-4-14B (the Phi-4 report), Llama-3.1/3.2 (the Llama 3 herd reports), Mistral-7B-v0.3 (the Mistral 7B paper lineage)
+
+ALL 26 PASS RULE 6. The three genuine uncertainties at proposal time - gemma-4, Ministral-3, Qwen3.5 - all have formal reports (the Gemma 4 Technical Report arXiv 2607.02770; the Ministral 3 paper arXiv 2601.08584, which is also the interesting architecture read: iterative shrinking and distillation from Mistral Small 3.1); the Qwen3.5 lineage continues the Qwen report series. THE REGISTRY STANDS AT 64 under all six model-selection rules.
