@@ -2979,3 +2979,17 @@ THE AUTHOR: "Whats the point of the base pass? I just want the seed passes." COR
 ## Addendum 262 - the replicate interface simplified: --v7-n, seeds 1..n
 
 THE AUTHOR: "Remove specifying corpus seeds as a list, just an n, meaning run from 1 to n." DONE: --v7-corpus-seed is retired for --v7-n (an integer, default 1). The run executes seeds 1..n, one full pass per seed on its own corpus - no list parsing, no ordering questions, no possibility of a gap (the 251/260 bug class is now unreachable by construction). n=1 is the plain single-corpus run; n=3 is the full match. The seed-to-block mapping is unchanged (seed 1 = the base block; k>1 = _s<k>).
+
+## Addendum 263 - the 8 GiB ceiling finding: memory above 4 GiB has nothing to buy
+
+THE AUTHOR OBSERVES: "I find the 8 gib field quite interesting, it is not capable of scoring higher than the 4 gib models." CONFIRMED AND EXPLAINED - the 8 GB class at best MATCHES the 4 GB class (Qwen3.5-2B: 6.99/30 at 4G vs 7.01/30 at 8G, n=3) and the mechanism is the three laws converging:
+
+1. THE KV AXIS IS FLAT (211/221/226/236): the only thing the champion can upgrade from 4 to 8 GiB is KV q4 -> q8, and the whole probe line proved KV above q4_0 buys nothing. The 8G cell IS the 4G cell plus free bytes.
+
+2. THE WEIGHTS LADDER TOPS AT Q8_0: the fit ladders only rung down (q8 -> q4) - F16 WEIGHTS WERE NEVER TRIED in the quick era. The one thing 8 GiB could genuinely buy (the champion at F16 weights: ~4.5 GB weights + 0.9 KV = ~5.5 GiB, fits 8) is outside the ladder. THIS IS THE REGISTERED NEXT QUESTION: does F16 beat Q8_0 at reach? The weights-are-the-value-axis law says it should - but the 211-era evidence says quant damage lives in weights, so the gap Q8->F16 is the one unmeasured weights step in the whole study.
+
+3. REACH IS CAPPED BY THE CORPUS GRID at 262k: no cell can out-reach the grid, so 8 GiB cannot buy more grades.
+
+THE RATE VIEW, honest: per-grade RATE does rise slightly (4G best 0.233, 8G best 0.253 - Ministral-3 at 131k) - but that is a different model entering, not the champions memory buying quality. The champion itself is rate-flat across 4G and 8G.
+
+THE 8G CONCLUSION: heavyweight memory is a NO-SPEND class under the current ladder. The registered follow-up: a one-off F16-weights bout for the champion (llama-server F16 weights + q4 KV + 262k, est ~5.5 GiB, inside 8) - if F16 beats Q8_0s 6.99 by more than seed spread, the weights ladder gains a top rung and the 8G class finally buys something. If flat, the weights-Q8 ceiling is the eras answer: the ladder is complete at Q8_0.
