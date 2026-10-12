@@ -2975,3 +2975,7 @@ THE COST OF THE BUG: one redundant full pass per card that listed seed 1 (the 4 
 ## Addendum 261 - the base pass removed: the seed passes ARE the run
 
 THE AUTHOR: "Whats the point of the base pass? I just want the seed passes." CORRECT - once the seed loop exists, the base pass is seed 1 again by another door (260 exposed the doubling). REMOVED: the v7 task now runs EXACTLY the listed seed passes - no --v7-corpus-seed means the default corpus (seed 1) ONCE; a list means exactly those passes, nothing extra. The --clean flag applies to the first pass only (a wipe before any measuring, never mid-match). Cells persist seed-scoped exactly as before (seed 1 = the base block, 2/3 = _s<n>); the summary prints once at the end from the last pass. One command, one meaning.
+
+## Addendum 262 - the replicate interface simplified: --v7-n, seeds 1..n
+
+THE AUTHOR: "Remove specifying corpus seeds as a list, just an n, meaning run from 1 to n." DONE: --v7-corpus-seed is retired for --v7-n (an integer, default 1). The run executes seeds 1..n, one full pass per seed on its own corpus - no list parsing, no ordering questions, no possibility of a gap (the 251/260 bug class is now unreachable by construction). n=1 is the plain single-corpus run; n=3 is the full match. The seed-to-block mapping is unchanged (seed 1 = the base block; k>1 = _s<k>).
