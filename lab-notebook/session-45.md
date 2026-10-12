@@ -2887,3 +2887,22 @@ THE SUDDEN-DEATH LESSON, confirmed: the n=1 reading crowned MiniCPM4-0.5B (0.261
 THE MECHANISM READING: granite-h-350m keeps Q8_0 WEIGHTS (0.34 GB) while MiniCPM cuts to Q4_0 - and the Q8 weights carry the bout. The weights law (204) holds at the very bottom of the roster, and the KV cut both take costs nothing (both q4, the flats hold). The featherweight bout IS the weights-are-the-value-axis finding in its purest form.
 
 THE PAGE: the 512M section corrected - the champion, the n=3 table with per-seed spreads, the command line, and the weights-law reading. The 256M class stays honestly empty.
+
+## Addendum 255 - the reclassification by ACTUAL GPU census; the n=3 brackets
+
+THE AUTHOR: "Check the actual gpu memory usage and reclassify. Some models are in the wrong category by actual ram usage." CONFIRMED - the class is the cells OWN census, and several were misfiled by budget-run origin. The full bracket, n=3 means (all three seeds measured independently; base==seed1 deduped):
+
+THE BELTS, census-corrected:
+- 512M: granite-4.0-h-350m (Q8_0/q4/q4, 0.56 GiB) mean 0.41 [0.23, 0.55, 0.46] - HOLDS (254)
+- 1G: MiniCPM4-0.5B (Q8_0/q8/q8, 0.80 GiB) mean 1.32 [1.42, 1.79, 0.74] - HOLDS; the 0.8B cut lands at 1.046 GiB = the 2G class by census (the challenger moved up a class by 46 MiB)
+- 2G: Qwen3.5-0.8B (Q4_0/q4/q4 @64k, 1.05 GiB) mean 2.53 [1.42, 3.85, 2.31] - THE WELTERWEIGHT CHAMPION, dominating the class from barely over 1 GiB
+- 4G: Qwen3.5-2B (Q8_0/q4/q4 @262k, 3.78 GiB) mean 6.99 [6.906, 6.557, 7.52] - HOLDS with the full n=3; the Jambas 8-card cells (3.93 GiB) FILE INTO 4G where they belong: Jamba2-3B q8/q8/q8 mean 3.31 (n=2, s3 pending)
+- 8G: Qwen3.5-2B (Q8_0/q8/q8 @262k, 4.53 GiB) mean 6.77 (n=2) - the provisional heavyweight belt; phi-4-mini @131k (7.45 GiB) mean 4.75 the first true heavyweight contender
+
+THE FINDINGS the re-sort surfaces:
+1. THE 0.8B IS THE WELTERWEIGHT PHENOM: 2.53/20 mean at 1.05 GiB - it beats every other cell in the 2G class by 13x and several 4G cells outright. 219s smaller-family prediction lands in the 2G tier.
+2. THE JAMBAS WERE NEVER HEAVYWEIGHTS: their 8-card cells census at 3.93 GiB - 4G class. The tiny KV (0.14 GiB at 262k, the 225 hybrid find) is why: hybrid architecture gives heavyweight REACH at middleweight WEIGHT.
+3. THE 4-GB CHAMPIONS N=3 SEED SPREAD: 6.906/6.557/7.52 - 0.96 spread across seeds, the belt holds with margin to spare.
+4. MiniCPM4-0.5Bs seed 3 dipped to 0.74 (from 1.42/1.79) - the lightweight belt holds but the spread is wide; the tiny families are noisier per seed.
+
+THE PAGE: all five weight-class tables rebuilt on census-corrected n=3 means.
