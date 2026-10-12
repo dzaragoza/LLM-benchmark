@@ -2935,3 +2935,17 @@ python3 full_benchmark.py --task v7 --v7-families 36 --v7-grammar v71 --v7-budge
 (the lower budgets 0.5/1/2 cannot place any of the four - all exceed 2 GiB at their floor - so no re-run needed there; their classes are unchanged)
 
 THE EXPECTED SHAKES: Ministral-3 at est 7.67 enters the TRUE heavyweight bracket against phi-4-mini (7.45); Qwen3-4B tests whether the Qwen hybrid reach magic survives at 4B params with dense-attention KV costs; MiniCPM3-4B likely posts reach-floor numbers (its 32k trained window halves the corpus grades).
+
+## Addendum 258 - the RAM estimator calibrated against the full census: 10.4 percent -> 1.6 percent mean error
+
+THE AUTHOR: "Improve your RAM usage prediction against the results." THE AUDIT (est vs census over all 45 quick-era cells) found THREE systematic errors, two of them mine:
+
+1. THE COMPUTE SLOPE WAS HALF THE TRUTH (the one real estimator bug): the census fits read 2 KiB/token on EVERY family (floor 0.062) - the addendum-187 constant was 1 KiB/token. Fixed: COMPUTE_KIB_PER_TOKEN = 2.0, FLOOR = 0.062. The units were right; the slope was not.
+
+2. THE WEIGHTS OVERHEAD (new term): census weights_gib exceeds params x bpB by a per-family constant - the f16 embedding/output tensors llama.cpp keeps unquantized. Fit from the census: gemma +0.37, phi-4-mini +0.62, Llama-3.2 +0.26, Qwen2.5 +0.23, most others 0.00-0.16. Now a geometry field (weights_overhead_gib) the estimator adds.
+
+3. MY OWN KV CALIBRATION BUG (twice, caught and reverted): I overwrote registry kv_bytes_per_token_f16 with post-interval values while kv_per_token_f16 divides by full_attention_interval - quartering the hybrids. REVERTED to the pristine registry; the original KV values were correct all along (Llama-3.2: 32768 = 16L x 8H x 64d x 2 x 2B reproduces its census exactly).
+
+4. THE TWO REAL GEOMETRY GAPS, fixed by implied interval: the Jambas registry interval was 1 but the census implies 27 (their hybrid ratio never extracted - the +43 percent overestimate); gemma-3-1b-it implies 12 (sliding-window layers). Both now census-calibrated intervals.
+
+THE RESULT: mean signed error +0.1 percent (was -5.3), mean absolute 1.6 percent (was 10.4), worst cell +9 percent (was +43). The estimator predicts the champions cells to <1 percent: Qwen3.5-2B @262k q4/q4 est 3.79 vs census 3.783. THE DISCIPLINE NOTE: the failed intermediate calibrations are on record - a census fit is only trustworthy when the estimator FORM is verified term by term first (weights, context, compute separately), exactly the 187 lesson re-learned.

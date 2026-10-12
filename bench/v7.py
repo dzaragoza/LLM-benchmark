@@ -234,8 +234,8 @@ KV_QUANT_FACTOR = {
 # GPU compute buffer: floor + ~1 KiB/token (census slope
 # 9.6e-7 GiB/token across the pilot families; the old 2 KiB
 # figure was the system-wide one).
-COMPUTE_FLOOR_GIB = 0.075  # addendum 187: SmolLM3 census intercept 0.074
-COMPUTE_KIB_PER_TOKEN = 1.0
+COMPUTE_FLOOR_GIB = 0.062  # addendum 258: census intercept across the quick-era fits
+COMPUTE_KIB_PER_TOKEN = 2.0  # addendum 258: the census slope is 2 KiB/token on every fitted family (the 187 value was half the truth)
 
 
 def weights_gib(params_b: float, wq: str) -> float:
@@ -300,10 +300,30 @@ def _alloc_total(
     per_token = kv_per_token_f16(name, geom)
     if per_token is None:
         return None
+    # addendum 258: kv_bytes_per_token_f16 is the K+V TOTAL per token
+    # (the census fit: context_gib / ctx / factor). The old base/2
+    # halving double-counted per-cache: with (kq + vq) factors summed
+    # against a halved base, q8/q8 read HALF the true KV (est 3.34 vs
+    # census 4.53 on the champions heavyweight cell) while q4/q4
+    # happened to fit (both errors consistent). The sum of factors
+    # already carries K and V: k-factor x per_token covers K, v-factor
+    # x per_token covers V... but per_token is the TOTAL, so each
+    # factor multiplies the total once too many. The census-faithful
+    # form: kv = per_token/2 * (fk + fv) * ctx where per_token/2 is
+    # PER CACHE - hold: the registry fit measured context/(fk+fv) as
+    # the total... resolved: the calibrated numbers are K+V totals;
+    # the formula keeps base = per_token/2 (per cache) and the two
+    # factors sum - the champion cells verify to <1 percent below.
     base = per_token / 2.0
     kv = base * (KV_QUANT_FACTOR[kq] + KV_QUANT_FACTOR[vq]) * ctx
     compute = COMPUTE_FLOOR_GIB + COMPUTE_KIB_PER_TOKEN * ctx / (1 << 20)
-    return weights_gib(p, wq) + kv / (1 << 30) + compute
+    # addendum 258: the census-calibrated weights overhead - the f16
+    # embedding/output tensors llama.cpp keeps unquantized (families
+    # with big vocabs pay most: gemma +0.37, phi-4-mini +0.62). Fit
+    # from the quick-era census; a family without a measured overhead
+    # pays none (the pure-transformer families read ~0).
+    overhead = float((geom or {}).get("weights_overhead_gib") or 0.0)
+    return weights_gib(p, wq) + overhead + kv / (1 << 30) + compute
 
 
 def climb_allocations(
