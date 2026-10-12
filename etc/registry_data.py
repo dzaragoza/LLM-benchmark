@@ -93,6 +93,10 @@ ROSTER = {
     "gemma-3-27b-it": "google/gemma-3-27b-it",
     "Qwen2.5-7B-Instruct": "Qwen/Qwen2.5-7B-Instruct",
     "OLMo-2-1124-7B-Instruct": "allenai/OLMo-2-1124-7B-Instruct",
+    # addendum 271: the audit finds the missed siblings (the Qwen2.5-0.5B
+    # failure mode) - the two genuinely interesting ones
+    "Qwen3-0.6B": "Qwen/Qwen3-0.6B",
+    "SmolLM2-360M-Instruct": "HuggingFaceTB/SmolLM2-360M-Instruct",
 }
 # The roster is CUT at gemma-4-e2b-it (5.12B) - the author's 80 GB
 # disk ruling (session 40, addendum 51): every family above it (from
