@@ -2993,3 +2993,19 @@ THE AUTHOR OBSERVES: "I find the 8 gib field quite interesting, it is not capabl
 THE RATE VIEW, honest: per-grade RATE does rise slightly (4G best 0.233, 8G best 0.253 - Ministral-3 at 131k) - but that is a different model entering, not the champions memory buying quality. The champion itself is rate-flat across 4G and 8G.
 
 THE 8G CONCLUSION: heavyweight memory is a NO-SPEND class under the current ladder. The registered follow-up: a one-off F16-weights bout for the champion (llama-server F16 weights + q4 KV + 262k, est ~5.5 GiB, inside 8) - if F16 beats Q8_0s 6.99 by more than seed spread, the weights ladder gains a top rung and the 8G class finally buys something. If flat, the weights-Q8 ceiling is the eras answer: the ladder is complete at Q8_0.
+
+## Addendum 264 - the roster question: yes, two 8,4,4-capable models await at spots 37-38; the F16 rung declined
+
+THE AUTHOR: "No f16, gains are minimal. What about introducing more models? Are there models capable still of 8,4,4? Not in the roster?"
+
+THE ANSWER: the registry already holds two families beyond the 36-roster cut, BOTH capable of the 8,4,4 class (Q8_0 weights + 131k+ at <8 GiB) - the hybrid-architecture club the 225 law predicts:
+- 37. Qwen3.5-4B (4.66B, window 262k, hybrid): at 8 GiB the planner places it at 262k Q8_0/q4_0/q4_0 est 7.42 - THE SAME HYBRID REACH MAGIC AS ITS 2B SIBLING, at twice the parameters. THE HEAVYWEIGHT TITLE THREAT: if its per-grade rate holds anywhere near the 2Bs, it takes the belt outright.
+- 38. gemma-4-e2b-it (5.12B, window 131k, sliding-window hybrid): at 8 GiB it places at 131k Q8_0/q8_0/q8_0 est 7.71 - the full-KV fit.
+
+BEYOND THE REGISTRY (the 2026 landscape survey): the other 8,4,4-capable candidates are Qwen3.5-9B (too big: Q8_0 ~9.3 GiB, a 16-GB-class model), Ministral-3-8B (same class), Gemma-4-E4B (~8.6B effective - the 16 GB class), Liquid AI Apollo (sub-1B, already lightweight-class territory). The 4-5B hybrid niche is otherwise EMPTY - which makes the two registry additions the right next card.
+
+THE CARD (fish; roster 38, both budgets, n=3):
+python3 full_benchmark.py --task v7 --v7-families 38 --v7-grammar v71 --v7-n 3 --v7-budget-gib 4.0
+python3 full_benchmark.py --task v7 --v7-families 38 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
+
+THE F16 RUNG: declined (the authors ruling - gains minimal); the weights ladder tops at Q8_0, final. The 263 finding stands complete: the 8 GB class buys nothing ABOVE Q8_0 weights, and the only new heavyweights are MORE PARAMETERS at the same quant.
