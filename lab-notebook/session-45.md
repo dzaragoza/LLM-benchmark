@@ -3037,3 +3037,14 @@ THE AUDIT of the 26 additions (265), verified:
 - Phi-3-mini-128k (the Phi-3 report lineage), Phi-4-14B (the Phi-4 report), Llama-3.1/3.2 (the Llama 3 herd reports), Mistral-7B-v0.3 (the Mistral 7B paper lineage)
 
 ALL 26 PASS RULE 6. The three genuine uncertainties at proposal time - gemma-4, Ministral-3, Qwen3.5 - all have formal reports (the Gemma 4 Technical Report arXiv 2607.02770; the Ministral 3 paper arXiv 2601.08584, which is also the interesting architecture read: iterative shrinking and distillation from Mistral Small 3.1); the Qwen3.5 lineage continues the Qwen report series. THE REGISTRY STANDS AT 64 under all six model-selection rules.
+
+## Addendum 267 - the n=36 card complete: the champion table final; prune_f16.py; the featherweight re-flip
+
+THE CARD COMPLETE (all seeds, all budgets, roster 36). THE FINAL CENSUS-CLASSED TABLE:
+- 512M: MiniCPM4-0.5B 0.30 [0.26, 0.32, 0.33] at 0.501 GiB - THE BELT RETURNS: granite-4.0-h-350ms cut cell censuses 0.555 GiB, 43 MiB OVER the class limit - the 254 crown was a mis-filing (census rules, 255); granite-h is a 1 GB-class fighter (its q8/q8 cell mean 0.51 holds second there)
+- 1GB: MiniCPM4-0.5B 1.32 [1.42, 1.79, 0.74]
+- 2GB: Qwen3.5-0.8B 2.53 [1.42, 3.85, 2.31] - the welterweight phenom, thirteen times ahead
+- 4GB: Qwen3.5-2B 6.99 [6.91, 6.56, 7.52]; Jamba2-3B completes n=3 at 3.61 [3.19, 3.42, 4.21], the strongest 3B in-class; Qwen3-4B 3.38 final (the hybrid magic did not survive MHA at 4B)
+- 8GB: Qwen3.5-2B 7.01 [6.91, 6.62, 7.48] - BOTH BELTS THE SAME MODEL, statistically identical scores (the KV-q8 upgrade buys nothing, fifth confirmation); Ministral-3-3B the real contender at 5.55 [6.33, 4.83, 5.49], wide-spread but clear of phi-4-mini (4.53)
+
+PRUNE_F16.PY (the author request): walks every models/ folder, checks each f16 GGUF for its Q8_0 and Q4_0 siblings AT DELETION TIME, removes the f16 only when both exist; --dry-run default posture, --remove to execute; a missing sibling keeps the file (the f16 stays as the quant source). Replaces the ad-hoc 255-era fish command with one auditable script.
