@@ -2963,3 +2963,11 @@ THE RESULTS BEFORE THE CRASH (the 36-roster expansion, all four new families mea
 THE ESTIMATOR NOTE: the MiniCPM3-4B miss (est 7.71 vs census 9.07) is the one cell outside the 258 calibration set - a family with 62 layers and MHA geometry whose compute term runs big at 32k. The 1.6 percent calibration stands for the measured families; MiniCPM3-4B joins the calibration set the moment its cells are measured.
 
 THE RE-RUN: the same command resumes - measured cells skip, the erased MiniCPM3-4B 32k cell now records an error entry instead of crashing, and the replicates complete.
+
+## Addendum 260 - the seed-1 double-measure: the namespace naming bug, found by the author
+
+THE AUTHOR CATCH: "Why there was a run before seed 1 of MiniCPM3-4B?" THE ANSWER has two parts: (a) the pre-banner run is the BASE PASS - the always-runs first pass, and the base corpus IS seed 1 by definition; (b) the "replicate seed 1" pass then RE-MEASURED the same cells because my 251 namespace fix named the loop block v7_quick_s1 while the base pass writes v7_quick (unsuffixed) - the loop found its own block empty and measured everything again (identical scores, same corpus, pure waste).
+
+THE FIX: seed CORPUS_SEED (1) shares the BASE block - the seed-1 loop pass reads and writes v7_quick directly, so measured cells skip and only genuinely-new cells measure. The 253 ruling (seed 1 in the loop as defense in depth) stands: the pass still runs; it just skips what the base already did. Seeds 2/3 keep their own blocks as before. AND the cross-tier inheritance now works for the seed-1 pass too (same-block matching by construction).
+
+THE COST OF THE BUG: one redundant full pass per card that listed seed 1 (the 4 GB and 8 GB cards each paid one no-op-ish re-measure; the scores were identical, nothing was corrupted - the state carries both blocks with equal values; the _s1 blocks are now redundant aliases and may be ignored).
