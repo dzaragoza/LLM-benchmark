@@ -3009,3 +3009,17 @@ python3 full_benchmark.py --task v7 --v7-families 38 --v7-grammar v71 --v7-n 3 -
 python3 full_benchmark.py --task v7 --v7-families 38 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
 
 THE F16 RUNG: declined (the authors ruling - gains minimal); the weights ladder tops at Q8_0, final. The 263 finding stands complete: the 8 GB class buys nothing ABOVE Q8_0 weights, and the only new heavyweights are MORE PARAMETERS at the same quant.
+
+## Addendum 265 - the registry extends to 64 (the same creation rules)
+
+THE AUTHOR: "Lets expand the registry. Same rules as when we created it - extend to 64." THE RULES (models.md, session 35 addendum 18): instruct tunes only, one per family, a HF repo whose config.json the fetch pulls; the store keeps the raw extract + derived geometry so audits are a git diff.
+
+THE 26 ADDITIONS (the 2026 landscape, param-ascending within the sub-27B instruct families not already in the store): SmolLM2-1.7B, Qwen2.5-0.5B, Ministral-3-1B/2B, stablelm-2-1.6b, gemma-2-2b, Phi-3-mini-128k, Qwen2.5-3B, Llama-3.2-3B, gemma-4-4b, granite-4.0-2b, Qwen3-2.5B, Qwen3.5-9B, gemma-4-e4b, Ministral-3-8B, SmolLM3-9B, Qwen3-8B, gemma-3-12b, Mistral-7B-v0.3, Llama-3.1-8B, granite-3.3-8b, Phi-4-14B, Qwen3-14B, gemma-3-27b, Qwen2.5-7B, OLMo-2-7B.
+
+THE PLACEMENT NOTE: the first 38 by parameter count remain the sub-5B class (the current 36-roster plus the two 264 additions); the new 26 fill the 5B-27B band - most are 16-GB-class citizens at Q8_0 (unplaceable at 8 GiB, findings by the 154 rule), but the band carries the architecture comparisons the study cares about: gemma-4s sliding-window hybrids at 4b/e4b, Ministral-3s full line, the Qwen3.5-9B hybrid, and OLMo-2 as the fully-open dense control.
+
+THE FETCH (on the T14s - it pulls 26 config.json files from the hub):
+python3 etc/registry_data.py fetch
+then the roster-64 card:
+python3 full_benchmark.py --task v7 --v7-families 64 --v7-grammar v71 --v7-n 3 --v7-budget-gib 8.0
+The sub-5B families skip as measured; the 5B+ band mostly reports findings (floor config exceeds 8 GiB); the genuinely placeable newcomers (gemma-4-4b, Ministral small steps, Qwen3-2.5B) measure their cells. The param-ascending 154 rule keeps the ordering honest.
