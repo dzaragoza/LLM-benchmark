@@ -15,6 +15,10 @@
 
 git pull --ff-only; or exit 1
 
+# the registry update: re-pull every family's config extract so new
+# roster additions (and geometry fixes) land before the sweep plans
+python3 etc/registry_data.py fetch; or echo "WARNING: registry fetch failed - continuing with the checked-in store"
+
 for budget in 0.25 0.5 1.0 2.0 4.0 8.0
     echo ""
     echo "============================================================"
