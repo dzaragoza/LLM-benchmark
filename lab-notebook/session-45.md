@@ -3080,3 +3080,16 @@ THE AUTHOR ASKS: "What does config drift mean?" - and the output exposed a REAL 
 THE ANSWER + THE BUG: config drift means a stored cell at the same (family, ctx) has a DIFFERENT config than planned - the stored measurement cannot be reused, so it re-measures and replaces. But the output showed identical configs re-measuring because the 251-era skip set its message AND NEVER CONTINUED - every already-measured cell fell through to the drift check below and re-measured anyway. The "identical configs" drift message was that fall-through printing planned-vs-planned. THE FIX: the resume structure is now explicit - measured -> skip-and-continue; budget-erased -> skip-and-continue; genuine drift (stored config DIFFERS) -> pop the SCOPED block (the old pop hit a legacy v7 block, erasing nothing) and re-measure; else measure. Consequence: the 0.5 rerun was re-measuring cells that were already done - harmless to data (same corpus, same scores), wasteful of time; the sweep is now pure skip as 269 promised.
 
 WHY Qwen2.5-0.5B WAS NOT THERE BEFORE: it IS the roster growing as designed - 265 added it, the fetch pulled its extract, and the param-ascending 154 order slots it at spot 4-5 (0.5B params); at --v7-families 36 it now enters the 0.5/1/2 GB cards (its Q4 floor at 32k ests ~0.37 GiB - a genuine 512M-class contender against MiniCPM4-0.5B). It is downloading its safetensors for the first conversion because it never ran before - new families acquire on first measurement.
+
+## Addendum 271 - the roster audit: two more missed siblings, same failure mode
+
+THE AUTHOR: "Very interesting. Please audit the roster again." THE AUDIT (family-by-family hub coverage vs the registry, sizes under 5B):
+
+TWO GENUINE MISSES found - the SAME failure mode as Qwen2.5-0.5B (a family enters at one size; the siblings were never checked):
+1. Qwen3-0.6B (Qwen/Qwen3-0.6B): the smallest Qwen3, DENSE, 32k window - a genuine 512M/1GB-class contender. Covered by the Qwen3 Technical Report (arXiv 2505.09388, rule 6 satisfied). At Q4/q4/q4 @32k it ests ~0.4 GiB - it enters the featherweight card against MiniCPM4-0.5B and Qwen2.5-0.5B, and at Q8 it ests ~0.75 - the lightweight card too. THE MOST IMPORTANT MISSING MODEL: the tiny-dense-Qwen bout tests the 204 weights law at the very bottom with a family whose larger siblings are proven (Qwen3-1.7B measured 2.45).
+2. SmolLM2-360M (HuggingFaceTB/SmolLM2-360M-Instruct): the smallest instruct with a report (the SmolLM2 paper covers the family, rule 6 satisfied). Window 8192 (the SmolLM2 config) - exactly at the grid floor. At Q4 it ests ~0.2 GiB - THE FIRST GENUINE 256M-CLASS CONTENDER (the 268 finding said empty by a hair with granite-h at 0.265-0.345; the 360M computes below the line).
+3. SmolLM2-135M: below the window/capability line (the report itself says not instruction-tuned grade) - rejected on type, not added.
+
+ADDED to the ROSTER (66 families now - the author asked for 64, the audit found the 2 that make the count honest; the extra 2 are exactly the interesting ones).
+
+gemma-2-9b NOT added: 16-GB class at Q8_0 (findings-only at the 8 GiB card); the gemma-3/4 and big-Qwen families are already represented at their small sizes.
