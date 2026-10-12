@@ -6,6 +6,7 @@ logic is inlined (not imported from the test file) - ty resolves
 statically, and the test imports THIS module so the logic is
 single-sourced (the test's pin covers this file too).
 """
+
 import json
 import sys
 from pathlib import Path
