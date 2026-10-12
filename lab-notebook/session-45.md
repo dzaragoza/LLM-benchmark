@@ -3115,3 +3115,7 @@ THE FIX, the addendum-22 precedent: PAPER-SOURCED GEOMETRY. The Gemma 3 Technica
 THE PLANNER VERDICT with the paper geometry: placeable at last - at 4 GiB: 64k Q4_0/q4_0/q4_0 est 3.24; at 8 GiB: 262k Q4_0/q4_0/q4_0 est 6.0. THE HEAVYWEIGHT CARD GAINS A 262K REACH CONTENDER at 6 GiB - the first model other than the Qwen hybrids and the Jambas to plan a full-reach cell. The sliding-window architecture (5 of 6 layers cache only 1024 tokens) is exactly the KV-light design the 225 law rewards.
 
 NOTE: the GGUF acquisition will still need the author gate approval (the model file is gated too) - the planner can now PLAN the cell, but the first measurement waits on the author accepting Google gated-repo terms, OR a first-party GGUF mirror if one exists ungated. The state will show acquire-gated if it cannot download; the cell is planned either way.
+
+## Addendum 274 - sweep.fish gains the registry update
+
+THE AUTHOR: "Good, add to sweep.fish the registry update, it will be needed as we add more models." THE SWEEP now: git pull, then python3 etc/registry_data.py fetch (the extract re-pull for every family), then the full budget ladder. A failed fetch WARNS and continues on the checked-in store (a hub outage must not block a resumable sweep); the fetch is the one place new roster additions become planner-visible, so the sweep is now self-syncing on all three axes: code, registry store, and measurements.
