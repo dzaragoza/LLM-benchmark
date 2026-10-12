@@ -3093,3 +3093,15 @@ TWO GENUINE MISSES found - the SAME failure mode as Qwen2.5-0.5B (a family enter
 ADDED to the ROSTER (66 families now - the author asked for 64, the audit found the 2 that make the count honest; the extra 2 are exactly the interesting ones).
 
 gemma-2-9b NOT added: 16-GB class at Q8_0 (findings-only at the 8 GiB card); the gemma-3/4 and big-Qwen families are already represented at their small sizes.
+
+## Addendum 272 - the one command: sweep.fish, the fixed protocol
+
+THE AUTHOR: "We are having too many bugs. Let us run like this: families = 42, always put a git pull at the beginning, always put the full sweep, starting from 0.25 to 8." THE RULING LANDS AS sweep.fish - the single canonical command; every invocation is THE SAME protocol, so the command-drift bug class (wrong roster count, forgotten budget, stale checkout - the 260/269/270 family) is unreachable by construction:
+
+- git pull --ff-only first: always current, never a stale tree
+- families = 42: the fixed roster cut (the standing 36 plus the 264/265/271 entrants that fit; the 42 limit keeps the card in the sub-8GiB class where measurement is meaningful - the 5B+ band reports findings)
+- the FULL sweep: 0.25, 0.5, 1, 2, 4, 8 GiB, n=3 each - every class, every seed, one pass; the 0.25 runs the 256M challenger (SmolLM2-360M), the skip logic makes everything already measured instant
+
+THE INVOCATION, fish: ./sweep.fish
+
+The ad-hoc command era is over: one script, one protocol, re-runnable, resumable, self-syncing. Bugs in the machinery will still be found - but they will be found ONCE, in the one path everything takes.
