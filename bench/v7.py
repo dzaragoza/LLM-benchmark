@@ -1557,8 +1557,14 @@ def certify_v7(
         # must never overwrite the 4 GiB cell (the drift check would
         # replace it); tiers accumulate in their own blocks and the
         # tier tables read ACROSS budgets by each cell's own census.
+        # addendum 260: seed CORPUS_SEED (1) IS the default corpus - its
+        # loop pass reads/writes the BASE block (no suffix), so the base
+        # pass and the seed-1 replicate share one namespace: measured
+        # cells skip, new-at-config cells measure once. The 251 bug: the
+        # loop named its block _s1 while the base wrote unsuffixed, so
+        # seed 1 re-measured every cell the base pass had just measured.
         suffix = ""
-        if corpus_seed is not None:
+        if corpus_seed is not None and corpus_seed != CORPUS_SEED:
             suffix = f"_s{corpus_seed}"
         if budget_gib != BUDGET_GIB:
             suffix = f"_b{budget_gib:g}" + suffix
