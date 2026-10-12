@@ -2949,3 +2949,17 @@ THE AUTHOR: "Improve your RAM usage prediction against the results." THE AUDIT (
 4. THE TWO REAL GEOMETRY GAPS, fixed by implied interval: the Jambas registry interval was 1 but the census implies 27 (their hybrid ratio never extracted - the +43 percent overestimate); gemma-3-1b-it implies 12 (sliding-window layers). Both now census-calibrated intervals.
 
 THE RESULT: mean signed error +0.1 percent (was -5.3), mean absolute 1.6 percent (was 10.4), worst cell +9 percent (was +43). The estimator predicts the champions cells to <1 percent: Qwen3.5-2B @262k q4/q4 est 3.79 vs census 3.783. THE DISCIPLINE NOTE: the failed intermediate calibrations are on record - a census fit is only trustworthy when the estimator FORM is verified term by term first (weights, context, compute separately), exactly the 187 lesson re-learned.
+
+## Addendum 259 - the crash: the budget gate outgrew its try; the heavyweight shake lands
+
+THE CRASH (the author reports): the 8 GB card died at MiniCPM3-4B (model 28 of 28) - measured 9.07 GiB vs 8.0 budget, BudgetExceeded raised OUTSIDE the per-cell except clauses, killing the run instead of erasing the cell. The gate sat after the try/except, added post-187; the probe path (1414) always caught it, the field path never did. THE FIX: the gate now erases the cell and records the error entry, the run continues - same semantics as the probe path. The crash rail did its job (artifacts committed before exit; nothing lost).
+
+THE RESULTS BEFORE THE CRASH (the 36-roster expansion, all four new families measured):
+- Ministral-3-3B: 4 GB pass mean 4.60 [4.75, 4.42, 4.62] @64k census 4.24 - ENTERS THE 4-GB TOP FIVE behind phi-4-mini; the 8 GB cell reads 6.334/25 @131k census 7.78 - THE NEW HEAVYWEIGHT CONTENDER, ahead of phi-4-mini (4.75) in-class
+- Qwen3-4B: 4 GB mean 3.38 [3.64, 3.30, 3.19] @32k census 3.91; the 8 GB cell 4.804/25 @131k census 7.89 - the dense-attention KV cost holds it back exactly as predicted (addendum 257)
+- MiniCPM3-4B: 4 GB mean 0.44 [0.2, 0.73, 0.4] @8k census 4.10 - the short-window class as expected; its 8 GB 32k cell measured 9.07 GiB (est 7.71, the MHA-with-LongRope geometry at 620 KiB/token f16 KV is expensive) - ERASED by the gate, correctly
+- gemma-3-4b-it: no cells - still unplaceable pending its registry extract (154 finding)
+
+THE ESTIMATOR NOTE: the MiniCPM3-4B miss (est 7.71 vs census 9.07) is the one cell outside the 258 calibration set - a family with 62 layers and MHA geometry whose compute term runs big at 32k. The 1.6 percent calibration stands for the measured families; MiniCPM3-4B joins the calibration set the moment its cells are measured.
+
+THE RE-RUN: the same command resumes - measured cells skip, the erased MiniCPM3-4B 32k cell now records an error entry instead of crashing, and the replicates complete.
