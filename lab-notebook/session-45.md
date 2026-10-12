@@ -3105,3 +3105,13 @@ THE AUTHOR: "We are having too many bugs. Let us run like this: families = 42, a
 THE INVOCATION, fish: ./sweep.fish
 
 The ad-hoc command era is over: one script, one protocol, re-runnable, resumable, self-syncing. Bugs in the machinery will still be found - but they will be found ONCE, in the one path everything takes.
+
+## Addendum 273 - the gemma-3-4b-it mystery solved: it is GATED, not unfetched; the paper-sourced geometry lands
+
+THE AUTHOR: "What can we do about gemma-3-4b-it unplaceable - we have run registry data fetch many times to no avail." THE DIAGNOSIS: the fetch can never fix it - the family sits in the GATED dict (the addendum-22 era entry, author pull required), and the gated path deliberately skips the hub fetch and never retries. The 401 confirms the repo is still gated.
+
+THE FIX, the addendum-22 precedent: PAPER-SOURCED GEOMETRY. The Gemma 3 Technical Report (arXiv 2503.19786) carries everything the estimator needs, all citable: 34 layers, 8 KV heads (GQA), head_dim 256, the 5:1 local:global sliding-window interleave (~6 full-window layers of 34 = full_attention_interval 6), 128k window rope-scaled to 131k practical, 4.3B total params (3.88B text). The registry entry is written with geometry_source paper - every number traceable to the report.
+
+THE PLANNER VERDICT with the paper geometry: placeable at last - at 4 GiB: 64k Q4_0/q4_0/q4_0 est 3.24; at 8 GiB: 262k Q4_0/q4_0/q4_0 est 6.0. THE HEAVYWEIGHT CARD GAINS A 262K REACH CONTENDER at 6 GiB - the first model other than the Qwen hybrids and the Jambas to plan a full-reach cell. The sliding-window architecture (5 of 6 layers cache only 1024 tokens) is exactly the KV-light design the 225 law rewards.
+
+NOTE: the GGUF acquisition will still need the author gate approval (the model file is gated too) - the planner can now PLAN the cell, but the first measurement waits on the author accepting Google gated-repo terms, OR a first-party GGUF mirror if one exists ungated. The state will show acquire-gated if it cannot download; the cell is planned either way.
