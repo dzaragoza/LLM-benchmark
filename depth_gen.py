@@ -24,6 +24,7 @@ Usage (fish):
   python3 depth_gen.py --gguf models/FAM/FAM-Q8_0.gguf --ctx 131072
   python3 depth_gen.py --gguf ... --ctx 131072 --kv q4_0   # KV-quant arm
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,7 +59,9 @@ def main() -> None:
     ap.add_argument("--kv", default="f16", help="cache-type-k/v value (f16, q8_0, q4_0)")
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--ngl", default="99")
-    ap.add_argument("--out", default=None, help="output json path (default state/depth-gen-<label>.json)")
+    ap.add_argument(
+        "--out", default=None, help="output json path (default state/depth-gen-<label>.json)"
+    )
     args = ap.parse_args()
 
     extra = ["-c", str(args.ctx), "--parallel", "1", "-ngl", str(args.ngl)]
@@ -70,7 +73,9 @@ def main() -> None:
 
     print(f"=== depth-gen: {args.gguf} kv={args.kv} ctx={args.ctx} ===")
     proc, healthy = llama_server.start_server(
-        args.gguf, port=args.port, extra_args=extra,
+        args.gguf,
+        port=args.port,
+        extra_args=extra,
         log_path=f"models/depth-gen-{label}-server.log",
     )
     rows = []

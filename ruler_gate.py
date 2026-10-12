@@ -327,13 +327,8 @@ def ask_with_logprobs(
     per_token: list[dict[str, Any]] = []
     info = data["choices"][0].get("logprobs") or {}
     for entry in info.get("content") or []:
-        top = [
-            (c.get("token"), c.get("logprob"))
-            for c in (entry.get("top_logprobs") or [])
-        ]
-        per_token.append(
-            {"token": entry.get("token"), "logprob": entry.get("logprob"), "top": top}
-        )
+        top = [(c.get("token"), c.get("logprob")) for c in (entry.get("top_logprobs") or [])]
+        per_token.append({"token": entry.get("token"), "logprob": entry.get("logprob"), "top": top})
     return text, per_token
 
 

@@ -12,6 +12,7 @@ Usage (fish):
   python3 prune_f16.py --dry-run   # list what would go (default)
   python3 prune_f16.py --remove    # actually delete
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,7 +50,9 @@ def scan() -> tuple[list[str], list[str]]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="remove f16 GGUFs whose Q8_0 and Q4_0 siblings both exist")
+    ap = argparse.ArgumentParser(
+        description="remove f16 GGUFs whose Q8_0 and Q4_0 siblings both exist"
+    )
     ap.add_argument("--remove", action="store_true", help="actually delete (default: dry-run list)")
     args = ap.parse_args()
     removable, skipped = scan()
@@ -65,7 +68,9 @@ def main() -> None:
         print(f"KEEP (missing {' and '.join(missing)}): {path}")
     unit = "GiB" if total >= (1 << 30) else "MiB"
     val = total / (1 << 30) if total >= (1 << 30) else total / (1 << 20)
-    print(f"\n{len(removable)} f16 files, {val:.1f} {unit} {'freed' if args.remove else 'freed if --remove'}")
+    print(
+        f"\n{len(removable)} f16 files, {val:.1f} {unit} {'freed' if args.remove else 'freed if --remove'}"
+    )
     if args.remove:
         for path in removable:
             os.remove(path)

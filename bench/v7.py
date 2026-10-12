@@ -130,7 +130,6 @@ def _acquire_missing_model(
     return built
 
 
-
 from bench.state_store import save_state  # noqa: E402
 from etc import registry_data  # noqa: E402
 
@@ -154,6 +153,7 @@ CORPUS_SEED = 1
 # Registered constants, not run-time choices.
 PROBE_CORPUS_SEEDS = [11, 12, 13]
 
+
 # addendum 196: the probe's config set, derived per cell - the base
 # (measured) config plus each axis stepped ONE rung down the ladder,
 # plus the pairwise down-steps. For the champion @131k (base
@@ -173,6 +173,8 @@ def probe_configs(wq: str, kq: str, vq: str) -> list[tuple[str, str, str]]:
         if c not in cfgs:
             cfgs.append(c)
     return cfgs
+
+
 # (upstream). Session 44 addenda 120/122/123/143: the author
 # rulings - 10x easier (K 20 -> 2), prefill-matched counts, the
 # 2k span dropped, then K removed outright. A cell is
@@ -352,7 +354,9 @@ def climb_allocations(
     them - the count of MEASURED families is then honest by
     construction."""
     if policy != "quick":
-        raise ValueError(f"unknown allocation policy: {policy!r} (quick is the only strategy, addendum 229)")
+        raise ValueError(
+            f"unknown allocation policy: {policy!r} (quick is the only strategy, addendum 229)"
+        )
     rows = sorted((registry_data.params_b(n) or 1e12, n) for n in registry_data.ROSTER)
     out = []
     for p, name in rows[:roster_limit]:
@@ -583,8 +587,13 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
             sign = "+" if delta >= 0 else "-"
             chain.append(f"VAR {names[j + 1]} = VAR {names[j]} {sign} {dname}")
             gate_specs.append(
-                {"dname": dname, "riddle": riddle.format(n=n_small),
-                 "gate_val": gate_val, "mul": 1, "sign": sign}
+                {
+                    "dname": dname,
+                    "riddle": riddle.format(n=n_small),
+                    "gate_val": gate_val,
+                    "mul": 1,
+                    "sign": sign,
+                }
             )
         decoy_names = [_edit_distance_one(n, rng) for n in names]
         dv = rng.randint(10000, 99999)
@@ -593,8 +602,7 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
             dmul = rng.randint(100, 999)
             decoy.append(f"VAR {decoy_names[j + 1]} = VAR {decoy_names[j]} + {dmul}")
         gates_text = [
-            f"{g['dname']} is {g['riddle']}, which is {g['gate_val']}"
-            for g in gate_specs
+            f"{g['dname']} is {g['riddle']}, which is {g['gate_val']}" for g in gate_specs
         ]
         # the blob: chain links spread with noise gaps, then the decoy
         # adjacent, then the gates scattered with small noise gaps -
@@ -611,8 +619,11 @@ def build_corpus_v73(port: int, s_max: int = S_MAX, seed: int = CORPUS_SEED) -> 
             blob.append(ruler_gate.VT_HAYSTACK)
         span_blobs[s].append(blob)
         questions[qi] = {
-            **q, "names": names, "value": str(value),
-            "values": [str(v) for v in values], "gates": gate_specs,
+            **q,
+            "names": names,
+            "value": str(value),
+            "values": [str(v) for v in values],
+            "gates": gate_specs,
         }
     # pass 2: compose the corpus - per span, the band holds noise +
     # every question's blob interleaved with noise; deeper spans
@@ -684,7 +695,9 @@ def question_prompt_v73(corpus: dict, q: dict) -> str:
 # carrier the 2B cannot carry), one edit-distance-1 decoy assignment
 # per real one (the K-stressor stays), and the question asks for the
 # SUM of the named variables' values.
-AGG_CHAIN_COUNT = 4  # addendum 231/233: 8 exceeded the 2Bs retrieval range (~4-of-8); 4 stays inside it
+AGG_CHAIN_COUNT = (
+    4  # addendum 231/233: 8 exceeded the 2Bs retrieval range (~4-of-8); 4 stays inside it
+)
 AGG_TEMPLATE = (
     "[INST] Memorize the variable assignments hidden in the "
     "following text.\n\n{context}\nQuestion: Report the sum of "
@@ -930,7 +943,12 @@ def preflight_reachable_grades(port: int, corpus: dict, window: int) -> dict[str
         )
         toks = len(llama_server.tokenize(port, renderer(corpus, q)))
         seen[(span, hops)] = toks
-        gen = max(ruler_gate.VT_GEN_TOKENS, (hops + 1) * 26 if corpus.get("grammar") in ("chainarith", "gatedchain") else (hops + 1) * 12)
+        gen = max(
+            ruler_gate.VT_GEN_TOKENS,
+            (hops + 1) * 26
+            if corpus.get("grammar") in ("chainarith", "gatedchain")
+            else (hops + 1) * 12,
+        )
         if toks + gen > window:
             raise PreflightError(
                 f"grade {span}x{hops}: rendered prompt is {toks} tokens + {gen} gen "
@@ -1003,11 +1021,7 @@ def run_cell(
             # addendum 231/233: agg answers get a WORK-SHOWN budget -
             # the floor run showed reasoning text cut at the cap before
             # the number (a truncated reasoner scores 0 knowing the sum)
-            per_q = (
-                256
-                if is_agg
-                else (q["hops"] + 1) * (26 if is_v72 else 12)
-            )
+            per_q = 256 if is_agg else (q["hops"] + 1) * (26 if is_v72 else 12)
             max_tokens = max(ruler_gate.VT_GEN_TOKENS, per_q)
             t0 = time.monotonic()
             # addendum 222 (A1): the margin readout - the same answer
@@ -1038,9 +1052,7 @@ def run_cell(
                 per_hop = [int(ok)]
             # addendum 222 (A3): the per-hop ledger - hop-position credit
             # per grade, so the depth-decay curve is a first-class view.
-            hop_ledger = per_hop_curves.setdefault(
-                f"{q['span']}x{q['hops']}", []
-            )
+            hop_ledger = per_hop_curves.setdefault(f"{q['span']}x{q['hops']}", [])
             hop_ledger.append(per_hop)
             # addendum 222 (A1): the mean answer-token margin (logprob of
             # the emitted token minus the best NON-emitted competitor);
@@ -1112,10 +1124,15 @@ def run_cell(
         if g["asked"]:
             score += g["credit"] / g["asked"]
             asked_grades += 1
+
     def _mean_curve(curves: list[list[int]]) -> list[float]:
         depth = max((len(c) for c in curves), default=0)
         return [
-            round(sum(c[i] for c in curves if len(c) > i) / max(len([c for c in curves if len(c) > i]), 1), 3)
+            round(
+                sum(c[i] for c in curves if len(c) > i)
+                / max(len([c for c in curves if len(c) > i]), 1),
+                3,
+            )
             for i in range(depth)
         ]
 
@@ -1197,6 +1214,7 @@ def _edit_distance_one(name: str, rng: random.Random) -> str:
     c = rng.choice(alphabet)
     return name[:i] + c + name[i + 1 :]
 
+
 # addendum 202/203: the chain-arith grammar (v7.2) - every link carries
 # an independent signed delta (VAR B = VAR A + -1234), so every
 # variable holds a DISTINCT value and the question asks for
@@ -1216,7 +1234,9 @@ PAIR_RE = re.compile(
 )
 
 
-def score_pairs_per_hop(answer: str, expected_names: list[str], expected_values: list[str]) -> list[int]:
+def score_pairs_per_hop(
+    answer: str, expected_names: list[str], expected_values: list[str]
+) -> list[int]:
     """Addendum 222 (A3): the per-hop view of score_pairs - a 0/1 per
     chain position, so the depth-decay curve is graded directly. If
     quant damage accumulates with depth it shows as a steeper per-hop
@@ -1231,7 +1251,9 @@ def score_pairs_per_hop(answer: str, expected_names: list[str], expected_values:
     return per_hop
 
 
-def score_pairs(answer: str, expected_names: list[str], expected_values: list[str]) -> tuple[bool, int]:
+def score_pairs(
+    answer: str, expected_names: list[str], expected_values: list[str]
+) -> tuple[bool, int]:
     """Addendum 203 partial credit per (name, value) pair, tolerant of
     work-shown: the pilot answers came back as NAME = base + delta =
     FINAL (the model computes in the answer), so the FINAL number is
@@ -1332,7 +1354,9 @@ def probe_axes(
             print(f"probe: {fam} ctx={ctx}: no measured base cell - skipped")
             continue
         cfgs = (
-            [tuple(explicit_cfgs)] if explicit_cfgs else probe_configs(base["wq"], base["kq"], base["vq"])
+            [tuple(explicit_cfgs)]
+            if explicit_cfgs
+            else probe_configs(base["wq"], base["kq"], base["vq"])
         )
         # addendum 205: the probe namespace is grammar-scoped - a chainarith
         # record is NOT the v7.1 record for the same config (the pilot run
@@ -1365,9 +1389,7 @@ def probe_axes(
             if not gguf:
                 results.append({"family": fam, "ctx": ctx, "cfg": key, "error": "acquire"})
                 continue
-            log_path = os.path.join(
-                results_dir, f"{fam}-ctx{ctx}-probe-{key}-server.log"
-            )
+            log_path = os.path.join(results_dir, f"{fam}-ctx{ctx}-probe-{key}-server.log")
             extra = ["-c", str(ctx), "--parallel", "1"]
             if kq != "f16" or vq != "f16":
                 extra += ["-fa", "on", "--cache-type-k", kq, "--cache-type-v", vq]
@@ -1376,9 +1398,7 @@ def probe_axes(
             )
             try:
                 if not healthy or not llama_server.wait_healthy(port, proc=proc):
-                    results.append(
-                        {"family": fam, "ctx": ctx, "cfg": key, "error": "server"}
-                    )
+                    results.append({"family": fam, "ctx": ctx, "cfg": key, "error": "server"})
                     continue
                 breakdown = llama_server.memory_breakdown_gib(log_path)
                 scores = []
@@ -1394,14 +1414,17 @@ def probe_axes(
                             print(f"  preflight: {probe_toks}")
                     except PreflightError as e:
                         results.append(
-                            {"family": fam, "ctx": ctx, "cfg": key,
-                             "error": f"preflight: {e}"}
+                            {"family": fam, "ctx": ctx, "cfg": key, "error": f"preflight: {e}"}
                         )
                         break
                     except TemplateMalfunction as e:
                         results.append(
-                            {"family": fam, "ctx": ctx, "cfg": key,
-                             "error": f"template_malfunction: {e}"}
+                            {
+                                "family": fam,
+                                "ctx": ctx,
+                                "cfg": key,
+                                "error": f"template_malfunction: {e}",
+                            }
                         )
                         break
                     g_suffix = "" if grammar == "v71" else f"-{grammar}"
@@ -1425,24 +1448,43 @@ def probe_axes(
                     devs = breakdown.get("devices") or {}
                     v = devs.get("Vulkan0") or {}
                     gpu_gib = (
-                        (v.get("model_gib") or 0)
-                        + (v.get("context_gib") or 0)
-                        + (v.get("compute_gib") or 0)
-                    ) if v else breakdown.get("total_gib")
+                        (
+                            (v.get("model_gib") or 0)
+                            + (v.get("context_gib") or 0)
+                            + (v.get("compute_gib") or 0)
+                        )
+                        if v
+                        else breakdown.get("total_gib")
+                    )
                     if gpu_gib is not None and gpu_gib > budget_gib:
                         results.append(
-                            {"family": fam, "ctx": ctx, "cfg": key,
-                             "error": f"budget: measured GPU {gpu_gib:.2f} GiB"}
+                            {
+                                "family": fam,
+                                "ctx": ctx,
+                                "cfg": key,
+                                "error": f"budget: measured GPU {gpu_gib:.2f} GiB",
+                            }
                         )
                         continue
                 rec_out = {
-                    "wq": wq, "kq": kq, "vq": vq,
+                    "wq": wq,
+                    "kq": kq,
+                    "vq": vq,
                     "mean_score": mean,
                     "scores": scores,
-                    "est_gib": round(_alloc_total(
-                        fam, registry_data.params_b(fam) or 0.0, family_geometry(fam),
-                        wq, kq, vq, ctx
-                    ) or 0.0, 2),
+                    "est_gib": round(
+                        _alloc_total(
+                            fam,
+                            registry_data.params_b(fam) or 0.0,
+                            family_geometry(fam),
+                            wq,
+                            kq,
+                            vq,
+                            ctx,
+                        )
+                        or 0.0,
+                        2,
+                    ),
                 }
                 print(f"  {key}: mean {mean} (per-seed {scores})")
                 pdir[str(ctx)] = {**(pdir.get(str(ctx)) or {}), key: rec_out}
@@ -1589,7 +1631,7 @@ def certify_v7(
                 if own_seed_sfx:
                     if not other_ns.endswith(own_seed_sfx):
                         continue
-                elif "_s" in other_ns[len("v7_quick"):]:
+                elif "_s" in other_ns[len("v7_quick") :]:
                     continue
                 cand = blk.get(key)
                 if (
@@ -1712,10 +1754,14 @@ def certify_v7(
                 devs = breakdown.get("devices") or {}
                 v = devs.get("Vulkan0") or {}
                 gpu_gib = (
-                    (v.get("model_gib") or 0)
-                    + (v.get("context_gib") or 0)
-                    + (v.get("compute_gib") or 0)
-                ) if v else breakdown.get("total_gib")
+                    (
+                        (v.get("model_gib") or 0)
+                        + (v.get("context_gib") or 0)
+                        + (v.get("compute_gib") or 0)
+                    )
+                    if v
+                    else breakdown.get("total_gib")
+                )
                 # addendum 177: print the GPU footprint (the estimate's own
                 # scope) - the whole-machine total was confusing to read next
                 # to a GPU-scoped estimate (the author's ruling)
@@ -1753,7 +1799,9 @@ def certify_v7(
                     v7[key] = {
                         "family": fam,
                         "ctx": int(key),
-                        "wq": cell["wq"], "kq": cell["kq"], "vq": cell["vq"],
+                        "wq": cell["wq"],
+                        "kq": cell["kq"],
+                        "vq": cell["vq"],
                         "params_b": cell["params_b"],
                         "est_gib": cell["est_gib"],
                         "mem_census": breakdown,

@@ -24,5 +24,5 @@ for budget in 0.25 0.5 1.0 2.0 4.0 8.0
     echo "============================================================"
     echo "sweep: budget $budget GiB, roster 42, n=3"
     echo "============================================================"
-    python3 full_benchmark.py --task v7 --v7-families 42 --v7-grammar v71 --v7-n 3 --v7-budget-gib $budget
+    python3 full_benchmark.py --task v7 --v7-families 48 --v7-grammar v71 --v7-n 3 --v7-budget-gib $budget
 end

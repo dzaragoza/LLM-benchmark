@@ -607,7 +607,9 @@ def _run(args: argparse.Namespace) -> None:
                 if not pdir:
                     continue
                 print(f"  {fam} ctx={ctx}:")
-                for key, rec in sorted(pdir.items(), key=lambda kv: -(kv[1].get("mean_score") or 0)):
+                for key, rec in sorted(
+                    pdir.items(), key=lambda kv: -(kv[1].get("mean_score") or 0)
+                ):
                     if "mean_score" in rec:
                         print(
                             f"    {key}: mean {rec['mean_score']} "
@@ -628,7 +630,7 @@ def _run(args: argparse.Namespace) -> None:
         results = []
         for seed in seeds:
             if len(seeds) > 1:
-                print(f"\n{'='*60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
+                print(f"\n{'=' * 60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
             results = certify_v7(
                 args.models_dir,
                 state,
@@ -682,6 +684,7 @@ def _run(args: argparse.Namespace) -> None:
         tee_output.uninstall()
         git_tail(args)
     stamp("run complete")
+
 
 if __name__ == "__main__":
     main()
