@@ -19,7 +19,7 @@ git pull --ff-only; or exit 1
 # roster additions (and geometry fixes) land before the sweep plans
 python3 etc/registry_data.py fetch; or echo "WARNING: registry fetch failed - continuing with the checked-in store"
 
-for budget in 0.25 0.5 1.0 2.0 4.0 8.0
+for budget in 0.25 0.5 1.0 2.0 4.0
     echo ""
     echo "============================================================"
     echo "sweep: budget $budget GiB, roster 42, n=3"
