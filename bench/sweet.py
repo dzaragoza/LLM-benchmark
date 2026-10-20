@@ -239,7 +239,11 @@ def run(
                 continue
             path = _build(fam, repo, famdir, rung)
             if not path:
-                rec["rungs"][rung] = {"tg": None, "pass": None, "error": "unavailable on this machine"}
+                rec["rungs"][rung] = {
+                    "tg": None,
+                    "pass": None,
+                    "error": "unavailable on this machine",
+                }
                 _state_store.save_state(state_file, state)
                 print(f"  {rung}: unavailable on this machine - skipped")
                 continue
