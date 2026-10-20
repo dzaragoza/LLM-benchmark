@@ -108,7 +108,10 @@ def _window(repo: str, famdir: str) -> int:
 
 
 def _build(fam: str, repo: str, famdir: str, rung: str) -> str | None:
-    """Phase 1 + 2 for one rung (the certify path, simplified)."""
+    """Phase 1 + 2 for one rung (the certify path, simplified). None =
+    the rung cannot exist on this machine (RAM-infeasible, a tensor
+    shape the quantizer cannot express - e.g. Q1_0 on a 960-col
+    tensor - or a tool failure): SKIP, not a model verdict."""
     hf_download.require_hub()
     list_repo_files = cast("Any", hf_download.list_repo_files)
     files = list_repo_files(repo)
@@ -117,7 +120,12 @@ def _build(fam: str, repo: str, famdir: str, rung: str) -> str | None:
         return path
     if plan.startswith("infeasible"):
         return None
-    return convert_quant.create(fam, famdir, rung, plan, False)
+    try:
+        return convert_quant.create(fam, famdir, rung, plan, False)
+    except SystemExit as e:
+        if e.code == 130:  # SIGINT must still kill the run
+            raise
+        return None
 
 
 def _bench(path: str, repeat: int) -> float | None:
@@ -198,6 +206,10 @@ def run(
             f"bar tg/s*{concurrency} >= {SERVICE_BAR:,} or > window)"
         )
         for rung in SWEET_LADDER:
+            if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is None:
+                if rec["rungs"][rung].get("error"):
+                    print(f"  {rung}: {rec['rungs'][rung]['error']} - skipped")
+                    continue
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
                 # RE-JUDGE with the run's concurrency (the stored verdict was
@@ -227,15 +239,17 @@ def run(
                 continue
             path = _build(fam, repo, famdir, rung)
             if not path:
-                rec["rungs"][rung] = {"tg": None, "pass": False, "error": "build infeasible"}
+                rec["rungs"][rung] = {"tg": None, "pass": None, "error": "unavailable on this machine"}
                 _state_store.save_state(state_file, state)
-                print(f"  {rung}: cannot build/run on this machine")
+                print(f"  {rung}: unavailable on this machine - skipped")
+                continue
             else:
                 tg = _bench(path, repeat)
                 if tg is None:
-                    rec["rungs"][rung] = {"tg": None, "pass": False, "error": "bench failed"}
+                    rec["rungs"][rung] = {"tg": None, "pass": None, "error": "bench failed"}
                     _state_store.save_state(state_file, state)
-                    print(f"  {rung}: llama-bench failed (see its stderr above)")
+                    print(f"  {rung}: llama-bench failed - skipped")
+                    continue
                 else:
                     ok = _passes(tg, window, concurrency)
                     rec["rungs"][rung] = {"tg": tg, "pass": ok}
