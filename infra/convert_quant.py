@@ -28,6 +28,54 @@ QUANTIZE_BIN = os.path.join(
 )
 CONVERTER = "./llama.cpp/convert_hf_to_gguf.py"
 
+IMATRIX_BIN = os.path.join(
+    ".", "llama-b11669", "llama-imatrix.exe" if os.name == "nt" else "llama-imatrix")
+
+# types the b11669 quantizer refuses without an importance matrix
+# (llama-quantize: "this quantization requires an importance matrix")
+IMATRIX_RUNGS = {
+    "IQ1_S", "IQ1_M", "TQ1_0", "TQ2_0",
+    "IQ2_XXS", "IQ2_XS", "IQ2_S", "IQ2_M", "Q2_K_S",
+    "IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M",
+    "IQ4_NL", "IQ4_XS",
+    "Q1_0", "Q2_0",
+}
+
+# calibration text for the imatrix: the repo's own corpus, flattened to
+# plain text (the imatrix only needs representative activations)
+IMATRIX_CORPUS = "./data/live-corpus-cal50.json"
+
+
+def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
+    """Build the family's importance matrix once (from the f16, with the
+    repo corpus as calibration text) and return its path. llama-imatrix
+    writes <f16>.imatrix next to the model; reused on reruns."""
+    out = f16 + ".imatrix"
+    if os.path.isfile(out):
+        return out
+    txt = os.path.join(famdir, "imatrix-calib.txt")
+    try:
+        import json
+
+        with open(IMATRIX_CORPUS, encoding="utf-8") as f:
+            convs = json.load(f)["conversations"]
+        with open(txt, "w", encoding="utf-8") as f:
+            for c in convs:
+                for turn in c.get("user_turns", []):
+                    f.write(turn + "\n\n")
+    except Exception:
+        print("  [2] WARNING: corpus unreadable - imatrix calibration falls back to a trivial text")
+        with open(txt, "w", encoding="utf-8") as f:
+            f.write("the quick brown fox jumps over the lazy dog\n" * 64)
+    log = os.path.join(famdir, "imatrix.log")
+    print(f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)")
+    rc = run_quiet(
+        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "-c", "0", "--chunk-num", "0"],
+        log, 2, "imatrix", "llama-imatrix run")
+    if rc != 0 or not os.path.isfile(out):
+        fail(2, "imatrix", f"llama-imatrix failed (full log: {log})", GUIDE[2])
+    return out
+
 GUIDE = {
     2: [
         "converter deps: pip install -r requirements.txt "
@@ -152,7 +200,13 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
     print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")
-    rc = run_quiet([QUANTIZE_BIN, f16, out, rung], log, 2, rung, "llama-quantize run")
+    cmd = [QUANTIZE_BIN, f16, out, rung]
+    if rung.upper() in IMATRIX_RUNGS:
+        imx = ensure_imatrix(fam, famdir, f16)
+        if imx:
+            cmd += ["--imatrix", imx]
+            print(f"  [2] using importance matrix {os.path.basename(imx)}")
+    rc = run_quiet(cmd, log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
         fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
     return out
