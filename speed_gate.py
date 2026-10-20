@@ -129,7 +129,7 @@ THINK_ALLOWANCE = 2048  # thinking category: generation room on top
 
 GUIDE = {
     3: [
-        "llama-server missing: ./llama-b10964-gpu/llama-server must exist",
+        "llama-server missing: ./llama-b11669/llama-server must exist",
         "corpus missing: python3 speed_gate.py --make-corpus",
         "port conflict: stop other llama-server instances (or pass --port)",
         "GPU stack: the server startup log names the GPU - it must "

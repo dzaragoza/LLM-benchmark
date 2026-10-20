@@ -22,8 +22,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.convert_quant as convert_quant
 import infra.hf_download as hf_download
-from bench.v7 import W_LADDER
 from etc.registry_data import ROSTER
+# every llama-quantize weight type (b11669 --help output), smallest first;
+# the K aliases (Q3_K, Q4_K, Q5_K) are expanded to their _M targets so each
+# rung names exactly one output file. F32/COPY/MXFP4_MOE are excluded: F32
+# and COPY do not quantize, MXFP4_MOE applies to MoE models only.
+ALL_RUNGS = [
+    "IQ1_S", "IQ1_M", "TQ1_0", "Q1_0", "IQ2_XXS", "TQ2_0", "IQ2_XS",
+    "Q2_0", "IQ2_S", "Q2_K_S", "IQ2_M", "Q2_K",
+    "IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M", "Q3_K_S", "Q3_K_M", "Q3_K_L",
+    "IQ4_NL", "IQ4_XS", "Q4_0", "Q4_1", "Q4_K_S", "Q4_K_M",
+    "Q5_0", "Q5_1", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0", "BF16", "F16",
+]
 
 
 def main() -> int:
@@ -38,10 +48,11 @@ def main() -> int:
     if fam not in ROSTER:
         sys.exit(f"unknown family {fam!r}; registered: {', '.join(sorted(ROSTER))}")
     repo = ROSTER[fam]
-    rungs = [r.strip().upper() for r in (args.rungs.split(",") if args.rungs else W_LADDER) if r.strip()]
-    bad = [r for r in rungs if r not in W_LADDER]
+    rungs = [r.strip().upper() for r in (args.rungs.split(",") if args.rungs else ALL_RUNGS) if r.strip()]
+    rungs = [{"Q3_K": "Q3_K_M", "Q4_K": "Q4_K_M", "Q5_K": "Q5_K_M"}.get(r, r) for r in rungs]
+    bad = [r for r in rungs if r not in ALL_RUNGS]
     if bad:
-        sys.exit(f"rungs {bad} are not on the ladder {W_LADDER}")
+        sys.exit(f"rungs {bad} are not supported; available: {','.join(ALL_RUNGS)}")
 
     famdir = os.path.join(args.models_dir, fam)
     os.makedirs(famdir, exist_ok=True)

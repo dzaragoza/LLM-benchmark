@@ -288,7 +288,7 @@ def st_source_complete(st_dir: str) -> bool:
 
 def has_pytorch_bin(names: list[str]) -> bool:
     """pytorch_model.bin (+ sharded index) - the legacy pickle format the
-    pinned b10964 converter loads natively (conversion/base.py falls
+    pinned llama.cpp converter loads natively (conversion/base.py falls
     back to pytorch_model*.bin when no safetensors parts exist; addendum 81
     - the MiniCPM-2B/1B-sft-bf16 repos ship bin-only)."""
     return any(

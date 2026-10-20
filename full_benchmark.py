@@ -141,13 +141,13 @@ def check_tooling(args: argparse.Namespace) -> None:
     for path, msg in [
         (
             QUANTIZE_BIN,
-            f"llama-quantize not found at {QUANTIZE_BIN} - place the b10964 build in the repo root",
+            f"llama-quantize not found at {QUANTIZE_BIN} - place the b11669 build in the repo root",
         ),
         (
             "./llama.cpp/convert_hf_to_gguf.py",
             "converter not found - the llama.cpp checkout must be in the repo root",
         ),
-        (SERVER_BIN or "", "llama-server not found - place the b10964 build in the repo root"),
+        (SERVER_BIN or "", "llama-server not found - place the b11669 build in the repo root"),
     ]:
         if not os.path.isfile(path):
             sys.exit(msg)

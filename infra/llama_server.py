@@ -76,7 +76,7 @@ def find_server() -> str | None:
     the caller (check_tooling) fails loudly with install guidance.
     Windows builds ship llama-server.exe - pick the right name."""
     exe = "llama-server.exe" if os.name == "nt" else "llama-server"
-    p = os.path.join(".", "llama-b10964-gpu", exe)
+    p = os.path.join(".", "llama-b11669", exe)
     return p if os.path.isfile(p) else None
 
 

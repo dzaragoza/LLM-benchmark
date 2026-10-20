@@ -6,7 +6,7 @@ Everything that shells out to llama.cpp conversion tooling lives here
 and nothing else shells out to it: safetensors -> f16 conversion with
 the pinned converter (./llama.cpp/convert_hf_to_gguf.py, checkout
 b29c606e2) and f16 -> rung quantization with the pinned llama-quantize
-binary (build b10964). Not a CLI - the orchestrator imports it.
+binary (build b11669). Not a CLI - the orchestrator imports it.
 
 Create stage of the pipeline (its phase 2).
 
@@ -24,7 +24,7 @@ from typing import NoReturn
 import infra.hf_download as hf_download
 
 QUANTIZE_BIN = os.path.join(
-    ".", "llama-b10964-gpu", "llama-quantize.exe" if os.name == "nt" else "llama-quantize"
+    ".", "llama-b11669", "llama-quantize.exe" if os.name == "nt" else "llama-quantize"
 )
 CONVERTER = "./llama.cpp/convert_hf_to_gguf.py"
 
@@ -32,8 +32,8 @@ GUIDE = {
     2: [
         "converter deps: pip install -r requirements.txt "
         "(needs transformers, torch, gguf, sentencepiece, protobuf)",
-        "pinned converter missing: ./llama.cpp must be the b10964 checkout",
-        "quantizer missing: place the b10964 build at ./llama-b10964-gpu/",
+        "pinned converter missing: ./llama.cpp must be the matching checkout",
+        "quantizer missing: place the b11669 build at ./llama-b11669/",
         "RAM/disk: f16 conversion needs several GB of each",
         "disk space: free some (the f16 gguf is written next to its "
         "source; both live together until the verified delete)",
