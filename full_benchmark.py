@@ -570,7 +570,8 @@ def _run(args: argparse.Namespace) -> None:
     elif args.task == "v7" and not args.v7_families:
         sys.exit("--v7-families is mandatory for --task v7 (addendum 156)")
     if args.task == "sweet":  # noqa: SIM108 - fall-through guard above
-        from bench.sweet import find_bench, run as sweet_run
+        from bench.sweet import find_bench
+        from bench.sweet import run as sweet_run
 
         sweet = sweet_run(
             args.models_dir,

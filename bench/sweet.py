@@ -17,6 +17,7 @@ clears the service bar, walking DOWN the measured tok/s ladder:
 
 State is saved after every measurement - reruns skip measured rungs.
 """
+
 from __future__ import annotations
 
 import csv
@@ -37,18 +38,47 @@ from bench import state_store as _state_store
 # first - the walk goes DOWN this list; the sweet spot is the last
 # quant that still clears the bar before the first failure
 SWEET_LADDER = [
-    "IQ1_S", "IQ1_M", "Q2_0", "IQ2_XXS", "IQ2_XS", "Q1_0", "IQ2_S",
-    "Q2_K_S", "IQ2_M", "IQ3_XXS", "TQ2_0", "Q2_K", "Q3_K_S", "IQ3_XS",
-    "IQ3_S", "IQ3_M", "Q3_K_M", "IQ4_XS", "Q4_0", "Q4_K_S", "Q3_K_L",
-    "Q4_1", "IQ4_NL", "Q4_K_M", "TQ1_0", "Q5_K_S", "Q5_0", "Q5_K_M",
-    "Q5_1", "Q6_K", "Q8_0", "BF16", "F16",
+    "IQ1_S",
+    "IQ1_M",
+    "Q2_0",
+    "IQ2_XXS",
+    "IQ2_XS",
+    "Q1_0",
+    "IQ2_S",
+    "Q2_K_S",
+    "IQ2_M",
+    "IQ3_XXS",
+    "TQ2_0",
+    "Q2_K",
+    "Q3_K_S",
+    "IQ3_XS",
+    "IQ3_S",
+    "IQ3_M",
+    "Q3_K_M",
+    "IQ4_XS",
+    "Q4_0",
+    "Q4_K_S",
+    "Q3_K_L",
+    "Q4_1",
+    "IQ4_NL",
+    "Q4_K_M",
+    "TQ1_0",
+    "Q5_K_S",
+    "Q5_0",
+    "Q5_K_M",
+    "Q5_1",
+    "Q6_K",
+    "Q8_0",
+    "BF16",
+    "F16",
 ]
 
 SERVICE_BAR = 2**17  # tg/s * 64 must reach this (or exceed the window)
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
 
 BENCH_BIN = os.path.join(
-    ".", "llama-b11669", "llama-bench.exe" if os.name == "nt" else "llama-bench")
+    ".", "llama-b11669", "llama-bench.exe" if os.name == "nt" else "llama-bench"
+)
 
 
 def find_bench() -> str | None:
@@ -94,7 +124,9 @@ def _bench(path: str, repeat: int) -> float | None:
     """llama-bench -p 0 -n 128: the generation rate (tg tok/s)."""
     r = subprocess.run(
         [BENCH_BIN, "-m", path, "-p", "0", "-n", "128", "-r", str(repeat), "-o", "csv"],
-        capture_output=True, text=True, timeout=3600,
+        capture_output=True,
+        text=True,
+        timeout=3600,
     )
     if r.returncode != 0:
         return None
@@ -140,7 +172,9 @@ def run(
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
-                print(f"  {rung}: {m['tg']:.2f} tok/s (measured) -> {'pass' if m['pass'] else 'FAIL'}")
+                print(
+                    f"  {rung}: {m['tg']:.2f} tok/s (measured) -> {'pass' if m['pass'] else 'FAIL'}"
+                )
                 if not m["pass"]:
                     break
                 continue
@@ -166,7 +200,9 @@ def run(
                     ok = _passes(tg, window)
                     rec["rungs"][rung] = {"tg": tg, "pass": ok}
                     _state_store.save_state(state_file, state)
-                    print(f"  {rung}: {tg:.2f} tok/s x 64 = {tg * 64:,.0f} -> {'pass' if ok else 'FAIL'}")
+                    print(
+                        f"  {rung}: {tg:.2f} tok/s x 64 = {tg * 64:,.0f} -> {'pass' if ok else 'FAIL'}"
+                    )
                     if ok:
                         rec["sweet_spot"] = rung
             if not rec["rungs"][rung]["pass"]:
@@ -175,7 +211,9 @@ def run(
                 if list(rec["rungs"]).index(rung) == 0 and rung == SWEET_LADDER[0]:
                     spot = rec.get("sweet_spot")
                     print(f"\n  {fam}: even the fastest quant ({rung}) cannot reach the bar")
-                    print("  STOPPING the benchmark - this hardware class cannot serve these models")
+                    print(
+                        "  STOPPING the benchmark - this hardware class cannot serve these models"
+                    )
                     return sweet
                 print(f"  {fam}: mechanical ceiling - sweet spot: {rec.get('sweet_spot')}")
                 break
