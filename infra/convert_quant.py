@@ -29,16 +29,29 @@ QUANTIZE_BIN = os.path.join(
 CONVERTER = "./llama.cpp/convert_hf_to_gguf.py"
 
 IMATRIX_BIN = os.path.join(
-    ".", "llama-b11669", "llama-imatrix.exe" if os.name == "nt" else "llama-imatrix")
+    ".", "llama-b11669", "llama-imatrix.exe" if os.name == "nt" else "llama-imatrix"
+)
 
 # types the b11669 quantizer refuses without an importance matrix
 # (llama-quantize: "this quantization requires an importance matrix")
 IMATRIX_RUNGS = {
-    "IQ1_S", "IQ1_M", "TQ1_0", "TQ2_0",
-    "IQ2_XXS", "IQ2_XS", "IQ2_S", "IQ2_M", "Q2_K_S",
-    "IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M",
-    "IQ4_NL", "IQ4_XS",
-    "Q1_0", "Q2_0",
+    "IQ1_S",
+    "IQ1_M",
+    "TQ1_0",
+    "TQ2_0",
+    "IQ2_XXS",
+    "IQ2_XS",
+    "IQ2_S",
+    "IQ2_M",
+    "Q2_K_S",
+    "IQ3_XXS",
+    "IQ3_XS",
+    "IQ3_S",
+    "IQ3_M",
+    "IQ4_NL",
+    "IQ4_XS",
+    "Q1_0",
+    "Q2_0",
 }
 
 # calibration text for the imatrix: the full arena English sample
@@ -65,7 +78,12 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
         print("  [2] building the imatrix calibration corpus from the arena sample")
         r = subprocess.run([sys.executable, "build_imatrix_corpus.py"], cwd=".")
         if r.returncode != 0 or not os.path.isfile(IMATRIX_CORPUS):
-            fail(2, "imatrix", "could not build the calibration corpus (build_imatrix_corpus.py failed)", GUIDE[2])
+            fail(
+                2,
+                "imatrix",
+                "could not build the calibration corpus (build_imatrix_corpus.py failed)",
+                GUIDE[2],
+            )
     try:
         os.link(IMATRIX_CORPUS, txt)
     except OSError:
@@ -73,13 +91,20 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
 
         shutil.copyfile(IMATRIX_CORPUS, txt)
     log = os.path.join(famdir, "imatrix.log")
-    print(f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)")
+    print(
+        f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)"
+    )
     rc = run_quiet(
         [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl"],
-        log, 2, "imatrix", "llama-imatrix run")
+        log,
+        2,
+        "imatrix",
+        "llama-imatrix run",
+    )
     if rc != 0 or not os.path.isfile(out):
         fail(2, "imatrix", f"llama-imatrix failed (full log: {log})", GUIDE[2])
     return out
+
 
 GUIDE = {
     2: [
@@ -138,7 +163,9 @@ def _missing_imatrix_tensors(log: str) -> list[str]:
         with open(log, encoding="utf-8") as f:
             for line in f:
                 if "Missing importance matrix for tensor" in line:
-                    name = line.split("Missing importance matrix for tensor", 1)[1].strip().split()[0]
+                    name = (
+                        line.split("Missing importance matrix for tensor", 1)[1].strip().split()[0]
+                    )
                     if name and name not in names:
                         names.append(name)
     except OSError:
@@ -161,7 +188,6 @@ def _add_overrides(famdir: str, overrides: str, names: list[str]) -> None:
             if base not in known:
                 f.write(f"{base}=q8_0\n")
                 known.add(base)
-
 
 
 def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = False) -> str | None:
