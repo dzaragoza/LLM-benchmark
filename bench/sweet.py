@@ -267,9 +267,14 @@ def run(
             if not rec["rungs"][rung]["pass"]:
                 rec["ceiling"] = True
                 _state_store.save_state(state_file, state)
-                if list(rec["rungs"]).index(rung) == 0 and rung == SWEET_LADDER[0]:
-                    spot = rec.get("sweet_spot")
-                    print(f"\n  {fam}: even the fastest quant ({rung}) cannot reach the bar")
+                # the global stop rule fires when NO rung ever passed:
+                # the walk reached a measured FAIL with no sweet spot,
+                # meaning even the fastest MEASURED quant (skips aside)
+                # cannot serve the model. The old dict-index/first-rung
+                # check was wrong - a skipped first rung shifted the
+                # indexes and could misfire
+                if not rec.get("sweet_spot"):
+                    print(f"\n  {fam}: no quant reaches the bar (fastest measured: {rung})")
                     print(
                         "  STOPPING the benchmark - this hardware class cannot serve these models"
                     )
