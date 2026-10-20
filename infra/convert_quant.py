@@ -297,6 +297,6 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         # files lesson: 'invalid magic characters' on load) - delete it
         if os.path.isfile(out):
             os.remove(out)
-            print(f"  [2] removed the partial output of the failed run")
+            print("  [2] removed the partial output of the failed run")
         fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
     return out
