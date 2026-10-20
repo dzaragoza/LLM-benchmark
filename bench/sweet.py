@@ -58,12 +58,15 @@ def _prune_rung(famdir: str, path: str) -> None:
 
 
 def _prune_previous(famdir: str, rec: dict[str, Any], current: str) -> None:
-    """After CURRENT measured in-window, the rung before it (the previous
-    sweet-spot candidate) is no longer needed."""
-    prev = rec.get("last_kept_file")
-    if prev and prev != current and os.path.isfile(prev):
+    """Disk retention with the sweet-spot KEEP rule: the f16 master and
+    the LATEST in-window rung (the sweet-spot candidate the walk will
+    hand to the downstream measurements) always stay. Only when the
+    walk moves PAST a rung (the new one measured in-window too) does the
+    superseded candidate get pruned."""
+    prev = rec.get("sweet_spot_file")
+    if prev and prev != current:
         _prune_rung(famdir, prev)
-    rec["last_kept_file"] = current
+    rec["sweet_spot_file"] = current
 
 
 # the Qwen3.5-2B measured tok/s order (the T14s/780M sweep), fastest
@@ -299,8 +302,14 @@ def run(
                         f"{tg * concurrency:,.0f} -> {'in-window' if ok else 'beyond the window'}"
                     )
                     if ok:
+                        prev_spot = rec.get("sweet_spot")
                         rec["sweet_spot"] = rung
-                        _prune_previous(famdir, rec, path)
+                        # prune the superseded candidate only now that the
+                        # walk has a NEWER in-window rung to hand over
+                        if prev_spot and prev_spot != rung:
+                            _prune_previous(famdir, rec, path)
+                        else:
+                            rec["sweet_spot_file"] = path
             if not rec["rungs"][rung]["in_window"]:
                 rec["ceiling"] = True
                 _state_store.save_state(state_file, state)
