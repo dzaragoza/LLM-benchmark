@@ -1,0 +1,53 @@
+name: ruff on push
+# The cheap always-on gate: every push gets ruff format + ruff check --fix,
+# and whatever the tools change is committed back automatically, so the
+# branch is always clean (the expensive regression suite stays on
+# workflow_dispatch + weekly, addendum 190).
+
+on: push
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ruff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # full history so the auto-commit can land on the pushed ref
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install ruff
+        run: python3 -m pip install ruff
+      - name: ruff format
+        run: python3 -m ruff format .
+      - name: ruff check --fix
+        id: check
+        continue-on-error: true
+        run: python3 -m ruff check . --fix
+      - name: commit the fixes (only when files changed)
+        id: commit
+        run: |
+          git config user.name "ruff-bot"
+          git config user.email "actions@github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "ruff: format + autofix [skip ci]"
+            git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: fail on remaining lint errors
+        if: steps.check.outcome == 'failure' && steps.commit.outputs.pushed == 'false'
+        run: exit 1
+      - name: recheck after fixes
+        if: steps.commit.outputs.pushed == 'true'
+        run: python3 -m ruff check .
