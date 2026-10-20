@@ -200,10 +200,22 @@ def run(
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
+                # RE-JUDGE with the run's concurrency (the stored verdict was
+                # computed under whatever factor was live then): a stored
+                # tg/s is a measurement - the pass bar is today's decision
+                ok = _passes(m["tg"], window, concurrency)
+                m["pass"] = ok
+                m["concurrency"] = concurrency
+                if ok:
+                    rec["sweet_spot"] = rung
+                    rec["ceiling"] = False
+                _state_store.save_state(state_file, state)
                 print(
-                    f"  {rung}: {m['tg']:.2f} tok/s (measured) -> {'pass' if m['pass'] else 'FAIL'}"
+                    f"  {rung}: {m['tg']:.2f} tok/s (measured) "
+                    f"x {concurrency} = {m['tg'] * concurrency:,.0f} "
+                    f"-> {'pass' if ok else 'FAIL'}"
                 )
-                if not m["pass"]:
+                if not ok:
                     break
                 continue
             if dry_run:
