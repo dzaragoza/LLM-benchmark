@@ -150,7 +150,9 @@ def roster_from_models_md() -> list[tuple[str, str]]:
     'unknown'-param rows sort to their file position - the table's own
     order decides, no re-sorting here."""
     rows = []
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md")
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md"
+    )
     in_table = False
     for line in open(path, encoding="utf-8"):
         if line.startswith("| model name"):

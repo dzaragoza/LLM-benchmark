@@ -573,10 +573,13 @@ def _run(args: argparse.Namespace) -> None:
     if args.task == "sweet":  # noqa: SIM108 - fall-through guard above
         from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
+
         families = [f.split("=")[0] for f in args.families]
         if not families:
             families = [n for n, _ in roster_from_models_md()]
-            stamp(f"fresh sweet run: the md/models.md roster, param-ascending ({len(families)} models)")
+            stamp(
+                f"fresh sweet run: the md/models.md roster, param-ascending ({len(families)} models)"
+            )
         sweet = sweet_run(
             args.models_dir,
             state,
