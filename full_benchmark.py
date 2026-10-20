@@ -429,8 +429,9 @@ def build_parser() -> argparse.ArgumentParser:
         "(session 42/43, addendum 227/229: the quick fit-ladder cell per "
         "family, one fixed corpus, graded (span, hops)); ARC and FWE are "
         "retired (session 43); 'sweet' is the mechanical-sweet-spot walk "
-        "(models param-ascending, quants down the measured tok/s ladder, "
-        "the service bar tg/s*64 >= 2**17 or > the training window)",
+        "(models param-ascending, quants down the measured tok/s ladder; "
+        "a rung is in-window while tg/s * concurrency > the training "
+        "window; the sweet spot is the last in-window quant)",
     )
     ap.add_argument(
         "--sweet-repeat",
@@ -442,8 +443,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--sweet-concurrency",
         type=int,
         default=1024,
-        help="sweet: the concurrency factor of the service bar - a rung passes "
-        "when tg/s * this >= 2**17 or > the training window (default 1024)",
+        help="sweet: the concurrency factor - a rung is in-window while "
+        "tg/s * this > the training window (default 1024)",
     )
     ap.add_argument(
         "--v7-budget-gib",
@@ -604,7 +605,9 @@ def _run(args: argparse.Namespace) -> None:
         stamp("SWEET-SPOT SUMMARY")
         for fam, rec in (sweet or {}).items():
             spot = rec.get("sweet_spot")
-            print(f"  {fam}: {'sweet spot ' + spot if spot else 'ceiling at first rung'}")
+            verdict = f"sweet spot {spot}" if spot else "no in-window rung"
+            beyond = rec.get("ceiling")
+            print(f"  {fam}: {verdict}{' (walk stopped beyond the window)' if beyond else ''}")
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)

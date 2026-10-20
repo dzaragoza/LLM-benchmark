@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """bench/sweet.py -- the mechanical-sweet-spot task (the session's new mode).
 
-For one class of hardware, find each model's fastest quant that still
-clears the service bar, walking DOWN the measured tok/s ladder:
+For one class of hardware, walk each model DOWN the measured tok/s
+ladder and find where it stops being able to fill its own window:
 
   per family (param-ascending):
     per quant (the Qwen3.5-2B discovered tok/s order, fastest first):
       build the quant, bench it (llama-bench -p 0 -n 128)
-      pass  = tg/s * concurrency >= 2**17  or  tg/s * concurrency > window
-      pass  -> the next quant down the ladder (same model)
-      fail  -> the mechanical ceiling: the LAST PASSING quant is the
-               model's sweet spot; next family
-    the FIRST ladder quant is the fastest there is - if IT fails the
-    bar, the hardware class cannot serve the model at all and the whole
-    benchmark STOPS (the author's stopping rule).
+      in-window = tg/s * concurrency > training window
+      in-window -> the next quant down the ladder (same model)
+      beyond    -> THE SWEET SPOT: the last in-window quant is where
+                   the model still saturates its window at this
+                   concurrency; next family
+      every rung in-window -> the LAST quant (F16) is the sweet spot
+
+No global stop: every model gets its own walk; unavailable rungs
+(unbuildable types, load failures) are skipped, not verdicts.
 
 State is saved after every measurement - reruns skip measured rungs.
 """
@@ -73,7 +75,7 @@ SWEET_LADDER = [
     "F16",
 ]
 
-SERVICE_BAR = 2**17  # tg/s * concurrency must reach this (or exceed the window)
+# the window boundary: a rung is in-window while tg/s * concurrency > window
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
 
 BENCH_BIN = os.path.join(
@@ -148,8 +150,8 @@ def _bench(path: str, repeat: int) -> float | None:
     return tg
 
 
-def _passes(tg: float, window: int, concurrency: int) -> bool:
-    return tg * concurrency >= SERVICE_BAR or tg * concurrency > window
+def _in_window(tg: float, window: int, concurrency: int) -> bool:
+    return tg * concurrency > window
 
 
 def roster_from_models_md() -> list[tuple[str, str]]:
@@ -201,31 +203,32 @@ def run(
         window = rec.get("window") or _window(repo, famdir)
         rec["window"] = window
         rec["repo"] = repo
-        print(
-            f"\n{'=' * 60}\n{fam} (window {window:,}, "
-            f"bar tg/s*{concurrency} >= {SERVICE_BAR:,} or > window)"
-        )
+        print(f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})")
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is None:
                 if rec["rungs"][rung].get("error"):
                     print(f"  {rung}: {rec['rungs'][rung]['error']} - skipped")
                     continue
+            # old-era records (tg present but keyed by pass, not in_window):
+            # fall through to the re-judge below which stamps in_window
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
                 # RE-JUDGE with the run's concurrency (the stored verdict was
                 # computed under whatever factor was live then): a stored
                 # tg/s is a measurement - the pass bar is today's decision
-                ok = _passes(m["tg"], window, concurrency)
-                m["pass"] = ok
+                ok = _in_window(m["tg"], window, concurrency)
+                m.pop("pass", None)
+                m["in_window"] = ok
                 m["concurrency"] = concurrency
                 if ok:
                     rec["sweet_spot"] = rung
-                    rec["ceiling"] = False
+                else:
+                    rec["ceiling"] = True
                 _state_store.save_state(state_file, state)
                 print(
                     f"  {rung}: {m['tg']:.2f} tok/s (measured) "
                     f"x {concurrency} = {m['tg'] * concurrency:,.0f} "
-                    f"-> {'pass' if ok else 'FAIL'}"
+                    f"-> {'in-window' if ok else 'beyond the window'}"
                 )
                 if not ok:
                     break
@@ -255,35 +258,28 @@ def run(
                     print(f"  {rung}: llama-bench failed - skipped")
                     continue
                 else:
-                    ok = _passes(tg, window, concurrency)
-                    rec["rungs"][rung] = {"tg": tg, "pass": ok}
+                    ok = _in_window(tg, window, concurrency)
+                    rec["rungs"][rung] = {"tg": tg, "in_window": ok}
                     _state_store.save_state(state_file, state)
                     print(
                         f"  {rung}: {tg:.2f} tok/s x {concurrency} = "
-                        f"{tg * concurrency:,.0f} -> {'pass' if ok else 'FAIL'}"
+                        f"{tg * concurrency:,.0f} -> {'in-window' if ok else 'beyond the window'}"
                     )
                     if ok:
                         rec["sweet_spot"] = rung
-            if not rec["rungs"][rung]["pass"]:
+            if not rec["rungs"][rung]["in_window"]:
                 rec["ceiling"] = True
                 _state_store.save_state(state_file, state)
-                # the global stop rule fires when NO rung ever passed:
-                # the walk reached a measured FAIL with no sweet spot,
-                # meaning even the fastest MEASURED quant (skips aside)
-                # cannot serve the model. The old dict-index/first-rung
-                # check was wrong - a skipped first rung shifted the
-                # indexes and could misfire
-                if not rec.get("sweet_spot"):
-                    print(f"\n  {fam}: no quant reaches the bar (fastest measured: {rung})")
-                    print(
-                        "  STOPPING the benchmark - this hardware class cannot serve these models"
-                    )
-                    return sweet
-                print(f"  {fam}: mechanical ceiling - sweet spot: {rec.get('sweet_spot')}")
+                print(f"  {fam}: sweet spot: {rec.get('sweet_spot')} (beyond at {rung})")
                 break
         else:
             if dry_run:
                 rec["ceiling"] = False
                 continue
-            print(f"  {fam}: every rung passed - sweet spot: {rec.get('sweet_spot')}")
+            # every MEASURED rung stayed in-window: the ladder's last
+            # measured quant is the sweet spot (the walk never went beyond)
+            last = [r for r in SWEET_LADDER if r in rec["rungs"] and rec["rungs"][r].get("tg") is not None]
+            rec["sweet_spot"] = last[-1] if last else None
+            _state_store.save_state(state_file, state)
+            print(f"  {fam}: every rung in-window - sweet spot: {rec.get('sweet_spot')}")
     return sweet
