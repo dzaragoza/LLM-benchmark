@@ -65,6 +65,7 @@ def _prune_previous(famdir: str, rec: dict[str, Any], current: str) -> None:
         _prune_rung(famdir, prev)
     rec["last_kept_file"] = current
 
+
 # the Qwen3.5-2B measured tok/s order (the T14s/780M sweep), fastest
 # first - the walk goes DOWN this list; the sweet spot is the last
 # quant that still clears the bar before the first failure
