@@ -59,14 +59,22 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
 
         with open(IMATRIX_CORPUS, encoding="utf-8") as f:
             convs = json.load(f)["conversations"]
+        # every quantized tensor needs imatrix data or llama-quantize bails
+        # out ("Missing importance matrix ... in a very low-bit
+        # quantization"). The collector skips chunks under 16 tokens, so a
+        # thin calibration text leaves sparsely-exercised tensors (attn_k
+        # and friends) with no entries - repeat the corpus to a healthy
+        # size so every tensor is collected.
+        target = 512 * 1024
         with open(txt, "w", encoding="utf-8") as f:
-            for c in convs:
-                for turn in c.get("user_turns", []):
-                    f.write(turn + "\n\n")
+            while f.tell() < target:
+                for c in convs:
+                    for turn in c.get("user_turns", []):
+                        f.write(turn + "\n\n")
     except Exception:
-        print("  [2] WARNING: corpus unreadable - imatrix calibration falls back to a trivial text")
+        print("  [2] WARNING: corpus unreadable - imatrix calibration falls back to a generic text")
         with open(txt, "w", encoding="utf-8") as f:
-            f.write("the quick brown fox jumps over the lazy dog\n" * 64)
+            f.write("the quick brown fox jumps over the lazy dog\n" * 8192)
     log = os.path.join(famdir, "imatrix.log")
     print(f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)")
     rc = run_quiet(
