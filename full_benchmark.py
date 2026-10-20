@@ -424,11 +424,19 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="v7",
-        choices=["v7"],
+        choices=["v7", "sweet"],
         help="the certify task; 'v7' is the fixed-budget reach benchmark "
         "(session 42/43, addendum 227/229: the quick fit-ladder cell per "
         "family, one fixed corpus, graded (span, hops)); ARC and FWE are "
-        "retired (session 43)",
+        "retired (session 43); 'sweet' is the mechanical-sweet-spot walk "
+        "(models param-ascending, quants down the measured tok/s ladder, "
+        "the service bar tg/s*64 >= 2**17 or > the training window)",
+    )
+    ap.add_argument(
+        "--sweet-repeat",
+        type=int,
+        default=3,
+        help="sweet: llama-bench repetitions per rung (default 3)",
     )
     ap.add_argument(
         "--v7-budget-gib",
@@ -439,7 +447,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--v7-families",
         type=int,
-        required=True,
+        default=None,
+        required=False,
         help="v7: MANDATORY (addendum 156) - the first N candidates param-ascending; "
         "unplaceable candidates are reported as findings, the measured count is "
         "honest by construction (addendum 154)",
@@ -556,6 +565,35 @@ def _run(args: argparse.Namespace) -> None:
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
     resolve_families(args, state)
+    if args.task == "sweet":
+        pass  # --v7-families is v7-only; fall through
+    elif args.task == "v7" and not args.v7_families:
+        sys.exit("--v7-families is mandatory for --task v7 (addendum 156)")
+    if args.task == "sweet":  # noqa: SIM108 - fall-through guard above
+        from bench.sweet import find_bench, run as sweet_run
+
+        sweet = sweet_run(
+            args.models_dir,
+            state,
+            args.state_file,
+            [f.split("=")[0] for f in args.families],
+            repeat=args.sweet_repeat,
+            dry_run=args.dry_run,
+            bench_bin=find_bench(),
+        )
+        state["sweet"] = sweet
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp("SWEET-SPOT SUMMARY")
+        for fam, rec in (sweet or {}).items():
+            spot = rec.get("sweet_spot")
+            print(f"  {fam}: {'sweet spot ' + spot if spot else 'ceiling at first rung'}")
+        if not args.no_git:
+            tee_output.uninstall()
+            git_tail(args)
+        stamp("run complete")
+        return
     # addendum 183: the v5 rung ladder args are retired with the v5 tasks
     if args.task == "v7":
         from bench.v7 import BUDGET_GIB
