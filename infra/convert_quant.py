@@ -70,7 +70,7 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
     log = os.path.join(famdir, "imatrix.log")
     print(f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)")
     rc = run_quiet(
-        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "-c", "0", "--chunk-num", "0"],
+        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out],
         log, 2, "imatrix", "llama-imatrix run")
     if rc != 0 or not os.path.isfile(out):
         fail(2, "imatrix", f"llama-imatrix failed (full log: {log})", GUIDE[2])
