@@ -173,7 +173,7 @@ def _missing_imatrix_tensors(log: str) -> list[str]:
     return names
 
 
-def _add_overrides(famdir: str, overrides: str, names: list[str]) -> None:
+def _add_overrides(famdir: str, overrides: str, names: list[str]) -> list[str]:
     """Persist Q8_0 overrides for the imatrix-less tensors (one per line,
     'name=q8_0'). Existing entries are kept - the file accumulates across
     rungs and reruns (every very-low-bit rung hits the same dead tensors,
@@ -182,12 +182,15 @@ def _add_overrides(famdir: str, overrides: str, names: list[str]) -> None:
     if os.path.isfile(overrides):
         with open(overrides, encoding="utf-8") as f:
             known = {l.split("=", 1)[0].strip() for l in f if "=" in l}
+    added: list[str] = []
     with open(overrides, "a", encoding="utf-8") as f:
         for n in sorted(names):
             base = n.rsplit(".", 1)[0]  # strip the trailing '.weight'
             if base not in known:
                 f.write(f"{base}=q8_0\n")
                 known.add(base)
+                added.append(base)
+    return added
 
 
 def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = False) -> str | None:
@@ -283,14 +286,24 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
 
     print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
-    if rc != 0:
+    # the retry LOOP: each failed attempt surfaces the NEXT dead tensor
+    # (llama-quantize bails on the first missing one it meets); the
+    # overrides file accumulates them and the next attempt gets further,
+    # until a pass adds nothing new and the run either succeeds or fails
+    # for a real reason
+    for _ in range(8):
+        if rc == 0:
+            break
         missing = _missing_imatrix_tensors(log)
-        if missing:
-            _add_overrides(famdir, overrides, missing)
-            print(f"  [2] retrying {rung}: {len(missing)} tensor(s) get no imatrix data ever")
-            print("      (hybrid-architecture tensors that no forward pass exercises);")
-            print(f"      they quantize to Q8_0 instead: {', '.join(sorted(missing))}")
-            rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
+        if not missing:
+            break
+        added = _add_overrides(famdir, overrides, missing)
+        if not added:
+            break
+        print(f"  [2] retrying {rung}: the imatrix can never cover these")
+        print("      (hybrid-architecture tensors that no forward pass exercises);")
+        print(f"      they quantize to Q8_0 instead: {', '.join(added)}")
+        rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
         # a failed llama-quantize leaves a TRUNCATED partial output that
         # the next run's local_rung would trust as ready (the 9-corrupt-
