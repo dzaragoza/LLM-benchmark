@@ -292,5 +292,11 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
             print(f"      they quantize to Q8_0 instead: {', '.join(sorted(missing))}")
             rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
+        # a failed llama-quantize leaves a TRUNCATED partial output that
+        # the next run's local_rung would trust as ready (the 9-corrupt-
+        # files lesson: 'invalid magic characters' on load) - delete it
+        if os.path.isfile(out):
+            os.remove(out)
+            print(f"  [2] removed the partial output of the failed run")
         fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
     return out
