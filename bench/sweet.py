@@ -43,6 +43,31 @@ from bench import state_store as _state_store
 KEEP_FILES = {"imatrix-calib.txt", "imatrix-overrides.txt", "config.json"}
 
 
+def _reconcile_disk(famdir: str, rec: dict[str, Any]) -> None:
+    """The keep-set reconciliation, run when a family's walk is (re)entered:
+    from the STORED verdicts, the f16 master and the current sweet-spot
+    rung's file are the keep-set; every other *.gguf in the family dir is
+    a superseded leftover (walks that ran before the retention landed,
+    or re-judged records whose files were never pruned) - delete them.
+    No state mutation: this only enforces what the state already says."""
+    spot = rec.get("sweet_spot")
+    if not spot or not os.path.isdir(famdir):
+        return
+    fam = os.path.basename(famdir)
+    keep = {f"{fam}-f16.gguf", f"{fam}-{spot}.gguf"}
+    freed = 0
+    for f in os.listdir(famdir):
+        p = os.path.join(famdir, f)
+        if f.endswith(".gguf") and f not in keep:
+            try:
+                freed += os.path.getsize(p)
+                os.remove(p)
+            except OSError:
+                pass
+    if freed:
+        print(f"  [disk] reconciled: {freed / 2**30:.2f} GiB of superseded rungs pruned")
+
+
 def _prune_rung(famdir: str, path: str) -> None:
     """Delete a measured rung file (never the f16 master or the imatrix)."""
     base = os.path.basename(path)
@@ -237,6 +262,7 @@ def run(
         window = rec.get("window") or _window(repo, famdir)
         rec["window"] = window
         rec["repo"] = repo
+        _reconcile_disk(famdir, rec)
         print(
             f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})"
         )
