@@ -36,6 +36,35 @@ import infra.convert_quant as convert_quant
 import infra.hf_download as hf_download
 from bench import state_store as _state_store
 
+# disk retention (the walk's own ruling): a rung file is dead weight once
+# its measurement is stored - only the f16 master (the quant source), the
+# imatrix, and the CURRENT sweet-spot candidate need to stay on disk.
+# Each newly measured rung deletes the previous one.
+KEEP_FILES = {"imatrix-calib.txt", "imatrix-overrides.txt", "config.json"}
+
+
+def _prune_rung(famdir: str, path: str) -> None:
+    """Delete a measured rung file (never the f16 master or the imatrix)."""
+    base = os.path.basename(path)
+    if not base.endswith(".gguf"):
+        return
+    if base.endswith("-f16.gguf") or ".imatrix" in base:
+        return
+    try:
+        os.remove(path)
+        print(f"  [disk] pruned {base}")
+    except OSError:
+        pass
+
+
+def _prune_previous(famdir: str, rec: dict[str, Any], current: str) -> None:
+    """After CURRENT measured in-window, the rung before it (the previous
+    sweet-spot candidate) is no longer needed."""
+    prev = rec.get("last_kept_file")
+    if prev and prev != current and os.path.isfile(prev):
+        _prune_rung(famdir, prev)
+    rec["last_kept_file"] = current
+
 # the Qwen3.5-2B measured tok/s order (the T14s/780M sweep), fastest
 # first - the walk goes DOWN this list; the sweet spot is the last
 # quant that still clears the bar before the first failure
@@ -269,6 +298,7 @@ def run(
                     )
                     if ok:
                         rec["sweet_spot"] = rung
+                        _prune_previous(famdir, rec, path)
             if not rec["rungs"][rung]["in_window"]:
                 rec["ceiling"] = True
                 _state_store.save_state(state_file, state)
