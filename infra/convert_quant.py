@@ -290,8 +290,11 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     # (llama-quantize bails on the first missing one it meets); the
     # overrides file accumulates them and the next attempt gets further,
     # until a pass adds nothing new and the run either succeeds or fails
-    # for a real reason
-    for _ in range(8):
+    # for a real reason. A whole hybrid layer can be dead (attn_q/k/v/
+    # output, ffn_gate/up/down - a dozen-plus tensors), and each attempt
+    # dies cheap at the first check, so the bound only needs to exceed
+    # the tensor count of one layer; 64 is comfortably that
+    for _ in range(64):
         if rc == 0:
             break
         missing = _missing_imatrix_tensors(log)
