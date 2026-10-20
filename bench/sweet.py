@@ -70,40 +70,14 @@ def _prune_previous(famdir: str, rec: dict[str, Any], current: str) -> None:
 # first - the walk goes DOWN this list; the sweet spot is the last
 # quant that still clears the bar before the first failure
 SWEET_LADDER = [
-    "IQ1_S",
-    "IQ1_M",
-    "Q2_0",
-    "IQ2_XXS",
-    "IQ2_XS",
-    "Q1_0",
-    "IQ2_S",
-    "Q2_K_S",
-    "IQ2_M",
-    "IQ3_XXS",
-    "TQ2_0",
-    "Q2_K",
-    "Q3_K_S",
-    "IQ3_XS",
-    "IQ3_S",
-    "IQ3_M",
-    "Q3_K_M",
-    "IQ4_XS",
-    "Q4_0",
-    "Q4_K_S",
-    "Q3_K_L",
-    "Q4_1",
-    "IQ4_NL",
-    "Q4_K_M",
-    "TQ1_0",
-    "Q5_K_S",
-    "Q5_0",
-    "Q5_K_M",
-    "Q5_1",
-    "Q6_K",
-    "Q8_0",
-    "BF16",
-    "F16",
+    "IQ1_S", "IQ1_M", "Q2_0", "IQ2_XXS", "IQ2_XS", "Q1_0", "IQ2_S",
+    "Q2_K_S", "IQ2_M", "IQ3_XXS", "TQ2_0", "Q2_K", "Q3_K_S", "IQ3_XS",
+    "IQ3_S", "IQ3_M", "Q3_K_M", "IQ4_XS", "Q4_0", "Q4_K_S", "Q3_K_L",
+    "Q4_1", "IQ4_NL", "Q4_K_M", "TQ1_0", "Q5_K_S", "Q5_0", "Q5_K_M",
+    "Q5_1", "Q6_K", "Q8_0", "F16",
 ]
+# BF16 is cut from the walk (the author's ruling: f16 is basically the
+# same thing) - one fewer full-size build+bench per model
 
 # the window boundary: a rung is in-window while tg/s * concurrency > window
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
