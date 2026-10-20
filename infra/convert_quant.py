@@ -200,12 +200,13 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
     print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")
-    cmd = [QUANTIZE_BIN, f16, out, rung]
+    cmd = [QUANTIZE_BIN]
     if rung.upper() in IMATRIX_RUNGS:
         imx = ensure_imatrix(fam, famdir, f16)
         if imx:
             cmd += ["--imatrix", imx]
             print(f"  [2] using importance matrix {os.path.basename(imx)}")
+    cmd += [f16, out, rung]
     rc = run_quiet(cmd, log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
         fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
