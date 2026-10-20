@@ -203,7 +203,9 @@ def run(
         window = rec.get("window") or _window(repo, famdir)
         rec["window"] = window
         rec["repo"] = repo
-        print(f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})")
+        print(
+            f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})"
+        )
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is None:
                 if rec["rungs"][rung].get("error"):
@@ -278,7 +280,11 @@ def run(
                 continue
             # every MEASURED rung stayed in-window: the ladder's last
             # measured quant is the sweet spot (the walk never went beyond)
-            last = [r for r in SWEET_LADDER if r in rec["rungs"] and rec["rungs"][r].get("tg") is not None]
+            last = [
+                r
+                for r in SWEET_LADDER
+                if r in rec["rungs"] and rec["rungs"][r].get("tg") is not None
+            ]
             rec["sweet_spot"] = last[-1] if last else None
             _state_store.save_state(state_file, state)
             print(f"  {fam}: every rung in-window - sweet spot: {rec.get('sweet_spot')}")
