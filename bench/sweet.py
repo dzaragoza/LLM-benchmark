@@ -144,6 +144,25 @@ def _passes(tg: float, window: int) -> bool:
     return tg * 64 >= SERVICE_BAR or tg * 64 > window
 
 
+def roster_from_models_md() -> list[tuple[str, str]]:
+    """The roster AS WRITTEN in md/models.md (the source of truth): the
+    table rows in file order (param-ascending), model name + repo. The
+    'unknown'-param rows sort to their file position - the table's own
+    order decides, no re-sorting here."""
+    rows = []
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md")
+    in_table = False
+    for line in open(path, encoding="utf-8"):
+        if line.startswith("| model name"):
+            in_table = True
+            continue
+        if in_table and line.startswith("|"):
+            parts = [p.strip() for p in line.strip().strip("|").split("|")]
+            if len(parts) >= 4 and parts[0] and parts[0] != "model name" and set(parts[0]) != {"-"}:
+                rows.append((parts[0], parts[3]))
+    return rows
+
+
 def run(
     models_dir: str,
     state: dict[str, Any],
@@ -155,19 +174,22 @@ def run(
 ) -> dict[str, Any]:
     if not dry_run and not bench_bin:
         sys.exit(f"llama-bench not found at {BENCH_BIN} - place the b11669 build in the repo root")
-    from etc import registry_data
+    roster = dict(roster_from_models_md())
+    if not roster:
+        sys.exit("md/models.md carries no roster rows - regenerate the table first")
 
     sweet = state.setdefault("sweet", {})
     for fam in families:
-        repo = registry_data.ROSTER.get(fam)
+        repo = roster.get(fam)
         if not repo:
-            print(f"  {fam}: not in the registry roster - skipped")
+            print(f"  {fam}: not in md/models.md - skipped")
             continue
         famdir = os.path.join(models_dir, fam)
         os.makedirs(famdir, exist_ok=True)
         rec = sweet.setdefault(fam, {"rungs": {}, "sweet_spot": None, "ceiling": False})
         window = rec.get("window") or _window(repo, famdir)
         rec["window"] = window
+        rec["repo"] = repo
         print(f"\n{'=' * 60}\n{fam} (window {window:,}, bar tg/s*64 >= {SERVICE_BAR:,})")
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:

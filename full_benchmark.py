@@ -564,20 +564,24 @@ def _run(args: argparse.Namespace) -> None:
         check_tooling(args)
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    resolve_families(args, state)
+    if args.task != "sweet":
+        resolve_families(args, state)
     if args.task == "sweet":
         pass  # --v7-families is v7-only; fall through
     elif args.task == "v7" and not args.v7_families:
         sys.exit("--v7-families is mandatory for --task v7 (addendum 156)")
     if args.task == "sweet":  # noqa: SIM108 - fall-through guard above
-        from bench.sweet import find_bench
+        from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
-
+        families = [f.split("=")[0] for f in args.families]
+        if not families:
+            families = [n for n, _ in roster_from_models_md()]
+            stamp(f"fresh sweet run: the md/models.md roster, param-ascending ({len(families)} models)")
         sweet = sweet_run(
             args.models_dir,
             state,
             args.state_file,
-            [f.split("=")[0] for f in args.families],
+            families,
             repeat=args.sweet_repeat,
             dry_run=args.dry_run,
             bench_bin=find_bench(),
