@@ -59,14 +59,7 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | Llama-3.1-8B-Instruct | unknown | unknown | meta-llama/Llama-3.1-8B-Instruct | yes | https://ai.meta.com/blog/meta-llama-3-1/ | unknown |
 | Llama-3.2-1B-Instruct | unknown | unknown | meta-llama/Llama-3.2-1B-Instruct | yes | https://ai.meta.com/blog/llama-3-2/ | unknown |
 | Llama-3.2-3B-Instruct | unknown | unknown | meta-llama/Llama-3.2-3B-Instruct | yes | https://ai.meta.com/blog/llama-3-2/ | unknown |
-| Ministral-3-1B-Instruct-2512 | unknown | unknown | mistralai/Ministral-3-1B-Instruct-2512 | ? | unknown | unknown |
-| Ministral-3-2B-Instruct-2512 | unknown | unknown | mistralai/Ministral-3-2B-Instruct-2512 | ? | unknown | unknown |
-| Qwen3-2.5B | unknown | unknown | Qwen/Qwen3-2.5B | ? | unknown | unknown |
-| SmolLM3-9B | unknown | unknown | HuggingFaceTB/SmolLM3-9B | ? | unknown | unknown |
 | gemma-2-2b-it | unknown | unknown | google/gemma-2-2b-it | yes | https://arxiv.org/abs/2408.00118 | unknown |
 | gemma-3-12b-it | unknown | unknown | google/gemma-3-12b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
-| gemma-3-1b-it | unknown | unknown | google/gemma-3-1b-it | yes | https://ai.google.dev/gemma/docs/core/card | unknown |
+| gemma-3-1b-it | unknown | unknown | google/gemma-3-1b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
 | gemma-3-27b-it | unknown | unknown | google/gemma-3-27b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
-| gemma-4-4b-it | unknown | unknown | google/gemma-4-4b-it | ? | unknown | unknown |
-| granite-4.0-2b | unknown | unknown | ibm-granite/granite-4.0-2b | ? | https://arxiv.org/abs/2510.17848 | unknown |
-| stablelm-2-1.6b-chat | unknown | unknown | stabilityai/stablelm-2-1.6b-chat | ? | https://arxiv.org/abs/2402.04779 | unknown |
