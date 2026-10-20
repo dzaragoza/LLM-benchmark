@@ -7,7 +7,7 @@ clears the service bar, walking DOWN the measured tok/s ladder:
   per family (param-ascending):
     per quant (the Qwen3.5-2B discovered tok/s order, fastest first):
       build the quant, bench it (llama-bench -p 0 -n 128)
-      pass  = tg/s * 64 >= 2**17  or  tg/s * 64 > training window
+      pass  = tg/s * concurrency >= 2**17  or  tg/s * concurrency > window
       pass  -> the next quant down the ladder (same model)
       fail  -> the mechanical ceiling: the LAST PASSING quant is the
                model's sweet spot; next family
@@ -73,7 +73,7 @@ SWEET_LADDER = [
     "F16",
 ]
 
-SERVICE_BAR = 2**17  # tg/s * 64 must reach this (or exceed the window)
+SERVICE_BAR = 2**17  # tg/s * concurrency must reach this (or exceed the window)
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
 
 BENCH_BIN = os.path.join(
@@ -140,8 +140,8 @@ def _bench(path: str, repeat: int) -> float | None:
     return tg
 
 
-def _passes(tg: float, window: int) -> bool:
-    return tg * 64 >= SERVICE_BAR or tg * 64 > window
+def _passes(tg: float, window: int, concurrency: int) -> bool:
+    return tg * concurrency >= SERVICE_BAR or tg * concurrency > window
 
 
 def roster_from_models_md() -> list[tuple[str, str]]:
@@ -171,6 +171,7 @@ def run(
     state_file: str,
     families: list[str],
     repeat: int = 3,
+    concurrency: int = 1024,
     dry_run: bool = False,
     bench_bin: str | None = None,
 ) -> dict[str, Any]:
@@ -192,7 +193,10 @@ def run(
         window = rec.get("window") or _window(repo, famdir)
         rec["window"] = window
         rec["repo"] = repo
-        print(f"\n{'=' * 60}\n{fam} (window {window:,}, bar tg/s*64 >= {SERVICE_BAR:,})")
+        print(
+            f"\n{'=' * 60}\n{fam} (window {window:,}, "
+            f"bar tg/s*{concurrency} >= {SERVICE_BAR:,} or > window)"
+        )
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
@@ -221,11 +225,12 @@ def run(
                     _state_store.save_state(state_file, state)
                     print(f"  {rung}: llama-bench failed (see its stderr above)")
                 else:
-                    ok = _passes(tg, window)
+                    ok = _passes(tg, window, concurrency)
                     rec["rungs"][rung] = {"tg": tg, "pass": ok}
                     _state_store.save_state(state_file, state)
                     print(
-                        f"  {rung}: {tg:.2f} tok/s x 64 = {tg * 64:,.0f} -> {'pass' if ok else 'FAIL'}"
+                        f"  {rung}: {tg:.2f} tok/s x {concurrency} = "
+                        f"{tg * concurrency:,.0f} -> {'pass' if ok else 'FAIL'}"
                     )
                     if ok:
                         rec["sweet_spot"] = rung
