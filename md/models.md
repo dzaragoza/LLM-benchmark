@@ -1,5 +1,7 @@
 # models.md — The Model Registry
 
+**Last updated: 2026-10-20**
+
 The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest first — the full benchmark starts at the top of this table). Params are `etc/registry_data.json`'s exact counts; the training window is each model's `max_position_embeddings`. Gated = HF repo requires license acceptance. The paper/report link is the model card's own arXiv citation, or the family's canonical report. Thinking = the card advertises a thinking/reasoning mode (hybrid models count as thinking).
 
 | model name | params (B) | training window | repo | gated? | paper/report | thinking? |
