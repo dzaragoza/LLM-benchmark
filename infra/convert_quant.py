@@ -75,7 +75,7 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
     log = os.path.join(famdir, "imatrix.log")
     print(f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)")
     rc = run_quiet(
-        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl", "--nextn"],
+        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl"],
         log, 2, "imatrix", "llama-imatrix run")
     if rc != 0 or not os.path.isfile(out):
         fail(2, "imatrix", f"llama-imatrix failed (full log: {log})", GUIDE[2])
@@ -125,6 +125,43 @@ def run_quiet(cmd: list[str], log_path: str, phase: int, rung: str, what: str) -
             print("(log unreadable)")
         print("--- end of tool output ---")
     return r.returncode
+
+
+def _missing_imatrix_tensors(log: str) -> list[str]:
+    """Tensor names from a failed llama-quantize log that bail out with
+    'Missing importance matrix for tensor X' - tensors no forward pass
+    ever exercises (hybrid SSM/attention layers; the imatrix collector
+    only records executed multiplications), so no corpus can cover
+    them."""
+    names: list[str] = []
+    try:
+        with open(log, encoding="utf-8") as f:
+            for line in f:
+                if "Missing importance matrix for tensor" in line:
+                    name = line.split("Missing importance matrix for tensor", 1)[1].strip().split()[0]
+                    if name and name not in names:
+                        names.append(name)
+    except OSError:
+        pass
+    return names
+
+
+def _add_overrides(famdir: str, overrides: str, names: list[str]) -> None:
+    """Persist Q8_0 overrides for the imatrix-less tensors (one per line,
+    'name=q8_0'). Existing entries are kept - the file accumulates across
+    rungs and reruns (every very-low-bit rung hits the same dead tensors,
+    so the first failure teaches the rest)."""
+    known = set()
+    if os.path.isfile(overrides):
+        with open(overrides, encoding="utf-8") as f:
+            known = {l.split("=", 1)[0].strip() for l in f if "=" in l}
+    with open(overrides, "a", encoding="utf-8") as f:
+        for n in sorted(names):
+            base = n.rsplit(".", 1)[0]  # strip the trailing '.weight'
+            if base not in known:
+                f.write(f"{base}=q8_0\n")
+                known.add(base)
+
 
 
 def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = False) -> str | None:
@@ -203,16 +240,31 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         print(f"  [2] f16 rung - {os.path.basename(f16)} is the rung file (no quantize step)")
         return f16
     out = os.path.join(famdir, f"{fam}-{rung}.gguf")
-    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
     log = os.path.join(famdir, f"quantize-{rung}.log")
-    cmd = [QUANTIZE_BIN]
-    if rung.upper() in IMATRIX_RUNGS:
-        imx = ensure_imatrix(fam, famdir, f16)
-        if imx:
-            cmd += ["--imatrix", imx]
-            print(f"  [2] using importance matrix {os.path.basename(imx)}")
-    cmd += [f16, out, rung]
-    rc = run_quiet(cmd, log, 2, rung, "llama-quantize run")
+    overrides = os.path.join(famdir, "imatrix-overrides.txt")
+
+    def build_cmd() -> list[str]:
+        cmd = [QUANTIZE_BIN]
+        if rung.upper() in IMATRIX_RUNGS:
+            imx = ensure_imatrix(fam, famdir, f16)
+            if imx:
+                cmd += ["--imatrix", imx]
+                print(f"  [2] using importance matrix {os.path.basename(imx)}")
+        if os.path.isfile(overrides):
+            cmd += ["--tensor-type-file", overrides]
+            print(f"  [2] using tensor overrides {os.path.basename(overrides)}")
+        return cmd + [f16, out, rung]
+
+    print(f"  [2] quantizing {os.path.basename(f16)} -> {rung} (output hidden; shown on error)")
+    rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
+    if rc != 0:
+        missing = _missing_imatrix_tensors(log)
+        if missing:
+            _add_overrides(famdir, overrides, missing)
+            print(f"  [2] retrying {rung}: {len(missing)} tensor(s) get no imatrix data ever")
+            print(f"      (hybrid-architecture tensors that no forward pass exercises);")
+            print(f"      they quantize to Q8_0 instead: {', '.join(sorted(missing))}")
+            rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):
         fail(2, rung, f"llama-quantize failed (full log: {log})", GUIDE[2])
     return out
