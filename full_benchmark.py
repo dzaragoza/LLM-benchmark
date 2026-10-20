@@ -447,6 +447,14 @@ def build_parser() -> argparse.ArgumentParser:
         "tg/s * this > the training window (default 1024)",
     )
     ap.add_argument(
+        "--sweet-retry-skipped",
+        action="store_true",
+        help="sweet: clear every stored skip (unavailable/bench-failed "
+        "records) before the walk, so transient causes (disk-full, a "
+        "truncated f16) get a fresh attempt; permanent shape "
+        "incompatibilities will re-skip",
+    )
+    ap.add_argument(
         "--v7-budget-gib",
         type=float,
         default=None,
@@ -582,6 +590,16 @@ def _run(args: argparse.Namespace) -> None:
         from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
 
+        if args.sweet_retry_skipped:
+            cleared = 0
+            for rec in state.get("sweet", {}).values():
+                for rung, m in list(rec.get("rungs", {}).items()):
+                    if m.get("tg") is None:
+                        del rec["rungs"][rung]
+                        cleared += 1
+            if cleared:
+                save_state(args.state_file, state)
+                stamp(f"sweet: cleared {cleared} skipped records for a fresh attempt")
         families = [f.split("=")[0] for f in args.families]
         if not families:
             families = [n for n, _ in roster_from_models_md()]
