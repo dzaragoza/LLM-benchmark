@@ -439,6 +439,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="sweet: llama-bench repetitions per rung (default 3)",
     )
     ap.add_argument(
+        "--sweet-concurrency",
+        type=int,
+        default=1024,
+        help="sweet: the concurrency factor of the service bar - a rung passes "
+        "when tg/s * this >= 2**17 or > the training window (default 1024)",
+    )
+    ap.add_argument(
         "--v7-budget-gib",
         type=float,
         default=None,
@@ -586,6 +593,7 @@ def _run(args: argparse.Namespace) -> None:
             args.state_file,
             families,
             repeat=args.sweet_repeat,
+            concurrency=args.sweet_concurrency,
             dry_run=args.dry_run,
             bench_bin=find_bench(),
         )
