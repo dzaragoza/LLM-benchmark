@@ -227,7 +227,12 @@ def find_rung_file(names: list[str] | tuple[str, ...], rung: str) -> str | None:
             continue
         if "f16" in low or "fp16" in low or "bf16" in low:
             continue
-        if tok in low:
+        # exact rung-name match, not substring: 'q1_0' must not match
+        # 'tq1_0.gguf' and 'q2_k' must not match 'q2_k_s.gguf' (the
+        # substring bug reported Q1_0/Q2_0/Q2_K as ready when only the
+        # neighbor rung's file existed)
+        stem = low[: -len(".gguf")]
+        if stem.endswith("-" + tok) or stem.endswith("." + tok) or stem.endswith("_" + tok):
             return f
     return None
 
