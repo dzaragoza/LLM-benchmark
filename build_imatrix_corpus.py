@@ -12,6 +12,7 @@ Usage:
   python3 build_imatrix_corpus.py [--input arena/english_sample.json]
                                   [--output data/imatrix-corpus.txt]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="flatten the arena English sample to imatrix calibration text")
+    ap = argparse.ArgumentParser(
+        description="flatten the arena English sample to imatrix calibration text"
+    )
     ap.add_argument("--input", default=os.path.join(ROOT, "arena", "english_sample.json"))
     ap.add_argument("--output", default=os.path.join(ROOT, "data", "imatrix-corpus.txt"))
     args = ap.parse_args()
