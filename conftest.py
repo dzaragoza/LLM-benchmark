@@ -6,10 +6,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "AI_tools"))
 
-from argparse import Namespace, ArgumentParser
-import infra.convert_quant as convert_quant
-import infra.git_ops as git_ops
+from argparse import ArgumentParser, Namespace
 from unittest.mock import MagicMock
+
 import pytest
 
 mock_process = MagicMock()
@@ -25,7 +24,6 @@ def mock_process():
 @pytest.fixture
 def mock_args():
     """Mock argparse Namespace object."""
-    from argparse import Namespace
 
     return Namespace()
 

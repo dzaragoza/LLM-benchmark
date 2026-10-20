@@ -288,7 +288,7 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
         if missing:
             _add_overrides(famdir, overrides, missing)
             print(f"  [2] retrying {rung}: {len(missing)} tensor(s) get no imatrix data ever")
-            print(f"      (hybrid-architecture tensors that no forward pass exercises);")
+            print("      (hybrid-architecture tensors that no forward pass exercises);")
             print(f"      they quantize to Q8_0 instead: {', '.join(sorted(missing))}")
             rc = run_quiet(build_cmd(), log, 2, rung, "llama-quantize run")
     if rc != 0 or not os.path.isfile(out):

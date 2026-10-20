@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 MODELS = os.path.join(ROOT, "models")

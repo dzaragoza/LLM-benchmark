@@ -121,7 +121,7 @@ def main() -> int:
         elif args.dry_run:
             print(f"  would build: {plan}")
         else:
-            print(f"  UNAVAILABLE (see output above)")
+            print("  UNAVAILABLE (see output above)")
             rc = 1
     return rc
 
