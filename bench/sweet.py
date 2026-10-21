@@ -189,6 +189,25 @@ def _window(repo: str, famdir: str) -> int:
     return WINDOW_DEFAULT
 
 
+def _unquantizable(log: str) -> str | None:
+    """The permanent-unquantizable signature from a failed llama-quantize
+    log (the b11669 hard requirements: a column count the quant type's
+    blocking cannot express, or no defined fallback for the type) - a
+    property of the ARCHITECTURE, not of the machine's disk or tools.
+    Returns the matched quantize error line, or None for transient
+    failures (disk-full, missing tools, OOM) that a rerun can fix."""
+    try:
+        with open(log, encoding="utf-8") as f:
+            for line in f:
+                if "not divisible by" in line and "required for type" in line:
+                    return line.strip()
+                if "no tensor type fallback is defined" in line:
+                    return line.strip()
+    except OSError:
+        pass
+    return None
+
+
 def _build(fam: str, repo: str, famdir: str, rung: str) -> str | None:
     """Phase 1 + 2 for one rung (the certify path, simplified). None =
     the rung cannot exist on this machine (RAM-infeasible, a tensor
@@ -331,13 +350,20 @@ def run(
                 continue
             path = _build(fam, repo, famdir, rung)
             if not path:
+                permanent = _unquantizable(os.path.join(famdir, f"quantize-{rung}.log"))
+                error = (
+                    f"quantization impossible for this architecture ({permanent})"
+                    if permanent
+                    else "unavailable on this machine"
+                )
                 rec["rungs"][rung] = {
                     "tg": None,
                     "pass": None,
-                    "error": "unavailable on this machine",
+                    "error": error,
+                    "permanent": bool(permanent),
                 }
                 _state_store.save_state(state_file, state)
-                print(f"  {rung}: unavailable on this machine - skipped")
+                print(f"  {rung}: {error} - skipped")
                 continue
             else:
                 tg = _bench(path, repeat)

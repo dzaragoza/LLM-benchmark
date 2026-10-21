@@ -600,11 +600,20 @@ def _run(args: argparse.Namespace) -> None:
 
         if args.sweet_retry_skipped:
             cleared = 0
+            kept = 0
             for rec in state.get("sweet", {}).values():
                 for rung, m in list(rec.get("rungs", {}).items()):
                     if m.get("tg") is None:
+                        if m.get("permanent"):
+                            kept += 1
+                            continue
                         del rec["rungs"][rung]
                         cleared += 1
+            if kept:
+                stamp(
+                    f"sweet: {kept} permanently-unquantizable records kept "
+                    "(the architecture can never express this rung)"
+                )
             if cleared:
                 save_state(args.state_file, state)
                 stamp(f"sweet: cleared {cleared} skipped records for a fresh attempt")
