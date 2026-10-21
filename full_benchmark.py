@@ -328,8 +328,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="v8",
-        choices=["v8", "sweet", "exam"],
+        default="exam",
+        choices=["exam", "sweet"],
         help="the task; 'v8' (default) is the integrated run: sweet "
         "walk over the first --models models, then the exam over "
         "their sweet spots; 'sweet' and 'exam' run the phases standalone",
@@ -560,17 +560,18 @@ def _run(args: argparse.Namespace) -> None:
         check_tooling(args)
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.task == "v8":
-        # the integrated run: the roster's first --models models, the
-        # same time parameter driving both phases
+    if args.task in ("v8", "exam"):
+        # v9: the exam is the only phase. No sweet walk, no in-window
+        # rule, no model-count logic: every (model, quant) candidate
+        # takes the exam under the full-window paper and the 1024s
+        # time bell; the roster is self-cleaning (strictly-lower
+        # scorers are deleted from disk as soon as scores exist).
         from bench.exam import run as exam_run
-        from bench.sweet import find_bench, roster_from_models_md
-        from bench.sweet import run as sweet_run
+        from bench.sweet import roster_from_models_md
 
         if args.eliminate:
-            # the tournament cut (the author's ruling): mark the
-            # eliminated models in the ledger, delete their artifacts
-            # from models/ - the collected data ALWAYS stays
+            # the manual tournament cut (mostly superseded by the
+            # self-clean; kept for the ledger bookkeeping)
             import shutil
 
             for fam in args.eliminate.split(","):
@@ -593,145 +594,7 @@ def _run(args: argparse.Namespace) -> None:
                 git_tail(args)
             stamp("elimination complete")
             return
-        if args.clean and state.get("exam"):
-            state["exam"] = {}
-            save_state(args.state_file, state)
-            stamp("exam: all records wiped (--clean) - a full re-measure")
-        from bench.sweet import calibrated_gen_len
 
-        cal_n = calibrated_gen_len(state)
-        if args.sweet_gen_len is None:
-            args.sweet_gen_len = cal_n or 128
-            if cal_n:
-                stamp(
-                    f"sweet: llama-bench -n calibrated to {cal_n} "
-                    "(the median passing exam answer, rounded up to a "
-                    "power of two)"
-                )
-        roster = [name for name, _ in roster_from_models_md()]
-        if args.refill:
-            # the tournament refill: the field is 16 CANDIDATES, not
-            # 16 roster positions. Open slots = eliminated models
-            # (their artifacts deleted); new models = the roster's
-            # first never-measured positions, filling those slots.
-            # Survivors are never re-run (idempotence).
-            exam = state.get("exam") or {}
-            measured = {
-                fam
-                for fam, rec in exam.items()
-                if rec and not (rec.get("_eliminated"))
-            }
-            eliminated = {fam for fam, rec in exam.items() if (rec or {}).get("_eliminated")}
-            # slots open = the eliminated whose artifacts are gone
-            # (the cut already ran); an eliminated model still on disk
-            # keeps its slot until --eliminate removes it
-            open_slots = sum(
-                1
-                for fam in eliminated
-                if not os.path.isdir(os.path.join(args.models_dir, fam))
-            )
-            first_new = 0
-            for i, name in enumerate(roster):
-                if name not in measured and name not in eliminated:
-                    first_new = i
-                    break
-            else:
-                first_new = len(roster)
-            newcomers = roster[first_new : first_new + open_slots]
-            survivors = [n for n in roster[:first_new] if n in measured]
-            if not newcomers:
-                sys.exit(
-                    f"the roster is exhausted - no new models for "
-                    f"{open_slots} open slot(s). The endgame: "
-                    f"{len(survivors)} survivor(s) remain; eliminate "
-                    "from the field until the top tier is held alone"
-                )
-            if len(newcomers) < open_slots:
-                stamp(
-                    f"roster short: {len(newcomers)} new model(s) for "
-                    f"{open_slots} open slot(s) - the final round; the "
-                    f"field is {len(survivors) + len(newcomers)}"
-                )
-            families = survivors + newcomers
-            stamp(
-                f"refill: {len(survivors)} survivor(s) kept "
-                f"(never re-measured), {len(newcomers)} newcomer(s): "
-                f"roster positions {first_new + 1}..{first_new + len(newcomers)}"
-            )
-        else:
-            start = max(1, args.models_from) - 1
-            families = roster[start : start + args.models]
-        if families:
-            stamp(
-                f"v8: roster positions {start + 1}..{start + len(families)} "
-                f"({', '.join(families[:3])}"
-                f"{'...' if len(families) > 3 else ''})"
-            )
-        if not families:
-            sys.exit(f"the roster has no position {args.models_from} - it is exhausted")
-        sweet = sweet_run(
-            args.models_dir,
-            state,
-            args.state_file,
-            families,
-            repeat=args.sweet_repeat,
-            concurrency=args.sweet_concurrency,
-            gen_len=args.sweet_gen_len,
-            dry_run=args.dry_run,
-            bench_bin=find_bench(),
-        )
-        state["sweet"] = sweet
-        save_state(args.state_file, state)
-        print()
-        print("=" * 60)
-        stamp("PHASE 1 COMPLETE - SWEET-SPOT SUMMARY")
-        for fam, rec in (sweet or {}).items():
-            spot = rec.get("sweet_spot")
-            beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
-            if spot and rec.get("over_window"):
-                verdict = f"fastest rung {spot} (OVER the window - the fill-rate bell binds)"
-            elif spot:
-                verdict = f"boundary {spot}"
-            else:
-                verdict = "no measured rung"
-            print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
-        print()
-        print("=" * 60)
-        stamp("PHASE 2 - THE EXAM")
-        results = exam_run(
-            args.models_dir,
-            state,
-            args.state_file,
-            state.get("ladder_port", 8210),
-            families,
-            n_seeds=args.exam_seeds,
-            max_level=args.exam_max_level,
-            dry_run=args.dry_run,
-            time_factor=args.sweet_concurrency,
-        )
-        _exam_to_state(state, results)
-        save_state(args.state_file, state)
-        write_v8_md(state, {name: i + 1 for i, name in enumerate(roster)})
-        print()
-        print("=" * 60)
-        stamp("V8 EXAM SUMMARY (highest difficulty achieved per candidate)")
-        for (fam, rung), rec in sorted(
-            results.items(), key=lambda kv: -(kv[1].get("score") or -1)
-        ):
-            verdict = rec.get("error") or f"score {rec.get('score')}"
-            print(f"  {fam} {rung}: {verdict}")
-        if not args.no_git:
-            tee_output.uninstall()
-            git_tail(args)
-        stamp("v8 run complete")
-        return
-    if args.task == "exam":
-        from bench.exam import run as exam_run
-
-        if args.clean and state.get("exam"):
-            state["exam"] = {}
-            save_state(args.state_file, state)
-            stamp("exam: all records wiped (--clean) - a full re-measure")
         results = exam_run(
             args.models_dir,
             state,
@@ -741,13 +604,14 @@ def _run(args: argparse.Namespace) -> None:
             n_seeds=args.exam_seeds,
             max_level=args.exam_max_level,
             dry_run=args.dry_run,
-            time_factor=args.sweet_concurrency,
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
+        write_v8_md(state, {name: i + 1 for i, name in enumerate(
+            [n for n, _ in roster_from_models_md()])})
         print()
         print("=" * 60)
-        stamp("EXAM SUMMARY (highest difficulty achieved per candidate)")
+        stamp("V9 EXAM SUMMARY (highest difficulty achieved per candidate)")
         for (fam, rung), rec in sorted(
             results.items(), key=lambda kv: -(kv[1].get("score") or -1)
         ):
@@ -756,7 +620,7 @@ def _run(args: argparse.Namespace) -> None:
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)
-        stamp("exam complete")
+        stamp("v9 run complete")
         return
     if args.task == "sweet":
         from bench.sweet import find_bench, roster_from_models_md

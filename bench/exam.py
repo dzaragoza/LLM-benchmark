@@ -1,53 +1,33 @@
-"""bench.exam -- the quality exam (phase 2): chain hops + elevator
-logic (Daniela's design, KNOWLEDGE.md variants 1 and 4c, the exam
-protocol).
+"""bench.exam -- THE benchmark (v9): the exam is the only phase.
 
-The phase-1 sweet walk found the quants that can FILL the context in
-time; the exam now DISTINGUISHES QUALITY between them. Each level has
-TWO parts:
+Daniela's ruling: forget the sweet-spot measurements entirely. The
+context is the FULL training window; the model has a literal bell to
+beat - 1024 seconds per attempt (the UX budget itself). No pre-
+measurement, no in-window rule, no quant ladder walk: every
+(model, quant) candidate is acquired on demand, served at its full
+window, and takes the exam directly. The exam IS the filter.
 
-  part 1  CHAIN FOLLOW (variant 1): pairs (A, B) where B is the first
-          item of exactly one other pair - identity matching; the
-          chain ends at the dangling token that never heads a pair.
-  part 2  ELEVATOR (variant 4c): a numbered list of (token,
-          signed-number) pairs - add the number to the pair's position
-          to find the next pair, 0 = end marker. The chain-following
-          primitive proven teachable to small models once the indices
-          are printed ("don't ask the model to count; print the
-          numbers").
+  candidates  every (model, quant) pair: F16 plus every quant that
+              can be built (the ladder is the ACQUISITION order,
+              not a ranking - a candidate that cannot exist on this
+              machine is recorded and skipped).
+  the paper    the full training window, as the generation budget.
+  the bells    TOKEN: max_tokens = the window (finish_reason
+              'length' = the paper filled); TIME: 1024s per
+              attempt (finish_reason 'time_limit' = the bell rang).
+  grading     PASS/FAIL, both parts (chain follow + elevator) per
+              level, ordered-subsequence (the flexible trial era).
+  sweeps      level 0 for every candidate; the next round's only
+              candidates are the previous round's passers.
+  self-clean  the moment a candidate has a SCORE, every candidate
+              with a strictly lower score is eliminated: its
+              artifacts are deleted from disk (the data always
+              stays). No model-count limits, no refill logic - run
+              the full roster and it cleans itself: disk holds the
+              survivors plus the family currently being examined.
 
-A level passes only when BOTH parts pass.
-
-Protocol (Daniela's exam philosophy):
-  - difficulty = number of hops, adjustable from level 0 upward
-  - PASS/FAIL, no partial credit: the ANSWER line must carry the full
-    chain in order, graded semantically
-  - the BELL is the CONTEXT, integrated with the phase-1 sweet-spot
-    measurements: the exam context is min(training window, tg/s x
-    1024) - the number of tokens the sweet spot can actually fill
-    (the in-window guarantee makes this the window for in-window
-    rungs; the tg/s leg binds otherwise). The exam ends when the
-    model EMITS an answer (finish_reason=stop) or RUNS OUT OF CONTEXT
-    (finish_reason=length) - both conditions are checked, and
-    running out is a FAIL (no answer within the bell).
-  - the seed follows the REPETITION count: n=1 for the benchmark, so
-    every exam instance is built from seed 1 - every model takes the
-    SAME exam
-  - predictability is protocol-registered (protocol.md:179):
-    temperature 0 (greedy argmax), sampler seed 1024, thinking
-    disabled - the model behaves as deterministically as it can
-  - applied in sweeps: level 0 tests every sweet spot, the next
-    round's only candidates are the previous round's passers, rounds
-    continue until no sweet spot passes - the final score is the
-    highest exam difficulty achieved
-  - answer tokens are recorded for every attempt (the spending
-    signature: terse refusal / rumination / solve)
-
-The prompts follow the validated design lessons: the input is stated
-WELL-FORMED (no integrity auditing), the demos show the PROCEDURE on
-dummy tokens, scratchpad is invited (thinking in the answer is
-load-bearing), and the final line is a fixed ANSWER format graded
-semantically (format drift elsewhere is tolerated).
+Everything is IDEMPOTENT and RESUMABLE; every attempt is logged with
+its full prompt and answer for debugging.
 """
 
 from __future__ import annotations
@@ -64,7 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.sweet import roster_from_models_md
+from bench.sweet import SWEET_LADDER, WINDOW_DEFAULT, roster_from_models_md
 
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
@@ -348,62 +328,45 @@ def fail_reason(rec: dict[str, Any]) -> str:
     return "unknown"
 
 
-def bell_rung(window: int | None, tg: float | None, time_factor: int = 1024) -> int | None:
-    """The bell for ONE rung: min(training window, tg/s x time_factor).
-    Under the window the window binds; over it the rung's own fill
-    rate binds. The time_factor is the run's time parameter (the same
-    1024 that set the sweet spots)."""
-    if not window or tg is None:
+def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
+    """The v9 bell: the FULL training window - the number of tokens
+    the model was trained to hold, the whole paper. No tg/s leg, no
+    in-window rule: the time bell (1024s per attempt) is what makes
+    the fill-rate problem the model's, not the benchmark's."""
+    sweet_rec = (state.get("sweet") or {}).get(fam) or {}
+    window = sweet_rec.get("window")
+    if window:
+        return int(window)
+    repo = dict(roster_from_models_md()).get(fam)
+    if not repo:
         return None
-    return max(1024, min(int(window), int(tg * time_factor)))
+    try:
+        from bench.sweet import _window
+
+        return _window(repo, os.path.join(models_dir, fam))
+    except Exception:
+        return WINDOW_DEFAULT
 
 
 def candidates(
-    state: dict[str, Any], families: list[str] | None, models_dir: str = "models"
-) -> list[tuple[str, str, str]]:
-    """The exam roster as (family, rung, gguf) tuples, param-ascending,
-    per the v8 rule pair:
-
-      tg/s x 1024 > window (UNDER): the boundary rung is THE sweet
-      spot - one candidate.
-      no rung meets it (OVER): EVERY measured quant is a sweet spot -
-      the whole ladder, one candidate per rung, each with its own
-      bell (min(window, its own tg x 1024)).
-
-    An explicit family list filters; each family prints its regime.
-    Rungs whose file is missing are reported and skipped (the sweep
-    continues with the working ones)."""
-    import infra.hf_download as hf_download
-
-    sweet = state.get("sweet") or {}
+    state: dict[str, Any],
+    families: list[str] | None,
+    models_dir: str = "models",
+    dry_run: bool = False,
+) -> list[tuple[str, str]]:
+    """The roster as (family, rung) pairs, param-ascending: every
+    model x every quant in the acquisition ladder. In v9 there is no
+    in-window rule - a candidate's bell is its own full window and
+    the 1024s time bell; the exam decides everything. Acquisition
+    happens lazily at exam time (the file must exist or be
+    buildable); this function only enumerates and filters by the
+    explicit family list."""
     order = [name for name, _ in roster_from_models_md()]
     fams = order if not families else [f.split("=")[0] for f in families]
-    out: list[tuple[str, str, str]] = []
+    out: list[tuple[str, str]] = []
     for fam in fams:
-        rec = sweet.get(fam) or {}
-        rungs = rec.get("rungs") or {}
-        if rec.get("over_window"):
-            rung_names = [r for r, m in rungs.items() if m.get("tg") is not None]
-            regime = "OVER the window - every measured quant is a sweet spot"
-        elif rec.get("sweet_spot"):
-            rung_names = [rec["sweet_spot"]]
-            regime = "UNDER the window - the boundary rung"
-        else:
-            print(f"  {fam}: no measured rungs - skipped")
-            continue
-        famdir = os.path.join(models_dir, fam)
-        resolved = []
-        for r in rung_names:
-            gguf = hf_download.local_rung(famdir, r) or os.path.join(
-                famdir, f"{fam}-{r}.gguf"
-            )
-            if os.path.isfile(gguf):
-                resolved.append((fam, r, gguf))
-            else:
-                print(f"  {fam} {r}: file missing ({gguf}) - skipped")
-        if resolved:
-            print(f"  {fam}: {len(resolved)} candidate(s), {regime}")
-        out.extend(resolved)
+        for rung in SWEET_LADDER:
+            out.append((fam, rung))
     return out
 
 
@@ -426,11 +389,9 @@ def run_family(
     failing level. The final score is the highest level passed (both
     parts, every seed). Resumable: recorded levels are never
     re-measured. State keys per candidate: exam.<fam>.<rung>."""
-    sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-    rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
-    ctx = bell_rung(sweet_rec.get("window"), rung_rec.get("tg"), time_factor)
+    ctx = bell_window(state, fam, models_dir)
     if ctx is None:
-        return {"error": "no measured rung (window/tg) to set the bell"}
+        return {"error": "no training window for the family - cannot set the paper"}
     exam = state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})
     exam["rung"] = rung
     exam["bell_ctx"] = ctx
@@ -584,86 +545,75 @@ def run_family(
             pass
 
 
-def fail_reason(rec: dict[str, Any]) -> str:
-    """Why the candidate failed its highest exam: read the last FAILING
-    level's attempts and classify the mode - the quick diagnostic the
-    ledger wants. Never a score, a REASON:
-      out of context   the bell rang (finish_reason length) - the
-                       paper filled before the answer
-      wrong chain      an answer arrived, the tokens/order were wrong
-      error            a transport/tool failure, not the model's
-                       fault
-      no record        nothing measured (or only passes stored)"""
-    levels = rec.get("levels") or {}
-    fail_keys = [k for k in levels if not levels[k].get("pass")]
-    if not fail_keys:
-        return "no record"
-    top = max(fail_keys, key=int)
-    attempts = levels[top].get("attempts") or []
-    reasons = []
-    for a in attempts:
-        if str(a.get("finish_reason") or "").startswith("error"):
-            reasons.append("error")
-        elif a.get("finish_reason") == "length" or a.get("ok") is None and not a.get("prompt"):
-            reasons.append("out of context")
-        elif a.get("ok") is False:
-            reasons.append("wrong chain")
-    if "error" in reasons and "wrong chain" not in reasons and "out of context" not in reasons:
-        return "error"
-    if "out of context" in reasons:
-        return "out of context"
-    if "wrong chain" in reasons:
-        return "wrong chain"
-    return "unknown"
-
-
-def candidates(
-    state: dict[str, Any], families: list[str] | None, models_dir: str = "models"
-) -> list[tuple[str, str, str]]:
-    """The exam roster as (family, rung, gguf) tuples, param-ascending,
-    per the v8 rule pair:
-
-      tg/s x 1024 > window (UNDER): the boundary rung is THE sweet
-      spot - one candidate.
-      no rung meets it (OVER): EVERY measured quant is a sweet spot -
-      the whole ladder, one candidate per rung, each with its own
-      bell (min(window, its own tg x 1024)).
-
-    An explicit family list filters; each family prints its regime.
-    Rungs whose file is missing are reported and skipped (the sweep
-    continues with the working ones)."""
+def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
+    """Lazy acquisition: the candidate's file, downloaded/quantized
+    on demand via the same build path the sweet walk used. None = the
+    candidate cannot exist on this machine (RAM-infeasible, an
+    unquantizable shape, a tool failure) - recorded, skipped."""
     import infra.hf_download as hf_download
+    from bench.sweet import _build
 
-    sweet = state.get("sweet") or {}
-    order = [name for name, _ in roster_from_models_md()]
-    fams = order if not families else [f.split("=")[0] for f in families]
-    out: list[tuple[str, str, str]] = []
-    for fam in fams:
-        rec = sweet.get(fam) or {}
-        rungs = rec.get("rungs") or {}
-        if rec.get("over_window"):
-            rung_names = [r for r, m in rungs.items() if m.get("tg") is not None]
-            regime = "OVER the window - every measured quant is a sweet spot"
-        elif rec.get("sweet_spot"):
-            rung_names = [rec["sweet_spot"]]
-            regime = "UNDER the window - the boundary rung"
-        else:
-            print(f"  {fam}: no measured rungs - skipped")
+    famdir = os.path.join(models_dir, fam)
+    existing = hf_download.local_rung(famdir, rung)
+    if existing and os.path.isfile(existing):
+        return existing
+    repo = dict(roster_from_models_md()).get(fam)
+    if not repo:
+        return None
+    try:
+        return _build(fam, repo, famdir, rung)
+    except SystemExit as e:
+        if e.code == 130:
+            raise
+        return None
+    except Exception:
+        return None
+
+
+def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
+    """The self-cleaning sweep (the author's v9 ruling): once any
+    candidate has a SCORE, every candidate whose final score is
+    strictly lower is eliminated - its artifacts are deleted from
+    models/ (the collected data ALWAYS stays: answers in results/,
+    the records in state). Disk holds the survivors plus the family
+    currently being examined. Runs after each family's sweep."""
+    import shutil
+
+    exam = state.get("exam") or {}
+    # the running maximum score over finished candidates
+    best = -1
+    for fam, fam_exam in exam.items():
+        if not isinstance(fam_exam, dict):
             continue
-        famdir = os.path.join(models_dir, fam)
-        resolved = []
-        for r in rung_names:
-            gguf = hf_download.local_rung(famdir, r) or os.path.join(
-                famdir, f"{fam}-{r}.gguf"
-            )
-            if os.path.isfile(gguf):
-                resolved.append((fam, r, gguf))
-            else:
-                print(f"  {fam} {r}: file missing ({gguf}) - skipped")
-        if resolved:
-            print(f"  {fam}: {len(resolved)} candidate(s), {regime}")
-        out.extend(resolved)
-    return out
+        for rung, rec in fam_exam.items():
+            if str(rung).startswith("_") or not isinstance(rec, dict):
+                continue
+            s = rec.get("score")
+            if s is not None and s > best:
+                best = s
+    if best < 0:
+        return  # nobody has finished level 0 yet - nothing to clean
+    for fam, fam_exam in exam.items():
+        if fam == exclude_fam or not isinstance(fam_exam, dict):
+            continue
+        if fam_exam.get("_eliminated"):
+            continue
+        # a family is eliminated when ALL its candidates have final
+        # scores strictly below the running best
+        scores = [
+            rec.get("score")
+            for rung, rec in fam_exam.items()
+            if not str(rung).startswith("_") and isinstance(rec, dict)
+        ]
+        if not scores or any(s is None for s in scores):
+            continue  # some candidate still running (or unmeasured)
+        if max(scores) < best:
+            fam_exam["_eliminated"] = True
+            famdir = os.path.join(models_dir, fam)
+            if os.path.isdir(famdir):
+                shutil.rmtree(famdir)
+                stamp_msg = f"gc: {fam} eliminated (best quant score {max(scores)} < running best {best}) - artifacts deleted"
+                print("  " + stamp_msg)
 
 
 def run(
@@ -675,13 +625,14 @@ def run(
     n_seeds: int = 1,
     max_level: int = 32,
     dry_run: bool = False,
-    time_factor: int = 1024,
 ) -> dict[tuple[str, str], Any]:
-    """The exam controller: sweeps of escalating difficulty over the
-    sweet-spot candidates - (model, quant) pairs. Round d's only
-    candidates are round d-1's passers; the rounds continue until no
-    candidate passes. The final score per candidate is the highest
-    difficulty achieved (both parts)."""
+    """The exam controller (v9 - the exam is the only phase): sweeps
+    of escalating difficulty over EVERY (model, quant) candidate in
+    the roster. Round d's only candidates are round d-1's passers;
+    the rounds continue until no candidate passes. After each
+    candidate's sweep the self-clean runs: strictly-lower scorers are
+    eliminated from disk. The final score per candidate is the
+    highest difficulty achieved (both parts)."""
     seeds = exam_seeds(n_seeds)
     cands = candidates(state, families, models_dir)
     if not cands:
@@ -690,14 +641,16 @@ def run(
     alive = cands
     level = 0
     while alive and level <= max_level:
-        print(f"\n{'=' * 60}\nEXAM ROUND: difficulty {level} ({len(alive)} candidates)")
+        print()
+        print("=" * 60)
+        print(f"EXAM ROUND: difficulty {level} ({len(alive)} candidates)")
         survivors = []
         for cand in alive:
-            fam, rung, gguf = cand
+            fam, rung = cand
             key = (fam, rung)
             fam_exam = (state.get("exam") or {}).get(fam) or {}
-            # old-era rollback records are family-keyed (the boundary
-            # candidate directly); new-era records are rung-keyed
+            # old-era records are family-keyed (the boundary candidate
+            # directly); new-era records are rung-keyed
             rec = fam_exam.get(rung) or {}
             if not rec and "levels" in fam_exam:
                 rec = fam_exam
@@ -706,16 +659,17 @@ def run(
             elif dry_run:
                 passed = None
             else:
-                sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-                rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
-                print(
-                    f"-- {fam} {rung}, bell "
-                    f"{bell_rung(sweet_rec.get('window'), rung_rec.get('tg'), time_factor)} "
-                    f"tokens --"
-                )
-                # one candidate's failure never kills the exam (the
-                # author's ruling: continue with the working ones) -
-                # any exception is recorded and the sweep moves on
+                gguf = _acquire(fam, rung, models_dir)
+                if not gguf:
+                    rec = {"error": "candidate cannot exist on this machine (unbuildable)"}
+                    results[key] = rec
+                    state.setdefault("exam", {}).setdefault(fam, {})[rung] = rec
+                    _state_store.save_state(state_file, state)
+                    print(f"  {fam} {rung}: unbuildable - skipped")
+                    continue
+                print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
+                # one candidate's failure never kills the exam - any
+                # exception is recorded and the sweep moves on
                 try:
                     rec = run_family(
                         fam,
@@ -729,7 +683,6 @@ def run(
                         max_level,
                         level,
                         dry_run,
-                        time_factor,
                     )
                 except SystemExit as e:
                     if e.code == 130:
@@ -741,6 +694,9 @@ def run(
                 passed = rec.get("error") is None and (rec.get("levels") or {}).get(
                     str(level), {}
                 ).get("pass")
+                # the self-clean: the moment scores exist, the strictly
+                # lower scorers leave the disk (data always stays)
+                _gc(models_dir, state, fam)
             if passed:
                 survivors.append(cand)
             if dry_run:
