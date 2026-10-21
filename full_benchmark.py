@@ -335,10 +335,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--models-from",
         type=int,
         default=1,
-        help="v8: the 1-based roster position to start from - the "
-        "tournament refill: after eliminations, the next run draws "
-        "the next models from the roster (e.g. --models-from 17 "
-        "after a full first round over 16)",
+        help="v8: the 1-based roster position to start from "
+        "(default 1 - the roster's first --models). Rarely used "
+        "directly: --refill derives it",
+    )
+    ap.add_argument(
+        "--refill",
+        action="store_true",
+        help="v8: the tournament refill - draw from the roster the "
+        "number of OPEN slots (16 minus the survivors still on disk) "
+        "starting at the first roster position never measured. After "
+        "the elimination cut, this brings the field back to 16 "
+        "candidates. Fails cleanly when the roster is exhausted "
+        "(fewer new models than open slots - the endgame phase)",
     )
     ap.add_argument(
         "--sweet-repeat",
@@ -568,8 +577,58 @@ def _run(args: argparse.Namespace) -> None:
             save_state(args.state_file, state)
             stamp("exam: all records wiped (--clean) - a full re-measure")
         roster = [name for name, _ in roster_from_models_md()]
-        start = max(1, args.models_from) - 1
-        families = roster[start : start + args.models]
+        if args.refill:
+            # the tournament refill: the field is 16 CANDIDATES, not
+            # 16 roster positions. Open slots = eliminated models
+            # (their artifacts deleted); new models = the roster's
+            # first never-measured positions, filling those slots.
+            # Survivors are never re-run (idempotence).
+            exam = state.get("exam") or {}
+            measured = {
+                fam
+                for fam, rec in exam.items()
+                if rec and not (rec.get("_eliminated"))
+            }
+            eliminated = {fam for fam, rec in exam.items() if (rec or {}).get("_eliminated")}
+            # slots open = the eliminated whose artifacts are gone
+            # (the cut already ran); an eliminated model still on disk
+            # keeps its slot until --eliminate removes it
+            open_slots = sum(
+                1
+                for fam in eliminated
+                if not os.path.isdir(os.path.join(args.models_dir, fam))
+            )
+            first_new = 0
+            for i, name in enumerate(roster):
+                if name not in measured and name not in eliminated:
+                    first_new = i
+                    break
+            else:
+                first_new = len(roster)
+            newcomers = roster[first_new : first_new + open_slots]
+            survivors = [n for n in roster[:first_new] if n in measured]
+            if not newcomers:
+                sys.exit(
+                    f"the roster is exhausted - no new models for "
+                    f"{open_slots} open slot(s). The endgame: "
+                    f"{len(survivors)} survivor(s) remain; eliminate "
+                    "from the field until the top tier is held alone"
+                )
+            if len(newcomers) < open_slots:
+                stamp(
+                    f"roster short: {len(newcomers)} new model(s) for "
+                    f"{open_slots} open slot(s) - the final round; the "
+                    f"field is {len(survivors) + len(newcomers)}"
+                )
+            families = survivors + newcomers
+            stamp(
+                f"refill: {len(survivors)} survivor(s) kept "
+                f"(never re-measured), {len(newcomers)} newcomer(s): "
+                f"roster positions {first_new + 1}..{first_new + len(newcomers)}"
+            )
+        else:
+            start = max(1, args.models_from) - 1
+            families = roster[start : start + args.models]
         if families:
             stamp(
                 f"v8: roster positions {start + 1}..{start + len(families)} "
