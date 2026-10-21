@@ -571,16 +571,20 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep (the author's v9 ruling): once any
-    candidate has a SCORE, every candidate whose final score is
-    strictly lower is eliminated - its artifacts are deleted from
-    models/ (the collected data ALWAYS stays: answers in results/,
-    the records in state). Disk holds the survivors plus the family
-    currently being examined. Runs after each family's sweep."""
+    """The self-cleaning sweep (the author's v9 ruling), at CANDIDATE
+    granularity: once any candidate has a score, every scored
+    candidate whose score is strictly lower than the running best
+    is eliminated - its quant artifact is deleted from models/
+    immediately (the data ALWAYS stays: answers in results/, the
+    records in state). A family whose EVERY candidate is eliminated
+    loses its whole directory. Old-era leftovers (artifacts of
+    candidates with no score that the family's survivors make
+    irrelevant) are swept when the family completes. Disk holds the
+    survivors plus the family currently being examined."""
+    import glob as _glob
     import shutil
 
     exam = state.get("exam") or {}
-    # the running maximum score over finished candidates
     best = -1
     for fam, fam_exam in exam.items():
         if not isinstance(fam_exam, dict):
@@ -594,26 +598,40 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     if best < 0:
         return  # nobody has finished level 0 yet - nothing to clean
     for fam, fam_exam in exam.items():
-        if fam == exclude_fam or not isinstance(fam_exam, dict):
+        if not isinstance(fam_exam, dict):
             continue
-        if fam_exam.get("_eliminated"):
-            continue
-        # a family is eliminated when ALL its candidates have final
-        # scores strictly below the running best
-        scores = [
-            rec.get("score")
+        scored = {
+            rung: rec.get("score")
             for rung, rec in fam_exam.items()
             if not str(rung).startswith("_") and isinstance(rec, dict)
-        ]
-        if not scores or any(s is None for s in scores):
-            continue  # some candidate still running (or unmeasured)
-        if max(scores) < best:
+        }
+        values = [s for s in scored.values() if s is not None]
+        some_unscored = len(values) < len(
+            [r for r in fam_exam if not str(r).startswith("_") and isinstance(fam_exam[r], dict)]
+        )
+        # the family being examined keeps its files until it finishes
+        if fam == exclude_fam and some_unscored:
+            continue
+        famdir = os.path.join(models_dir, fam)
+        if not os.path.isdir(famdir):
+            continue
+        eliminated_any = False
+        for rung, s in scored.items():
+            if s is None or s >= best:
+                continue  # unscored (not the running family) or a survivor
+            # the beaten candidate's artifact goes, by name (either case)
+            for p in _glob.glob(os.path.join(famdir, f"*-{rung}.gguf")):
+                try:
+                    os.remove(p)
+                    print(f"  gc: {fam} {rung} (score {s} < best {best}) - artifact deleted")
+                    eliminated_any = True
+                except OSError:
+                    pass
+        # the whole family out? the directory goes
+        if values and max(values) < best:
             fam_exam["_eliminated"] = True
-            famdir = os.path.join(models_dir, fam)
-            if os.path.isdir(famdir):
-                shutil.rmtree(famdir)
-                stamp_msg = f"gc: {fam} eliminated (best quant score {max(scores)} < running best {best}) - artifacts deleted"
-                print("  " + stamp_msg)
+            shutil.rmtree(famdir, ignore_errors=True)
+            print(f"  gc: {fam} eliminated (best score {max(values)} < {best}) - artifacts deleted")
 
 
 def run(
