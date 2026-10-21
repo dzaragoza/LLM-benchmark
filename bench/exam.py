@@ -441,19 +441,29 @@ def run(
                     f"-- {fam} ({sweet_rec.get('sweet_spot')}, bell "
                     f"{bell_context(sweet_rec, time_factor)} tokens) --"
                 )
-                rec = run_family(
-                    fam,
-                    gguf,
-                    models_dir,
-                    state,
-                    state_file,
-                    port,
-                    seeds,
-                    max_level,
-                    level,
-                    dry_run,
-                    time_factor,
-                )
+                # one family's failure never kills the exam (the
+                # author's ruling: continue with the working ones) -
+                # any exception is recorded and the sweep moves on
+                try:
+                    rec = run_family(
+                        fam,
+                        gguf,
+                        models_dir,
+                        state,
+                        state_file,
+                        port,
+                        seeds,
+                        max_level,
+                        level,
+                        dry_run,
+                        time_factor,
+                    )
+                except SystemExit as e:
+                    if e.code == 130:
+                        raise
+                    rec = {"error": f"exam run failed: {e.code}"}
+                except Exception as e:
+                    rec = {"error": f"exam run failed: {e}"}
                 results[fam] = rec
                 passed = rec.get("error") is None and (rec.get("levels") or {}).get(
                     str(level), {}

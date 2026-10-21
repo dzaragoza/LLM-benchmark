@@ -346,11 +346,12 @@ def run(
                 m["concurrency"] = concurrency
                 if ok:
                     rec["sweet_spot"] = rung
-                    prev_spot = rec.get("prev_sweet")
-                    if prev_spot and prev_spot != rung:
-                        prev_file = rec.get("sweet_spot_file")
-                        if prev_file and os.path.isfile(prev_file):
-                            _prune_rung(famdir, prev_file)
+                    # NO mid-walk prune here: prev_sweet is STALE on a
+                    # resume (it names the previous run's boundary -
+                    # often the very rung _regenerate_missing just
+                    # rebuilt), so pruning on it deleted live boundary
+                    # files mid-walk. Retention is _reconcile_disk's
+                    # job at the next entry, over the FINAL verdicts.
                     rec["prev_sweet"] = rung
                     # the ACTUAL on-disk file, not the ladder spelling:
                     # the f16 master is lowercase ({fam}-f16.gguf, the
