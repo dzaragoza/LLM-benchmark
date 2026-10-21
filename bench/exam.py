@@ -421,6 +421,13 @@ def run(
         for fam in alive:
             sweet_rec = (state.get("sweet") or {}).get(fam) or {}
             gguf = sweet_rec.get("sweet_spot_file")
+            if gguf and not os.path.isfile(gguf):
+                # case-insensitive fallback: the stored path may carry
+                # the ladder's spelling while the artifact differs
+                import infra.hf_download as hf_download
+
+                famdir = os.path.join(models_dir, fam)
+                gguf = hf_download.local_rung(famdir, str(sweet_rec.get("sweet_spot"))) or gguf
             if not gguf or not os.path.isfile(gguf):
                 results[fam] = {"error": f"sweet-spot file missing: {gguf}"}
                 continue

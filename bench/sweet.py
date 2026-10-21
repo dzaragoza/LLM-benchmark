@@ -352,7 +352,14 @@ def run(
                         if prev_file and os.path.isfile(prev_file):
                             _prune_rung(famdir, prev_file)
                     rec["prev_sweet"] = rung
-                    rec["sweet_spot_file"] = _rung_file(famdir, fam, rung)
+                    # the ACTUAL on-disk file, not the ladder spelling:
+                    # the f16 master is lowercase ({fam}-f16.gguf, the
+                    # converter's convention) while the ladder's rung
+                    # name is uppercase - a stored uppercase path made
+                    # the exam report the sweet spot missing
+                    rec["sweet_spot_file"] = (
+                        hf_download.local_rung(famdir, rung) or _rung_file(famdir, fam, rung)
+                    )
                 else:
                     rec["beyond"] = True
                 _state_store.save_state(state_file, state)
