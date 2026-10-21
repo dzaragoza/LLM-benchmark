@@ -208,7 +208,17 @@ def git_tail(args: argparse.Namespace) -> None:
         glob.glob("ladder-results/*")
         + glob.glob("ruler-results/*")
     )
-    existing = [p for p in paths if os.path.exists(p)]
+    existing = []
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        try:
+            if os.path.getsize(p) > 48 * 1024 * 1024:
+                stamp(f"skipping {p}: {os.path.getsize(p) / 2**20:.0f} MiB exceeds github's 50 MiB limit")
+                continue
+        except OSError:
+            continue
+        existing.append(p)
     if not existing:
         stamp("nothing to commit - no artifacts found")
         return

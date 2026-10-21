@@ -425,6 +425,20 @@ def run_family(
     finally:
         if proc is not None:
             llama_server.stop_server(proc, port)
+        # the -lv 5 server log is debug gold but HUGE (100MB+ per
+        # candidate - the push-breaking kind); its value is the
+        # startup banner (head) and the memory breakdown (tail), so
+        # keep those and drop the middle
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.readlines()
+            if len(lines) > 500:
+                with open(log_path, "w", encoding="utf-8") as fh:
+                    fh.writelines(lines[:100])
+                    fh.write(f"... [{len(lines) - 400} middle lines truncated]\n")
+                    fh.writelines(lines[-300:])
+        except OSError:
+            pass
 
 
 def fail_reason(rec: dict[str, Any]) -> str:
