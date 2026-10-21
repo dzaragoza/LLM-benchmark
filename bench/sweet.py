@@ -289,6 +289,48 @@ def _in_window(tg: float, window: int, concurrency: int) -> bool:
     return tg * concurrency > window
 
 
+def calibrated_gen_len(state: dict[str, Any]) -> int | None:
+    """The author's calibration: llama-bench's -n (the GENERATION
+    LENGTH the rate is measured at) is the MEDIAN length of every
+    PASSING exam answer on record, rounded UP to a power of two.
+
+    The rationale: the 1024s promise is 'a good answer within the
+    budget', and passing answers are what a good answer costs -
+    measuring tg/s at that length matches the measurement to the
+    workload the promise is actually about (n=128 was the guess;
+    the first era's median passing answer was 76 -> n=128 - the
+    guess was right, now it is grounded).
+
+    None until passing attempts exist in state (the flag/default
+    binds). Expect the median to GROW with higher levels passed -
+    recalibrate and re-measure when it moves a power of two."""
+    import statistics
+
+    toks = []
+    for fam, fam_exam in (state.get("exam") or {}).items():
+        if not isinstance(fam_exam, dict):
+            continue
+        recs = [
+            rec
+            for key, rec in fam_exam.items()
+            if not str(key).startswith("_") and isinstance(rec, dict) and "levels" in rec
+        ]
+        if "levels" in fam_exam and fam_exam.get("levels"):
+            recs.append(fam_exam)
+        for rec in recs:
+            for lv in (rec.get("levels") or {}).values():
+                for a in lv.get("attempts") or []:
+                    if a.get("ok") and a.get("answer_tokens"):
+                        toks.append(a["answer_tokens"])
+    if not toks:
+        return None
+    med = statistics.median(toks)
+    n = 1
+    while n < med:
+        n *= 2
+    return n
+
+
 def roster_from_models_md() -> list[tuple[str, str]]:
     """The roster AS WRITTEN in md/models.md (the source of truth): the
     table rows in file order (param-ascending), model name + repo. The
