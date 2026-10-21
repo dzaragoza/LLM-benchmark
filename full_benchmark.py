@@ -424,7 +424,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="v7",
-        choices=["v7", "sweet"],
+        choices=["v7", "sweet", "exam"],
         help="the certify task; 'v7' is the fixed-budget reach benchmark "
         "(session 42/43, addendum 227/229: the quick fit-ladder cell per "
         "family, one fixed corpus, graded (span, hops)); ARC and FWE are "
@@ -516,6 +516,27 @@ def build_parser() -> argparse.ArgumentParser:
         "three corpora and the belts are decided on means.",
     )
     ap.add_argument(
+        "--exam-cap",
+        type=int,
+        default=2048,
+        help="exam: the token cap - the bell. No answer within cap "
+        "completion tokens = fail (KNOWLEDGE.md's formal protocol)",
+    )
+    ap.add_argument(
+        "--exam-seeds",
+        type=int,
+        default=3,
+        help="exam: the fixed seed set size per level - every model "
+        "takes the SAME exams; a level pass requires passing every "
+        "seed (n>=2 fights understanding-luck)",
+    )
+    ap.add_argument(
+        "--exam-max-level",
+        type=int,
+        default=32,
+        help="exam: the sweep's hard ceiling on difficulty (hops)",
+    )
+    ap.add_argument(
         "--clean",
         action="store_true",
         help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
@@ -590,6 +611,34 @@ def _run(args: argparse.Namespace) -> None:
     stamp_disk(state, args.state_file)
     if args.task != "sweet":
         resolve_families(args, state)
+    if args.task == "exam":
+        from bench.exam import run as exam_run
+
+        results = exam_run(
+            args.models_dir,
+            state,
+            args.state_file,
+            state.get("ladder_port", 8210),
+            args.families or None,
+            cap=args.exam_cap,
+            n_seeds=args.exam_seeds,
+            max_level=args.exam_max_level,
+            dry_run=args.dry_run,
+        )
+        state["exam"] = results
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp("EXAM SUMMARY (highest difficulty achieved per sweet spot)")
+        for fam, rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
+            spot = ((state.get("sweet") or {}).get(fam) or {}).get("sweet_spot")
+            verdict = rec.get("error") or f"score {rec.get('score')}"
+            print(f"  {fam} ({spot}): {verdict}")
+        if not args.no_git:
+            tee_output.uninstall()
+            git_tail(args)
+        stamp("exam complete")
+        return
     if args.task == "sweet":
         pass  # --v7-families is v7-only; fall through
     elif args.task == "v7" and not args.v7_families:
