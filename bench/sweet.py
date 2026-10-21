@@ -56,7 +56,12 @@ def _reconcile_disk(famdir: str, rec: dict[str, Any]) -> None:
     if not spot or not os.path.isdir(famdir):
         return
     fam = os.path.basename(famdir)
+    # keep the f16 master, the boundary, and EVERY beyond-window curve
+    # point (they are all sweet spots - the downstream measurements)
     keep = {f"{fam}-f16.gguf", f"{fam}-{spot}.gguf"}
+    for rung, m in rec.get("rungs", {}).items():
+        if m.get("in_window") is False:
+            keep.add(f"{fam}-{rung}.gguf")
     freed = 0
     for f in os.listdir(famdir):
         p = os.path.join(famdir, f)
@@ -100,38 +105,11 @@ def _prune_previous(famdir: str, rec: dict[str, Any], current: str) -> None:
 # first - the walk goes DOWN this list; the sweet spot is the last
 # quant that still clears the bar before the first failure
 SWEET_LADDER = [
-    "IQ1_S",
-    "IQ1_M",
-    "Q2_0",
-    "IQ2_XXS",
-    "IQ2_XS",
-    "Q1_0",
-    "IQ2_S",
-    "Q2_K_S",
-    "IQ2_M",
-    "IQ3_XXS",
-    "TQ2_0",
-    "Q2_K",
-    "Q3_K_S",
-    "IQ3_XS",
-    "IQ3_S",
-    "IQ3_M",
-    "Q3_K_M",
-    "IQ4_XS",
-    "Q4_0",
-    "Q4_K_S",
-    "Q3_K_L",
-    "Q4_1",
-    "IQ4_NL",
-    "Q4_K_M",
-    "TQ1_0",
-    "Q5_K_S",
-    "Q5_0",
-    "Q5_K_M",
-    "Q5_1",
-    "Q6_K",
-    "Q8_0",
-    "F16",
+    "IQ1_S", "Q2_0", "Q1_0", "IQ2_XXS", "Q2_K_S", "TQ2_0", "IQ1_M",
+    "IQ2_XS", "IQ2_S", "Q2_K", "IQ3_XXS", "IQ2_M", "IQ3_XS", "IQ4_XS",
+    "IQ3_S", "IQ3_M", "Q3_K_S", "Q4_0", "IQ4_NL", "Q3_K_M", "Q4_K_S",
+    "Q4_1", "Q4_K_M", "Q3_K_L", "Q5_K_S", "TQ1_0", "Q5_0", "Q5_K_M",
+    "Q5_1", "Q6_K", "Q8_0", "F16",
 ]
 # BF16 is cut from the walk (the author's ruling: f16 is basically the
 # same thing) - one fewer full-size build+bench per model
