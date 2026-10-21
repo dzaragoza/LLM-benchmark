@@ -53,6 +53,14 @@ def main() -> None:
         help="an observed sustained rate (e.g. the exam's "
         "answer_tokens/elapsed_s) to print the ratio against",
     )
+    ap.add_argument(
+        "--kv",
+        default=None,
+        help="quantize the KV cache both axes (e.g. q4_0) - the A/B "
+        "experiment: a 4x smaller cache should flatten the token/"
+        "KV-driven part of the decay while leaving thermal decay "
+        "alone. Uses -fa on (required for cache quant)",
+    )
     args = ap.parse_args()
 
     famdir = os.path.join(args.models_dir, args.family)
@@ -69,11 +77,16 @@ def main() -> None:
         ns.append(args.max_n)
 
     print(f"# dyadic -n probe: {args.family} {args.rung} ({os.path.basename(path)})")
+    if args.kv:
+        print(f"# KV cache quantized: k={args.kv} v={args.kv} (-fa on)")
     print(f"# {'n':>7} {'tg/s':>8} {'seconds':>8} {'vs first':>9}")
     first = None
     for n in ns:
+        cmd = [BENCH_BIN, "-m", path, "-p", "0", "-n", str(n), "-r", str(args.repeat), "-o", "csv"]
+        if args.kv:
+            cmd += ["-fa", "on", "--cache-type-k", args.kv, "--cache-type-v", args.kv]
         r = subprocess.run(
-            [BENCH_BIN, "-m", path, "-p", "0", "-n", str(n), "-r", str(args.repeat), "-o", "csv"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=7200,
