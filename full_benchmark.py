@@ -447,6 +447,14 @@ def build_parser() -> argparse.ArgumentParser:
         "tg/s * this > the training window (default 1024)",
     )
     ap.add_argument(
+        "--sweet-limit",
+        type=int,
+        default=4,
+        help="sweet: cap the walked roster to the first N models of "
+        "md/models.md (param-ascending; default 4 - the disk ruling). "
+        "The table keeps every model; only the walk is capped",
+    )
+    ap.add_argument(
         "--sweet-retry-skipped",
         action="store_true",
         help="sweet: clear every stored skip (unavailable/bench-failed "

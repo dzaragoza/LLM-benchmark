@@ -75,21 +75,28 @@ def _reconcile_disk(famdir: str, rec: dict[str, Any]) -> None:
         print(f"  [disk] reconciled: {freed / 2**30:.2f} GiB of superseded rungs pruned")
 
 
-def _regenerate_missing(fam: str, repo: str, famdir: str, rec: dict[str, Any]) -> None:
+def _regenerate_missing(
+    fam: str, repo: str, famdir: str, rec: dict[str, Any], dry_run: bool = False
+) -> None:
     """The era bridge: the pre-curve retention pruned files the curve
     semantics now needs - any rung with a STORED measurement that is a
     keep-set member (the boundary or a beyond-window sweet spot) but
     whose file is absent gets rebuilt from the f16 master (no re-bench:
-    the measurement stands; only the file was lost)."""
+    the measurement stands; only the file was lost). The F16 rung's
+    file IS the f16 master itself."""
     spot = rec.get("sweet_spot")
-    if not spot:
+    if not spot or dry_run:
         return
     fam_spot = os.path.basename(famdir)
     for rung, m in rec.get("rungs", {}).items():
         keep = rung == spot or m.get("in_window") is False
         if not keep or m.get("tg") is None:
             continue
-        path = _rung_file(famdir, fam_spot, rung)
+        path = (
+            os.path.join(famdir, f"{fam_spot}-f16.gguf")
+            if rung.upper() == "F16"
+            else _rung_file(famdir, fam_spot, rung)
+        )
         if os.path.isfile(path):
             continue
         print(f"  {rung}: sweet-spot file was pruned earlier - regenerating (no re-bench)")
@@ -102,6 +109,11 @@ def _regenerate_missing(fam: str, repo: str, famdir: str, rec: dict[str, Any]) -
             built = None
         if not built or not os.path.isfile(path):
             print(f"  {rung}: could not regenerate ({path} still missing) - skipped")
+
+
+def _rung_file(famdir: str, fam: str, rung: str) -> str:
+    """The rung's expected on-disk name (the pipeline's own convention)."""
+    return os.path.join(famdir, f"{fam}-{rung}.gguf")
 
 
 def _prune_rung(famdir: str, path: str) -> None:
@@ -275,7 +287,7 @@ def run(
         print(
             f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})"
         )
-        _regenerate_missing(fam, repo, famdir, rec)
+        _regenerate_missing(fam, repo, famdir, rec, dry_run)
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is None:
                 if rec["rungs"][rung].get("error"):
