@@ -230,12 +230,29 @@ def git_tail(args: argparse.Namespace) -> None:
 # =========================================================== sigint
 
 
+_SHUTTING_DOWN = False
+
+
 def sigint_shutdown(_signum, _frame, args=None):
     """Session 38, addendum 8: Ctrl-C stops cleanly - stop llama-server,
     stop results logging, git commit and pull. os._exit, not sys.exit:
     a SystemExit inside the handler unwinds through huggingface_hub's
     ThreadPoolExecutor shutdown(wait=True), which waits out every
-    in-flight download - the Ctrl-C "did not stop"."""
+    in-flight download - the Ctrl-C "did not stop".
+
+    Re-entry hard-exits: the first press runs the clean shutdown (the
+    git tail can take seconds), a SECOND press means the user wants
+    out NOW - falling into the handler a second time mid-commit (two
+    racing git processes, a torn tee) is the failure this guard
+    closes. SIGTERM rides the same path: a bare `kill` must leave the
+    machine as clean as Ctrl-C does, not strand a llama-server."""
+    global _SHUTTING_DOWN
+    if _SHUTTING_DOWN:
+        stamp("shutdown already in progress - exiting immediately")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(130)
+    _SHUTTING_DOWN = True
     stamp("SIGINT - shutting down cleanly (addendum 8)")
     stopped = llama_server.kill_stale_server()
     stamp("llama-server stopped" if stopped else "no llama-server to stop")
@@ -261,7 +278,9 @@ def sigint_shutdown(_signum, _frame, args=None):
 
 
 def install_sigint_handler(args: argparse.Namespace) -> None:
-    signal.signal(signal.SIGINT, lambda s, f: sigint_shutdown(s, f, args))
+    handler = lambda s, f: sigint_shutdown(s, f, args)  # noqa: E731
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
 
 
 # =========================================================== main
