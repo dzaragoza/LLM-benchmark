@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""full_benchmark.py -- the certify orchestrator (session 41, addendum 35:
-the simplification - ONE mode, the protocol; the legacy sweep, tournament,
-rescore, diagnose and size-table modes are cut, their code in git history).
+"""full_benchmark.py -- the v8 orchestrator (sweet spot + exam).
 
-One command: acquire each family's rung file on demand (the registry's
-param-ascending order, smallest model first - no hidden selection), then
-run the certify controllers (speed + vt per cell, never re-measuring
-a stored cell; arc/fwe retired session 43, or --task v7: the
-fixed-budget reach benchmark).
+One command, two phases:
+  phase 1  the sweet walk - for the roster's first --models models,
+           walk the quant ladder, measure tg/s, find the boundary
+           rung: the last quant that can fill the training window
+           within the time parameter (tg/s x 1024 > window).
+  phase 2  the exam - each sweet spot takes the chain-follow +
+           elevator exam (one shared context per level, PASS/FAIL,
+           difficulty = hops); the final score is the highest
+           difficulty achieved.
 
-  families  the registry roster (param-ascending) or the specs given.
-  rung      default Q8_0; --force-rung f16 is the full-capacity pass.
-  verdicts  commit and push themselves (addendum 31); --no-git opts out.
+  families  the roster's first --models models (param-ascending) or
+             the families given.
+  verdicts   commit and push themselves (addendum 31); --no-git opts out.
 
 Everything is IDEMPOTENT and RESUMABLE: the state file is rewritten after
-every cell; rerun the same command to resume.
+every cell; rerun the same command to resume. The v5/v7 tasks are cut,
+their code in git history (bench/v7.py remains importable).
 """
 
 from __future__ import annotations
@@ -37,14 +40,7 @@ import infra.git_ops as git_ops
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.v7 import certify_v7
 
-# addendum 132: the llama-server-supported --cache-type-k/v values
-# (the KV_QUANT_LADDER rungs must come from this set)
-_KV_CHOICES = ["q8_0", "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl"]
-
-# addendum 183: the v5 cell/controller surface is retired; only the v7
-# machinery and the state-store loader remain
 kill_stale_server = llama_server.kill_stale_server
 
 QUANTIZE_BIN = convert_quant.QUANTIZE_BIN
@@ -153,100 +149,6 @@ def check_tooling(args: argparse.Namespace) -> None:
             sys.exit(msg)
 
 
-# =========================================================== roster
-
-
-def _registry_params(spec: str) -> float | None:
-    """The spec's registry parameter count. The spec may be a REPO
-    ("Qwen/Qwen2.5-1.5B-Instruct") or a family NAME (the state file
-    stores names - addendum 57: the name-only lookup silently sorted
-    every state-carried family as uncounted, so restarts ran in
-    alphabetical order instead of param-ascending)."""
-    try:
-        from etc import registry_data
-
-        key = spec.partition("=")[0].rstrip("/")
-        # addendum 62: the state carries acquisition-era names that may
-        # differ from the roster key by a quant suffix (MiniCPM-1B-sft-bf16
-        # vs roster MiniCPM-1B-sft) - strip the common suffixes so both
-        # shapes resolve and the param sort never degenerates to
-        # "unknowns last".
-        aliases = {key}
-        for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
-            if key.endswith(suffix):
-                aliases.add(key[: -len(suffix)])
-        for name, r in registry_data.ROSTER.items():
-            if (
-                key in (r, name, r.rpartition("/")[2]) or aliases & {name, r.rpartition("/")[2]}
-            ) and (registry_data.params_b(name) is not None):
-                return registry_data.params_b(name)
-    except ImportError:
-        return None
-    return None
-
-
-def param_ascending_specs(specs: list[str]) -> list[str]:
-    """Family specs in PARAM-ASCENDING order (session 40, addendum 28):
-    the model repo's registry parameter count, smallest first;
-    unregistered repos sort after the counted ones, by repo name."""
-    return sorted(
-        specs,
-        key=lambda s: (
-            _registry_params(s.partition("=")[0].rstrip("/")) is None,
-            _registry_params(s.partition("=")[0].rstrip("/")) or 0.0,
-            s.partition("=")[0].rstrip("/"),
-        ),
-    )
-
-
-def _resolve_spec_repo(spec: str) -> str | None:
-    """A name-only spec (a state-carried family name, no stored spec)
-    resolves to its roster REPO before it ever reaches the hub
-    (addendum 63): 'MiniCPM-1B-sft-bf16' is a family name, not a repo -
-    the hub 404s on it and the run crashes. Matches the repo string,
-    its basename, or the roster name; suffix-quant aliases resolve too
-    (the addendum-62 alias class).
-    """
-    try:
-        from etc import registry_data
-
-        key = spec.partition("=")[0].rstrip("/")
-        aliases = {key}
-        for suffix in ("-bf16", "-f16", "-f32", "-instruct"):
-            if key.endswith(suffix):
-                aliases.add(key[: -len(suffix)])
-        for name, r in registry_data.ROSTER.items():
-            base = r.rpartition("/")[2]
-            if key in (r, name, base) or aliases & {name, base}:
-                return r if "=" not in spec else spec
-    except Exception:
-        return None
-    return None
-
-
-def resolve_families(args: argparse.Namespace, state: dict[str, Any]) -> None:
-    """With no positional specs: the state file's families (param-
-    ascending), or a fresh state's full registered roster."""
-    if args.families:
-        return
-    saved = [(fst or {}).get("spec") or fam for fam, fst in (state.get("families") or {}).items()]
-    args.families = param_ascending_specs([_resolve_spec_repo(s) or s for s in saved if s])
-    if args.families:
-        return
-    try:
-        from etc import registry_data
-
-        args.families = [
-            registry_data.ROSTER[name] for name in registry_data.params_sorted_roster()
-        ]
-        stamp(
-            f"fresh state: the full registered roster, param-ascending "
-            f"({len(args.families)} models, smallest first)"
-        )
-    except Exception:
-        sys.exit("no family specs given and the state file has none")
-
-
 # =========================================================== git
 
 
@@ -325,47 +227,6 @@ def git_tail(args: argparse.Namespace) -> None:
         stamp("pushed")
 
 
-def v7_model_commit(args: argparse.Namespace, entries: list[dict[str, Any]]) -> None:
-    """Session 44, addendum 132: the commit fires once per MODEL,
-    after all its ctx cells are scored (was per cell, addendum 115 -
-    too frequent). Addendum 147: it fires only when at least one
-    cell RAN - a fully-skipped family (resume) commits nothing.
-    A git failure never stops the run; the commit is skipped under
-    --no-git/dry-run."""
-    fam = entries[0].get("family")
-    scored = sum(1 for e in entries if e.get("score") is not None)
-    stamp(f"v7 model done: {fam} ({scored}/{len(entries)} cells scored) - committing artifacts")
-    tee_output.uninstall()
-    try:
-        git_tail(args)
-    finally:
-        tee_output.install()
-
-
-def verdict_commit(
-    args: argparse.Namespace, fam: str, verdict: str, medal: Any, depth: int
-) -> None:
-    """Session 40, addendum 31: every VERDICT commits and pushes
-    IMMEDIATELY, so the run is watchable while it goes. A git failure
-    never stops the run."""
-    if verdict == "accept":
-        what = f"{fam} MEDAL {medal} at rung {depth:,}"
-    elif verdict == "infeasible":
-        what = f"{fam} INFEASIBLE at rung {depth:,} - out of the benchmark (addendum 45)"
-    else:
-        what = f"{fam} DEAD at rung {depth:,}"
-    stamp(f"verdict: {what} - committing partial results")
-    tee_output.uninstall()
-    try:
-        git_tail(args)
-    finally:
-        tee_output.install()
-
-
-def partial_commit_hook(args: argparse.Namespace) -> Any:
-    return lambda fam, verdict, medal, depth: verdict_commit(args, fam, verdict, medal, depth)
-
-
 # =========================================================== sigint
 
 
@@ -408,15 +269,17 @@ def install_sigint_handler(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="the certify benchmark: acquire each family's rung file "
-        "on demand (param-ascending) and run the medal ladder"
+        description="the v8 benchmark: find each model's sweet spot "
+        "(phase 1, the quant that fills the context in time) and grade "
+        "the sweet spots with the exam (phase 2, chain-following "
+        "difficulty under a context bell)"
     )
     ap.add_argument(
         "families",
         nargs="*",
-        help='family specs: "model_repo" or "model_repo=source_repo"; '
-        "omitted = the state file's families or the full registered "
-        "roster (param-ascending)",
+        help="family names, limiting the run to these models "
+        "(param-ascending from md/models.md); omitted = the roster's "
+        "first --models (v8) or the sweet-spot holders (exam)",
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -424,14 +287,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="v8",
-        choices=["v8", "v7", "sweet", "exam"],
-        help="the certify task; 'v8' is the integrated benchmark (sweet "
-        "spot + exam): find the sweet spot for the first --models models "
-        "(the mechanical-sweet-spot walk, a rung in-window while tg/s * "
-        "the time factor > the training window), then grade the sweet "
-        "spots with the exam (chain follow + elevator, PASS/FAIL sweeps); "
-        "'v7' is the fixed-budget reach benchmark (session 42/43); "
-        "'sweet' and 'exam' run the two v8 phases standalone",
+        choices=["v8", "sweet", "exam"],
+        help="the task; 'v8' (default) is the integrated run: sweet "
+        "walk over the first --models models, then the exam over "
+        "their sweet spots; 'sweet' and 'exam' run the phases standalone",
     )
     ap.add_argument(
         "--models",
@@ -470,59 +329,6 @@ def build_parser() -> argparse.ArgumentParser:
         "incompatibilities will re-skip",
     )
     ap.add_argument(
-        "--v7-budget-gib",
-        type=float,
-        default=None,
-        help="v7: the memory budget in GiB (default 4.0)",
-    )
-    ap.add_argument(
-        "--v7-families",
-        type=int,
-        default=None,
-        required=False,
-        help="v7: MANDATORY (addendum 156) - the first N candidates param-ascending; "
-        "unplaceable candidates are reported as findings, the measured count is "
-        "honest by construction (addendum 154)",
-    )
-    ap.add_argument(
-        "--v7-cells",
-        default=None,
-        help="v7: measure ONLY these cells, comma-separated family:ctx "
-        "pairs (addendum 162) - everything else reports as skipped, never "
-        "measured. E.g. --v7-cells Qwen3.5-2B:262144,granite-4.0-1b:16384",
-    )
-    ap.add_argument(
-        "--v7-probe-axes",
-        default=None,
-        help="v7: the axis probe (addendum 196) - measure the config neighborhood "
-        "(base + each axis one rung down + the pairwise downs) with n=3 "
-        "different corpora on these cells, comma-separated family:ctx pairs. Results land "
-        "under families/<fam>/probe/<ctx>/, apart from the v7 table. "
-        "E.g. --v7-probe-axes Qwen3.5-2B:131072",
-    )
-    ap.add_argument(
-        "--v7-grammar",
-        default="v71",
-        choices=["v71", "chainarith", "gatedchain", "gatedchain-agg"],
-        help="v7: the corpus grammar (addenda 202/203/222) - v71 is the alias-chain "
-        "lookup (the field grammar, the frozen suite's default); chainarith is "
-        "the v7.2 grammar: every link carries a signed delta, distinct "
-        "per-link values, NAME = VALUE pair answers with exact-value partial "
-        "credit (quant-sensitive by design); gatedchain is the v7.3 grammar "
-        "(riddle gates + decoy chains); gatedchain-agg is the v7.4 grammar "
-        "(addendum 222: sum-of-values aggregation questions, the V-error "
-        "amplifier). Applies to the probe cells.",
-    )
-    ap.add_argument(
-        "--v7-n",
-        type=int,
-        default=1,
-        help="v7: the replicate count (addendum 262) - run seeds 1..n, "
-        "one full pass per seed on its own corpus. n=1 (the default) is "
-        "the single default-corpus run; n=3 measures every cell on "
-        "three corpora and the belts are decided on means.",
-    )
-    ap.add_argument(
         "--exam-seeds",
         type=int,
         default=1,
@@ -539,10 +345,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="wipe ALL stored results UP FRONT, then measure - never "
-        "leave mixed-era results in the table (addendum 129): the v7 "
-        "cells for --task v7, the exam records for --task exam/v8 "
-        "(levels, scores, errors - a full re-measure)",
+        help="wipe the stored exam records UP FRONT, then measure - "
+        "never leave mixed-era results in the table (addendum 129); "
+        "the sweet measurements always stand",
     )
     ap.add_argument(
         "--dry-run",
@@ -677,8 +482,6 @@ def _run(args: argparse.Namespace) -> None:
             git_tail(args)
         stamp("v8 run complete")
         return
-    if args.task != "sweet":
-        resolve_families(args, state)
     if args.task == "exam":
         from bench.exam import run as exam_run
 
@@ -711,10 +514,6 @@ def _run(args: argparse.Namespace) -> None:
         stamp("exam complete")
         return
     if args.task == "sweet":
-        pass  # --v7-families is v7-only; fall through
-    elif args.task == "v7" and not args.v7_families:
-        sys.exit("--v7-families is mandatory for --task v7 (addendum 156)")
-    if args.task == "sweet":  # noqa: SIM108 - fall-through guard above
         from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
 
@@ -777,130 +576,6 @@ def _run(args: argparse.Namespace) -> None:
             git_tail(args)
         stamp("run complete")
         return
-    # addendum 183: the v5 rung ladder args are retired with the v5 tasks
-    if args.task == "v7":
-        from bench.v7 import BUDGET_GIB
-
-        def parse_v7_cells(spec: str | None) -> list[tuple[str, int]] | None:
-            if not spec:
-                return None
-            out = []
-            for pair in spec.split(","):
-                fam, ctx = pair.rsplit(":", 1)
-                out.append((fam.strip(), int(ctx)))
-            return out
-
-        if args.v7_probe_axes:
-            from bench.v7 import probe_axes
-
-            probe_spec = []
-            for pair in args.v7_probe_axes.split(","):
-                parts = pair.split(":")
-                if len(parts) == 3 and "-" in parts[2]:
-                    fam, ctx, cfg = parts
-                    wq, kq, vq = cfg.split("-")
-                    probe_spec.append((fam.strip(), int(ctx), (wq, kq, vq)))
-                else:
-                    fam, ctx = pair.rsplit(":", 1)
-                    probe_spec.append((fam.strip(), int(ctx)))
-            probe_results = probe_axes(
-                args.models_dir,
-                state,
-                args.state_file,
-                state.get("ladder_port", 8210),
-                probe_spec,
-                dry_run=args.dry_run,
-                budget_gib=args.v7_budget_gib or BUDGET_GIB,
-                grammar=args.v7_grammar,
-                on_model_commit=None
-                if (args.no_git or args.dry_run)
-                else partial(v7_model_commit, args),
-            )
-            state["probe"] = probe_results
-            save_state(args.state_file, state)
-            print()
-            print("=" * 60)
-            stamp("V7 AXIS PROBE SUMMARY")
-            for spec_cell in probe_spec:
-                fam, ctx = spec_cell[0], spec_cell[1]
-                ns = "probe" if args.v7_grammar == "v71" else f"probe_{args.v7_grammar}"
-                pdir = ((state["families"].get(fam) or {}).get(ns) or {}).get(str(ctx)) or {}
-                if not pdir:
-                    continue
-                print(f"  {fam} ctx={ctx}:")
-                for key, rec in sorted(
-                    pdir.items(), key=lambda kv: -(kv[1].get("mean_score") or 0)
-                ):
-                    if "mean_score" in rec:
-                        print(
-                            f"    {key}: mean {rec['mean_score']} "
-                            f"(per-seed {rec.get('scores')}) est {rec.get('est_gib')} GiB"
-                        )
-            if not args.no_git:
-                tee_output.uninstall()
-                git_tail(args)
-            stamp("probe complete")
-            return
-
-        # addendum 262: the replicate count, not a seed list - run
-        # seeds 1..n, one full pass per seed on its own corpus. The
-        # base pass is gone (261); each pass is seed-scoped as before
-        # (seed 1 = the base block; k>1 = _s<k> blocks).
-        seeds = list(range(1, args.v7_n + 1))
-
-        results = []
-        for seed in seeds:
-            if len(seeds) > 1:
-                print(f"\n{'=' * 60}\nreplicate seed {seed}: the full field on corpus seed {seed}")
-            results = certify_v7(
-                args.models_dir,
-                state,
-                args.state_file,
-                state.get("ladder_port", 8210),
-                args.v7_families,
-                dry_run=args.dry_run,
-                budget_gib=args.v7_budget_gib or BUDGET_GIB,
-                on_model_commit=None
-                if (args.no_git or args.dry_run)
-                else partial(v7_model_commit, args),
-                clean=args.clean if seed == seeds[0] else False,
-                only_cells=parse_v7_cells(args.v7_cells),
-                grammar=args.v7_grammar,
-                corpus_seed=seed,
-            )
-            state["v7"] = results
-            state[f"v7_seed_{seed}"] = results
-            save_state(args.state_file, state)
-        print()
-        print("=" * 60)
-        stamp("V7 REACH BENCHMARK SUMMARY")
-        best = None
-        for r in results:
-            if r.get("score") is None:
-                print(f"  {r['family']} ctx={r['ctx']}: {r.get('skipped', r.get('error', '?'))}")
-                continue
-            print(f"  {r['family']} ctx={r['ctx']}: score {r['score']}/{r['max_score']}")
-            if not r["max_score"]:
-                continue  # no reachable grades: excluded, not a zero (R-19)
-            if best is None or r["score"] > best["score"]:
-                best = r
-        if best:
-            stamp(
-                f"V7 ARGMAX at 4 GiB: {best['family']} ctx={best['ctx']} "
-                f"({best['wq']}, k={best['kq']}, v={best['vq']}) "
-                f"score {best['score']}/{best['max_score']}"
-            )
-        if not args.no_git:
-            tee_output.uninstall()
-            git_tail(args)
-        stamp("run complete")
-        return
-
-    # addendum 183: the v5 task controllers (vt/speed/all) are retired with
-    # the v5 cell machinery - only the v7 task remains (the author's ruling:
-    # "We only need V7.1 machinery. Rest is dead code.")
-    if args.task != "v7":
-        raise SystemExit(f"task {args.task!r} is retired (addendum 183) - only --task v7 exists")
     if not args.no_git:
         tee_output.uninstall()
         git_tail(args)
