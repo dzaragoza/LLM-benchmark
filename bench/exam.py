@@ -305,7 +305,10 @@ def run_family(
     # start already succeeded by the time we are here
     exam.pop("error", None)
     levels = exam.setdefault("levels", {})
-    answers_dir = os.path.join(models_dir, "exam-results", fam)
+    # benchmark OUTPUTS live in the results tree (uploaded by the git
+    # rail), never under models/ - that directory holds only what can
+    # be re-downloaded or re-created (quants, sources, the imatrix)
+    answers_dir = os.path.join("results", "exam", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, "answers.jsonl")
     log_path = os.path.join(answers_dir, "exam-server.log")

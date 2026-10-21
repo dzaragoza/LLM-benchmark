@@ -176,23 +176,36 @@ def git_pull_head() -> None:
 def git_tail(args: argparse.Namespace) -> None:
     """Commit and push every artifact the study needs (addendum 78
     item 5): state, results, dumps, sidecars, logs - force-added past
-    the .gitignore."""
+    the .gitignore.
+
+    The rule (the author's v8 ruling): models/ holds ONLY re-
+    downloadable or re-creatable data (quants, safetensors sources,
+    the imatrix); every benchmark OUTPUT - exam answers, server and
+    quantize logs, dumps, sidecars - lives in the results/ tree and
+    is uploaded wholesale, so all debug data is always available
+    remotely."""
     stamp("committing artifacts to git (state, results, dumps, mem sidecars)")
     paths = [args.state_file, args.results_file, "results.txt"]
+    # the results tree wholesale: exam answers + logs, the historical
+    # dumps and sidecars that predate the split
+    paths += glob.glob("results/**/*", recursive=True)
+    # tool failure logs from models/ (quantize/convert/imatrix) are
+    # BENCHMARK DEBUG DATA: they explain why a rung could not be
+    # created - uploaded, never left stranded on the machine
+    paths += glob.glob("models/*/quantize-*.log")
+    paths += glob.glob("models/*/convert-f16.log")
+    paths += glob.glob("models/*/imatrix.log")
+    # the historical output globs (pre-split locations, already
+    # committed trees stay reachable; new artifacts land in results/)
     paths += (
         glob.glob("models/*/*.live-dump*.json")
         + glob.glob("models/*/*.sentinel*.json")
         + glob.glob("models/*/*.mem.json")
-        + glob.glob("models/*/*-server.log")
-        + glob.glob("models/*/*window-probe.log")
+        + glob.glob("models/tournament-results/**/*", recursive=True)
+        + glob.glob("models/*/ladder-results/*")
     )
-    # addendum 60: the cell/server logs moved into the results tree -
-    # the tournament-results glob below picks them up; the model-dir
-    # globs stay for the pre-addendum-60 logs already committed.
-    paths += glob.glob("models/tournament-results/**/*", recursive=True)
     paths += (
-        glob.glob("models/*/ladder-results/*")
-        + glob.glob("ladder-results/*")
+        glob.glob("ladder-results/*")
         + glob.glob("ruler-results/*")
     )
     existing = [p for p in paths if os.path.exists(p)]
