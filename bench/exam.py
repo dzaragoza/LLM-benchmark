@@ -427,6 +427,39 @@ def run_family(
             llama_server.stop_server(proc, port)
 
 
+def fail_reason(rec: dict[str, Any]) -> str:
+    """Why the candidate failed its highest exam: read the last FAILING
+    level's attempts and classify the mode - the quick diagnostic the
+    ledger wants. Never a score, a REASON:
+      out of context   the bell rang (finish_reason length) - the
+                       paper filled before the answer
+      wrong chain      an answer arrived, the tokens/order were wrong
+      error            a transport/tool failure, not the model's
+                       fault
+      no record        nothing measured (or only passes stored)"""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "no record"
+    top = max(fail_keys, key=int)
+    attempts = levels[top].get("attempts") or []
+    reasons = []
+    for a in attempts:
+        if str(a.get("finish_reason") or "").startswith("error"):
+            reasons.append("error")
+        elif a.get("finish_reason") == "length" or a.get("ok") is None and not a.get("prompt"):
+            reasons.append("out of context")
+        elif a.get("ok") is False:
+            reasons.append("wrong chain")
+    if "error" in reasons and "wrong chain" not in reasons and "out of context" not in reasons:
+        return "error"
+    if "out of context" in reasons:
+        return "out of context"
+    if "wrong chain" in reasons:
+        return "wrong chain"
+    return "unknown"
+
+
 def candidates(
     state: dict[str, Any], families: list[str] | None, models_dir: str = "models"
 ) -> list[tuple[str, str, str]]:

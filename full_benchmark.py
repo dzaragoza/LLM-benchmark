@@ -328,8 +328,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--models",
         type=int,
         default=16,
-        help="v8: the number of models to test - the roster's first N, "
-        "param-ascending (default 16)",
+        help="v8: the number of models to test (default 16), drawn "
+        "from the roster param-ascending starting at --models-from",
+    )
+    ap.add_argument(
+        "--models-from",
+        type=int,
+        default=1,
+        help="v8: the 1-based roster position to start from - the "
+        "tournament refill: after eliminations, the next run draws "
+        "the next models from the roster (e.g. --models-from 17 "
+        "after a full first round over 16)",
     )
     ap.add_argument(
         "--sweet-repeat",
@@ -373,6 +382,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=32,
         help="exam: the sweep's hard ceiling on difficulty (hops)",
+    )
+    ap.add_argument(
+        "--eliminate",
+        default=None,
+        help="v8: mark these models ELIMINATED in the ledger and delete "
+        "their models/ artifacts (the collected data always stays in "
+        "git) - comma-separated family names. Run after reading the "
+        "exam summary; the next tournament round refills with "
+        "--models-from",
     )
     ap.add_argument(
         "--clean",
@@ -436,6 +454,61 @@ def main() -> None:
         raise
 
 
+def write_v8_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
+    """md/v8.md - the tournament ledger, rewritten from state after
+    every v8 run: every model the benchmark has ever measured, its
+    quants tested, why each failed its highest exam, the context
+    size (the bell), and whether it is eliminated (its models/
+    artifacts deleted on the benchmark machine - the data always
+    stays here). The roster position grounds the refill bookkeeping
+    (--models-from)."""
+    from bench.exam import fail_reason
+
+    exam = state.get("exam") or {}
+    sweet = state.get("sweet") or {}
+    lines = [
+        "# v8.md - the tournament ledger",
+        "",
+        "One row per (model, quant) candidate, param-ascending; regenerated",
+        "from state after every v8 run. Eliminated = the model's artifacts",
+        "were deleted from the benchmark machine (the collected data",
+        "always stays). The exam's failure reasons:",
+        "`out of context` (the bell rang before an answer), `wrong chain`",
+        "(an answer arrived, the chain was incorrect), `error` (tool",
+        "failure), `no record` (never measured).",
+        "",
+        "| # | model | quant | score | ctx (bell) | failed at | why | eliminated? |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for fam, pos in sorted(roster_pos.items(), key=lambda kv: kv[1]):
+        fam_exam = exam.get(fam) or {}
+        if not fam_exam:
+            continue
+        rungs = sorted(fam_exam.items(), key=lambda kv: -(kv[1].get("score") or -1))
+        for rung, rec in rungs:
+            score = rec.get("score")
+            failed_at = ""
+            if score is not None:
+                failed_at = f"level {score + 1}" if fail_reason(rec) not in ("no record",) else ""
+            why = fail_reason(rec)
+            ctx = rec.get("bell_ctx")
+            lines.append(
+                f"| {pos} | {fam} | {rung} | {score if score is not None else '-'} "
+                f"| {ctx if ctx is not None else '-'} | {failed_at or '-'} "
+                f"| {why if failed_at or why != 'no record' else '-'} "
+                f"| {'yes' if fam_exam.get('_eliminated') else 'no'} |"
+            )
+    lines.append("")
+    lines.append(
+        f"_Eliminated models: {sum(1 for f in exam if (exam[f] or {}).get('_eliminated'))} "
+        f"of {len(exam)} ever measured. The roster refill continues at "
+        f"--models-from {max(roster_pos.values(), default=0) + 1}._"
+    )
+    with open(os.path.join("md", "v8.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    stamp("v8.md ledger rewritten")
+
+
 def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
     """Store the exam results under state.exam with JSON-safe keys:
     exam.<family>.<rung> - a tuple key cannot survive json.dump (it
@@ -464,17 +537,47 @@ def _run(args: argparse.Namespace) -> None:
         from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
 
+        if args.eliminate:
+            # the tournament cut (the author's ruling): mark the
+            # eliminated models in the ledger, delete their artifacts
+            # from models/ - the collected data ALWAYS stays
+            import shutil
+
+            for fam in args.eliminate.split(","):
+                fam = fam.strip()
+                if not fam:
+                    continue
+                tree = (state.setdefault("exam", {}).setdefault(fam, {}))
+                tree["_eliminated"] = True
+                famdir = os.path.join(args.models_dir, fam)
+                if os.path.isdir(famdir):
+                    shutil.rmtree(famdir)
+                    stamp(f"eliminated {fam}: artifacts deleted (data kept)")
+                else:
+                    stamp(f"eliminated {fam}: marked (no artifacts on disk)")
+            save_state(args.state_file, state)
+            write_v8_md(state, {name: i + 1 for i, name in enumerate(
+                [n for n, _ in roster_from_models_md()])})
+            if not args.no_git:
+                tee_output.uninstall()
+                git_tail(args)
+            stamp("elimination complete")
+            return
         if args.clean and state.get("exam"):
             state["exam"] = {}
             save_state(args.state_file, state)
             stamp("exam: all records wiped (--clean) - a full re-measure")
         roster = [name for name, _ in roster_from_models_md()]
-        families = roster[: args.models]
-        if len(families) < len(roster):
+        start = max(1, args.models_from) - 1
+        families = roster[start : start + args.models]
+        if families:
             stamp(
-                f"v8: the roster's first {len(families)} models "
-                f"(before {roster[len(families)]} - --models)"
+                f"v8: roster positions {start + 1}..{start + len(families)} "
+                f"({', '.join(families[:3])}"
+                f"{'...' if len(families) > 3 else ''})"
             )
+        if not families:
+            sys.exit(f"the roster has no position {args.models_from} - it is exhausted")
         sweet = sweet_run(
             args.models_dir,
             state,
@@ -516,6 +619,7 @@ def _run(args: argparse.Namespace) -> None:
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
+        write_v8_md(state, {name: i + 1 for i, name in enumerate(roster)})
         print()
         print("=" * 60)
         stamp("V8 EXAM SUMMARY (highest difficulty achieved per candidate)")
