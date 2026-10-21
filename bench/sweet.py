@@ -75,6 +75,35 @@ def _reconcile_disk(famdir: str, rec: dict[str, Any]) -> None:
         print(f"  [disk] reconciled: {freed / 2**30:.2f} GiB of superseded rungs pruned")
 
 
+def _regenerate_missing(fam: str, repo: str, famdir: str, rec: dict[str, Any]) -> None:
+    """The era bridge: the pre-curve retention pruned files the curve
+    semantics now needs - any rung with a STORED measurement that is a
+    keep-set member (the boundary or a beyond-window sweet spot) but
+    whose file is absent gets rebuilt from the f16 master (no re-bench:
+    the measurement stands; only the file was lost)."""
+    spot = rec.get("sweet_spot")
+    if not spot:
+        return
+    fam_spot = os.path.basename(famdir)
+    for rung, m in rec.get("rungs", {}).items():
+        keep = rung == spot or m.get("in_window") is False
+        if not keep or m.get("tg") is None:
+            continue
+        path = _rung_file(famdir, fam_spot, rung)
+        if os.path.isfile(path):
+            continue
+        print(f"  {rung}: sweet-spot file was pruned earlier - regenerating (no re-bench)")
+        files = cast("Any", hf_download.list_repo_files)(repo)
+        try:
+            built = convert_quant.create(fam, famdir, rung, "", False)
+        except SystemExit as e:
+            if e.code == 130:
+                raise
+            built = None
+        if not built or not os.path.isfile(path):
+            print(f"  {rung}: could not regenerate ({path} still missing) - skipped")
+
+
 def _prune_rung(famdir: str, path: str) -> None:
     """Delete a measured rung file (never the f16 master or the imatrix)."""
     base = os.path.basename(path)
@@ -246,6 +275,7 @@ def run(
         print(
             f"\n{'=' * 60}\n{fam} (window {window:,}, in-window while tg/s*{concurrency} > {window:,})"
         )
+        _regenerate_missing(fam, repo, famdir, rec)
         for rung in SWEET_LADDER:
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is None:
                 if rec["rungs"][rung].get("error"):
