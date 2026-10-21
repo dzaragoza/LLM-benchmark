@@ -111,8 +111,18 @@ def _regenerate_missing(
         path = candidates[0]
         print(f"  {rung}: sweet-spot file was pruned earlier - regenerating (no re-bench)")
         files = cast("Any", hf_download.list_repo_files)(repo)
+        # the full acquire path (not bare create): when the F16 rung's
+        # own master is gone there is no local source to convert from,
+        # so the safetensors must come back from the hub first - the
+        # same phase-1 path a fresh walk uses (measurements stand)
         try:
-            built = convert_quant.create(fam, famdir, rung, "", False)
+            got, plan = hf_download.acquire(fam, famdir, rung, repo, files, repo, files, False)
+            if got:
+                built = got
+            elif not plan.startswith("infeasible"):
+                built = convert_quant.create(fam, famdir, rung, plan, False)
+            else:
+                built = None
         except SystemExit as e:
             if e.code == 130:
                 raise
