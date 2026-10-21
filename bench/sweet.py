@@ -57,15 +57,20 @@ def _reconcile_disk(famdir: str, rec: dict[str, Any]) -> None:
         return
     fam = os.path.basename(famdir)
     # keep the f16 master, the boundary, and EVERY beyond-window curve
-    # point (they are all sweet spots - the downstream measurements)
+    # point (they are all sweet spots - the downstream measurements).
+    # Case-insensitive: rung names cross the pipeline in both cases
+    # (F16 vs f16 master vs a repo's lowercase artifacts) - a case
+    # mismatch pruned live sweet-spot files as leftovers (the v8
+    # run's lesson: the exam found every boundary file missing)
     keep = {f"{fam}-f16.gguf", f"{fam}-{spot}.gguf"}
     for rung, m in rec.get("rungs", {}).items():
         if m.get("in_window") is False:
             keep.add(f"{fam}-{rung}.gguf")
+    keep_lower = {k.lower() for k in keep}
     freed = 0
     for f in os.listdir(famdir):
         p = os.path.join(famdir, f)
-        if f.endswith(".gguf") and f not in keep:
+        if f.endswith(".gguf") and f.lower() not in keep_lower:
             try:
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -92,13 +97,18 @@ def _regenerate_missing(
         keep = rung == spot or m.get("in_window") is False
         if not keep or m.get("tg") is None:
             continue
-        path = (
-            os.path.join(famdir, f"{fam_spot}-f16.gguf")
+        # case-insensitive presence check (the pipeline's rung names
+        # cross in both cases); regenerate only when no file of the
+        # keep-set name exists in either case
+        candidates = (
+            [os.path.join(famdir, f"{fam_spot}-f16.gguf"), os.path.join(famdir, f"{fam_spot}-F16.gguf")]
             if rung.upper() == "F16"
-            else _rung_file(famdir, fam_spot, rung)
+            else [_rung_file(famdir, fam_spot, rung)]
         )
-        if os.path.isfile(path):
+        path = next((c for c in candidates if os.path.isfile(c)), None)
+        if path:
             continue
+        path = candidates[0]
         print(f"  {rung}: sweet-spot file was pruned earlier - regenerating (no re-bench)")
         files = cast("Any", hf_download.list_repo_files)(repo)
         try:
@@ -121,7 +131,8 @@ def _prune_rung(famdir: str, path: str) -> None:
     base = os.path.basename(path)
     if not base.endswith(".gguf"):
         return
-    if base.endswith("-f16.gguf") or ".imatrix" in base:
+    low = base.lower()
+    if low.endswith("-f16.gguf") or ".imatrix" in base:
         return
     try:
         os.remove(path)
