@@ -8,11 +8,13 @@ ladder and find where it stops being able to fill its own window:
     per quant (the Qwen3.5-2B discovered tok/s order, fastest first):
       build the quant, bench it (llama-bench -p 0 -n 128)
       in-window = tg/s * concurrency > training window
-      in-window -> the next quant down the ladder (same model)
-      beyond    -> THE SWEET SPOT: the last in-window quant is where
-                   the model still saturates its window at this
-                   concurrency; next family
-      every rung in-window -> the LAST quant (F16) is the sweet spot
+      the in-window side contributes its BOUNDARY: the slowest in-window
+      quant (the last one before the first beyond) - the only in-window
+      file kept on disk
+      the beyond side (tg/s * concurrency <= window) is MEASURED IN
+      FULL: every rung from the first beyond one to the ladder's end
+      gets its tg/s recorded - the model's sweet CURVE is the boundary
+      quant plus every beyond-quant's tg/s
 
 No global stop: every model gets its own walk; unavailable rungs
 (unbuildable types, load failures) are skipped, not verdicts.
@@ -284,16 +286,21 @@ def run(
                 m["concurrency"] = concurrency
                 if ok:
                     rec["sweet_spot"] = rung
+                    prev_spot = rec.get("prev_sweet")
+                    if prev_spot and prev_spot != rung:
+                        prev_file = rec.get("sweet_spot_file")
+                        if prev_file and os.path.isfile(prev_file):
+                            _prune_rung(famdir, prev_file)
+                    rec["prev_sweet"] = rung
+                    rec["sweet_spot_file"] = _rung_file(famdir, fam, rung)
                 else:
-                    rec["ceiling"] = True
+                    rec["beyond"] = True
                 _state_store.save_state(state_file, state)
                 print(
                     f"  {rung}: {m['tg']:.2f} tok/s (measured) "
                     f"x {concurrency} = {m['tg'] * concurrency:,.0f} "
-                    f"-> {'in-window' if ok else 'beyond the window'}"
+                    f"-> {'in-window' if ok else 'BEYOND (curve point)'}"
                 )
-                if not ok:
-                    break
                 continue
             if dry_run:
                 if rec.get("ceiling"):
@@ -336,23 +343,16 @@ def run(
                             _prune_previous(famdir, rec, path)
                         else:
                             rec["sweet_spot_file"] = path
-            if not rec["rungs"][rung]["in_window"]:
-                rec["ceiling"] = True
-                _state_store.save_state(state_file, state)
-                print(f"  {fam}: sweet spot: {rec.get('sweet_spot')} (beyond at {rung})")
-                break
         else:
             if dry_run:
                 rec["ceiling"] = False
                 continue
             # every MEASURED rung stayed in-window: the ladder's last
             # measured quant is the sweet spot (the walk never went beyond)
-            last = [
-                r
-                for r in SWEET_LADDER
-                if r in rec["rungs"] and rec["rungs"][r].get("tg") is not None
-            ]
-            rec["sweet_spot"] = last[-1] if last else None
+            n_beyond = sum(1 for m in rec["rungs"].values() if m.get("in_window") is False)
             _state_store.save_state(state_file, state)
-            print(f"  {fam}: every rung in-window - sweet spot: {rec.get('sweet_spot')}")
+            print(
+                f"  {fam}: curve complete - boundary {rec.get('sweet_spot')}, "
+                f"{n_beyond} beyond points"
+            )
     return sweet

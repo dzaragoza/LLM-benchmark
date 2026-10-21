@@ -632,9 +632,9 @@ def _run(args: argparse.Namespace) -> None:
         stamp("SWEET-SPOT SUMMARY")
         for fam, rec in (sweet or {}).items():
             spot = rec.get("sweet_spot")
-            verdict = f"sweet spot {spot}" if spot else "no in-window rung"
-            beyond = rec.get("ceiling")
-            print(f"  {fam}: {verdict}{' (walk stopped beyond the window)' if beyond else ''}")
+            beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
+            verdict = f"boundary {spot}" if spot else "no in-window rung"
+            print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)
