@@ -250,10 +250,16 @@ def _build(fam: str, repo: str, famdir: str, rung: str) -> str | None:
         return None
 
 
-def _bench(path: str, repeat: int) -> float | None:
-    """llama-bench -p 0 -n 128: the generation rate (tg tok/s)."""
+def _bench(path: str, repeat: int, gen_len: int = 2048) -> float | None:
+    """llama-bench -p 0 -n <gen_len>: the SUSTAINED generation rate
+    (tg tok/s). The old -n 128 was a 2-second burst - blind to the
+    thermal throttling (the 780M iGPU) and KV-growth slowdown that a
+    1024-second fill actually suffers (the v8 lesson: Qwen3-1.7B
+    benched ~50 tok/s at n=128 but filled its bell at ~1/3 of that).
+    2048 tokens is long enough to see the decay, short enough to keep
+    the walk affordable (~16x the old burst per rung)."""
     r = subprocess.run(
-        [BENCH_BIN, "-m", path, "-p", "0", "-n", "128", "-r", str(repeat), "-o", "csv"],
+        [BENCH_BIN, "-m", path, "-p", "0", "-n", str(gen_len), "-r", str(repeat), "-o", "csv"],
         capture_output=True,
         text=True,
         timeout=3600,
@@ -268,6 +274,15 @@ def _bench(path: str, repeat: int) -> float | None:
             except ValueError:
                 pass
     return tg
+
+
+def _era_ok(rec_rung: dict[str, Any], gen_len: int) -> bool:
+    """A stored tg is reusable only within its measurement era: the
+    -n it was measured at (burst n=128 vs sustained n=2048) changes
+    the number materially (thermal decay, KV growth). A record
+    without a gen_len stamp is the old burst era - stale under a
+    sustained run."""
+    return rec_rung.get("gen_len") == gen_len
 
 
 def _in_window(tg: float, window: int, concurrency: int) -> bool:
@@ -304,6 +319,7 @@ def run(
     concurrency: int = 1024,
     dry_run: bool = False,
     bench_bin: str | None = None,
+    gen_len: int = 2048,
 ) -> dict[str, Any]:
     if not dry_run and not bench_bin:
         sys.exit(f"llama-bench not found at {BENCH_BIN} - place the b11669 build in the repo root")
@@ -334,7 +350,18 @@ def run(
                     print(f"  {rung}: {rec['rungs'][rung]['error']} - skipped")
                     continue
             # old-era records (tg present but keyed by pass, not in_window):
-            # fall through to the re-judge below which stamps in_window
+            # fall through to the re-judge below which stamps in_window.
+            # A tg measured in a DIFFERENT gen_len era is stale: drop
+            # it and re-measure (the burst-era number predicted fills
+            # the sustained era could not deliver - the v8 lesson)
+            if (
+                rung in rec["rungs"]
+                and rec["rungs"][rung].get("tg") is not None
+                and not _era_ok(rec["rungs"][rung], gen_len)
+            ):
+                print(f"  {rung}: stored tg is from the -n "
+                      f"{rec['rungs'][rung].get('gen_len') or 128} era - re-measuring at -n {gen_len}")
+                del rec["rungs"][rung]
             if rung in rec["rungs"] and rec["rungs"][rung].get("tg") is not None:
                 m = rec["rungs"][rung]
                 # RE-JUDGE with the run's concurrency (the stored verdict was
@@ -395,7 +422,7 @@ def run(
                 print(f"  {rung}: {error} - skipped")
                 continue
             else:
-                tg = _bench(path, repeat)
+                tg = _bench(path, repeat, gen_len)
                 if tg is None:
                     rec["rungs"][rung] = {"tg": None, "pass": None, "error": "bench failed"}
                     _state_store.save_state(state_file, state)
@@ -403,7 +430,7 @@ def run(
                     continue
                 else:
                     ok = _in_window(tg, window, concurrency)
-                    rec["rungs"][rung] = {"tg": tg, "in_window": ok}
+                    rec["rungs"][rung] = {"tg": tg, "in_window": ok, "gen_len": gen_len}
                     _state_store.save_state(state_file, state)
                     print(
                         f"  {rung}: {tg:.2f} tok/s x {concurrency} = "

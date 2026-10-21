@@ -356,6 +356,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="sweet: llama-bench repetitions per rung (default 3)",
     )
     ap.add_argument(
+        "--sweet-gen-len",
+        type=int,
+        default=2048,
+        help="sweet: llama-bench's generation length (-n) - the "
+        "SUSTAINED rate measurement. The old 128 was a 2-second "
+        "burst, blind to thermal throttling and KV growth over a "
+        "1024-second fill; 2048 sees the decay (the v8 lesson)",
+    )
+    ap.add_argument(
         "--sweet-concurrency",
         type=int,
         default=1024,
@@ -644,6 +653,7 @@ def _run(args: argparse.Namespace) -> None:
             families,
             repeat=args.sweet_repeat,
             concurrency=args.sweet_concurrency,
+            gen_len=args.sweet_gen_len,
             dry_run=args.dry_run,
             bench_bin=find_bench(),
         )
@@ -770,6 +780,7 @@ def _run(args: argparse.Namespace) -> None:
             families,
             repeat=args.sweet_repeat,
             concurrency=args.sweet_concurrency,
+            gen_len=args.sweet_gen_len,
             dry_run=args.dry_run,
             bench_bin=find_bench(),
         )
