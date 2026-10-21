@@ -352,13 +352,16 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--sweet-repeat",
         type=int,
-        default=3,
-        help="sweet: llama-bench repetitions per rung (default 3)",
+        default=1,
+        help="sweet: llama-bench repetitions per rung (default 1 - the "
+        "decay correction is a systematic effect one sustained run "
+        "captures; per-rung noise is a few percent, not worth 3x the "
+        "era cost)",
     )
     ap.add_argument(
         "--sweet-gen-len",
         type=int,
-        default=2048,
+        default=4096,
         help="sweet: llama-bench's generation length (-n) - the "
         "SUSTAINED rate measurement. The old 128 was a 2-second "
         "burst, blind to thermal throttling and KV growth over a "
