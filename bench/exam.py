@@ -626,86 +626,69 @@ def run(
     max_level: int = 32,
     dry_run: bool = False,
 ) -> dict[tuple[str, str], Any]:
-    """The exam controller (v9 - the exam is the only phase): sweeps
-    of escalating difficulty over EVERY (model, quant) candidate in
-    the roster. Round d's only candidates are round d-1's passers;
-    the rounds continue until no candidate passes. After each
-    candidate's sweep the self-clean runs: strictly-lower scorers are
-    eliminated from disk. The final score per candidate is the
-    highest difficulty achieved (both parts)."""
+    """The exam controller (v9): ONE straight pass over the
+    candidates - roster order (param-ascending) x the tg/s-sorted
+    ladder - each candidate swept 0..first-fail IN FULL before the
+    next begins (the author's efficiency ruling: an answer as soon as
+    possible, the pruning starts with the first score).
+
+    A stored score is final (idempotence): scored candidates are
+    never re-run; the pass skips them and keeps their record. After
+    each sweep the self-clean deletes strictly-lower scorers from
+    disk (the data stays)."""
     seeds = exam_seeds(n_seeds)
     cands = candidates(state, families, models_dir)
     if not cands:
         return {}
     results: dict[tuple[str, str], Any] = {}
-    alive = cands
-    level = 0
-    while alive and level <= max_level:
-        print()
-        print("=" * 60)
-        print(f"EXAM ROUND: difficulty {level} ({len(alive)} candidates)")
-        survivors = []
-        for cand in alive:
-            fam, rung = cand
-            key = (fam, rung)
-            fam_exam = (state.get("exam") or {}).get(fam) or {}
-            # old-era records are family-keyed (the boundary candidate
-            # directly); new-era records are rung-keyed
-            rec = fam_exam.get(rung) or {}
-            if not rec and "levels" in fam_exam:
-                rec = fam_exam
-            if str(level) in (rec.get("levels") or {}) and not dry_run:
-                passed = rec["levels"][str(level)].get("pass")
-            elif dry_run:
-                passed = None
-            else:
-                gguf = _acquire(fam, rung, models_dir)
-                if not gguf:
-                    rec = {"error": "candidate cannot exist on this machine (unbuildable)"}
-                    results[key] = rec
-                    state.setdefault("exam", {}).setdefault(fam, {})[rung] = rec
-                    _state_store.save_state(state_file, state)
-                    print(f"  {fam} {rung}: unbuildable - skipped")
-                    continue
-                print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
-                # one candidate's failure never kills the exam - any
-                # exception is recorded and the sweep moves on
-                try:
-                    rec = run_family(
-                        fam,
-                        rung,
-                        gguf,
-                        models_dir,
-                        state,
-                        state_file,
-                        port,
-                        seeds,
-                        max_level,
-                        level,
-                        dry_run,
-                    )
-                except SystemExit as e:
-                    if e.code == 130:
-                        raise
-                    rec = {"error": f"exam run failed: {e.code}"}
-                except Exception as e:
-                    rec = {"error": f"exam run failed: {e}"}
-                results[key] = rec
-                passed = rec.get("error") is None and (rec.get("levels") or {}).get(
-                    str(level), {}
-                ).get("pass")
-                # the self-clean: the moment scores exist, the strictly
-                # lower scorers leave the disk (data always stays)
-                _gc(models_dir, state, fam)
-            if passed:
-                survivors.append(cand)
-            if dry_run:
-                survivors = alive  # the plan shows every candidate's sweep
-        alive = survivors
-        level += 1
-    for cand in cands:
-        key = (cand[0], cand[1])
-        if key not in results:
-            fam, rung = key
-            results[key] = ((state.get("exam") or {}).get(fam) or {}).get(rung) or {}
+    for fam, rung in cands:
+        key = (fam, rung)
+        fam_exam = (state.get("exam") or {}).get(fam) or {}
+        # old-era records are family-keyed (the boundary candidate
+        # directly); new-era records are rung-keyed
+        rec = fam_exam.get(rung) or {}
+        if not rec and "levels" in fam_exam:
+            rec = fam_exam
+        # a stored final score is final - skip (idempotence)
+        if rec.get("score") is not None and not dry_run:
+            results[key] = rec
+            continue
+        if dry_run:
+            results[key] = {"planned": f"sweep 0..{max_level} on seeds {seeds}"}
+            continue
+        gguf = _acquire(fam, rung, models_dir)
+        if not gguf:
+            rec = {"error": "candidate cannot exist on this machine (unbuildable)"}
+            results[key] = rec
+            state.setdefault("exam", {}).setdefault(fam, {})[rung] = rec
+            _state_store.save_state(state_file, state)
+            print(f"  {fam} {rung}: unbuildable - skipped")
+            continue
+        print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
+        # one candidate's failure never kills the exam - any
+        # exception is recorded and the sweep moves on
+        try:
+            rec = run_family(
+                fam,
+                rung,
+                gguf,
+                models_dir,
+                state,
+                state_file,
+                port,
+                seeds,
+                max_level,
+                0,
+                dry_run,
+            )
+        except SystemExit as e:
+            if e.code == 130:
+                raise
+            rec = {"error": f"exam run failed: {e.code}"}
+        except Exception as e:
+            rec = {"error": f"exam run failed: {e}"}
+        results[key] = rec
+        # the self-clean: the moment this candidate's score exists,
+        # strictly-lower scorers leave the disk (data always stays)
+        _gc(models_dir, state, fam)
     return results
