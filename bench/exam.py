@@ -260,17 +260,11 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     return all(tok in it for tok in expected)
 
 
-def bell_context(sweet_rec: dict[str, Any], time_factor: int = 1024) -> int | None:
-    """The bell, integrated with the phase-1 measurements: the exam
-    context is min(training window, tg/s x time_factor) for the
-    sweet-spot rung - either leg binds depending on the model/quant
-    (the in-window rungs' window leg, or the fill-rate leg). The
-    time_factor is the run's time parameter (the same 1024 that set
-    the sweet spot). None when the sweet spot has no measured tg."""
-    window = sweet_rec.get("window")
-    spot = sweet_rec.get("sweet_spot")
-    rung = (sweet_rec.get("rungs") or {}).get(spot or "") or {}
-    tg = rung.get("tg")
+def bell_rung(window: int | None, tg: float | None, time_factor: int = 1024) -> int | None:
+    """The bell for ONE rung: min(training window, tg/s x time_factor).
+    Under the window the window binds; over it the rung's own fill
+    rate binds. The time_factor is the run's time parameter (the same
+    1024 that set the sweet spots)."""
     if not window or tg is None:
         return None
     return max(1024, min(int(window), int(tg * time_factor)))
@@ -278,6 +272,7 @@ def bell_context(sweet_rec: dict[str, Any], time_factor: int = 1024) -> int | No
 
 def run_family(
     fam: str,
+    rung: str,
     gguf: str,
     models_dir: str,
     state: dict[str, Any],
@@ -289,16 +284,18 @@ def run_family(
     dry_run: bool = False,
     time_factor: int = 1024,
 ) -> dict[str, Any]:
-    """One family's sweep: every level from the first unrecorded one,
-    both parts per level, until the first failing level. The final
-    score is the highest level passed (both parts, every seed).
-    Resumable: recorded levels are never re-measured."""
+    """One candidate's sweep - a (model, quant) pair: every level from
+    the first unrecorded one, both parts per level, until the first
+    failing level. The final score is the highest level passed (both
+    parts, every seed). Resumable: recorded levels are never
+    re-measured. State keys per candidate: exam.<fam>.<rung>."""
     sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-    ctx = bell_context(sweet_rec, time_factor)
+    rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
+    ctx = bell_rung(sweet_rec.get("window"), rung_rec.get("tg"), time_factor)
     if ctx is None:
-        return {"error": "no measured sweet spot (window/tg) to set the bell"}
-    exam = state.setdefault("exam", {}).setdefault(fam, {})
-    exam["rung"] = os.path.basename(gguf)
+        return {"error": "no measured rung (window/tg) to set the bell"}
+    exam = state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})
+    exam["rung"] = rung
     exam["bell_ctx"] = ctx
     # a stale error from an earlier run must not shadow this run's
     # levels/score in the summary - the file resolution and server
@@ -308,7 +305,7 @@ def run_family(
     # benchmark OUTPUTS live in the results tree (uploaded by the git
     # rail), never under models/ - that directory holds only what can
     # be re-downloaded or re-created (quants, sources, the imatrix)
-    answers_dir = os.path.join("results", "exam", fam)
+    answers_dir = os.path.join("results", "exam", fam, rung)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, "answers.jsonl")
     log_path = os.path.join(answers_dir, "exam-server.log")
@@ -430,21 +427,53 @@ def run_family(
             llama_server.stop_server(proc, port)
 
 
-def candidates(state: dict[str, Any], families: list[str] | None) -> list[str]:
-    """The exam roster: the phase-1 sweet spots (the in-window boundary
-    rungs), param-ascending - only a measured sweet spot is a phase-2
-    candidate. An explicit family list filters to its sweet-spot
-    members (a family with no sweet spot is reported, not examined)."""
+def candidates(
+    state: dict[str, Any], families: list[str] | None, models_dir: str = "models"
+) -> list[tuple[str, str, str]]:
+    """The exam roster as (family, rung, gguf) tuples, param-ascending,
+    per the v8 rule pair:
+
+      tg/s x 1024 > window (UNDER): the boundary rung is THE sweet
+      spot - one candidate.
+      no rung meets it (OVER): EVERY measured quant is a sweet spot -
+      the whole ladder, one candidate per rung, each with its own
+      bell (min(window, its own tg x 1024)).
+
+    An explicit family list filters; each family prints its regime.
+    Rungs whose file is missing are reported and skipped (the sweep
+    continues with the working ones)."""
+    import infra.hf_download as hf_download
+
     sweet = state.get("sweet") or {}
     order = [name for name, _ in roster_from_models_md()]
-    fams = [f for f in order if (sweet.get(f) or {}).get("sweet_spot")]
-    if families:
-        wanted = [f.split("=")[0] for f in families]
-        missing = [f for f in wanted if f not in fams]
-        for f in missing:
-            print(f"  {f}: not a sweet-spot candidate - skipped")
-        fams = [f for f in fams if f in wanted]
-    return fams
+    fams = order if not families else [f.split("=")[0] for f in families]
+    out: list[tuple[str, str, str]] = []
+    for fam in fams:
+        rec = sweet.get(fam) or {}
+        rungs = rec.get("rungs") or {}
+        if rec.get("over_window"):
+            rung_names = [r for r, m in rungs.items() if m.get("tg") is not None]
+            regime = "OVER the window - every measured quant is a sweet spot"
+        elif rec.get("sweet_spot"):
+            rung_names = [rec["sweet_spot"]]
+            regime = "UNDER the window - the boundary rung"
+        else:
+            print(f"  {fam}: no measured rungs - skipped")
+            continue
+        famdir = os.path.join(models_dir, fam)
+        resolved = []
+        for r in rung_names:
+            gguf = hf_download.local_rung(famdir, r) or os.path.join(
+                famdir, f"{fam}-{r}.gguf"
+            )
+            if os.path.isfile(gguf):
+                resolved.append((fam, r, gguf))
+            else:
+                print(f"  {fam} {r}: file missing ({gguf}) - skipped")
+        if resolved:
+            print(f"  {fam}: {len(resolved)} candidate(s), {regime}")
+        out.extend(resolved)
+    return out
 
 
 def run(
@@ -457,51 +486,45 @@ def run(
     max_level: int = 32,
     dry_run: bool = False,
     time_factor: int = 1024,
-) -> dict[str, Any]:
+) -> dict[tuple[str, str], Any]:
     """The exam controller: sweeps of escalating difficulty over the
-    sweet-spot candidates. Round d's only candidates are round d-1's
-    passers; the rounds continue until no candidate passes. The final
-    score per candidate is the highest difficulty achieved (both
-    parts)."""
+    sweet-spot candidates - (model, quant) pairs. Round d's only
+    candidates are round d-1's passers; the rounds continue until no
+    candidate passes. The final score per candidate is the highest
+    difficulty achieved (both parts)."""
     seeds = exam_seeds(n_seeds)
-    fams = candidates(state, families)
-    if not fams:
+    cands = candidates(state, families, models_dir)
+    if not cands:
         return {}
-    results: dict[str, Any] = {}
-    alive = fams
+    results: dict[tuple[str, str], Any] = {}
+    alive = cands
     level = 0
     while alive and level <= max_level:
         print(f"\n{'=' * 60}\nEXAM ROUND: difficulty {level} ({len(alive)} candidates)")
         survivors = []
-        for fam in alive:
-            sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-            gguf = sweet_rec.get("sweet_spot_file")
-            if gguf and not os.path.isfile(gguf):
-                # case-insensitive fallback: the stored path may carry
-                # the ladder's spelling while the artifact differs
-                import infra.hf_download as hf_download
-
-                famdir = os.path.join(models_dir, fam)
-                gguf = hf_download.local_rung(famdir, str(sweet_rec.get("sweet_spot"))) or gguf
-            if not gguf or not os.path.isfile(gguf):
-                results[fam] = {"error": f"sweet-spot file missing: {gguf}"}
-                continue
-            rec = (state.get("exam") or {}).get(fam) or {}
+        for cand in alive:
+            fam, rung, gguf = cand
+            key = (fam, rung)
+            rec = ((state.get("exam") or {}).get(fam) or {}).get(rung) or {}
             if str(level) in (rec.get("levels") or {}) and not dry_run:
                 passed = rec["levels"][str(level)].get("pass")
             elif dry_run:
                 passed = None
             else:
+                sweet_rec = (state.get("sweet") or {}).get(fam) or {}
+                rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
                 print(
-                    f"-- {fam} ({sweet_rec.get('sweet_spot')}, bell "
-                    f"{bell_context(sweet_rec, time_factor)} tokens) --"
+                    f"-- {fam} {rung}, bell "
+                    f"{bell_rung(sweet_rec.get('window'), rung_rec.get('tg'), time_factor)} "
+                    f"tokens --"
                 )
-                # one family's failure never kills the exam (the
+                # one candidate's failure never kills the exam (the
                 # author's ruling: continue with the working ones) -
                 # any exception is recorded and the sweep moves on
                 try:
                     rec = run_family(
                         fam,
+                        rung,
                         gguf,
                         models_dir,
                         state,
@@ -519,17 +542,19 @@ def run(
                     rec = {"error": f"exam run failed: {e.code}"}
                 except Exception as e:
                     rec = {"error": f"exam run failed: {e}"}
-                results[fam] = rec
+                results[key] = rec
                 passed = rec.get("error") is None and (rec.get("levels") or {}).get(
                     str(level), {}
                 ).get("pass")
             if passed:
-                survivors.append(fam)
+                survivors.append(cand)
             if dry_run:
                 survivors = alive  # the plan shows every candidate's sweep
         alive = survivors
         level += 1
-    for fam in fams:
-        if fam not in results:
-            results[fam] = (state.get("exam") or {}).get(fam) or {}
+    for cand in cands:
+        key = (cand[0], cand[1])
+        if key not in results:
+            fam, rung = key
+            results[key] = ((state.get("exam") or {}).get(fam) or {}).get(rung) or {}
     return results

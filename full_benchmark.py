@@ -436,6 +436,15 @@ def main() -> None:
         raise
 
 
+def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
+    """Store the exam results under state.exam with JSON-safe keys:
+    exam.<family>.<rung> - a tuple key cannot survive json.dump (it
+    would coerce to a string and break the resume path)."""
+    tree = state.setdefault("exam", {})
+    for (fam, rung), rec in results.items():
+        tree.setdefault(fam, {})[rung] = rec
+
+
 def _run(args: argparse.Namespace) -> None:
     global DRY_RUN_ACTIVE
     DRY_RUN_ACTIVE = args.dry_run
@@ -505,15 +514,16 @@ def _run(args: argparse.Namespace) -> None:
             dry_run=args.dry_run,
             time_factor=args.sweet_concurrency,
         )
-        state["exam"] = results
+        _exam_to_state(state, results)
         save_state(args.state_file, state)
         print()
         print("=" * 60)
-        stamp("V8 EXAM SUMMARY (highest difficulty achieved per sweet spot)")
-        for fam, rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
-            spot = ((state.get("sweet") or {}).get(fam) or {}).get("sweet_spot")
+        stamp("V8 EXAM SUMMARY (highest difficulty achieved per candidate)")
+        for (fam, rung), rec in sorted(
+            results.items(), key=lambda kv: -(kv[1].get("score") or -1)
+        ):
             verdict = rec.get("error") or f"score {rec.get('score')}"
-            print(f"  {fam} ({spot}): {verdict}")
+            print(f"  {fam} {rung}: {verdict}")
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)
@@ -535,16 +545,18 @@ def _run(args: argparse.Namespace) -> None:
             n_seeds=args.exam_seeds,
             max_level=args.exam_max_level,
             dry_run=args.dry_run,
+            time_factor=args.sweet_concurrency,
         )
-        state["exam"] = results
+        _exam_to_state(state, results)
         save_state(args.state_file, state)
         print()
         print("=" * 60)
-        stamp("EXAM SUMMARY (highest difficulty achieved per sweet spot)")
-        for fam, rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
-            spot = ((state.get("sweet") or {}).get(fam) or {}).get("sweet_spot")
+        stamp("EXAM SUMMARY (highest difficulty achieved per candidate)")
+        for (fam, rung), rec in sorted(
+            results.items(), key=lambda kv: -(kv[1].get("score") or -1)
+        ):
             verdict = rec.get("error") or f"score {rec.get('score')}"
-            print(f"  {fam} ({spot}): {verdict}")
+            print(f"  {fam} {rung}: {verdict}")
         if not args.no_git:
             tee_output.uninstall()
             git_tail(args)

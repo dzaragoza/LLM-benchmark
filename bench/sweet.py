@@ -425,31 +425,20 @@ def run(
             # every MEASURED rung stayed in-window: the ladder's last
             # measured quant is the sweet spot (the walk never went beyond)
             n_beyond = sum(1 for m in rec["rungs"].values() if m.get("in_window") is False)
-            # the OVER condition (the v8 rule pair): when NO rung can
-            # fill the training window within the time parameter, the
-            # sweet spot is the FASTEST measured rung - the model's
-            # best mechanical capacity. The exam's bell already handles
-            # both regimes (min(window, tg/s x time_factor)): under the
-            # window the window binds, over it the fill rate binds.
+            # the v8 rule pair, per rung: tg/s x time_factor >
+            # window = UNDER (the boundary rung is THE sweet spot);
+            # no rung meets it = OVER the window, and then EVERY
+            # measured quant is a sweet spot - the exam roster derives
+            # the candidates per rung, each with its own bell
+            # (min(window, its own tg x time_factor)). The walk itself
+            # records only the boundary; over-window models carry
+            # the flag, the exam reads the whole ladder.
             if not rec.get("sweet_spot") and n_beyond:
-                fastest = max(
-                    ((m.get("tg"), r) for r, m in rec["rungs"].items() if m.get("tg")),
-                    key=lambda x: x[0],
-                    default=(None, None),
+                rec["over_window"] = True
+                print(
+                    f"  {fam}: no rung fills the window within the time "
+                    "parameter (OVER) - every measured quant is a sweet spot"
                 )
-                if fastest[1]:
-                    rec["sweet_spot"] = fastest[1]
-                    famdir_f = os.path.join(models_dir, fam)
-                    rec["sweet_spot_file"] = (
-                        hf_download.local_rung(famdir_f, fastest[1])
-                        or _rung_file(famdir_f, fam, fastest[1])
-                    )
-                    rec["over_window"] = True
-                    print(
-                        f"  {fam}: no rung fills the window within the time "
-                        f"parameter - sweet spot = the fastest rung "
-                        f"{fastest[1]} ({fastest[0]:.2f} tok/s, OVER the window)"
-                    )
             _state_store.save_state(state_file, state)
             print(
                 f"  {fam}: curve complete - boundary {rec.get('sweet_spot')}, "
