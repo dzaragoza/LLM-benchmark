@@ -44,7 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.sweet import SWEET_LADDER, WINDOW_DEFAULT, roster_from_models_md
+from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md, window
 
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
@@ -333,17 +333,16 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
     the model was trained to hold, the whole paper. No tg/s leg, no
     in-window rule: the time bell (1024s per attempt) is what makes
     the fill-rate problem the model's, not the benchmark's."""
-    sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-    window = sweet_rec.get("window")
+    # the window may be cached in state (a previous era's read) -
+    # a fast path, not a dependency on the retired sweet tree
+    window = ((state.get("sweet") or {}).get(fam) or {}).get("window")
     if window:
         return int(window)
     repo = dict(roster_from_models_md()).get(fam)
     if not repo:
         return None
     try:
-        from bench.sweet import _window
-
-        return _window(repo, os.path.join(models_dir, fam))
+        return window(repo, os.path.join(models_dir, fam))
     except Exception:
         return WINDOW_DEFAULT
 
@@ -365,7 +364,7 @@ def candidates(
     fams = order if not families else [f.split("=")[0] for f in families]
     out: list[tuple[str, str]] = []
     for fam in fams:
-        for rung in SWEET_LADDER:
+        for rung in LADDER:
             out.append((fam, rung))
     return out
 
@@ -522,8 +521,8 @@ def run_family(
             exam["score"] = score
         if dry_run:
             exam["planned"] = (
-                f"bell ctx {ctx} (window {sweet_rec.get('window')} vs tg/s x 1024), "
-                f"sweep {start_level}..{max_level} on seeds {seeds}, 2 parts per level"
+                f"paper {ctx} tokens, sweep {start_level}..{max_level} "
+                f"on seeds {seeds}, 2 parts per level"
             )
         return exam
     finally:
@@ -547,11 +546,11 @@ def run_family(
 
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
     """Lazy acquisition: the candidate's file, downloaded/quantized
-    on demand via the same build path the sweet walk used. None = the
-    candidate cannot exist on this machine (RAM-infeasible, an
-    unquantizable shape, a tool failure) - recorded, skipped."""
+    on demand via the roster build path. None = the candidate cannot
+    exist on this machine (RAM-infeasible, an unquantizable shape, a
+    tool failure) - recorded, skipped."""
     import infra.hf_download as hf_download
-    from bench.sweet import _build
+    from bench.roster import build
 
     famdir = os.path.join(models_dir, fam)
     existing = hf_download.local_rung(famdir, rung)
@@ -561,7 +560,7 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
     if not repo:
         return None
     try:
-        return _build(fam, repo, famdir, rung)
+        return build(fam, repo, famdir, rung)
     except SystemExit as e:
         if e.code == 130:
             raise

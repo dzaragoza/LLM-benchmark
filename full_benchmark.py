@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
-"""full_benchmark.py -- the v8 orchestrator (sweet spot + exam).
+"""full_benchmark.py -- the v9 benchmark: the exam is the only phase.
 
-One command, two phases:
-  phase 1  the sweet walk - for the roster's first --models models,
-           walk the quant ladder, measure tg/s, find the boundary
-           rung: the last quant that can fill the training window
-           within the time parameter (tg/s x 1024 > window).
-  phase 2  the exam - each sweet spot takes the chain-follow +
-           elevator exam (one shared context per level, PASS/FAIL,
-           difficulty = hops); the final score is the highest
-           difficulty achieved.
+One command: every (model, quant) candidate in the roster takes the
+exam - the full training window as the paper, the 1024-second time
+bell per attempt, PASS/FAIL chain-following sweeps of escalating
+difficulty. The roster is self-cleaning: a scored candidate strictly
+below the running best loses its artifacts from disk (the data
+always stays in git). No pre-measurement, no model-count limits.
 
-  families  the roster's first --models models (param-ascending) or
-             the families given.
-  verdicts   commit and push themselves (addendum 31); --no-git opts out.
-
-Everything is IDEMPOTENT and RESUMABLE: the state file is rewritten after
-every cell; rerun the same command to resume. The v5/v7 tasks are cut,
-their code in git history (bench/v7.py remains importable).
-"""
+Everything is IDEMPOTENT and RESUMABLE: the state file is rewritten
+after every attempt; rerun the same command to resume."""
 
 from __future__ import annotations
 
@@ -311,17 +302,15 @@ def install_sigint_handler(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="the v8 benchmark: find each model's sweet spot "
-        "(phase 1, the quant that fills the context in time) and grade "
-        "the sweet spots with the exam (phase 2, chain-following "
-        "difficulty under a context bell)"
+        description="the v9 benchmark: every (model, quant) candidate "
+        "takes the exam - the full training window as the paper, the "
+        "1024s time bell, self-cleaning elimination"
     )
     ap.add_argument(
         "families",
         nargs="*",
-        help="family names, limiting the run to these models "
-        "(param-ascending from md/models.md); omitted = the roster's "
-        "first --models (v8) or the sweet-spot holders (exam)",
+        help="family names, limiting the exam to these models "
+        "(param-ascending from md/models.md); omitted = the full roster",
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -329,81 +318,16 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="exam",
-        choices=["exam", "sweet"],
-        help="the task; 'v8' (default) is the integrated run: sweet "
-        "walk over the first --models models, then the exam over "
-        "their sweet spots; 'sweet' and 'exam' run the phases standalone",
-    )
-    ap.add_argument(
-        "--models",
-        type=int,
-        default=16,
-        help="v8: the number of models to test (default 16), drawn "
-        "from the roster param-ascending starting at --models-from",
-    )
-    ap.add_argument(
-        "--models-from",
-        type=int,
-        default=1,
-        help="v8: the 1-based roster position to start from "
-        "(default 1 - the roster's first --models). Rarely used "
-        "directly: --refill derives it",
-    )
-    ap.add_argument(
-        "--refill",
-        action="store_true",
-        help="v8: the tournament refill - draw from the roster the "
-        "number of OPEN slots (16 minus the survivors still on disk) "
-        "starting at the first roster position never measured. After "
-        "the elimination cut, this brings the field back to 16 "
-        "candidates. Fails cleanly when the roster is exhausted "
-        "(fewer new models than open slots - the endgame phase)",
-    )
-    ap.add_argument(
-        "--sweet-repeat",
-        type=int,
-        default=3,
-        help="sweet: llama-bench repetitions per rung (default 3)",
-    )
-    ap.add_argument(
-        "--sweet-gen-len",
-        type=int,
-        default=None,
-        help="sweet: llama-bench's generation length (-n). Default: "
-        "the calibrated n - the median passing exam answer rounded "
-        "up to a power of two (measure the rate at the length good "
-        "answers actually are); falls back to 128 until passing "
-        "attempts exist in state. Expect the calibrated n to grow "
-        "as higher levels are passed - recalibrate then",
-    )
-    ap.add_argument(
-        "--sweet-concurrency",
-        type=int,
-        default=1024,
-        help="sweet: the concurrency factor - a rung is in-window while "
-        "tg/s * this > the training window (default 1024)",
-    )
-    ap.add_argument(
-        "--sweet-limit",
-        type=int,
-        default=4,
-        help="sweet: cap the walked roster to the first N models of "
-        "md/models.md (param-ascending; default 4 - the disk ruling). "
-        "The table keeps every model; only the walk is capped",
-    )
-    ap.add_argument(
-        "--sweet-retry-skipped",
-        action="store_true",
-        help="sweet: clear every stored skip (unavailable/bench-failed "
-        "records) before the walk, so transient causes (disk-full, a "
-        "truncated f16) get a fresh attempt; permanent shape "
-        "incompatibilities will re-skip",
+        choices=["exam"],
+        help="the benchmark: every (model, quant) candidate takes the "
+        "exam - the full training window as the paper, the 1024s time "
+        "bell, PASS/FAIL sweeps, self-cleaning elimination",
     )
     ap.add_argument(
         "--exam-seeds",
         type=int,
         default=1,
-        help="exam: the repetition count - the seed set is 1..n (the "
+        help="the repetition count - the seed set is 1..n (the "
         "benchmark runs n=1, so every instance is built from seed 1 "
         "and every model takes the SAME exam)",
     )
@@ -411,34 +335,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--exam-max-level",
         type=int,
         default=32,
-        help="exam: the sweep's hard ceiling on difficulty (hops)",
+        help="the sweep's hard ceiling on difficulty (hops)",
     )
     ap.add_argument(
         "--eliminate",
         default=None,
-        help="v8: mark these models ELIMINATED in the ledger and delete "
+        help="mark these models ELIMINATED in the ledger and delete "
         "their models/ artifacts (the collected data always stays in "
-        "git) - comma-separated family names. Run after reading the "
-        "exam summary; the next tournament round refills with "
-        "--models-from",
+        "git) - comma-separated family names; mostly superseded by "
+        "the run's self-cleaning gc",
     )
     ap.add_argument(
         "--clean",
         action="store_true",
         help="wipe the stored exam records UP FRONT, then measure - "
-        "never leave mixed-era results in the table (addendum 129); "
-        "the sweet measurements always stand",
+        "never leave mixed-era results; era changes only",
     )
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="READ-ONLY pre-flight: the plan, the feasibility checks, "
-        "nothing downloaded, converted, benched or written",
+        help="READ-ONLY pre-flight: the plan, nothing downloaded, "
+        "converted, examined or written",
     )
     ap.add_argument(
         "--no-git",
         action="store_true",
-        help="skip the git tail and the verdict commits",
+        help="skip the git tail and the artifact commits",
     )
     return ap
 
@@ -486,21 +408,18 @@ def main() -> None:
 
 def write_v8_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     """md/v8.md - the tournament ledger, rewritten from state after
-    every v8 run: every model the benchmark has ever measured, its
-    quants tested, why each failed its highest exam, the context
-    size (the bell), and whether it is eliminated (its models/
-    artifacts deleted on the benchmark machine - the data always
-    stays here). The roster position grounds the refill bookkeeping
-    (--models-from)."""
+    every run: every candidate ever measured, its score, why it
+    failed its highest exam, and whether it is eliminated (its
+    artifacts deleted from the benchmark machine - the data always
+    stays in git)."""
     from bench.exam import fail_reason
 
     exam = state.get("exam") or {}
-    sweet = state.get("sweet") or {}
     lines = [
         "# v8.md - the tournament ledger",
         "",
         "One row per (model, quant) candidate, param-ascending; regenerated",
-        "from state after every v8 run. Eliminated = the model's artifacts",
+        "from state after every run. Eliminated = the candidate's artifacts",
         "were deleted from the benchmark machine (the collected data",
         "always stays). The exam's failure reasons:",
         "`out of context` (the bell rang before an answer), `wrong chain`",
@@ -567,7 +486,7 @@ def _run(args: argparse.Namespace) -> None:
         # time bell; the roster is self-cleaning (strictly-lower
         # scorers are deleted from disk as soon as scores exist).
         from bench.exam import run as exam_run
-        from bench.sweet import roster_from_models_md
+        from bench.roster import roster_from_models_md
 
         if args.clean and state.get("exam"):
             state["exam"] = {}
@@ -626,75 +545,6 @@ def _run(args: argparse.Namespace) -> None:
             tee_output.uninstall()
             git_tail(args)
         stamp("v9 run complete")
-        return
-    if args.task == "sweet":
-        from bench.sweet import find_bench, roster_from_models_md
-        from bench.sweet import run as sweet_run
-
-        if args.sweet_retry_skipped:
-            cleared = 0
-            kept = 0
-            for rec in state.get("sweet", {}).values():
-                for rung, m in list(rec.get("rungs", {}).items()):
-                    if m.get("tg") is None:
-                        if m.get("permanent"):
-                            kept += 1
-                            continue
-                        del rec["rungs"][rung]
-                        cleared += 1
-            if kept:
-                stamp(
-                    f"sweet: {kept} permanently-unquantizable records kept "
-                    "(the architecture can never express this rung)"
-                )
-            if cleared:
-                save_state(args.state_file, state)
-                stamp(f"sweet: cleared {cleared} skipped records for a fresh attempt")
-        families = [f.split("=")[0] for f in args.families]
-        if not families:
-            families = [n for n, _ in roster_from_models_md()]
-            if args.sweet_limit and len(families) > args.sweet_limit:
-                cut = families[args.sweet_limit]
-                families = families[: args.sweet_limit]
-                stamp(
-                    f"sweet run capped at {len(families)} models (before {cut} - "
-                    f"--sweet-limit; md/models.md still carries the full roster)"
-                )
-            else:
-                stamp(
-                    f"fresh sweet run: the md/models.md roster, "
-                    f"param-ascending ({len(families)} models)"
-                )
-        sweet = sweet_run(
-            args.models_dir,
-            state,
-            args.state_file,
-            families,
-            repeat=args.sweet_repeat,
-            concurrency=args.sweet_concurrency,
-            gen_len=args.sweet_gen_len,
-            dry_run=args.dry_run,
-            bench_bin=find_bench(),
-        )
-        state["sweet"] = sweet
-        save_state(args.state_file, state)
-        print()
-        print("=" * 60)
-        stamp("SWEET-SPOT SUMMARY")
-        for fam, rec in (sweet or {}).items():
-            spot = rec.get("sweet_spot")
-            beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
-            if spot and rec.get("over_window"):
-                verdict = f"fastest rung {spot} (OVER the window - the fill-rate bell binds)"
-            elif spot:
-                verdict = f"boundary {spot}"
-            else:
-                verdict = "no measured rung"
-            print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
-        if not args.no_git:
-            tee_output.uninstall()
-            git_tail(args)
-        stamp("run complete")
         return
     if not args.no_git:
         tee_output.uninstall()
