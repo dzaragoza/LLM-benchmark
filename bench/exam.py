@@ -615,20 +615,27 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         famdir = os.path.join(models_dir, fam)
         if not os.path.isdir(famdir):
             continue
-        eliminated_any = False
+        values = [s for s in scored.values() if s is not None]
+        family_beaten = bool(values) and max(values) < best
         for rung, s in scored.items():
             if s is None or s >= best:
                 continue  # unscored (not the running family) or a survivor
+            # the f16 master is the QUANTIZATION SOURCE for the whole
+            # family - it is always the last to go, deleted only with
+            # the fully-eliminated family's directory (no quant of
+            # this family will ever be built again); until then it
+            # stays, whatever its own score
+            if rung.upper() == "F16" and not family_beaten:
+                continue
             # the beaten candidate's artifact goes, by name (either case)
             for p in _glob.glob(os.path.join(famdir, f"*-{rung}.gguf")):
                 try:
                     os.remove(p)
                     print(f"  gc: {fam} {rung} (score {s} < best {best}) - artifact deleted")
-                    eliminated_any = True
                 except OSError:
                     pass
-        # the whole family out? the directory goes
-        if values and max(values) < best:
+        # the whole family out? the directory goes - f16 included
+        if family_beaten:
             fam_exam["_eliminated"] = True
             shutil.rmtree(famdir, ignore_errors=True)
             print(f"  gc: {fam} eliminated (best score {max(values)} < {best}) - artifacts deleted")
