@@ -93040,3 +93040,224 @@ Qwen3.5-2B (window 262,144, in-window while tg/s*1024 > 262,144)
   Qwen3-4B-Instruct-2507: no in-window rung, 1 beyond-the-window curve points
   MiniCPM3-4B: boundary IQ1_S, 1 beyond-the-window curve points
   gemma-3-4b-it: no in-window rung, 0 beyond-the-window curve points
+
+===== 2026-10-21T15:15:02 | full_benchmark.py --task sweet --sweet-retry-skipped SmolLM2-360M-Instruct granite-4.0-1b Qwen3.5-2B =====
+[2026-10-21T15:15:02] sweet: cleared 1 skipped records for a fresh attempt
+
+============================================================
+SmolLM2-360M-Instruct (window 8,192, in-window while tg/s*1024 > 8,192)
+  IQ1_S: 188.06 tok/s (measured) x 1024 = 192,573 -> in-window
+  Q2_0: 221.41 tok/s (measured) x 1024 = 226,721 -> in-window
+  [2] quantizing SmolLM2-360M-Instruct-f16.gguf -> Q1_0 (output hidden; shown on error)
+  [2] using importance matrix SmolLM2-360M-Instruct-f16.gguf.imatrix
+
+--- output of the failed llama-quantize run (full log: ./models/SmolLM2-360M-Instruct/quantize-Q1_0.log) ---
+load_backend: loaded RPC backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-rpc.so
+ggml_vulkan: Found 1 Vulkan devices:
+ggml_vulkan: 0 = AMD Radeon 780M Graphics (RADV PHOENIX) (radv) | uma: 1 | fp16: dot2 | bf16: 0 | fp4: 0 | warp size: 64 | shared memory: 65536 | int dot: 1 | matrix cores: KHR_coopmat
+load_backend: loaded Vulkan backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+load_backend: loaded CPU backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-cpu-zen4.so
+version: 0.7.0-dev (build 11669, commit 620d2225c)
+built with GNU 11.4.0 for Linux x86_64
+llama_quantize: quantizing './models/SmolLM2-360M-Instruct/SmolLM2-360M-Instruct-f16.gguf' to './models/SmolLM2-360M-Instruct/SmolLM2-360M-Instruct-Q1_0.gguf' as Q1_0
+llama_model_loader: loaded meta data with 30 key-value pairs and 290 tensors from ./models/SmolLM2-360M-Instruct/SmolLM2-360M-Instruct-f16.gguf (version GGUF V3 (latest))
+llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+llama_model_loader: - kv   0:                       general.architecture str              = llama
+llama_model_loader: - kv   1:                               general.type str              = model
+llama_model_loader: - kv   2:                               general.name str              = Safetensors Source
+llama_model_loader: - kv   3:                         general.size_label str              = 362M
+llama_model_loader: - kv   4:                          llama.block_count u32              = 32
+llama_model_loader: - kv   5:                       llama.context_length u32              = 8192
+llama_model_loader: - kv   6:                     llama.embedding_length u32              = 960
+llama_model_loader: - kv   7:                  llama.feed_forward_length u32              = 2560
+llama_model_loader: - kv   8:                 llama.attention.head_count u32              = 15
+llama_model_loader: - kv   9:              llama.attention.head_count_kv u32              = 5
+llama_model_loader: - kv  10:                       llama.rope.freq_base f32              = 100000.000000
+llama_model_loader: - kv  11:     llama.attention.layer_norm_rms_epsilon f32              = 0.000010
+llama_model_loader: - kv  12:                 llama.attention.key_length u32              = 64
+llama_model_loader: - kv  13:               llama.attention.value_length u32              = 64
+llama_model_loader: - kv  14:                          general.file_type u32              = 1
+llama_model_loader: - kv  15:                           llama.vocab_size u32              = 49152
+llama_model_loader: - kv  16:                 llama.rope.dimension_count u32              = 64
+llama_model_loader: - kv  17:               general.quantization_version u32              = 2
+llama_model_loader: - kv  18:            tokenizer.ggml.add_space_prefix bool             = false
+llama_model_loader: - kv  19:                       tokenizer.ggml.model str              = gpt2
+llama_model_loader: - kv  20:                         tokenizer.ggml.pre str              = smollm
+llama_model_loader: - kv  21:                      tokenizer.ggml.tokens arr[str,49152]   = ["<|endoftext|>", "<|im_start|>", "<|...
+llama_model_loader: - kv  22:                  tokenizer.ggml.token_type arr[i32,49152]   = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, ...
+llama_model_loader: - kv  23:                      tokenizer.ggml.merges arr[str,48900]   = ["Ġ t", "Ġ a", "i n", "h e", "Ġ Ġ...
+llama_model_loader: - kv  24:                tokenizer.ggml.bos_token_id u32              = 1
+llama_model_loader: - kv  25:                tokenizer.ggml.eos_token_id u32              = 2
+llama_model_loader: - kv  26:            tokenizer.ggml.unknown_token_id u32              = 0
+llama_model_loader: - kv  27:            tokenizer.ggml.padding_token_id u32              = 2
+llama_model_loader: - kv  28:                    tokenizer.chat_template str              = {% for message in messages %}{% if lo...
+llama_model_loader: - kv  29:               tokenizer.ggml.add_bos_token bool             = false
+llama_model_loader: - type  f32:   65 tensors
+llama_model_loader: - type  f16:  225 tensors
+
+llama_model_quantize_impl: have importance matrix data with 224 entries
+warning: blk.0.attn_k.weight                  - ncols    960 not divisible by 128 (required for type    q1_0) llama_model_quantize: failed to quantize: no tensor type fallback is defined for type q1_0
+llama_quantize: failed to quantize model from './models/SmolLM2-360M-Instruct/SmolLM2-360M-Instruct-f16.gguf'
+load_imatrix: imatrix datasets=['./models/SmolLM2-360M-Instruct/imatrix-calib.txt']
+load_imatrix: loaded 224 importance matrix entries from ./models/SmolLM2-360M-Instruct/SmolLM2-360M-Instruct-f16.gguf.imatrix computed on 128 chunks
+prepare_imatrix: have 224 importance matrix entries
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q1_0: llama-quantize failed (full log: ./models/SmolLM2-360M-Instruct/quantize-Q1_0.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+  Q1_0: unavailable on this machine - skipped
+  IQ2_XXS: 188.52 tok/s (measured) x 1024 = 193,042 -> in-window
+  Q2_K_S: 191.47 tok/s (measured) x 1024 = 196,068 -> in-window
+  TQ2_0: 200.10 tok/s (measured) x 1024 = 204,899 -> in-window
+  IQ1_M: 176.36 tok/s (measured) x 1024 = 180,590 -> in-window
+  IQ2_XS: 186.17 tok/s (measured) x 1024 = 190,639 -> in-window
+  IQ2_S: 197.37 tok/s (measured) x 1024 = 202,104 -> in-window
+  Q2_K: 192.51 tok/s (measured) x 1024 = 197,129 -> in-window
+  IQ3_XXS: 195.46 tok/s (measured) x 1024 = 200,156 -> in-window
+  IQ2_M: 195.01 tok/s (measured) x 1024 = 199,688 -> in-window
+  IQ3_XS: 189.36 tok/s (measured) x 1024 = 193,900 -> in-window
+  IQ4_XS: 186.57 tok/s (measured) x 1024 = 191,050 -> in-window
+  IQ3_S: 190.17 tok/s (measured) x 1024 = 194,739 -> in-window
+  IQ3_M: 182.18 tok/s (measured) x 1024 = 186,555 -> in-window
+  Q3_K_S: 190.34 tok/s (measured) x 1024 = 194,911 -> in-window
+  Q4_0: 198.23 tok/s (measured) x 1024 = 202,987 -> in-window
+  IQ4_NL: 185.45 tok/s (measured) x 1024 = 189,902 -> in-window
+  Q3_K_M: 196.21 tok/s (measured) x 1024 = 200,919 -> in-window
+  Q4_K_S: 158.88 tok/s (measured) x 1024 = 162,693 -> in-window
+  Q4_1: 178.74 tok/s (measured) x 1024 = 183,029 -> in-window
+  Q4_K_M: 171.39 tok/s (measured) x 1024 = 175,499 -> in-window
+  Q3_K_L: 176.21 tok/s (measured) x 1024 = 180,435 -> in-window
+  Q5_K_S: 152.53 tok/s (measured) x 1024 = 156,195 -> in-window
+  TQ1_0: 191.22 tok/s (measured) x 1024 = 195,805 -> in-window
+  Q5_0: 167.11 tok/s (measured) x 1024 = 171,125 -> in-window
+  Q5_K_M: 152.98 tok/s (measured) x 1024 = 156,651 -> in-window
+  Q5_1: 157.13 tok/s (measured) x 1024 = 160,897 -> in-window
+  Q6_K: 142.38 tok/s (measured) x 1024 = 145,792 -> in-window
+  Q8_0: 142.39 tok/s (measured) x 1024 = 145,809 -> in-window
+  F16: 94.27 tok/s (measured) x 1024 = 96,527 -> in-window
+  SmolLM2-360M-Instruct: curve complete - boundary F16, 0 beyond points
+
+============================================================
+granite-4.0-1b (window 131,072, in-window while tg/s*1024 > 131,072)
+  IQ1_S: 95.80 tok/s (measured) x 1024 = 98,101 -> BEYOND (curve point)
+  Q2_0: 90.83 tok/s (measured) x 1024 = 93,005 -> BEYOND (curve point)
+  Q1_0: 82.72 tok/s (measured) x 1024 = 84,707 -> BEYOND (curve point)
+  IQ2_XXS: 80.61 tok/s (measured) x 1024 = 82,540 -> BEYOND (curve point)
+  Q2_K_S: 83.57 tok/s (measured) x 1024 = 85,572 -> BEYOND (curve point)
+  TQ2_0: 78.75 tok/s (measured) x 1024 = 80,639 -> BEYOND (curve point)
+  IQ1_M: 90.36 tok/s (measured) x 1024 = 92,529 -> BEYOND (curve point)
+  IQ2_XS: 80.37 tok/s (measured) x 1024 = 82,294 -> BEYOND (curve point)
+  IQ2_S: 77.82 tok/s (measured) x 1024 = 79,693 -> BEYOND (curve point)
+  Q2_K: 77.06 tok/s (measured) x 1024 = 78,913 -> BEYOND (curve point)
+  IQ3_XXS: 72.64 tok/s (measured) x 1024 = 74,384 -> BEYOND (curve point)
+  IQ2_M: 71.76 tok/s (measured) x 1024 = 73,485 -> BEYOND (curve point)
+  IQ3_XS: 69.55 tok/s (measured) x 1024 = 71,217 -> BEYOND (curve point)
+  IQ4_XS: 68.45 tok/s (measured) x 1024 = 70,095 -> BEYOND (curve point)
+  IQ3_S: 67.45 tok/s (measured) x 1024 = 69,066 -> BEYOND (curve point)
+  IQ3_M: 67.78 tok/s (measured) x 1024 = 69,408 -> BEYOND (curve point)
+  Q3_K_S: 67.07 tok/s (measured) x 1024 = 68,684 -> BEYOND (curve point)
+  Q4_0: 65.37 tok/s (measured) x 1024 = 66,943 -> BEYOND (curve point)
+  IQ4_NL: 63.12 tok/s (measured) x 1024 = 64,635 -> BEYOND (curve point)
+  Q3_K_M: 66.50 tok/s (measured) x 1024 = 68,096 -> BEYOND (curve point)
+  Q4_K_S: 65.68 tok/s (measured) x 1024 = 67,259 -> BEYOND (curve point)
+  Q4_1: 63.06 tok/s (measured) x 1024 = 64,575 -> BEYOND (curve point)
+  Q4_K_M: 62.78 tok/s (measured) x 1024 = 64,290 -> BEYOND (curve point)
+  Q3_K_L: 63.34 tok/s (measured) x 1024 = 64,861 -> BEYOND (curve point)
+  Q5_K_S: 58.10 tok/s (measured) x 1024 = 59,490 -> BEYOND (curve point)
+  TQ1_0: 58.27 tok/s (measured) x 1024 = 59,672 -> BEYOND (curve point)
+  Q5_0: 56.84 tok/s (measured) x 1024 = 58,200 -> BEYOND (curve point)
+  Q5_K_M: 56.69 tok/s (measured) x 1024 = 58,054 -> BEYOND (curve point)
+  Q5_1: 54.58 tok/s (measured) x 1024 = 55,894 -> BEYOND (curve point)
+  Q6_K: 50.78 tok/s (measured) x 1024 = 52,003 -> BEYOND (curve point)
+  Q8_0: 41.22 tok/s (measured) x 1024 = 42,211 -> BEYOND (curve point)
+  F16: 24.06 tok/s (measured) x 1024 = 24,637 -> BEYOND (curve point)
+  granite-4.0-1b: curve complete - boundary None, 32 beyond points
+
+============================================================
+Qwen3.5-2B (window 262,144, in-window while tg/s*1024 > 262,144)
+  IQ1_S: 72.02 tok/s (measured) x 1024 = 73,746 -> BEYOND (curve point)
+  Q2_0: 69.06 tok/s (measured) x 1024 = 70,713 -> BEYOND (curve point)
+  Q1_0: 64.04 tok/s (measured) x 1024 = 65,577 -> BEYOND (curve point)
+  IQ2_XXS: 67.12 tok/s (measured) x 1024 = 68,733 -> BEYOND (curve point)
+  Q2_K_S: 62.04 tok/s (measured) x 1024 = 63,534 -> BEYOND (curve point)
+  TQ2_0: 62.70 tok/s (measured) x 1024 = 64,200 -> BEYOND (curve point)
+  IQ1_M: 70.43 tok/s (measured) x 1024 = 72,122 -> BEYOND (curve point)
+  IQ2_XS: 63.61 tok/s (measured) x 1024 = 65,140 -> BEYOND (curve point)
+  IQ2_S: 62.43 tok/s (measured) x 1024 = 63,929 -> BEYOND (curve point)
+  Q2_K: 59.17 tok/s (measured) x 1024 = 60,593 -> BEYOND (curve point)
+  IQ3_XXS: 59.65 tok/s (measured) x 1024 = 61,082 -> BEYOND (curve point)
+  IQ2_M: 58.98 tok/s (measured) x 1024 = 60,396 -> BEYOND (curve point)
+  IQ3_XS: 54.91 tok/s (measured) x 1024 = 56,230 -> BEYOND (curve point)
+  IQ4_XS: 53.21 tok/s (measured) x 1024 = 54,489 -> BEYOND (curve point)
+  IQ3_S: 54.00 tok/s (measured) x 1024 = 55,293 -> BEYOND (curve point)
+  IQ3_M: 54.52 tok/s (measured) x 1024 = 55,830 -> BEYOND (curve point)
+  Q3_K_S: 54.04 tok/s (measured) x 1024 = 55,333 -> BEYOND (curve point)
+  Q4_0: 53.43 tok/s (measured) x 1024 = 54,715 -> BEYOND (curve point)
+  IQ4_NL: 51.15 tok/s (measured) x 1024 = 52,380 -> BEYOND (curve point)
+  Q3_K_M: 53.72 tok/s (measured) x 1024 = 55,010 -> BEYOND (curve point)
+  Q4_K_S: 52.76 tok/s (measured) x 1024 = 54,028 -> BEYOND (curve point)
+  Q4_1: 51.61 tok/s (measured) x 1024 = 52,853 -> BEYOND (curve point)
+  Q4_K_M: 50.54 tok/s (measured) x 1024 = 51,748 -> BEYOND (curve point)
+  Q3_K_L: 51.76 tok/s (measured) x 1024 = 52,997 -> BEYOND (curve point)
+  Q5_K_S: 48.05 tok/s (measured) x 1024 = 49,199 -> BEYOND (curve point)
+  TQ1_0: 47.98 tok/s (measured) x 1024 = 49,131 -> BEYOND (curve point)
+  Q5_0: 47.32 tok/s (measured) x 1024 = 48,455 -> BEYOND (curve point)
+  Q5_K_M: 47.01 tok/s (measured) x 1024 = 48,135 -> BEYOND (curve point)
+  Q5_1: 45.75 tok/s (measured) x 1024 = 46,843 -> BEYOND (curve point)
+  Q6_K: 43.20 tok/s (measured) x 1024 = 44,233 -> BEYOND (curve point)
+  Q8_0: 34.58 tok/s (measured) x 1024 = 35,406 -> BEYOND (curve point)
+  F16: 20.32 tok/s (measured) x 1024 = 20,808 -> BEYOND (curve point)
+  Qwen3.5-2B: curve complete - boundary None, 32 beyond points
+
+============================================================
+[2026-10-21T15:15:18] SWEET-SPOT SUMMARY
+  granite-4.0-h-350m: boundary F16, 0 beyond-the-window curve points
+  granite-4.0-350m: boundary F16, 0 beyond-the-window curve points
+  SmolLM2-360M-Instruct: boundary F16, 0 beyond-the-window curve points
+  MiniCPM4-0.5B: boundary F16, 0 beyond-the-window curve points
+  Qwen2.5-0.5B-Instruct: boundary F16, 0 beyond-the-window curve points
+  Qwen3-0.6B: boundary F16, 0 beyond-the-window curve points
+  Qwen3.5-0.8B: no in-window rung, 32 beyond-the-window curve points
+  MiniCPM5-1B: boundary IQ2_S, 24 beyond-the-window curve points
+  MiniCPM-1B-sft: boundary F16, 0 beyond-the-window curve points
+  phi-1: boundary F16, 0 beyond-the-window curve points
+  granite-4.0-h-1b: no in-window rung, 32 beyond-the-window curve points
+  Qwen2.5-1.5B-Instruct: boundary Q8_0, 2 beyond-the-window curve points
+  granite-4.0-1b: no in-window rung, 32 beyond-the-window curve points
+  SmolLM2-1.7B-Instruct: boundary F16, 0 beyond-the-window curve points
+  Qwen3-1.7B: boundary Q6_K, 2 beyond-the-window curve points
+  Qwen3.5-2B: no in-window rung, 32 beyond-the-window curve points
+  MiniCPM5-2B: no in-window rung, 1 beyond-the-window curve points
+  granite-3.1-2b-instruct: no in-window rung, 1 beyond-the-window curve points
+  granite-3.2-2b-instruct: no in-window rung, 1 beyond-the-window curve points
+  granite-3.3-2b-instruct: no in-window rung, 1 beyond-the-window curve points
+  granite-3.0-2b-instruct: boundary F16, 0 beyond-the-window curve points
+  MiniCPM-2B-sft: boundary F16, 0 beyond-the-window curve points
+  phi-2: boundary F16, 0 beyond-the-window curve points
+  RWKV7-World-2.9B: boundary F16, 0 beyond-the-window curve points
+  AI21-Jamba2-3B: no in-window rung, 1 beyond-the-window curve points
+  SmolLM3-3B: boundary IQ1_S, 1 beyond-the-window curve points
+  Qwen2.5-3B-Instruct: boundary Q4_K_M, 1 beyond-the-window curve points
+  granite-4.0-h-micro: no in-window rung, 1 beyond-the-window curve points
+  AI21-Jamba-Reasoning-3B: no in-window rung, 1 beyond-the-window curve points
+  granite-4.0-micro: no in-window rung, 1 beyond-the-window curve points
+  granite-4.1-3b: no in-window rung, 1 beyond-the-window curve points
+  granite-4.2-3b: no in-window rung, 1 beyond-the-window curve points
+  Phi-3-mini-128k-instruct: no in-window rung, 1 beyond-the-window curve points
+  Phi-3-mini-4k-instruct: boundary F16, 0 beyond-the-window curve points
+  Phi-3.5-mini-instruct: no in-window rung, 1 beyond-the-window curve points
+  phi-4-mini-instruct: no in-window rung, 1 beyond-the-window curve points
+  Ministral-3-3B-Instruct-2512: no in-window rung, 1 beyond-the-window curve points
+  Qwen3-4B-Instruct-2507: no in-window rung, 1 beyond-the-window curve points
+  MiniCPM3-4B: boundary IQ1_S, 1 beyond-the-window curve points
+  gemma-3-4b-it: no in-window rung, 0 beyond-the-window curve points
