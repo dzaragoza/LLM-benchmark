@@ -539,8 +539,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="v7: wipe ALL stored v7 cells and answer logs UP FRONT, then "
-        "measure - never leave mixed-era results in the table (addendum 129)",
+        help="wipe ALL stored results UP FRONT, then measure - never "
+        "leave mixed-era results in the table (addendum 129): the v7 "
+        "cells for --task v7, the exam records for --task exam/v8 "
+        "(levels, scores, errors - a full re-measure)",
     )
     ap.add_argument(
         "--dry-run",
@@ -616,6 +618,10 @@ def _run(args: argparse.Namespace) -> None:
         from bench.sweet import find_bench, roster_from_models_md
         from bench.sweet import run as sweet_run
 
+        if args.clean and state.get("exam"):
+            state["exam"] = {}
+            save_state(args.state_file, state)
+            stamp("exam: all records wiped (--clean) - a full re-measure")
         roster = [name for name, _ in roster_from_models_md()]
         families = roster[: args.models]
         if len(families) < len(roster):
@@ -676,6 +682,10 @@ def _run(args: argparse.Namespace) -> None:
     if args.task == "exam":
         from bench.exam import run as exam_run
 
+        if args.clean and state.get("exam"):
+            state["exam"] = {}
+            save_state(args.state_file, state)
+            stamp("exam: all records wiped (--clean) - a full re-measure")
         results = exam_run(
             args.models_dir,
             state,

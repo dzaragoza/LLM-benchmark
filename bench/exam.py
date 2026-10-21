@@ -249,7 +249,15 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
         else:
             return False
     found = [t for t in TRIGRAMS.findall(line)]
-    return found == [t.lower() for t in exam["path"]]
+    expected = [t.lower() for t in exam["path"]]
+    # FLEXIBLE GRADING (the trial era): the expected chain must appear
+    # as an ORDERED SUBSEQUENCE of the ANSWER line - extra tokens,
+    # padding (e.g. trailing end markers), and duplicates are
+    # tolerated; only the order of the real links is enforced. The
+    # strict era (exact match, no extras) returns once the benchmark
+    # matures and the contestant field narrows
+    it = iter(found)
+    return all(tok in it for tok in expected)
 
 
 def bell_context(sweet_rec: dict[str, Any], time_factor: int = 1024) -> int | None:
