@@ -389,7 +389,7 @@ def run_family(
                             answer_tokens=tokens,
                             finish_reason=finish,
                             elapsed_s=round(time.monotonic() - t0, 1),
-                            answer=(answer or "")[-400:],
+                            answer=(answer or "")[-2000:],
                         )
                         attempts.append(attempt)
                         with open(answers_path, "a", encoding="utf-8") as fh:
