@@ -278,10 +278,13 @@ def _bench(path: str, repeat: int, gen_len: int = 2048) -> float | None:
 
 def _era_ok(rec_rung: dict[str, Any], gen_len: int) -> bool:
     """A stored tg is reusable only within its measurement era: the
-    -n it was measured at (burst n=128 vs sustained n=2048) changes
-    the number materially (thermal decay, KV growth). A record
-    without a gen_len stamp is the old burst era - stale under a
-    sustained run."""
+    -n it was measured at changes the number materially (thermal
+    decay, KV growth). An UNSTAMPED record is the original burst
+    era - n=128, the first protocol - which is exactly the
+    calibrated default era; stamped records must match the run's
+    gen_len."""
+    if rec_rung.get("gen_len") is None:
+        return gen_len == 128
     return rec_rung.get("gen_len") == gen_len
 
 

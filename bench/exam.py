@@ -348,7 +348,12 @@ def run(
         for cand in alive:
             fam, rung, gguf = cand
             key = (fam, rung)
-            rec = ((state.get("exam") or {}).get(fam) or {}).get(rung) or {}
+            fam_exam = (state.get("exam") or {}).get(fam) or {}
+            # old-era rollback records are family-keyed (the boundary
+            # candidate directly); new-era records are rung-keyed
+            rec = fam_exam.get(rung) or {}
+            if not rec and "levels" in fam_exam:
+                rec = fam_exam
             if str(level) in (rec.get("levels") or {}) and not dry_run:
                 passed = rec["levels"][str(level)].get("pass")
             elif dry_run:
