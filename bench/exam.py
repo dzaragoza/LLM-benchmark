@@ -1,36 +1,53 @@
-"""bench.exam -- the quality exam (phase 2): the chain-hop test with
-elevator logic (Daniela's design, KNOWLEDGE.md variants 4b/4c).
+"""bench.exam -- the quality exam (phase 2): chain hops + elevator
+logic (Daniela's design, KNOWLEDGE.md variants 1 and 4c, the exam
+protocol).
 
 The phase-1 sweet walk found the quants that can FILL the context in
-time; the exam now DISTINGUISHES QUALITY between them. The task: a
-numbered list of (token, signed-number) pairs - the elevator (variant
-4c): add the number to the pair's position to find the next pair, 0 =
-end marker. This is the chain-following primitive proven teachable to
-small models (the 2B solved it once the positions were printed:
-"don't ask the model to count; print the numbers").
+time; the exam now DISTINGUISHES QUALITY between them. Each level has
+TWO parts:
+
+  part 1  CHAIN FOLLOW (variant 1): pairs (A, B) where B is the first
+          item of exactly one other pair - identity matching; the
+          chain ends at the dangling token that never heads a pair.
+  part 2  ELEVATOR (variant 4c): a numbered list of (token,
+          signed-number) pairs - add the number to the pair's position
+          to find the next pair, 0 = end marker. The chain-following
+          primitive proven teachable to small models once the indices
+          are printed ("don't ask the model to count; print the
+          numbers").
+
+A level passes only when BOTH parts pass.
 
 Protocol (Daniela's exam philosophy):
-  - difficulty = number of hops (chain links): level 0 = read the
-    start pair (1 pair, end marker), level d = d hops over d+1 pairs
-  - PASS/FAIL, no partial credit (the phase-1 score was partial; the
-    exam is a bell: the full chain in the ANSWER line, or fail)
-  - the bell is a TOKEN CAP, not a time budget (KNOWLEDGE.md's formal
-    protocol): no answer within cap completion tokens = fail
-  - every model takes the SAME exams: a fixed set of seeds per level;
-    a level pass requires passing every seed (n>=2 fights
-    understanding-luck near boundaries)
-  - applied in sweeps: level 0 tests every sweet spot; the next round's
-    only candidates are the previous round's passers; rounds continue
-    until no sweet spot passes - the final score is the highest exam
-    difficulty achieved
+  - difficulty = number of hops, adjustable from level 0 upward
+  - PASS/FAIL, no partial credit: the ANSWER line must carry the full
+    chain in order, graded semantically
+  - the BELL is the CONTEXT, integrated with the phase-1 sweet-spot
+    measurements: the exam context is min(training window, tg/s x
+    1024) - the number of tokens the sweet spot can actually fill
+    (the in-window guarantee makes this the window for in-window
+    rungs; the tg/s leg binds otherwise). The exam ends when the
+    model EMITS an answer (finish_reason=stop) or RUNS OUT OF CONTEXT
+    (finish_reason=length) - both conditions are checked, and
+    running out is a FAIL (no answer within the bell).
+  - the seed follows the REPETITION count: n=1 for the benchmark, so
+    every exam instance is built from seed 1 - every model takes the
+    SAME exam
+  - predictability is protocol-registered (protocol.md:179):
+    temperature 0 (greedy argmax), sampler seed 1024, thinking
+    disabled - the model behaves as deterministically as it can
+  - applied in sweeps: level 0 tests every sweet spot, the next
+    round's only candidates are the previous round's passers, rounds
+    continue until no sweet spot passes - the final score is the
+    highest exam difficulty achieved
   - answer tokens are recorded for every attempt (the spending
     signature: terse refusal / rumination / solve)
 
-The prompt follows the validated design lessons: the input is stated
-WELL-FORMED (no integrity auditing), the demo shows the PROCEDURE on
-dummy tokens (outcomes teach nothing), scratchpad is invited (thinking
-in the answer is load-bearing), and the final line is a fixed ANSWER
-format graded semantically (format drift elsewhere is tolerated).
+The prompts follow the validated design lessons: the input is stated
+WELL-FORMED (no integrity auditing), the demos show the PROCEDURE on
+dummy tokens, scratchpad is invited (thinking in the answer is
+load-bearing), and the final line is a fixed ANSWER format graded
+semantically (format drift elsewhere is tolerated).
 """
 
 from __future__ import annotations
@@ -49,20 +66,16 @@ import infra.llama_server as llama_server
 from bench import state_store as _state_store
 from bench.sweet import roster_from_models_md
 
-# the fixed seed set - every model takes the SAME exams (the
-# protocol's fixed-N-seeds ruling; repetition fights chaos)
+# protocol.md:179 - Determinism: temperature 0, seed 1024
+SAMPLER_SEED = 1024
+
+# the repetition count IS the seed set: n=1 for the benchmark, so the
+# seed is 1 - one exam instance per level, identical for every model
 def exam_seeds(n: int) -> list[int]:
     return list(range(1, n + 1))
 
 TRIGRAMS = re.compile(r"\b[a-z]{3}\b")
-
-DEMO = """Worked example (dummy tokens, not part of the task):
-  1. bbb  +2
-  2. aaa  -1
-  3. ccc  +1
-  4. ddd   0
-Start at aaa, which sits at position 2. aaa's number is -1: 2 + (-1) = 1, so the next pair is the one at position 1: bbb. bbb's number is +2: 1 + 2 = 3, so the next pair is the one at position 3: ccc. ccc's number is +1: 3 + 1 = 4, so the next pair is the one at position 4: ddd. ddd's number is 0: end of chain.
-ANSWER: aaa, bbb, ccc, ddd"""
+ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 
 
 def _gen_tokens(rng: random.Random, n: int) -> list[str]:
@@ -71,101 +84,90 @@ def _gen_tokens(rng: random.Random, n: int) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
     while len(out) < n:
-        t = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(3))
+        t = "".join(rng.choice(ALPHABET) for _ in range(3))
         if t not in seen:
             seen.add(t)
             out.append(t)
     return out
 
 
-def build_exam(seed: int, level: int) -> dict[str, Any]:
-    """One numbered-elevator instance at the given difficulty.
-
-    level = number of hops: level 0 = 1 pair (the given start carries
-    the 0 end marker), level d = d+1 pairs, d links to follow. The
-    chain is a verified Hamiltonian path over the printed positions
-    (every pair visited exactly once, ends at the 0 pair), built by
-    construction: the path IS the chain, the jumps are the position
-    differences along it. Tokens are fresh per (seed, level) - the
-    same seed set for every model, so every candidate takes the SAME
-    exam at every level."""
-    rng = random.Random(f"exam-{seed}-{level}")
+def build_chain(seed: int, level: int) -> dict[str, Any]:
+    """Part 1 - the identity-matching chain (variant 1). level d = d+1
+    pairs, d+1 links; the chain t0 -> t1 -> ... -> t(d+1) has a
+    dangling end that never heads a pair. The start token is given; the
+    model matches second-items to first-items until the dangling end.
+    Verified single chain by construction (one unbroken path, no
+    forks, no loops)."""
+    rng = random.Random(f"exam-chain-{seed}-{level}")
     n_pairs = max(1, level + 1)
-    # chain order: pairs[0] is the start; its token is given in the
-    # prompt. tokens[0..n-1] are the pair tokens, tokens[n] the
-    # dangling end-of-chain token (printed nowhere - the ANSWER stops
-    # at the 0 pair).
+    tokens = _gen_tokens(rng, n_pairs + 1)
+    pairs = [(tokens[i], tokens[i + 1]) for i in range(n_pairs)]
+    order = list(range(n_pairs))
+    rng.shuffle(order)
+    rows = [pairs[i] for i in order]
+    return {
+        "part": "chain",
+        "level": level,
+        "seed": seed,
+        "rows": rows,
+        "start": tokens[0],
+        "path": tokens,
+    }
+
+
+def build_elevator(seed: int, level: int) -> dict[str, Any]:
+    """Part 2 - the numbered elevator (variant 4c). level d = d+1
+    printed pairs, d hops: add the signed number to the pair's
+    position to find the next pair; 0 = end marker. A Hamiltonian path
+    over the printed positions by construction - the path IS the
+    chain, the jumps are the position differences along it."""
+    rng = random.Random(f"exam-elevator-{seed}-{level}")
+    n_pairs = max(1, level + 1)
     tokens = _gen_tokens(rng, n_pairs)
-    # printed order = a seeded shuffle of the chain; positions are
-    # the printed row numbers (1-based) the jumps refer to
     printed = list(range(n_pairs))
     rng.shuffle(printed)
-    rows = []  # printed rows: (position, token, jump)
+    rows = []
     for chain_index, printed_index in enumerate(printed):
         last = chain_index == n_pairs - 1
-        if last:
-            jump = 0
-        else:
-            jump = printed[chain_index + 1] - printed_index
+        jump = 0 if last else printed[chain_index + 1] - printed_index
         rows.append((printed_index + 1, tokens[chain_index], jump))
-    start = tokens[0]
-    path = list(tokens)
-    # verified by construction; the sanity re-check is the design's
-    # own no-forks/no-loops rule made code (R-level: generated sets
-    # are verified single chains)
-    pos = {t: p for p, t, _ in rows}
-    walked: list[str] = []
-    cur = start
-    while True:
-        walked.append(cur)
-        row = next(r for r in rows if r[1] == cur)
-        if row[2] == 0:
-            break
-        nxt = pos_of(pos, row, rows, row[2])
-        assert nxt is not None and nxt not in walked, "chain generation bug"
-        cur = nxt
-    assert walked == path, "chain generation bug"
-    return {"level": level, "seed": seed, "rows": rows, "start": start, "path": path}
+    return {
+        "part": "elevator",
+        "level": level,
+        "seed": seed,
+        "rows": rows,
+        "start": tokens[0],
+        "path": list(tokens),
+    }
 
 
-def pos_of(pos: dict[str, int], row: tuple[int, str, int], rows: list, jump: int) -> str | None:
-    """The token at this row's position + jump (elevator arithmetic)."""
-    target = row[0] + jump
-    for p, t, _ in rows:
-        if p == target:
-            return t
-    return None
+CHAIN_DEMO = """Worked example (dummy tokens, not part of the task):
+  (bbb, ccc)
+  (aaa, bbb)
+  (ddd, ccc)
+Chain rule: after a pair (A, B), the next pair in the chain is the one whose FIRST item is B. Start at aaa: the pair (aaa, bbb) comes first; its second item is bbb, so the next pair is the one whose first item is bbb: (bbb, ccc). Its second item is ccc, but ccc never appears as a first item - so ccc is the dangling end of the chain.
+ANSWER: aaa, bbb, ccc, ddd"""
+
+ELEVATOR_DEMO = """Worked example (dummy tokens, not part of the task):
+  1. bbb  +2
+  2. aaa  -1
+  3. ccc  +1
+  4. ddd   0
+Start at aaa, which sits at position 2. aaa's number is -1: 2 + (-1) = 1, so the next pair is the one at position 1: bbb. bbb's number is +2: 1 + 2 = 3, so the next pair is the one at position 3: ccc. ccc's number is +1: 3 + 1 = 4, so the next pair is the one at position 4: ddd. ddd's number is 0: end of chain.
+ANSWER: aaa, bbb, ccc, ddd"""
 
 
-def exam_prompt(exam: dict[str, Any]) -> str:
-    """The validated prompt skeleton: well-formed statement, procedure
-    demo on dummy tokens, printed indices, scratchpad invitation, and
-    the fixed final ANSWER line the grader reads."""
-    lines = ["You are solving a CHAIN-FOLLOWING task.", ""]
-    lines.append(
-        "You are given a numbered list of pairs. Each pair is a 3-letter token "
-        "and a signed number. The number tells you where the next pair in the "
-        "chain lives: add the number to the pair's position in the list, and the "
-        "pair at the resulting position is the next link in the chain. A pair "
-        "with the number 0 is the END of the chain."
-    )
-    lines.append("")
+def _shared_prompt(exam: dict[str, Any], demo: str, task_lines: list[str]) -> str:
+    lines = [f"You are solving PART {exam['part'].upper()} of a CHAIN-FOLLOWING task.", ""]
     lines.append(
         "The input is WELL-FORMED: no loops, no typos, exactly one valid chain "
         "exists, and it visits every pair exactly once. Do not spend time "
         "checking this - it is guaranteed."
     )
     lines.append("")
-    lines.append(DEMO)
+    lines.append(demo)
     lines.append("")
-    lines.append(f"The task (the chain starts at {exam['start']}):")
-    for p, t, j in exam["rows"]:
-        lines.append(f"  {p}. {t}  {j:+d}")
-    lines.append("")
-    lines.append(
-        f"Solve the task: start at {exam['start']}, follow the chain pair by "
-        "pair until you reach the pair with the number 0."
-    )
+    lines.extend(task_lines)
     lines.append("")
     lines.append(
         "You may work freely - show your steps, there is no penalty for "
@@ -176,33 +178,58 @@ def exam_prompt(exam: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def ask_exam(port: int, prompt: str, cap: int, no_thinking: bool = True) -> tuple[str, int]:
-    """One completion under the bell: max_tokens = the token cap (fail =
-    no answer within cap tokens, the formal protocol). Returns the text
-    and the ACTUAL completion-token count (the spending signature -
-    the answer's cost is a first-class metric, KNOWLEDGE.md's metric
-    update)."""
+def chain_prompt(exam: dict[str, Any]) -> str:
+    task = [f"The task (the chain starts at {exam['start']}):"]
+    for a, b in exam["rows"]:
+        task.append(f"  ({a}, {b})")
+    return _shared_prompt(exam, CHAIN_DEMO, task)
+
+
+def elevator_prompt(exam: dict[str, Any]) -> str:
+    task = [f"The task (the chain starts at {exam['start']}):"]
+    for p, t, j in exam["rows"]:
+        task.append(f"  {p}. {t}  {j:+d}")
+    return _shared_prompt(exam, ELEVATOR_DEMO, task)
+
+
+def ask_exam(
+    port: int, prompt: str, bell_tokens: int, no_thinking: bool = True
+) -> tuple[str, int, str]:
+    """One completion under the bell. The bell is the CONTEXT budget:
+    max_tokens = bell_tokens, the sweet-spot-derived fill capacity.
+    Returns (text, completion_tokens, finish_reason) - the caller
+    checks BOTH end conditions: an emitted answer (finish_reason
+    'stop') or the bell (finish_reason 'length' = out of context)."""
     payload: dict[str, Any] = {
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": cap,
+        "max_tokens": bell_tokens,
         "temperature": 0,
+        "seed": SAMPLER_SEED,
         "stream": False,
     }
     if no_thinking:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
     data = llama_server.post_json(port, "/v1/chat/completions", payload)
-    msg = data["choices"][0]["message"]
+    choice = data["choices"][0]
+    msg = choice["message"]
     text = msg.get("content") or msg.get("reasoning_content") or ""
     usage = data.get("usage") or {}
-    return text, int(usage.get("completion_tokens") or 0)
+    return (
+        text,
+        int(usage.get("completion_tokens") or 0),
+        choice.get("finish_reason") or "",
+    )
 
 
-def score_exam(answer: str, exam: dict[str, Any]) -> bool:
-    """PASS/FAIL on completion (the protocol's bell): the ANSWER line
-    must carry the full chain in order. Graded semantically - the
-    tokens are matched case-insensitively in order; surrounding text
-    or separators are tolerated, the ORDER is not. Missing ANSWER line
-    = fail (the bell rang without an answer: no score for traces)."""
+def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
+    """PASS/FAIL on completion: the ANSWER line must carry the full
+    chain in order. Graded semantically - tokens matched
+    case-insensitively in order; surrounding text and separators
+    tolerated, the ORDER not. An exam that ran out of context
+    (finish_reason 'length') FAILS even if a partial answer leaked -
+    the bell rang before completion. Missing ANSWER line = fail."""
+    if finish_reason == "length":
+        return False
     text = (answer or "").lower()
     m = re.search(r"answer\s*:\s*(.+)", text)
     line = m.group(1) if m else ""
@@ -218,6 +245,21 @@ def score_exam(answer: str, exam: dict[str, Any]) -> bool:
     return found == [t.lower() for t in exam["path"]]
 
 
+def bell_context(sweet_rec: dict[str, Any]) -> int | None:
+    """The bell, integrated with the phase-1 measurements: the exam
+    context is min(training window, tg/s x 1024) for the sweet-spot
+    rung - either leg binds depending on the model/quant (the
+    in-window rungs' window leg, or the fill-rate leg). None when the
+    sweet spot has no measured tg."""
+    window = sweet_rec.get("window")
+    spot = sweet_rec.get("sweet_spot")
+    rung = (sweet_rec.get("rungs") or {}).get(spot or "") or {}
+    tg = rung.get("tg")
+    if not window or tg is None:
+        return None
+    return max(1024, min(int(window), int(tg * 1024)))
+
+
 def run_family(
     fam: str,
     gguf: str,
@@ -225,30 +267,38 @@ def run_family(
     state: dict[str, Any],
     state_file: str,
     port: int,
-    cap: int,
     seeds: list[int],
     max_level: int,
     start_level: int,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """One family's sweep: every level from the first unrecorded one,
-    every seed per level, until the first failing level. The final
-    score is the highest level passed (all seeds). Resumable: recorded
-    levels are never re-measured (idempotence, the state-store rule)."""
+    both parts per level, until the first failing level. The final
+    score is the highest level passed (both parts, every seed).
+    Resumable: recorded levels are never re-measured."""
+    sweet_rec = (state.get("sweet") or {}).get(fam) or {}
+    ctx = bell_context(sweet_rec)
+    if ctx is None:
+        return {"error": "no measured sweet spot (window/tg) to set the bell"}
     exam = state.setdefault("exam", {}).setdefault(fam, {})
     exam["rung"] = os.path.basename(gguf)
+    exam["bell_ctx"] = ctx
     levels = exam.setdefault("levels", {})
     answers_dir = os.path.join(models_dir, "exam-results", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, "answers.jsonl")
-    ctx = max(4096, cap + 2048)
     log_path = os.path.join(answers_dir, "exam-server.log")
     proc = None
     score = None
     try:
         if not dry_run:
+            # server context: the bell + prompt headroom (the prompt
+            # and template must fit alongside the generation budget)
             proc, healthy = llama_server.start_server(
-                gguf, port=port, extra_args=["-c", str(ctx), "--parallel", "1"], log_path=log_path
+                gguf,
+                port=port,
+                extra_args=["-c", str(ctx + 2048), "--parallel", "1"],
+                log_path=log_path,
             )
             if not healthy or not llama_server.wait_healthy(port, proc=proc):
                 exam["error"] = "server did not come up"
@@ -262,41 +312,49 @@ def run_family(
                 attempts = []
                 passed = True
                 for seed in seeds:
-                    inst = build_exam(seed, level)
-                    prompt = exam_prompt(inst)
-                    attempt: dict[str, Any] = {
-                        "seed": seed,
-                        "level": level,
-                        "expected": inst["path"],
-                    }
-                    if dry_run:
-                        attempt["ok"] = None
+                    for part, builder, prompter in (
+                        ("chain", build_chain, chain_prompt),
+                        ("elevator", build_elevator, elevator_prompt),
+                    ):
+                        inst = builder(seed, level)
+                        prompt = prompter(inst)
+                        attempt: dict[str, Any] = {
+                            "seed": seed,
+                            "level": level,
+                            "part": part,
+                            "expected": inst["path"],
+                        }
+                        if dry_run:
+                            attempt["ok"] = None
+                            attempts.append(attempt)
+                            continue
+                        t0 = time.monotonic()
+                        answer, tokens, finish = ask_exam(port, prompt, ctx)
+                        ok = score_exam(answer, inst, finish)
+                        attempt.update(
+                            ok=ok,
+                            answer_tokens=tokens,
+                            finish_reason=finish,
+                            elapsed_s=round(time.monotonic() - t0, 1),
+                            answer=(answer or "")[-400:],
+                        )
                         attempts.append(attempt)
-                        continue
-                    t0 = time.monotonic()
-                    answer, tokens = ask_exam(port, prompt, cap)
-                    ok = score_exam(answer, inst)
-                    attempt.update(
-                        ok=ok,
-                        answer_tokens=tokens,
-                        elapsed_s=round(time.monotonic() - t0, 1),
-                        answer=(answer or "")[-400:],
-                    )
-                    attempts.append(attempt)
-                    with open(answers_path, "a", encoding="utf-8") as fh:
-                        fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
-                    if not ok:
-                        passed = False
+                        with open(answers_path, "a", encoding="utf-8") as fh:
+                            fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+                        if not ok:
+                            passed = False
                 rec = {"pass": passed and not dry_run, "attempts": attempts}
                 levels[key] = rec
                 _state_store.save_state(state_file, state)
-                verdict = "PASS" if rec["pass"] else "FAIL"
-                toks = [a.get("answer_tokens") for a in attempts if a.get("answer_tokens") is not None]
-                tstr = f", {len(toks)}/{len(seeds)} attempts capped" if len(toks) < len(seeds) else ""
-                print(
-                    f"  level {level}: {verdict} (seeds "
-                    f"{[a.get('ok') for a in attempts]}{tstr})"
-                )
+                if not dry_run:
+                    verdict = "PASS" if rec["pass"] else "FAIL"
+                    capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
+                    print(
+                        f"  level {level}: {verdict} "
+                        f"(parts {[a.get('ok') for a in attempts]}"
+                        + (f", {capped} ran out of context" if capped else "")
+                        + ")"
+                    )
             if not rec.get("pass"):
                 score = level - 1
                 break
@@ -305,7 +363,10 @@ def run_family(
         if score is not None:
             exam["score"] = score
         if dry_run:
-            exam["planned"] = f"sweep {start_level}..{max_level} on seeds {seeds}"
+            exam["planned"] = (
+                f"bell ctx {ctx} (window {sweet_rec.get('window')} vs tg/s x 1024), "
+                f"sweep {start_level}..{max_level} on seeds {seeds}, 2 parts per level"
+            )
         return exam
     finally:
         if proc is not None:
@@ -335,15 +396,15 @@ def run(
     state_file: str,
     port: int,
     families: list[str] | None,
-    cap: int = 2048,
-    n_seeds: int = 3,
+    n_seeds: int = 1,
     max_level: int = 32,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """The exam controller: sweeps of escalating difficulty over the
     sweet-spot candidates. Round d's only candidates are round d-1's
     passers; the rounds continue until no candidate passes. The final
-    score per candidate is the highest difficulty achieved."""
+    score per candidate is the highest difficulty achieved (both
+    parts)."""
     seeds = exam_seeds(n_seeds)
     fams = candidates(state, families)
     if not fams:
@@ -366,7 +427,10 @@ def run(
             elif dry_run:
                 passed = None
             else:
-                print(f"-- {fam} ({sweet_rec.get('sweet_spot')}) --")
+                print(
+                    f"-- {fam} ({sweet_rec.get('sweet_spot')}, bell "
+                    f"{bell_context(sweet_rec)} tokens) --"
+                )
                 rec = run_family(
                     fam,
                     gguf,
@@ -374,7 +438,6 @@ def run(
                     state,
                     state_file,
                     port,
-                    cap,
                     seeds,
                     max_level,
                     level,

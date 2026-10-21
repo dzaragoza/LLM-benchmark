@@ -516,19 +516,12 @@ def build_parser() -> argparse.ArgumentParser:
         "three corpora and the belts are decided on means.",
     )
     ap.add_argument(
-        "--exam-cap",
-        type=int,
-        default=2048,
-        help="exam: the token cap - the bell. No answer within cap "
-        "completion tokens = fail (KNOWLEDGE.md's formal protocol)",
-    )
-    ap.add_argument(
         "--exam-seeds",
         type=int,
-        default=3,
-        help="exam: the fixed seed set size per level - every model "
-        "takes the SAME exams; a level pass requires passing every "
-        "seed (n>=2 fights understanding-luck)",
+        default=1,
+        help="exam: the repetition count - the seed set is 1..n (the "
+        "benchmark runs n=1, so every instance is built from seed 1 "
+        "and every model takes the SAME exam)",
     )
     ap.add_argument(
         "--exam-max-level",
@@ -620,7 +613,6 @@ def _run(args: argparse.Namespace) -> None:
             args.state_file,
             state.get("ladder_port", 8210),
             args.families or None,
-            cap=args.exam_cap,
             n_seeds=args.exam_seeds,
             max_level=args.exam_max_level,
             dry_run=args.dry_run,
