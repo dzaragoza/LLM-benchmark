@@ -362,20 +362,19 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--sweet-repeat",
         type=int,
-        default=1,
-        help="sweet: llama-bench repetitions per rung (default 1 - the "
-        "decay correction is a systematic effect one sustained run "
-        "captures; per-rung noise is a few percent, not worth 3x the "
-        "era cost)",
+        default=3,
+        help="sweet: llama-bench repetitions per rung (default 3)",
     )
     ap.add_argument(
         "--sweet-gen-len",
         type=int,
-        default=4096,
-        help="sweet: llama-bench's generation length (-n) - the "
-        "SUSTAINED rate measurement. The old 128 was a 2-second "
-        "burst, blind to thermal throttling and KV growth over a "
-        "1024-second fill; 2048 sees the decay (the v8 lesson)",
+        default=None,
+        help="sweet: llama-bench's generation length (-n). Default: "
+        "the calibrated n - the median passing exam answer rounded "
+        "up to a power of two (measure the rate at the length good "
+        "answers actually are); falls back to 128 until passing "
+        "attempts exist in state. Expect the calibrated n to grow "
+        "as higher levels are passed - recalibrate then",
     )
     ap.add_argument(
         "--sweet-concurrency",
@@ -598,6 +597,17 @@ def _run(args: argparse.Namespace) -> None:
             state["exam"] = {}
             save_state(args.state_file, state)
             stamp("exam: all records wiped (--clean) - a full re-measure")
+        from bench.sweet import calibrated_gen_len
+
+        cal_n = calibrated_gen_len(state)
+        if args.sweet_gen_len is None:
+            args.sweet_gen_len = cal_n or 128
+            if cal_n:
+                stamp(
+                    f"sweet: llama-bench -n calibrated to {cal_n} "
+                    "(the median passing exam answer, rounded up to a "
+                    "power of two)"
+                )
         roster = [name for name, _ in roster_from_models_md()]
         if args.refill:
             # the tournament refill: the field is 16 CANDIDATES, not
