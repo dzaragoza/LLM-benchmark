@@ -569,6 +569,11 @@ def _run(args: argparse.Namespace) -> None:
         from bench.exam import run as exam_run
         from bench.sweet import roster_from_models_md
 
+        if args.clean and state.get("exam"):
+            state["exam"] = {}
+            save_state(args.state_file, state)
+            stamp("exam: all records wiped (--clean) - a full re-measure under the v9 protocol")
+
         if args.eliminate:
             # the manual tournament cut (mostly superseded by the
             # self-clean; kept for the ledger bookkeeping)

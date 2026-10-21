@@ -669,11 +669,14 @@ def run(
     for fam, rung in cands:
         key = (fam, rung)
         fam_exam = (state.get("exam") or {}).get(fam) or {}
-        # old-era records are family-keyed (the boundary candidate
-        # directly); new-era records are rung-keyed
+        # v9 records are rung-keyed ONLY. The old family-keyed shape
+        # (a boundary record stored directly under the family) is
+        # PRE-v9 era data: it belongs to a different protocol and is
+        # NEVER inherited as this candidate's record - doing so made
+        # a --clean-less run silently skip candidates (the
+        # Qwen3.5-0.8B-first bug). --clean wipes it; without --clean
+        # an old-era family record is simply not this candidate's.
         rec = fam_exam.get(rung) or {}
-        if not rec and "levels" in fam_exam:
-            rec = fam_exam
         # a stored final score is final - skip (idempotence)
         if rec.get("score") is not None and not dry_run:
             results[key] = rec
