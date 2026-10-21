@@ -69,6 +69,12 @@ from bench.sweet import roster_from_models_md
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
 
+# the TIME bell: one exam attempt may run at most 1024s - the UX
+# budget itself (the same 1024 as tg/s x 1024 = context). The
+# conversation expires: the streamed read is cut and the socket
+# closed, cancelling the server-side generation
+TIME_BELL_SECONDS = 1024
+
 # the repetition count IS the seed set: n=1 for the benchmark, so the
 # seed is 1 - one exam instance per level, identical for every model
 def exam_seeds(n: int) -> list[int]:
@@ -193,39 +199,85 @@ def elevator_prompt(exam: dict[str, Any]) -> str:
 
 
 def ask_exam(
-    port: str,
+    port: int,
     messages: list[dict[str, str]],
     bell_tokens: int,
     no_thinking: bool = True,
+    deadline: float | None = None,
 ) -> tuple[str, int, str]:
-    """One completion under the bell. The bell is the CONTEXT budget:
-    max_tokens = the remaining generation tokens of the shared exam
-    paper. messages carries the WHOLE conversation so far - both parts
-    of the exam run in ONE context (the paper): the model's part-1
-    reasoning stays visible as its own scratchpad when part 2 is
-    asked. Returns (text, completion_tokens, finish_reason) - the
-    caller checks BOTH end conditions: an emitted answer
-    (finish_reason 'stop') or the bell (finish_reason 'length' = the
-    paper is full)."""
+    """One completion under BOTH bells, streamed and cut at the wall:
+
+    - the TOKEN bell: max_tokens = the paper's remaining generation
+      tokens (finish_reason 'length' = the paper is full)
+    - the TIME bell (deadline): the conversation EXPIRES - the client
+      stops reading and closes the socket, which cancels the
+      server-side generation (finish_reason 'time_limit'). The 1024s
+      UX budget enforced at its source, per attempt.
+
+    Streaming instead of the silent blocking wait: chunks arrive as
+    the model writes and the deadline is checked per chunk - the cut
+    is clean and the wait is bounded. Returns (text,
+    completion_tokens, finish_reason)."""
+    import urllib.request
+
     payload: dict[str, Any] = {
         "messages": messages,
         "max_tokens": bell_tokens,
         "temperature": 0,
         "seed": SAMPLER_SEED,
-        "stream": False,
+        "stream": True,
     }
     if no_thinking:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
-    data = llama_server.post_json(port, "/v1/chat/completions", payload)
-    choice = data["choices"][0]
-    msg = choice["message"]
-    text = msg.get("content") or msg.get("reasoning_content") or ""
-    usage = data.get("usage") or {}
-    return (
-        text,
-        int(usage.get("completion_tokens") or 0),
-        choice.get("finish_reason") or "",
+    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
     )
+    sock_to = max(30.0, deadline - time.monotonic()) if deadline else 1800.0
+    text_parts: list[str] = []
+    finish = ""
+    usage_tokens = 0
+    resp = urllib.request.urlopen(req, timeout=sock_to)
+    try:
+        for raw in resp:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data: "):
+                continue
+            body = line[6:]
+            if body == "[DONE]":
+                break
+            try:
+                chunk = json.loads(body)
+            except ValueError:
+                continue
+            choices = chunk.get("choices") or []
+            if choices:
+                choice = choices[0]
+                delta = choice.get("delta") or {}
+                text_parts.append(delta.get("content") or "")
+                if choice.get("finish_reason"):
+                    finish = choice["finish_reason"]
+            u = chunk.get("usage") or {}
+            if u.get("completion_tokens"):
+                usage_tokens = int(u["completion_tokens"])
+            if deadline is not None and time.monotonic() >= deadline:
+                finish = "time_limit"
+                break
+    except TimeoutError:
+        finish = "time_limit"
+    finally:
+        # closing the socket cancels the server's generation
+        # (llama-server aborts the slot task on client disconnect)
+        resp.close()
+    text = "".join(text_parts)
+    if not usage_tokens and text:
+        try:
+            usage_tokens = len(llama_server.tokenize(port, text))
+        except Exception:
+            usage_tokens = 0
+    return text, usage_tokens, finish
 
 
 def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
@@ -235,7 +287,7 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     tolerated, the ORDER not. An exam that ran out of context
     (finish_reason 'length') FAILS even if a partial answer leaked -
     the bell rang before completion. Missing ANSWER line = fail."""
-    if finish_reason == "length":
+    if finish_reason in ("length", "time_limit"):
         return False
     text = (answer or "").lower()
     m = re.search(r"answer\s*:\s*(.+)", text)
@@ -260,6 +312,42 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     return all(tok in it for tok in expected)
 
 
+def fail_reason(rec: dict[str, Any]) -> str:
+    """Why the candidate failed its highest exam: read the last FAILING
+    level's attempts and classify the mode - the quick diagnostic the
+    ledger wants:
+      out of time      the conversation expired (the 1024s time bell)
+      out of context   the token bell rang (the paper filled) first
+      wrong chain      an answer arrived, the tokens/order were wrong
+      error            a transport/tool failure, not the model's fault
+      no record        nothing measured (or only passes stored)"""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "no record"
+    top = max(fail_keys, key=int)
+    reasons = []
+    for a in levels[top].get("attempts") or []:
+        fr = a.get("finish_reason")
+        if str(fr or "").startswith("error"):
+            reasons.append("error")
+        elif fr == "time_limit":
+            reasons.append("out of time")
+        elif fr == "length":
+            reasons.append("out of context")
+        elif a.get("ok") is False:
+            reasons.append("wrong chain")
+    if "error" in reasons and not ({"wrong chain", "out of context", "out of time"} & set(reasons)):
+        return "error"
+    if "out of time" in reasons:
+        return "out of time"
+    if "out of context" in reasons:
+        return "out of context"
+    if "wrong chain" in reasons:
+        return "wrong chain"
+    return "unknown"
+
+
 def bell_rung(window: int | None, tg: float | None, time_factor: int = 1024) -> int | None:
     """The bell for ONE rung: min(training window, tg/s x time_factor).
     Under the window the window binds; over it the rung's own fill
@@ -268,6 +356,265 @@ def bell_rung(window: int | None, tg: float | None, time_factor: int = 1024) -> 
     if not window or tg is None:
         return None
     return max(1024, min(int(window), int(tg * time_factor)))
+
+
+def candidates(
+    state: dict[str, Any], families: list[str] | None, models_dir: str = "models"
+) -> list[tuple[str, str, str]]:
+    """The exam roster as (family, rung, gguf) tuples, param-ascending,
+    per the v8 rule pair:
+
+      tg/s x 1024 > window (UNDER): the boundary rung is THE sweet
+      spot - one candidate.
+      no rung meets it (OVER): EVERY measured quant is a sweet spot -
+      the whole ladder, one candidate per rung, each with its own
+      bell (min(window, its own tg x 1024)).
+
+    An explicit family list filters; each family prints its regime.
+    Rungs whose file is missing are reported and skipped (the sweep
+    continues with the working ones)."""
+    import infra.hf_download as hf_download
+
+    sweet = state.get("sweet") or {}
+    order = [name for name, _ in roster_from_models_md()]
+    fams = order if not families else [f.split("=")[0] for f in families]
+    out: list[tuple[str, str, str]] = []
+    for fam in fams:
+        rec = sweet.get(fam) or {}
+        rungs = rec.get("rungs") or {}
+        if rec.get("over_window"):
+            rung_names = [r for r, m in rungs.items() if m.get("tg") is not None]
+            regime = "OVER the window - every measured quant is a sweet spot"
+        elif rec.get("sweet_spot"):
+            rung_names = [rec["sweet_spot"]]
+            regime = "UNDER the window - the boundary rung"
+        else:
+            print(f"  {fam}: no measured rungs - skipped")
+            continue
+        famdir = os.path.join(models_dir, fam)
+        resolved = []
+        for r in rung_names:
+            gguf = hf_download.local_rung(famdir, r) or os.path.join(
+                famdir, f"{fam}-{r}.gguf"
+            )
+            if os.path.isfile(gguf):
+                resolved.append((fam, r, gguf))
+            else:
+                print(f"  {fam} {r}: file missing ({gguf}) - skipped")
+        if resolved:
+            print(f"  {fam}: {len(resolved)} candidate(s), {regime}")
+        out.extend(resolved)
+    return out
+
+
+def run_family(
+    fam: str,
+    rung: str,
+    gguf: str,
+    models_dir: str,
+    state: dict[str, Any],
+    state_file: str,
+    port: int,
+    seeds: list[int],
+    max_level: int,
+    start_level: int,
+    dry_run: bool = False,
+    time_factor: int = 1024,
+) -> dict[str, Any]:
+    """One candidate's sweep - a (model, quant) pair: every level from
+    the first unrecorded one, both parts per level, until the first
+    failing level. The final score is the highest level passed (both
+    parts, every seed). Resumable: recorded levels are never
+    re-measured. State keys per candidate: exam.<fam>.<rung>."""
+    sweet_rec = (state.get("sweet") or {}).get(fam) or {}
+    rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
+    ctx = bell_rung(sweet_rec.get("window"), rung_rec.get("tg"), time_factor)
+    if ctx is None:
+        return {"error": "no measured rung (window/tg) to set the bell"}
+    exam = state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})
+    exam["rung"] = rung
+    exam["bell_ctx"] = ctx
+    # a stale error from an earlier run must not shadow this run's
+    # levels/score in the summary - the file resolution and server
+    # start already succeeded by the time we are here
+    exam.pop("error", None)
+    levels = exam.setdefault("levels", {})
+    # benchmark OUTPUTS live in the results tree (uploaded by the git
+    # rail), never under models/ - that directory holds only what can
+    # be re-downloaded or re-created (quants, sources, the imatrix)
+    answers_dir = os.path.join("results", "exam", fam, rung)
+    os.makedirs(answers_dir, exist_ok=True)
+    answers_path = os.path.join(answers_dir, "answers.jsonl")
+    log_path = os.path.join(answers_dir, "exam-server.log")
+    proc = None
+    score = None
+    try:
+        if not dry_run:
+            # server context: the bell + prompt headroom (the prompt
+            # and template must fit alongside the generation budget)
+            proc, healthy = llama_server.start_server(
+                gguf,
+                port=port,
+                extra_args=["-c", str(ctx + 2048), "--parallel", "1"],
+                log_path=log_path,
+            )
+            if not healthy or not llama_server.wait_healthy(port, proc=proc):
+                exam["error"] = "server did not come up"
+                return exam
+        level = start_level
+        while level <= max_level:
+            key = str(level)
+            if key in levels:
+                rec = levels[key]
+            else:
+                attempts = []
+                passed = True
+                for seed in seeds:
+                    # ONE exam paper per (seed, level): both parts run
+                    # in the SAME context - part 1's prompt, the
+                    # model's own reasoning, then part 2's prompt all
+                    # live in one conversation, and the generation
+                    # budget (the bell) is SHARED across the parts:
+                    # what part 1 spends, part 2 no longer has
+                    insts = {
+                        "chain": build_chain(seed, level),
+                        "elevator": build_elevator(seed, level),
+                    }
+                    messages: list[dict[str, str]] = []
+                    remaining = ctx
+                    for part, prompter in (
+                        ("chain", chain_prompt),
+                        ("elevator", elevator_prompt),
+                    ):
+                        inst = insts[part]
+                        prompt = prompter(inst)
+                        attempt: dict[str, Any] = {
+                            "seed": seed,
+                            "level": level,
+                            "part": part,
+                            "expected": inst["path"],
+                        }
+                        if dry_run:
+                            attempt["ok"] = None
+                            attempts.append(attempt)
+                            continue
+                        if remaining <= 0:
+                            # part 1 (or an earlier seed's paper) spent
+                            # the whole bell: the paper is full, this
+                            # part cannot even be asked
+                            attempt.update(ok=False, answer_tokens=0, finish_reason="length")
+                            attempts.append(attempt)
+                            with open(answers_path, "a", encoding="utf-8") as fh:
+                                fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+                            passed = False
+                            continue
+                        messages.append({"role": "user", "content": prompt})
+                        t0 = time.monotonic()
+                        # the TIME bell: the conversation expires 1024s
+                        # after the question is asked - the UX budget at
+                        # its source, per attempt
+                        deadline = t0 + TIME_BELL_SECONDS
+                        try:
+                            answer, tokens, finish = ask_exam(
+                                port, messages, remaining, deadline=deadline
+                            )
+                        except Exception as e:
+                            # one transport failure (server hiccup, HTTP
+                            # error) must not kill the family's sweep:
+                            # record it, fail the part, keep the paper
+                            answer, tokens, finish = "", 0, f"error: {e}"
+                        ok = score_exam(answer, inst, finish)
+                        attempt.update(
+                            ok=ok,
+                            answer_tokens=tokens,
+                            finish_reason=finish,
+                            elapsed_s=round(time.monotonic() - t0, 1),
+                            answer=(answer or "")[-2000:],
+                        )
+                        attempts.append(attempt)
+                        with open(answers_path, "a", encoding="utf-8") as fh:
+                            fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+                        if not ok:
+                            passed = False
+                        # the model's own reasoning STAYS in the paper
+                        # (the shared context) for the next part to use
+                        messages.append({"role": "assistant", "content": answer or ""})
+                        remaining -= tokens
+                rec = {"pass": passed and not dry_run, "attempts": attempts}
+                levels[key] = rec
+                _state_store.save_state(state_file, state)
+                if not dry_run:
+                    verdict = "PASS" if rec["pass"] else "FAIL"
+                    capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
+                    print(
+                        f"  level {level}: {verdict} "
+                        f"(parts {[a.get('ok') for a in attempts]}"
+                        + (f", {capped} ran out of context" if capped else "")
+                        + ")"
+                    )
+            if not rec.get("pass"):
+                score = level - 1
+                break
+            score = level
+            level += 1
+        if score is not None:
+            exam["score"] = score
+        if dry_run:
+            exam["planned"] = (
+                f"bell ctx {ctx} (window {sweet_rec.get('window')} vs tg/s x 1024), "
+                f"sweep {start_level}..{max_level} on seeds {seeds}, 2 parts per level"
+            )
+        return exam
+    finally:
+        if proc is not None:
+            llama_server.stop_server(proc, port)
+        # the -lv 5 server log is debug gold but HUGE (100MB+ per
+        # candidate - the push-breaking kind); its value is the
+        # startup banner (head) and the memory breakdown (tail), so
+        # keep those and drop the middle
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.readlines()
+            if len(lines) > 500:
+                with open(log_path, "w", encoding="utf-8") as fh:
+                    fh.writelines(lines[:100])
+                    fh.write(f"... [{len(lines) - 400} middle lines truncated]\n")
+                    fh.writelines(lines[-300:])
+        except OSError:
+            pass
+
+
+def fail_reason(rec: dict[str, Any]) -> str:
+    """Why the candidate failed its highest exam: read the last FAILING
+    level's attempts and classify the mode - the quick diagnostic the
+    ledger wants. Never a score, a REASON:
+      out of context   the bell rang (finish_reason length) - the
+                       paper filled before the answer
+      wrong chain      an answer arrived, the tokens/order were wrong
+      error            a transport/tool failure, not the model's
+                       fault
+      no record        nothing measured (or only passes stored)"""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "no record"
+    top = max(fail_keys, key=int)
+    attempts = levels[top].get("attempts") or []
+    reasons = []
+    for a in attempts:
+        if str(a.get("finish_reason") or "").startswith("error"):
+            reasons.append("error")
+        elif a.get("finish_reason") == "length" or a.get("ok") is None and not a.get("prompt"):
+            reasons.append("out of context")
+        elif a.get("ok") is False:
+            reasons.append("wrong chain")
+    if "error" in reasons and "wrong chain" not in reasons and "out of context" not in reasons:
+        return "error"
+    if "out of context" in reasons:
+        return "out of context"
+    if "wrong chain" in reasons:
+        return "wrong chain"
+    return "unknown"
 
 
 def candidates(
