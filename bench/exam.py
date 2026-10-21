@@ -193,15 +193,22 @@ def elevator_prompt(exam: dict[str, Any]) -> str:
 
 
 def ask_exam(
-    port: int, prompt: str, bell_tokens: int, no_thinking: bool = True
+    port: str,
+    messages: list[dict[str, str]],
+    bell_tokens: int,
+    no_thinking: bool = True,
 ) -> tuple[str, int, str]:
     """One completion under the bell. The bell is the CONTEXT budget:
-    max_tokens = bell_tokens, the sweet-spot-derived fill capacity.
-    Returns (text, completion_tokens, finish_reason) - the caller
-    checks BOTH end conditions: an emitted answer (finish_reason
-    'stop') or the bell (finish_reason 'length' = out of context)."""
+    max_tokens = the remaining generation tokens of the shared exam
+    paper. messages carries the WHOLE conversation so far - both parts
+    of the exam run in ONE context (the paper): the model's part-1
+    reasoning stays visible as its own scratchpad when part 2 is
+    asked. Returns (text, completion_tokens, finish_reason) - the
+    caller checks BOTH end conditions: an emitted answer
+    (finish_reason 'stop') or the bell (finish_reason 'length' = the
+    paper is full)."""
     payload: dict[str, Any] = {
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "max_tokens": bell_tokens,
         "temperature": 0,
         "seed": SAMPLER_SEED,
@@ -314,11 +321,23 @@ def run_family(
                 attempts = []
                 passed = True
                 for seed in seeds:
-                    for part, builder, prompter in (
-                        ("chain", build_chain, chain_prompt),
-                        ("elevator", build_elevator, elevator_prompt),
+                    # ONE exam paper per (seed, level): both parts run
+                    # in the SAME context - part 1's prompt, the
+                    # model's own reasoning, then part 2's prompt all
+                    # live in one conversation, and the generation
+                    # budget (the bell) is SHARED across the parts:
+                    # what part 1 spends, part 2 no longer has
+                    insts = {
+                        "chain": build_chain(seed, level),
+                        "elevator": build_elevator(seed, level),
+                    }
+                    messages: list[dict[str, str]] = []
+                    remaining = ctx
+                    for part, prompter in (
+                        ("chain", chain_prompt),
+                        ("elevator", elevator_prompt),
                     ):
-                        inst = builder(seed, level)
+                        inst = insts[part]
                         prompt = prompter(inst)
                         attempt: dict[str, Any] = {
                             "seed": seed,
@@ -330,8 +349,19 @@ def run_family(
                             attempt["ok"] = None
                             attempts.append(attempt)
                             continue
+                        if remaining <= 0:
+                            # part 1 (or an earlier seed's paper) spent
+                            # the whole bell: the paper is full, this
+                            # part cannot even be asked
+                            attempt.update(ok=False, answer_tokens=0, finish_reason="length")
+                            attempts.append(attempt)
+                            with open(answers_path, "a", encoding="utf-8") as fh:
+                                fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+                            passed = False
+                            continue
+                        messages.append({"role": "user", "content": prompt})
                         t0 = time.monotonic()
-                        answer, tokens, finish = ask_exam(port, prompt, ctx)
+                        answer, tokens, finish = ask_exam(port, messages, remaining)
                         ok = score_exam(answer, inst, finish)
                         attempt.update(
                             ok=ok,
@@ -345,6 +375,10 @@ def run_family(
                             fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
                         if not ok:
                             passed = False
+                        # the model's own reasoning STAYS in the paper
+                        # (the shared context) for the next part to use
+                        messages.append({"role": "assistant", "content": answer or ""})
+                        remaining -= tokens
                 rec = {"pass": passed and not dry_run, "attempts": attempts}
                 levels[key] = rec
                 _state_store.save_state(state_file, state)
