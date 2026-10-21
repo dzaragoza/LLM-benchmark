@@ -245,19 +245,20 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     return found == [t.lower() for t in exam["path"]]
 
 
-def bell_context(sweet_rec: dict[str, Any]) -> int | None:
+def bell_context(sweet_rec: dict[str, Any], time_factor: int = 1024) -> int | None:
     """The bell, integrated with the phase-1 measurements: the exam
-    context is min(training window, tg/s x 1024) for the sweet-spot
-    rung - either leg binds depending on the model/quant (the
-    in-window rungs' window leg, or the fill-rate leg). None when the
-    sweet spot has no measured tg."""
+    context is min(training window, tg/s x time_factor) for the
+    sweet-spot rung - either leg binds depending on the model/quant
+    (the in-window rungs' window leg, or the fill-rate leg). The
+    time_factor is the run's time parameter (the same 1024 that set
+    the sweet spot). None when the sweet spot has no measured tg."""
     window = sweet_rec.get("window")
     spot = sweet_rec.get("sweet_spot")
     rung = (sweet_rec.get("rungs") or {}).get(spot or "") or {}
     tg = rung.get("tg")
     if not window or tg is None:
         return None
-    return max(1024, min(int(window), int(tg * 1024)))
+    return max(1024, min(int(window), int(tg * time_factor)))
 
 
 def run_family(
@@ -271,13 +272,14 @@ def run_family(
     max_level: int,
     start_level: int,
     dry_run: bool = False,
+    time_factor: int = 1024,
 ) -> dict[str, Any]:
     """One family's sweep: every level from the first unrecorded one,
     both parts per level, until the first failing level. The final
     score is the highest level passed (both parts, every seed).
     Resumable: recorded levels are never re-measured."""
     sweet_rec = (state.get("sweet") or {}).get(fam) or {}
-    ctx = bell_context(sweet_rec)
+    ctx = bell_context(sweet_rec, time_factor)
     if ctx is None:
         return {"error": "no measured sweet spot (window/tg) to set the bell"}
     exam = state.setdefault("exam", {}).setdefault(fam, {})
@@ -399,6 +401,7 @@ def run(
     n_seeds: int = 1,
     max_level: int = 32,
     dry_run: bool = False,
+    time_factor: int = 1024,
 ) -> dict[str, Any]:
     """The exam controller: sweeps of escalating difficulty over the
     sweet-spot candidates. Round d's only candidates are round d-1's
@@ -429,7 +432,7 @@ def run(
             else:
                 print(
                     f"-- {fam} ({sweet_rec.get('sweet_spot')}, bell "
-                    f"{bell_context(sweet_rec)} tokens) --"
+                    f"{bell_context(sweet_rec, time_factor)} tokens) --"
                 )
                 rec = run_family(
                     fam,
@@ -442,6 +445,7 @@ def run(
                     max_level,
                     level,
                     dry_run,
+                    time_factor,
                 )
                 results[fam] = rec
                 passed = rec.get("error") is None and (rec.get("levels") or {}).get(

@@ -423,15 +423,22 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="v7",
-        choices=["v7", "sweet", "exam"],
-        help="the certify task; 'v7' is the fixed-budget reach benchmark "
-        "(session 42/43, addendum 227/229: the quick fit-ladder cell per "
-        "family, one fixed corpus, graded (span, hops)); ARC and FWE are "
-        "retired (session 43); 'sweet' is the mechanical-sweet-spot walk "
-        "(models param-ascending, quants down the measured tok/s ladder; "
-        "a rung is in-window while tg/s * concurrency > the training "
-        "window; the sweet spot is the last in-window quant)",
+        default="v8",
+        choices=["v8", "v7", "sweet", "exam"],
+        help="the certify task; 'v8' is the integrated benchmark (sweet "
+        "spot + exam): find the sweet spot for the first --models models "
+        "(the mechanical-sweet-spot walk, a rung in-window while tg/s * "
+        "the time factor > the training window), then grade the sweet "
+        "spots with the exam (chain follow + elevator, PASS/FAIL sweeps); "
+        "'v7' is the fixed-budget reach benchmark (session 42/43); "
+        "'sweet' and 'exam' run the two v8 phases standalone",
+    )
+    ap.add_argument(
+        "--models",
+        type=int,
+        default=16,
+        help="v8: the number of models to test - the roster's first N, "
+        "param-ascending (default 16)",
     )
     ap.add_argument(
         "--sweet-repeat",
@@ -602,6 +609,68 @@ def _run(args: argparse.Namespace) -> None:
         check_tooling(args)
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
+    if args.task == "v8":
+        # the integrated run: the roster's first --models models, the
+        # same time parameter driving both phases
+        from bench.exam import run as exam_run
+        from bench.sweet import find_bench, roster_from_models_md
+        from bench.sweet import run as sweet_run
+
+        roster = [name for name, _ in roster_from_models_md()]
+        families = roster[: args.models]
+        if len(families) < len(roster):
+            stamp(
+                f"v8: the roster's first {len(families)} models "
+                f"(before {roster[len(families)]} - --models)"
+            )
+        sweet = sweet_run(
+            args.models_dir,
+            state,
+            args.state_file,
+            families,
+            repeat=args.sweet_repeat,
+            concurrency=args.sweet_concurrency,
+            dry_run=args.dry_run,
+            bench_bin=find_bench(),
+        )
+        state["sweet"] = sweet
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp("PHASE 1 COMPLETE - SWEET-SPOT SUMMARY")
+        for fam, rec in (sweet or {}).items():
+            spot = rec.get("sweet_spot")
+            beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
+            verdict = f"boundary {spot}" if spot else "no in-window rung"
+            print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
+        print()
+        print("=" * 60)
+        stamp("PHASE 2 - THE EXAM")
+        results = exam_run(
+            args.models_dir,
+            state,
+            args.state_file,
+            state.get("ladder_port", 8210),
+            families,
+            n_seeds=args.exam_seeds,
+            max_level=args.exam_max_level,
+            dry_run=args.dry_run,
+            time_factor=args.sweet_concurrency,
+        )
+        state["exam"] = results
+        save_state(args.state_file, state)
+        print()
+        print("=" * 60)
+        stamp("V8 EXAM SUMMARY (highest difficulty achieved per sweet spot)")
+        for fam, rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
+            spot = ((state.get("sweet") or {}).get(fam) or {}).get("sweet_spot")
+            verdict = rec.get("error") or f"score {rec.get('score')}"
+            print(f"  {fam} ({spot}): {verdict}")
+        if not args.no_git:
+            tee_output.uninstall()
+            git_tail(args)
+        stamp("v8 run complete")
+        return
     if args.task != "sweet":
         resolve_families(args, state)
     if args.task == "exam":
