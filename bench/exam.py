@@ -292,6 +292,10 @@ def run_family(
     exam = state.setdefault("exam", {}).setdefault(fam, {})
     exam["rung"] = os.path.basename(gguf)
     exam["bell_ctx"] = ctx
+    # a stale error from an earlier run must not shadow this run's
+    # levels/score in the summary - the file resolution and server
+    # start already succeeded by the time we are here
+    exam.pop("error", None)
     levels = exam.setdefault("levels", {})
     answers_dir = os.path.join(models_dir, "exam-results", fam)
     os.makedirs(answers_dir, exist_ok=True)
