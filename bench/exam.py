@@ -373,7 +373,13 @@ def run_family(
                             continue
                         messages.append({"role": "user", "content": prompt})
                         t0 = time.monotonic()
-                        answer, tokens, finish = ask_exam(port, messages, remaining)
+                        try:
+                            answer, tokens, finish = ask_exam(port, messages, remaining)
+                        except Exception as e:
+                            # one transport failure (server hiccup, HTTP
+                            # error) must not kill the family's sweep:
+                            # record it, fail the part, keep the paper
+                            answer, tokens, finish = "", 0, f"error: {e}"
                         ok = score_exam(answer, inst, finish)
                         attempt.update(
                             ok=ok,

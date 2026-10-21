@@ -114,7 +114,28 @@ def load_state(path: str) -> dict[str, Any]:
 
 
 def save_state(path: str, state: dict[str, Any]) -> None:
+    """Atomic state write (addendum 15) + the durability guards the
+    idempotence contract needs: fsync before the rename (a crash mid-
+    write must never leave a truncated .tmp that a later os.replace
+    would promote over the good file), and the .tmp cleanup on any
+    failure so the next save starts clean. The state file IS the
+    never-re-measure ledger - losing it re-measures everything, so
+    its write is the one place the run pays for durability."""
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=1)
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=1)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        dir_fd = os.open(os.path.dirname(os.path.abspath(path)) or ".", os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise

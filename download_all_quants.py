@@ -3,7 +3,7 @@
 
 Uses the repo's own layers only: infra/hf_download.py (the HF interface)
 and infra/convert_quant.py (convert + quantize). The rung set is the
-registry's weight ladder (bench.v7.W_LADDER), smallest first; each rung
+registry's weight ladder, smallest first; each rung
 is idempotent - an existing local file is reused, never re-downloaded.
 
 Usage:
