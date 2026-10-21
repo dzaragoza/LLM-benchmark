@@ -484,7 +484,12 @@ def _run(args: argparse.Namespace) -> None:
         for fam, rec in (sweet or {}).items():
             spot = rec.get("sweet_spot")
             beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
-            verdict = f"boundary {spot}" if spot else "no in-window rung"
+            if spot and rec.get("over_window"):
+                verdict = f"fastest rung {spot} (OVER the window - the fill-rate bell binds)"
+            elif spot:
+                verdict = f"boundary {spot}"
+            else:
+                verdict = "no measured rung"
             print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
         print()
         print("=" * 60)
@@ -601,7 +606,12 @@ def _run(args: argparse.Namespace) -> None:
         for fam, rec in (sweet or {}).items():
             spot = rec.get("sweet_spot")
             beyond = sum(1 for m in rec.get("rungs", {}).values() if m.get("in_window") is False)
-            verdict = f"boundary {spot}" if spot else "no in-window rung"
+            if spot and rec.get("over_window"):
+                verdict = f"fastest rung {spot} (OVER the window - the fill-rate bell binds)"
+            elif spot:
+                verdict = f"boundary {spot}"
+            else:
+                verdict = "no measured rung"
             print(f"  {fam}: {verdict}, {beyond} beyond-the-window curve points")
         if not args.no_git:
             tee_output.uninstall()
