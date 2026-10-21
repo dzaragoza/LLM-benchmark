@@ -270,6 +270,46 @@ def bell_rung(window: int | None, tg: float | None, time_factor: int = 1024) -> 
     return max(1024, min(int(window), int(tg * time_factor)))
 
 
+def calibrated_cap(state: dict[str, Any]) -> int | None:
+    """The data-calibrated bell cap (the author's ruling): the MEDIAN
+    length of every PASSING answer on record, rounded UP to a power
+    of two. The 1024s promise is 'a good answer within the budget' -
+    and the passing answers are what a good answer costs (the first
+    era's median was 76 -> cap 128). The cap binds on top of the
+    rung bell: no exam paper larger than what passing actually
+    needs; rumination fails fast instead of burning a cache fill.
+
+    Self-calibrating: no passing attempts yet -> None (the rung bell
+    alone binds); as passes accumulate the cap tightens toward the
+    observed median. Computed over ALL candidates' passes (one exam,
+    one standard)."""
+    import statistics
+
+    toks = []
+    for fam, fam_exam in (state.get("exam") or {}).items():
+        if not isinstance(fam_exam, dict):
+            continue
+        recs = [
+            rec
+            for key, rec in fam_exam.items()
+            if not str(key).startswith("_") and isinstance(rec, dict) and "levels" in rec
+        ]
+        if "levels" in fam_exam and fam_exam.get("levels"):
+            recs.append(fam_exam)
+        for rec in recs:
+            for lv in (rec.get("levels") or {}).values():
+                for a in lv.get("attempts") or []:
+                    if a.get("ok") and a.get("answer_tokens"):
+                        toks.append(a["answer_tokens"])
+    if not toks:
+        return None
+    med = statistics.median(toks)
+    cap = 1
+    while cap < med:
+        cap *= 2
+    return cap
+
+
 def run_family(
     fam: str,
     rung: str,
@@ -294,6 +334,11 @@ def run_family(
     ctx = bell_rung(sweet_rec.get("window"), rung_rec.get("tg"), time_factor)
     if ctx is None:
         return {"error": "no measured rung (window/tg) to set the bell"}
+    # the calibrated cap binds on top of the rung bell: the paper is
+    # never larger than what passing answers actually need
+    cap = calibrated_cap(state)
+    if cap is not None:
+        ctx = min(ctx, cap)
     exam = state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})
     exam["rung"] = rung
     exam["bell_ctx"] = ctx
@@ -560,11 +605,10 @@ def run(
             else:
                 sweet_rec = (state.get("sweet") or {}).get(fam) or {}
                 rung_rec = (sweet_rec.get("rungs") or {}).get(rung) or {}
-                print(
-                    f"-- {fam} {rung}, bell "
-                    f"{bell_rung(sweet_rec.get('window'), rung_rec.get('tg'), time_factor)} "
-                    f"tokens --"
-                )
+                _bell = bell_rung(sweet_rec.get("window"), rung_rec.get("tg"), time_factor)
+                _cap = calibrated_cap(state)
+                _ctx = min(_bell, _cap) if (_bell and _cap) else _bell
+                print(f"-- {fam} {rung}, bell {_ctx} tokens --")
                 # one candidate's failure never kills the exam (the
                 # author's ruling: continue with the working ones) -
                 # any exception is recorded and the sweep moves on
