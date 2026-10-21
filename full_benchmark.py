@@ -603,9 +603,18 @@ def _run(args: argparse.Namespace) -> None:
         families = [f.split("=")[0] for f in args.families]
         if not families:
             families = [n for n, _ in roster_from_models_md()]
-            stamp(
-                f"fresh sweet run: the md/models.md roster, param-ascending ({len(families)} models)"
-            )
+            if args.sweet_limit and len(families) > args.sweet_limit:
+                cut = families[args.sweet_limit]
+                families = families[: args.sweet_limit]
+                stamp(
+                    f"sweet run capped at {len(families)} models (before {cut} - "
+                    f"--sweet-limit; md/models.md still carries the full roster)"
+                )
+            else:
+                stamp(
+                    f"fresh sweet run: the md/models.md roster, "
+                    f"param-ascending ({len(families)} models)"
+                )
         sweet = sweet_run(
             args.models_dir,
             state,
