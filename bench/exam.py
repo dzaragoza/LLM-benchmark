@@ -7,18 +7,18 @@ comprehensiveness yielded to efficiency.
               (param-ascending, per md/models.md). The F16
               candidate's max score IS the model's max score.
   the paper    the full training window, as the generation budget.
-  the bells    TOKEN: max_tokens = the window (finish_reason
-              'length' = the paper filled); TIME: 1024s per
-              attempt (finish_reason 'time_limit' = the bell rang).
+  the bell     TOKEN only: max_tokens = the window (finish_reason
+              'length' = the paper filled). The time limit is
+              RETIRED (the author's ruling after the first
+              time-out: an arbitrary measure).
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
   self-clean  MODEL granularity: a model whose F16 scored strictly
               below the global best is eliminated - its models/
-              directory is deleted (the data always stays).
-  HARD STOP   a time_limit is NOT an elimination: the model might
-              be able to answer but ran out of clock. The benchmark
-              STOPS (TimeBellHit), the artifacts commit, and the
-              human decides.
+              directory is deleted (the data always stays). Tied
+              leaders are NEVER eliminated; TIME ranks them
+              (elapsed per attempt is recorded) but decides nothing
+              - the human breaks ties.
 
 Run data is v9-compatible: the same state shape (exam.<fam>.<rung>),
 the same answers files, the same ledger - a v9.1 run resumes a v9
@@ -47,11 +47,6 @@ from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
 
-# the TIME bell: one exam attempt may run at most 1024s - the UX
-# budget itself (the same 1024 as tg/s x 1024 = context). The
-# conversation expires: the streamed read is cut and the socket
-# closed, cancelling the server-side generation
-TIME_BELL_SECONDS = 1024
 
 
 # the repetition count IS the seed set: n=1 for the benchmark, so the
@@ -183,21 +178,19 @@ def ask_exam(
     messages: list[dict[str, str]],
     bell_tokens: int,
     no_thinking: bool = True,
-    deadline: float | None = None,
 ) -> tuple[str, int, str]:
-    """One completion under BOTH bells, streamed and cut at the wall:
+    """One completion under the TOKEN bell, streamed.
 
-    - the TOKEN bell: max_tokens = the paper's remaining generation
-      tokens (finish_reason 'length' = the paper is full)
-    - the TIME bell (deadline): the conversation EXPIRES - the client
-      stops reading and closes the socket, which cancels the
-      server-side generation (finish_reason 'time_limit'). The 1024s
-      UX budget enforced at its source, per attempt.
+    max_tokens = the paper's remaining generation tokens
+    (finish_reason 'length' = the paper is full). The time limit is
+    RETIRED (the author's ruling after the first time-out: an
+    arbitrary measure - the model may use its whole paper; elapsed
+    time is recorded per attempt and ranks TIED leaders, never
+    eliminates).
 
-    Streaming instead of the silent blocking wait: chunks arrive as
-    the model writes and the deadline is checked per chunk - the cut
-    is clean and the wait is bounded. Returns (text,
-    completion_tokens, finish_reason)."""
+    Streaming stays: chunks arrive as the model writes; the socket
+    timeout is the dead-connection fallback only, not a limit.
+    Returns (text, completion_tokens, finish_reason)."""
     import urllib.request
 
     payload: dict[str, Any] = {
@@ -215,7 +208,7 @@ def ask_exam(
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    sock_to = max(30.0, deadline - time.monotonic()) if deadline else 1800.0
+    sock_to = 1800.0  # dead-connection fallback, not a limit
     text_parts: list[str] = []
     finish = ""
     usage_tokens = 0
@@ -242,11 +235,8 @@ def ask_exam(
             u = chunk.get("usage") or {}
             if u.get("completion_tokens"):
                 usage_tokens = int(u["completion_tokens"])
-            if deadline is not None and time.monotonic() >= deadline:
-                finish = "time_limit"
-                break
     except TimeoutError:
-        finish = "time_limit"
+        finish = "error: read timed out (dead connection)"
     finally:
         # closing the socket cancels the server's generation
         # (llama-server aborts the slot task on client disconnect)
@@ -345,20 +335,6 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
         return window(repo, os.path.join(models_dir, fam))
     except Exception:
         return WINDOW_DEFAULT
-
-
-class TimeBellHit(Exception):
-    """The v9.1 hard stop: a candidate hit the 1024s time bell -
-    the model might be able to answer but ran out of clock. The
-    author's rule: STOP the benchmark; the human decides. Carries
-    (family, rung, level, part) so the stop is findable."""
-
-    def __init__(self, fam: str, rung: str, level: int, part: str) -> None:
-        super().__init__(f"{fam} {rung}: time bell at level {level} part {part}")
-        self.fam = fam
-        self.rung = rung
-        self.level = level
-        self.part = part
 
 
 def candidates(
@@ -481,24 +457,13 @@ def run_family(
                         # the TIME bell: the conversation expires 1024s
                         # after the question is asked - the UX budget at
                         # its source, per attempt
-                        deadline = t0 + TIME_BELL_SECONDS
                         try:
-                            answer, tokens, finish = ask_exam(
-                                port, messages, remaining, deadline=deadline
-                            )
+                            answer, tokens, finish = ask_exam(port, messages, remaining)
                         except Exception as e:
                             # one transport failure (server hiccup, HTTP
                             # error) must not kill the family's sweep:
                             # record it, fail the part, keep the paper
                             answer, tokens, finish = "", 0, f"error: {e}"
-                        if finish == "time_limit":
-                            # v9.1: the model might be able to answer
-                            # but ran out of clock - the author's HARD
-                            # STOP. The attempt is logged first, then
-                            # the benchmark stops for the human to
-                            # decide (state already carries every
-                            # level before this one)
-                            raise TimeBellHit(fam, rung, level, part)
                         ok = score_exam(answer, inst, finish)
                         attempt.update(
                             ok=ok,
@@ -593,8 +558,9 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     data ALWAYS stays: answers in results/, records in state). The
     model being examined keeps its files until its F16 sweep
     finishes. Unscored models (pending, interrupted) are never
-    touched. A TimeBellHit never reaches the gc - the benchmark
-    stops before any elimination judgement of the stopped model."""
+    touched. Tied leaders are never
+    eliminated - time ranks them (recorded per attempt) but the
+    human breaks ties."""
     import shutil
 
     exam = state.get("exam") or {}
@@ -684,10 +650,8 @@ def run(
             print(f"  {fam} {rung}: unbuildable - skipped")
             continue
         print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
-        # the TimeBellHit passes through: run_family raises it on
-        # a 1024s cut and it must stop the whole benchmark (the
-        # author's v9.1 rule). Everything else is contained: one
-        # candidate's failure is recorded and the sweep moves on.
+        # one candidate's failure never kills the exam - any
+        # exception is recorded and the sweep moves on.
         try:
             rec = run_family(
                 fam,
@@ -702,14 +666,6 @@ def run(
                 0,
                 dry_run,
             )
-        except TimeBellHit as e:
-            # record the stop, save, re-raise: the orchestrator's
-            # crash rail commits and the human decides
-            state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})[
-                "time_bell_hit"
-            ] = {"level": e.level, "part": e.part}
-            _state_store.save_state(state_file, state)
-            raise
         except SystemExit as e:
             if e.code == 130:
                 raise

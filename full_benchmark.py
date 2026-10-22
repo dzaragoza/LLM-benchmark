@@ -479,12 +479,7 @@ def main() -> None:
         tb = traceback.format_exc()
         try:
             print(tb)
-            from bench.exam import TimeBellHit
-
-            if isinstance(exc, TimeBellHit):
-                stamp(f"TIME BELL HIT - {exc} - the benchmark is STOPPED for review")
-            else:
-                stamp("CRASH DETECTED - committing artifacts before exit")
+            stamp("CRASH DETECTED - committing artifacts before exit")
             try:
                 llama_server.kill_stale_server()
             except Exception as e:
