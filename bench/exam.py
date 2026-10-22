@@ -617,7 +617,12 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             continue
         s = rec.get("score")
         if s is None or s >= best:
-            continue  # pending or a survivor
+            # pending, or a SURVIVOR: a stale _eliminated flag (e.g.
+            # a fossil of the v9 premature-elimination bug) must be
+            # CLEARED - the flag is derived state, the score is truth
+            if s is not None and fam_exam.get("_eliminated"):
+                fam_exam["_eliminated"] = False
+            continue
         famdir = os.path.join(models_dir, fam)
         if not os.path.isdir(famdir):
             continue
