@@ -277,7 +277,7 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     if not m:
         # format-instruction drift is real (KNOWLEDGE.md): accept a
         # bare final line that starts with the chain's start token
-        lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+        lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
         if lines and lines[-1].split(",")[0].strip() == exam["path"][0].lower():
             line = lines[-1]
         else:
@@ -587,11 +587,11 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
 
     exam = state.get("exam") or {}
     best = -1
-    for fam, fam_exam in exam.items():
+    for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        for rung, rec in fam_exam.items():
-            if str(rung).startswith("_") or not isinstance(rec, dict):
+        for rec in fam_exam.values():
+            if not isinstance(rec, dict):
                 continue
             s = rec.get("score")
             if s is not None and s > best:
@@ -618,6 +618,17 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             continue
         values = [s for s in scored.values() if s is not None]
         family_beaten = bool(values) and max(values) < best
+        # completion FIRST (score or error = final, over the whole
+        # ladder): the F16 guard below needs it, and 'beaten so far'
+        # is NOT completion - max(scored-so-far) < best with 31
+        # candidates unexamined is exactly the premature-elimination
+        # failure mode
+        n_final = sum(
+            1
+            for rec in fam_exam.values()
+            if isinstance(rec, dict) and (rec.get("score") is not None or rec.get("error"))
+        )
+        family_complete = n_final >= len(LADDER)
         for rung, s in scored.items():
             if s is None or s >= best:
                 continue  # unscored (not the running family) or a survivor
@@ -626,7 +637,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             # the fully-eliminated family's directory (no quant of
             # this family will ever be built again); until then it
             # stays, whatever its own score
-            if rung.upper() == "F16" and not family_beaten:
+            if rung.upper() == "F16" and not family_complete:
                 continue
             # the beaten candidate's artifact goes, by name (either case)
             for p in _glob.glob(os.path.join(famdir, f"*-{rung}.gguf")):
@@ -636,22 +647,10 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
                 except OSError:
                     pass
         # the whole family out? Only when EVERY candidate of the
-        # family's ladder has a final score (an early sweep sees only
-        # a few scored candidates - eliminating then would destroy
-        # the f16 master the remaining quants must quantize from,
-        # forcing a full hub re-download per candidate)
-        # completion counts ERROR records as final too (an
-        # unbuildable candidate is decided - matching the family-done
-        # hook's definition), else a family with one unbuildable
-        # would never be cleaned
-        n_final = sum(
-            1
-            for rec in fam_exam.values()
-            if isinstance(rec, dict)
-            and not str(rec).startswith("_")
-            and (rec.get("score") is not None or rec.get("error"))
-        )
-        family_complete = n_final >= len(LADDER)
+        # family's ladder has a final verdict (score or unbuildable
+        # error) - eliminating earlier destroys the f16 master the
+        # remaining quants must quantize from, forcing a full hub
+        # re-download per candidate
         if family_beaten and family_complete:
             fam_exam["_eliminated"] = True
             shutil.rmtree(famdir, ignore_errors=True)

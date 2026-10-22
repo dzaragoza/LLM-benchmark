@@ -122,6 +122,96 @@ def check_requirements() -> None:
         )
 
 
+def preflight_selfcheck() -> None:
+    """The behavioral self-check (the ruff --fix lesson): syntax and
+    lint cannot see the failure class that cost hours - the gc
+    deleting a family mid-sweep, a shadowed name silently returning
+    the wrong paper. Before any model is touched, the exact
+    simulations run against the live code on temp dirs with fake
+    state; ANY assertion failure refuses to start the run. ~2s."""
+    import tempfile
+
+    import bench.exam as E
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # --- the paper: all three bell_window branches ---
+        # (the roster lookup needs a REAL roster family; use the
+        # first one, with a local config.json in the temp dir)
+        from bench.roster import roster_from_models_md as _roster
+
+        fam = _roster()[0][0]
+        famdir = os.path.join(tmp, fam)
+        os.makedirs(famdir, exist_ok=True)
+        with open(os.path.join(famdir, "config.json"), "w", encoding="utf-8") as f:
+            json.dump({"max_position_embeddings": 32768}, f)
+        w = E.bell_window({"sweet": {}}, fam, tmp)
+        assert w == 32768, f"bell_window config branch: {w}"
+        w = E.bell_window({"sweet": {fam: {"window": 8192}}}, fam, tmp)
+        assert w == 8192, f"bell_window cached branch: {w}"
+        assert E.bell_window({"sweet": {}}, "no-such-family-xyz", tmp) is None
+
+        # --- the gc: mid-family protection ---
+        d = os.path.join(tmp, "gcA")
+        os.makedirs(d, exist_ok=True)
+        for r in E.LADDER:
+            open(os.path.join(d, f"gcA-{r}.gguf"), "w", encoding="utf-8").close()
+        state = {
+            "exam": {
+                "gcA": {r: {"score": -1} for r in E.LADDER[:3]},
+                "top": {"F16": {"score": 4}},
+            }
+        }
+        E._gc(tmp, state, exclude_fam="gcA")
+        assert os.path.isdir(d), "gc deleted the family mid-sweep!"
+        for r in E.LADDER[:3]:
+            assert not os.path.isfile(os.path.join(d, f"gcA-{r}.gguf")), f"gc kept beaten {r}"
+        for r in E.LADDER[3:]:
+            assert os.path.isfile(os.path.join(d, f"gcA-{r}.gguf")), f"gc deleted unexamined {r}"
+
+        # --- the gc: a beaten F16 master survives while the family lives ---
+        state["exam"]["gcA"]["F16"] = {"score": 0}
+        E._gc(tmp, state, exclude_fam="gcA")
+        assert os.path.isfile(
+            os.path.join(d, "gcA-F16.gguf")
+        ), "gc deleted a beaten F16 while the family lives"
+
+        # --- the gc: family completion sweeps (incl. unbuildables) ---
+        d2 = os.path.join(tmp, "gcB")
+        os.makedirs(d2, exist_ok=True)
+        open(os.path.join(d2, "gcB-IQ1_S.gguf"), "w", encoding="utf-8").close()
+        state2 = {
+            "exam": {
+                "gcB": {
+                    **{r: {"score": -1} for r in E.LADDER if r != "Q1_0"},
+                    "Q1_0": {"error": "unbuildable"},
+                },
+                "top": {"F16": {"score": 4}},
+            }
+        }
+        E._gc(tmp, state2, exclude_fam=None)
+        assert not os.path.isdir(d2), "gc kept a fully-beaten family (with unbuildable)"
+
+        # --- the grader: the flexible subsequence ---
+        inst = {"path": ["abc", "def", "ghi"]}
+        assert E.score_exam("ANSWER: abc, def, ghi", inst, "stop")
+        assert E.score_exam("ANSWER: x abc y def z ghi", inst, "stop")
+        assert not E.score_exam("ANSWER: abc, ghi, def", inst, "stop")
+        assert not E.score_exam("ANSWER: abc, def, ghi", inst, "length")
+        assert not E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
+        assert not E.score_exam("I cannot solve this", inst, "stop")
+
+        # --- the ladder: F16 last; 32 rungs ---
+        assert E.LADDER[-1] == "F16" and len(E.LADDER) == 32
+
+        # --- the roster: readable, granite first ---
+        from bench.roster import roster_from_models_md
+
+        roster = roster_from_models_md()
+        assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
+
+    print("  self-check: the gc, the paper, the grader, the ladder, the roster - OK")
+
+
 def check_tooling(args: argparse.Namespace) -> None:
     """Verify the run's tooling (real runs only; addendum 79)."""
     for path, msg in [
@@ -201,9 +291,8 @@ def git_tail(args: argparse.Namespace) -> None:
             continue
         try:
             if os.path.getsize(p) > 48 * 1024 * 1024:
-                stamp(
-                    f"skipping {p}: {os.path.getsize(p) / 2**20:.0f} MiB exceeds github's 50 MiB limit"
-                )
+                size_mib = os.path.getsize(p) / 2**20
+                stamp(f"skipping {p}: {size_mib:.0f} MiB exceeds github's 50 MiB limit")
                 continue
         except OSError:
             continue
@@ -474,6 +563,8 @@ def _run(args: argparse.Namespace) -> None:
     if not args.dry_run:
         kill_stale_server()
         check_tooling(args)
+    if not args.dry_run:
+        preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
     if args.task in ("v8", "exam"):

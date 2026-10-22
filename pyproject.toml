@@ -3,6 +3,13 @@ line-length = 100
 target-version = "py310"
 exclude = ["live-corpus.json", "reports", "*.md"]
 
+# bench/exam.py's CHAIN_DEMO/ELEVATOR_DEMO carry the exam prompts as
+# single long lines BY DESIGN (the models read them as one line;
+# wrapping changes the exam). The per-file E501 ignore is the honest
+# exception - everything else stays at 100.
+[tool.ruff.lint.per-file-ignores]
+"bench/exam.py" = ["E501"]
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 
