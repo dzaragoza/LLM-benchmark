@@ -633,8 +633,13 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
                     print(f"  gc: {fam} {rung} (score {s} < best {best}) - artifact deleted")
                 except OSError:
                     pass
-        # the whole family out? the directory goes - f16 included
-        if family_beaten:
+        # the whole family out? Only when EVERY candidate of the
+        # family's ladder has a final score (an early sweep sees only
+        # a few scored candidates - eliminating then would destroy
+        # the f16 master the remaining quants must quantize from,
+        # forcing a full hub re-download per candidate)
+        family_complete = len(values) == len(LADDER) and not some_unscored
+        if family_beaten and family_complete:
             fam_exam["_eliminated"] = True
             shutil.rmtree(famdir, ignore_errors=True)
             print(f"  gc: {fam} eliminated (best score {max(values)} < {best}) - artifacts deleted")
@@ -649,6 +654,7 @@ def run(
     n_seeds: int = 1,
     max_level: int = 32,
     dry_run: bool = False,
+    on_family_done: Any = None,
 ) -> dict[tuple[str, str], Any]:
     """The exam controller (v9): ONE straight pass over the
     candidates - roster order (param-ascending) x the tg/s-sorted
@@ -718,4 +724,20 @@ def run(
         # the self-clean: the moment this candidate's score exists,
         # strictly-lower scorers leave the disk (data always stays)
         _gc(models_dir, state, fam)
+        # the family's last candidate done? report and push - the
+        # author's watchability ruling: a push every time a model
+        # completes all its candidates
+        fam_exam = state.get("exam", {}).get(fam) or {}
+        scored_or_final = [
+            r
+            for r, rr in fam_exam.items()
+            if not str(r).startswith("_")
+            and isinstance(rr, dict)
+            and (rr.get("score") is not None or rr.get("error"))
+        ]
+        if len(scored_or_final) >= len(LADDER) and on_family_done is not None:
+            try:
+                on_family_done(fam)
+            except Exception as e:
+                print(f"  family-done hook failed (ignored): {e}")
     return results

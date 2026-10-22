@@ -519,6 +519,32 @@ def _run(args: argparse.Namespace) -> None:
             stamp("elimination complete")
             return
 
+        def family_done(fam: str) -> None:
+            """A push every time a model completes all its candidates
+            (the author's watchability ruling): state + answers + the
+            refreshed ledger are committed and pushed, so the run is
+            readable model by model, hours apart instead of at the
+            end."""
+            _exam_to_state_keep(state)
+            save_state(args.state_file, state)
+            write_v8_md(
+                state, {name: i + 1 for i, name in enumerate(
+                    [n for n, _ in roster_from_models_md()])}
+            )
+            stamp(f"family complete: {fam} - committing artifacts")
+            if args.no_git or args.dry_run:
+                return
+            tee_output.uninstall()
+            try:
+                git_tail(args)
+            except Exception as e:
+                stamp(f"family push failed (ignored): {e}")
+            finally:
+                tee_output.install()
+
+        def _exam_to_state_keep(state: dict[str, Any]) -> None:
+            pass  # the exam writes state directly; nothing to merge
+
         results = exam_run(
             args.models_dir,
             state,
@@ -528,6 +554,7 @@ def _run(args: argparse.Namespace) -> None:
             n_seeds=args.exam_seeds,
             max_level=args.exam_max_level,
             dry_run=args.dry_run,
+            on_family_done=None if args.dry_run else family_done,
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
