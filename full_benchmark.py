@@ -406,8 +406,8 @@ def main() -> None:
         raise
 
 
-def write_v8_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
-    """md/v8.md - the tournament ledger, rewritten from state after
+def write_v9_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
+    """md/v9.md - the tournament ledger, rewritten from state after
     every run: every candidate ever measured, its score, why it
     failed its highest exam, and whether it is eliminated (its
     artifacts deleted from the benchmark machine - the data always
@@ -416,7 +416,7 @@ def write_v8_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
 
     exam = state.get("exam") or {}
     lines = [
-        "# v8.md - the tournament ledger",
+        "# v9.md - the tournament ledger",
         "",
         "One row per (model, quant) candidate, param-ascending; regenerated",
         "from state after every run. Eliminated = the candidate's artifacts",
@@ -453,9 +453,9 @@ def write_v8_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         f"of {len(exam)} ever measured. The roster refill continues at "
         f"--models-from {max(roster_pos.values(), default=0) + 1}._"
     )
-    with open(os.path.join("md", "v8.md"), "w", encoding="utf-8") as f:
+    with open(os.path.join("md", "v9.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    stamp("v8.md ledger rewritten")
+    stamp("v9.md ledger rewritten")
 
 
 def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
@@ -511,7 +511,7 @@ def _run(args: argparse.Namespace) -> None:
                 else:
                     stamp(f"eliminated {fam}: marked (no artifacts on disk)")
             save_state(args.state_file, state)
-            write_v8_md(state, {name: i + 1 for i, name in enumerate(
+            write_v9_md(state, {name: i + 1 for i, name in enumerate(
                 [n for n, _ in roster_from_models_md()])})
             if not args.no_git:
                 tee_output.uninstall()
@@ -527,7 +527,7 @@ def _run(args: argparse.Namespace) -> None:
             end."""
             _exam_to_state_keep(state)
             save_state(args.state_file, state)
-            write_v8_md(
+            write_v9_md(
                 state, {name: i + 1 for i, name in enumerate(
                     [n for n, _ in roster_from_models_md()])}
             )
@@ -558,7 +558,7 @@ def _run(args: argparse.Namespace) -> None:
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
-        write_v8_md(state, {name: i + 1 for i, name in enumerate(
+        write_v9_md(state, {name: i + 1 for i, name in enumerate(
             [n for n, _ in roster_from_models_md()])})
         print()
         print("=" * 60)
