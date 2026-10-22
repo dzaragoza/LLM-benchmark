@@ -712,6 +712,11 @@ def run(
         except Exception as e:
             rec = {"error": f"exam run failed: {e}"}
         results[key] = rec
+        # the self-clean FIRST: a model whose F16 scored strictly
+        # below the global best leaves the disk (the data always
+        # stays), THEN the family push - so this model's own
+        # deletions are staged and committed in its push
+        _gc(models_dir, state, fam)
         # v9.1: the F16 IS the model - the family is complete after
         # its one candidate; report and push (the watchability ruling)
         if on_family_done is not None:
@@ -719,7 +724,4 @@ def run(
                 on_family_done(fam)
             except Exception as e:
                 print(f"  family-done hook failed (ignored): {e}")
-        # the self-clean: a model whose F16 scored strictly below the
-        # global best leaves the disk (the data always stays)
-        _gc(models_dir, state, fam)
     return results

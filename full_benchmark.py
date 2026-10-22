@@ -18,6 +18,7 @@ import glob
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from typing import Any
@@ -261,10 +262,27 @@ def git_tail(args: argparse.Namespace) -> None:
     paths += glob.glob("results/**/*", recursive=True)
     # tool failure logs from models/ (quantize/convert/imatrix) are
     # BENCHMARK DEBUG DATA: they explain why a rung could not be
-    # created - uploaded, never left stranded on the machine
+    # created - uploaded, never left stranded on the machine.
+    # The gc's eliminations DELETE these logs from models/ - the
+    # deletions must be staged too, else they stay unstaged and
+    # block the next run's pull --rebase (the v9.1 lesson: git add
+    # on an existing-file list never stages a deletion)
     paths += glob.glob("models/*/quantize-*.log")
     paths += glob.glob("models/*/convert-f16.log")
     paths += glob.glob("models/*/imatrix.log")
+    deleted = [
+        p
+        for p in subprocess.run(
+            ["git", "ls-files", "-d", "--", "models/"],
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        if p
+    ]
+    if deleted:
+        rc, err = git_ops.add(deleted)
+        if rc != 0:
+            stamp(f"staging log deletions failed: {err.strip()[:120]}")
     # the historical output globs (pre-split locations, already
     # committed trees stay reachable; new artifacts land in results/)
     paths += (
