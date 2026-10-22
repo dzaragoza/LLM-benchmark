@@ -92,7 +92,8 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
         shutil.copyfile(IMATRIX_CORPUS, txt)
     log = os.path.join(famdir, "imatrix.log")
     print(
-        f"  [2] computing importance matrix from {os.path.basename(f16)} (output hidden; shown on error)"
+        f"  [2] computing importance matrix from {os.path.basename(f16)} "
+        "(output hidden; shown on error)"
     )
     rc = run_quiet(
         [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl"],
@@ -181,7 +182,7 @@ def _add_overrides(famdir: str, overrides: str, names: list[str]) -> list[str]:
     known = set()
     if os.path.isfile(overrides):
         with open(overrides, encoding="utf-8") as f:
-            known = {l.split("=", 1)[0].strip() for l in f if "=" in l}
+            known = {ln.split("=", 1)[0].strip() for ln in f if "=" in ln}
     added: list[str] = []
     with open(overrides, "a", encoding="utf-8") as f:
         for n in sorted(names):
@@ -273,7 +274,7 @@ def create(fam: str, famdir: str, rung: str, plan: str = "", dry_run: bool = Fal
     overrides = os.path.join(famdir, "imatrix-overrides.txt")
 
     def build_cmd() -> list[str]:
-        cmd = [QUANTIZE_BIN]
+        cmd: list[str] = [QUANTIZE_BIN]
         if rung.upper() in IMATRIX_RUNGS:
             imx = ensure_imatrix(fam, famdir, f16)
             if imx:
