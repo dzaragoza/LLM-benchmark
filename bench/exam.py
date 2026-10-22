@@ -1,30 +1,28 @@
-"""bench.exam -- THE benchmark (v9): the exam is the only phase.
+"""bench.exam -- THE benchmark (v9.1): the exam is the only phase.
 
-Daniela's ruling: forget the sweet-spot measurements entirely. The
-context is the FULL training window; the model has a literal bell to
-beat - 1024 seconds per attempt (the UX budget itself). No pre-
-measurement, no in-window rule, no quant ladder walk: every
-(model, quant) candidate is acquired on demand, served at its full
-window, and takes the exam directly. The exam IS the filter.
+Daniela's v9.1 ruling: keep the v9 machinery, sharpen the search -
+comprehensiveness yielded to efficiency.
 
-  candidates  every (model, quant) pair: F16 plus every quant that
-              can be built (the ladder is the ACQUISITION order,
-              not a ranking - a candidate that cannot exist on this
-              machine is recorded and skipped).
+  candidates  ONE per model: (model, F16), roster order
+              (param-ascending, per md/models.md). The F16
+              candidate's max score IS the model's max score.
   the paper    the full training window, as the generation budget.
   the bells    TOKEN: max_tokens = the window (finish_reason
               'length' = the paper filled); TIME: 1024s per
               attempt (finish_reason 'time_limit' = the bell rang).
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
-  sweeps      level 0 for every candidate; the next round's only
-              candidates are the previous round's passers.
-  self-clean  the moment a candidate has a SCORE, every candidate
-              with a strictly lower score is eliminated: its
-              artifacts are deleted from disk (the data always
-              stays). No model-count limits, no refill logic - run
-              the full roster and it cleans itself: disk holds the
-              survivors plus the family currently being examined.
+  self-clean  MODEL granularity: a model whose F16 scored strictly
+              below the global best is eliminated - its models/
+              directory is deleted (the data always stays).
+  HARD STOP   a time_limit is NOT an elimination: the model might
+              be able to answer but ran out of clock. The benchmark
+              STOPS (TimeBellHit), the artifacts commit, and the
+              human decides.
+
+Run data is v9-compatible: the same state shape (exam.<fam>.<rung>),
+the same answers files, the same ledger - a v9.1 run resumes a v9
+run's F16 records directly.
 
 Everything is IDEMPOTENT and RESUMABLE; every attempt is logged with
 its full prompt and answer for debugging.
@@ -44,7 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md, window
+from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
@@ -349,26 +347,34 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
         return WINDOW_DEFAULT
 
 
+class TimeBellHit(Exception):
+    """The v9.1 hard stop: a candidate hit the 1024s time bell -
+    the model might be able to answer but ran out of clock. The
+    author's rule: STOP the benchmark; the human decides. Carries
+    (family, rung, level, part) so the stop is findable."""
+
+    def __init__(self, fam: str, rung: str, level: int, part: str) -> None:
+        super().__init__(f"{fam} {rung}: time bell at level {level} part {part}")
+        self.fam = fam
+        self.rung = rung
+        self.level = level
+        self.part = part
+
+
 def candidates(
     state: dict[str, Any],
     families: list[str] | None,
     models_dir: str = "models",
     dry_run: bool = False,
 ) -> list[tuple[str, str]]:
-    """The roster as (family, rung) pairs, param-ascending: every
-    model x every quant in the acquisition ladder. In v9 there is no
-    in-window rule - a candidate's bell is its own full window and
-    the 1024s time bell; the exam decides everything. Acquisition
-    happens lazily at exam time (the file must exist or be
-    buildable); this function only enumerates and filters by the
-    explicit family list."""
+    """v9.1: the roster as (family, F16) pairs, param-ascending - ONE
+    candidate per model. The F16 candidate's max score IS the model's
+    max score (the author's v9.1 ruling: comprehensiveness yielded to
+    efficiency; the quant ablation era ended). Acquisition stays
+    lazy (the f16 is downloaded/converted on demand)."""
     order = [name for name, _ in roster_from_models_md()]
     fams = order if not families else [f.split("=")[0] for f in families]
-    out: list[tuple[str, str]] = []
-    for fam in fams:
-        for rung in LADDER:
-            out.append((fam, rung))
-    return out
+    return [(fam, "F16") for fam in fams]
 
 
 def run_family(
@@ -485,6 +491,14 @@ def run_family(
                             # error) must not kill the family's sweep:
                             # record it, fail the part, keep the paper
                             answer, tokens, finish = "", 0, f"error: {e}"
+                        if finish == "time_limit":
+                            # v9.1: the model might be able to answer
+                            # but ran out of clock - the author's HARD
+                            # STOP. The attempt is logged first, then
+                            # the benchmark stops for the human to
+                            # decide (state already carries every
+                            # level before this one)
+                            raise TimeBellHit(fam, rung, level, part)
                         ok = score_exam(answer, inst, finish)
                         attempt.update(
                             ok=ok,
@@ -572,17 +586,15 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep (the author's v9 ruling), at CANDIDATE
-    granularity: once any candidate has a score, every scored
-    candidate whose score is strictly lower than the running best
-    is eliminated - its quant artifact is deleted from models/
-    immediately (the data ALWAYS stays: answers in results/, the
-    records in state). A family whose EVERY candidate is eliminated
-    loses its whole directory. Old-era leftovers (artifacts of
-    candidates with no score that the family's survivors make
-    irrelevant) are swept when the family completes. Disk holds the
-    survivors plus the family currently being examined."""
-    import glob as _glob
+    """The self-cleaning sweep, v9.1 - MODEL granularity: a model is
+    eliminated when its F16 candidate has a final score strictly
+    below the global best (the F16 score IS the model's max score).
+    Elimination deletes the model's whole models/ directory (the
+    data ALWAYS stays: answers in results/, records in state). The
+    model being examined keeps its files until its F16 sweep
+    finishes. Unscored models (pending, interrupted) are never
+    touched. A TimeBellHit never reaches the gc - the benchmark
+    stops before any elimination judgement of the stopped model."""
     import shutil
 
     exam = state.get("exam") or {}
@@ -590,76 +602,28 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        for rec in fam_exam.values():
-            if not isinstance(rec, dict):
-                continue
+        rec = fam_exam.get("F16")
+        if isinstance(rec, dict):
             s = rec.get("score")
             if s is not None and s > best:
                 best = s
     if best < 0:
-        return  # nobody has finished level 0 yet - nothing to clean
+        return  # nobody has a score yet - nothing to clean
     for fam, fam_exam in exam.items():
-        if not isinstance(fam_exam, dict):
+        if not isinstance(fam_exam, dict) or fam == exclude_fam:
             continue
-        scored = {
-            rung: rec.get("score")
-            for rung, rec in fam_exam.items()
-            if rung in LADDER and isinstance(rec, dict)
-        }
-        values = [s for s in scored.values() if s is not None]
-        some_unscored = len(values) < len(
-            [r for r in fam_exam if not str(r).startswith("_") and isinstance(fam_exam[r], dict)]
-        )
-        # the family being examined keeps its files until it finishes
-        if fam == exclude_fam and some_unscored:
+        rec = fam_exam.get("F16")
+        if not isinstance(rec, dict):
             continue
+        s = rec.get("score")
+        if s is None or s >= best:
+            continue  # pending or a survivor
         famdir = os.path.join(models_dir, fam)
         if not os.path.isdir(famdir):
             continue
-        values = [s for s in scored.values() if s is not None]
-        family_beaten = bool(values) and max(values) < best
-        # completion FIRST (score or error = final, over the whole
-        # ladder): the F16 guard below needs it, and 'beaten so far'
-        # is NOT completion - max(scored-so-far) < best with 31
-        # candidates unexamined is exactly the premature-elimination
-        # failure mode
-        # completion counts only REAL ladder candidates (a foreign
-        # or corrupted record key must not inflate the count into a
-        # premature family elimination)
-        n_final = sum(
-            1
-            for rung, rec in fam_exam.items()
-            if rung in LADDER
-            and isinstance(rec, dict)
-            and (rec.get("score") is not None or rec.get("error"))
-        )
-        family_complete = n_final >= len(LADDER)
-        for rung, s in scored.items():
-            if s is None or s >= best:
-                continue  # unscored (not the running family) or a survivor
-            # the f16 master is the QUANTIZATION SOURCE for the whole
-            # family - it is always the last to go, deleted only with
-            # the fully-eliminated family's directory (no quant of
-            # this family will ever be built again); until then it
-            # stays, whatever its own score
-            if rung.upper() == "F16" and not family_complete:
-                continue
-            # the beaten candidate's artifact goes, by name (either case)
-            for p in _glob.glob(os.path.join(famdir, f"*-{rung}.gguf")):
-                try:
-                    os.remove(p)
-                    print(f"  gc: {fam} {rung} (score {s} < best {best}) - artifact deleted")
-                except OSError:
-                    pass
-        # the whole family out? Only when EVERY candidate of the
-        # family's ladder has a final verdict (score or unbuildable
-        # error) - eliminating earlier destroys the f16 master the
-        # remaining quants must quantize from, forcing a full hub
-        # re-download per candidate
-        if family_beaten and family_complete:
-            fam_exam["_eliminated"] = True
-            shutil.rmtree(famdir, ignore_errors=True)
-            print(f"  gc: {fam} eliminated (best score {max(values)} < {best}) - artifacts deleted")
+        fam_exam["_eliminated"] = True
+        shutil.rmtree(famdir, ignore_errors=True)
+        print(f"  gc: {fam} eliminated (F16 score {s} < best {best}) - artifacts deleted")
 
 
 def run(
@@ -715,8 +679,10 @@ def run(
             print(f"  {fam} {rung}: unbuildable - skipped")
             continue
         print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
-        # one candidate's failure never kills the exam - any
-        # exception is recorded and the sweep moves on
+        # the TimeBellHit passes through: run_family raises it on
+        # a 1024s cut and it must stop the whole benchmark (the
+        # author's v9.1 rule). Everything else is contained: one
+        # candidate's failure is recorded and the sweep moves on.
         try:
             rec = run_family(
                 fam,
@@ -731,6 +697,14 @@ def run(
                 0,
                 dry_run,
             )
+        except TimeBellHit as e:
+            # record the stop, save, re-raise: the orchestrator's
+            # crash rail commits and the human decides
+            state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})[
+                "time_bell_hit"
+            ] = {"level": e.level, "part": e.part}
+            _state_store.save_state(state_file, state)
+            raise
         except SystemExit as e:
             if e.code == 130:
                 raise
@@ -738,23 +712,14 @@ def run(
         except Exception as e:
             rec = {"error": f"exam run failed: {e}"}
         results[key] = rec
-        # the self-clean: the moment this candidate's score exists,
-        # strictly-lower scorers leave the disk (data always stays)
-        _gc(models_dir, state, fam)
-        # the family's last candidate done? report and push - the
-        # author's watchability ruling: a push every time a model
-        # completes all its candidates
-        fam_exam = state.get("exam", {}).get(fam) or {}
-        scored_or_final = [
-            r
-            for r, rr in fam_exam.items()
-            if not str(r).startswith("_")
-            and isinstance(rr, dict)
-            and (rr.get("score") is not None or rr.get("error"))
-        ]
-        if len(scored_or_final) >= len(LADDER) and on_family_done is not None:
+        # v9.1: the F16 IS the model - the family is complete after
+        # its one candidate; report and push (the watchability ruling)
+        if on_family_done is not None:
             try:
                 on_family_done(fam)
             except Exception as e:
                 print(f"  family-done hook failed (ignored): {e}")
+        # the self-clean: a model whose F16 scored strictly below the
+        # global best leaves the disk (the data always stays)
+        _gc(models_dir, state, fam)
     return results

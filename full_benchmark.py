@@ -150,46 +150,34 @@ def preflight_selfcheck() -> None:
         assert w == 8192, f"bell_window cached branch: {w}"
         assert E.bell_window({"sweet": {}}, "no-such-family-xyz", tmp) is None
 
-        # --- the gc: mid-family protection ---
-        d = os.path.join(tmp, "gcA")
+        # --- v9.1: candidates are (model, F16) only ---
+        c = E.candidates({}, [fam])
+        assert c == [(fam, 'F16')], f'candidates must be F16-only, got {c}'
+
+        # --- v9.1 gc: model granularity, F16-keyed ---
+        d = os.path.join(tmp, 'gcA')
         os.makedirs(d, exist_ok=True)
-        for r in E.LADDER:
-            open(os.path.join(d, f"gcA-{r}.gguf"), "w", encoding="utf-8").close()
-        state = {
-            "exam": {
-                "gcA": {r: {"score": -1} for r in E.LADDER[:3]},
-                "top": {"F16": {"score": 4}},
-            }
-        }
-        E._gc(tmp, state, exclude_fam="gcA")
-        assert os.path.isdir(d), "gc deleted the family mid-sweep!"
-        for r in E.LADDER[:3]:
-            assert not os.path.isfile(os.path.join(d, f"gcA-{r}.gguf")), f"gc kept beaten {r}"
-        for r in E.LADDER[3:]:
-            assert os.path.isfile(os.path.join(d, f"gcA-{r}.gguf")), f"gc deleted unexamined {r}"
-
-        # --- the gc: a beaten F16 master survives while the family lives ---
-        state["exam"]["gcA"]["F16"] = {"score": 0}
-        E._gc(tmp, state, exclude_fam="gcA")
-        assert os.path.isfile(os.path.join(d, "gcA-F16.gguf")), (
-            "gc deleted a beaten F16 while the family lives"
-        )
-
-        # --- the gc: family completion sweeps (incl. unbuildables) ---
-        d2 = os.path.join(tmp, "gcB")
+        open(os.path.join(d, 'gcA-F16.gguf'), 'w', encoding='utf-8').close()
+        state = {'exam': {'gcA': {'F16': {'score': -1}}, 'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state, exclude_fam=None)
+        assert not os.path.isdir(d), 'gc kept a beaten model'
+        assert state['exam']['gcA']['_eliminated'] is True
+        d2 = os.path.join(tmp, 'gcB')
         os.makedirs(d2, exist_ok=True)
-        open(os.path.join(d2, "gcB-IQ1_S.gguf"), "w", encoding="utf-8").close()
-        state2 = {
-            "exam": {
-                "gcB": {
-                    **{r: {"score": -1} for r in E.LADDER if r != "Q1_0"},
-                    "Q1_0": {"error": "unbuildable"},
-                },
-                "top": {"F16": {"score": 4}},
-            }
-        }
+        open(os.path.join(d2, 'gcB-F16.gguf'), 'w', encoding='utf-8').close()
+        state2 = {'exam': {'gcB': {'F16': {'score': 4}}, 'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state2, exclude_fam=None)
-        assert not os.path.isdir(d2), "gc kept a fully-beaten family (with unbuildable)"
+        assert os.path.isdir(d2), 'gc deleted a survivor model'
+        d3 = os.path.join(tmp, 'gcC')
+        os.makedirs(d3, exist_ok=True)
+        open(os.path.join(d3, 'gcC-F16.gguf'), 'w', encoding='utf-8').close()
+        state3 = {'exam': {'gcC': {'F16': {}}, 'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state3, exclude_fam=None)
+        assert os.path.isdir(d3), 'gc deleted a pending model'
+        open(os.path.join(d3, 'gcC-F16.gguf'), 'w', encoding='utf-8').close()
+        state4 = {'exam': {'gcC': {'F16': {'score': -1}}, 'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state4, exclude_fam='gcC')
+        assert os.path.isdir(d3), 'gc deleted the running model'
 
         # --- the grader: the flexible subsequence ---
         inst = {"path": ["abc", "def", "ghi"]}
@@ -200,8 +188,10 @@ def preflight_selfcheck() -> None:
         assert not E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
         assert not E.score_exam("I cannot solve this", inst, "stop")
 
-        # --- the ladder: F16 last; 32 rungs ---
-        assert E.LADDER[-1] == "F16" and len(E.LADDER) == 32
+        # --- v9.1: the candidate is F16, always ---
+        from bench.roster import LADDER
+
+        assert LADDER[-1] == "F16" and len(LADDER) == 32
 
         # --- the roster: readable, granite first ---
         from bench.roster import roster_from_models_md
@@ -465,13 +455,18 @@ def main() -> None:
         _run(args)
     except SystemExit:
         raise
-    except BaseException:
+    except BaseException as exc:
         import traceback
 
         tb = traceback.format_exc()
         try:
             print(tb)
-            stamp("CRASH DETECTED - committing artifacts before exit")
+            from bench.exam import TimeBellHit
+
+            if isinstance(exc, TimeBellHit):
+                stamp(f"TIME BELL HIT - {exc} - the benchmark is STOPPED for review")
+            else:
+                stamp("CRASH DETECTED - committing artifacts before exit")
             try:
                 llama_server.kill_stale_server()
             except Exception as e:
