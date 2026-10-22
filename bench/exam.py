@@ -44,7 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md
+from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md, window
 
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
@@ -337,9 +337,9 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
     the fill-rate problem the model's, not the benchmark's."""
     # the window may be cached in state (a previous era's read) -
     # a fast path, not a dependency on the retired sweet tree
-    window = ((state.get("sweet") or {}).get(fam) or {}).get("window")
-    if window:
-        return int(window)
+    cached = ((state.get("sweet") or {}).get(fam) or {}).get("window")
+    if cached:
+        return int(cached)
     repo = dict(roster_from_models_md()).get(fam)
     if not repo:
         return None
@@ -640,7 +640,18 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         # a few scored candidates - eliminating then would destroy
         # the f16 master the remaining quants must quantize from,
         # forcing a full hub re-download per candidate)
-        family_complete = len(values) == len(LADDER) and not some_unscored
+        # completion counts ERROR records as final too (an
+        # unbuildable candidate is decided - matching the family-done
+        # hook's definition), else a family with one unbuildable
+        # would never be cleaned
+        n_final = sum(
+            1
+            for rec in fam_exam.values()
+            if isinstance(rec, dict)
+            and not str(rec).startswith("_")
+            and (rec.get("score") is not None or rec.get("error"))
+        )
+        family_complete = n_final >= len(LADDER)
         if family_beaten and family_complete:
             fam_exam["_eliminated"] = True
             shutil.rmtree(famdir, ignore_errors=True)
