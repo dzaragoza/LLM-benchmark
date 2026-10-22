@@ -505,65 +505,65 @@ def main() -> None:
         raise
 
 
-def write_v9_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
-    """md/v9.md - the tournament ledger, rewritten from state after
-    every run: every candidate ever measured, its score, why it
-    failed its highest exam, and whether it is eliminated (its
-    artifacts deleted from the benchmark machine - the data always
-    stays in git)."""
+def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
+    """md/v9.1.md - the tournament ledger, v9.1: ONE line per model
+    (its F16 candidate), in md/models.md order. The F16 score IS the
+    model's score. Eliminated = the model's artifacts were deleted
+    from the benchmark machine (the collected data always stays in
+    git)."""
     from bench.exam import fail_reason
 
     exam = state.get("exam") or {}
     lines = [
-        "# v9.md - the tournament ledger",
+        "# v9.1.md - the tournament ledger (v9.1: one F16 candidate per model)",
         "",
-        "One row per (model, quant) candidate, param-ascending; regenerated",
-        "from state after every run. Eliminated = the candidate's artifacts",
-        "were deleted from the benchmark machine (the collected data",
-        "always stays). The exam's failure reasons:",
-        "`out of context` (the bell rang before an answer), `wrong chain`",
-        "(an answer arrived, the chain was incorrect), `error` (tool",
-        "failure), `no record` (never measured).",
+        "One line per model, md/models.md order (param-ascending). The F16",
+        "candidate's score IS the model's score. Eliminated = the model's",
+        "artifacts were deleted from the benchmark machine (the data always",
+        "stays in git). The exam's failure reasons:",
+        "`out of time` (the 1024s bell - the run stops for review),",
+        "`out of context` (the paper filled before an answer), `wrong chain`",
+        "(an answer arrived, incorrect), `error` (tool failure),",
+        "`no record` (never measured).",
         "",
-        "| # | model | quant | score | ctx (bell) | failed at | why | eliminated? |",
-        "|---|---|---|---|---|---|---|---|",
+        "| # | model | score | paper | failed at | why | eliminated? |",
+        "|---|---|---|---|---|---|---|",
     ]
+    n_elim = 0
     for fam, pos in sorted(roster_pos.items(), key=lambda kv: kv[1]):
         fam_exam = exam.get(fam) or {}
-        if not fam_exam:
+        if not isinstance(fam_exam, dict):
             continue
-        # the family record mixes candidates with the _eliminated
-        # flag (a bool) - the ledger iterates DICT candidates only
-        rungs = sorted(
-            (
-                (rung, rec)
-                for rung, rec in fam_exam.items()
-                if not str(rung).startswith("_") and isinstance(rec, dict)
-            ),
-            key=lambda kv: -(kv[1].get("score") if kv[1].get("score") is not None else -1),
+        rec = fam_exam.get("F16")
+        if not isinstance(rec, dict):
+            continue
+        score = rec.get("score")
+        failed_at = ""
+        why = fail_reason(rec) if rec.get("levels") else "no record"
+        if score is not None and why not in ("no record",):
+            failed_at = f"level {score + 1}"
+        ctx = rec.get("bell_ctx")
+        elim = "yes" if fam_exam.get("_eliminated") else "no"
+        if fam_exam.get("_eliminated"):
+            n_elim += 1
+        lines.append(
+            f"| {pos} | {fam} | {score if score is not None else '-'} "
+            f"| {ctx if ctx is not None else '-'} | {failed_at or '-'} "
+            f"| {why if failed_at or why != 'no record' else '-'} | {elim} |"
         )
-        for rung, rec in rungs:
-            score = rec.get("score")
-            failed_at = ""
-            if score is not None:
-                failed_at = f"level {score + 1}" if fail_reason(rec) not in ("no record",) else ""
-            why = fail_reason(rec)
-            ctx = rec.get("bell_ctx")
-            lines.append(
-                f"| {pos} | {fam} | {rung} | {score if score is not None else '-'} "
-                f"| {ctx if ctx is not None else '-'} | {failed_at or '-'} "
-                f"| {why if failed_at or why != 'no record' else '-'} "
-                f"| {'yes' if fam_exam.get('_eliminated') else 'no'} |"
-            )
     lines.append("")
-    lines.append(
-        f"_Eliminated models: {sum(1 for f in exam if (exam[f] or {}).get('_eliminated'))} "
-        f"of {len(exam)} ever measured. The roster refill continues at "
-        f"--models-from {max(roster_pos.values(), default=0) + 1}._"
+    n_measured = sum(
+        1
+        for fe in exam.values()
+        if isinstance(fe, dict) and isinstance(fe.get("F16"), dict)
     )
-    with open(os.path.join("md", "v9.md"), "w", encoding="utf-8") as f:
+    lines.append(
+        f"_{n_elim} of {n_measured} measured models eliminated; the F16 "
+        "records decide everything._"
+    )
+    with open(os.path.join("md", "v9.1.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    stamp("v9.md ledger rewritten")
+    stamp("v9.1.md ledger rewritten")
 
 
 def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
@@ -621,7 +621,7 @@ def _run(args: argparse.Namespace) -> None:
                 else:
                     stamp(f"eliminated {fam}: marked (no artifacts on disk)")
             save_state(args.state_file, state)
-            write_v9_md(
+            write_v91_md(
                 state,
                 {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
             )
@@ -639,7 +639,7 @@ def _run(args: argparse.Namespace) -> None:
             end."""
             _exam_to_state_keep(state)
             save_state(args.state_file, state)
-            write_v9_md(
+            write_v91_md(
                 state,
                 {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
             )
@@ -670,7 +670,7 @@ def _run(args: argparse.Namespace) -> None:
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
-        write_v9_md(
+        write_v91_md(
             state, {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])}
         )
         print()
