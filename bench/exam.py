@@ -604,7 +604,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         scored = {
             rung: rec.get("score")
             for rung, rec in fam_exam.items()
-            if not str(rung).startswith("_") and isinstance(rec, dict)
+            if rung in LADDER and isinstance(rec, dict)
         }
         values = [s for s in scored.values() if s is not None]
         some_unscored = len(values) < len(
@@ -623,10 +623,15 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         # is NOT completion - max(scored-so-far) < best with 31
         # candidates unexamined is exactly the premature-elimination
         # failure mode
+        # completion counts only REAL ladder candidates (a foreign
+        # or corrupted record key must not inflate the count into a
+        # premature family elimination)
         n_final = sum(
             1
-            for rec in fam_exam.values()
-            if isinstance(rec, dict) and (rec.get("score") is not None or rec.get("error"))
+            for rung, rec in fam_exam.items()
+            if rung in LADDER
+            and isinstance(rec, dict)
+            and (rec.get("score") is not None or rec.get("error"))
         )
         family_complete = n_final >= len(LADDER)
         for rung, s in scored.items():
