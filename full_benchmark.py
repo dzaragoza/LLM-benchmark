@@ -505,26 +505,14 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     (its F16 candidate), in md/models.md order. The F16 score IS the
     model's score. Eliminated = the model's artifacts were deleted
     from the benchmark machine (the collected data always stays in
-    git)."""
+    git). Tied top-tier models are never eliminated; their ranking
+    column shows the time order at the highest exam level (the
+    tiebreaker indication - the human breaks ties)."""
     from bench.exam import fail_reason
 
     exam = state.get("exam") or {}
-    lines = [
-        "# v9.1.md - the tournament ledger (v9.1: one F16 candidate per model)",
-        "",
-        "One line per model, md/models.md order (param-ascending). The F16",
-        "candidate's score IS the model's score. Eliminated = the model's",
-        "artifacts were deleted from the benchmark machine (the data always",
-        "stays in git). The exam's failure reasons:",
-        "`out of time` (the 1024s bell - the run stops for review),",
-        "`out of context` (the paper filled before an answer), `wrong chain`",
-        "(an answer arrived, incorrect), `error` (tool failure),",
-        "`no record` (never measured).",
-        "",
-        "| # | model | score | paper | failed at | why | eliminated? |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    n_elim = 0
+    # gather the measured models first (needed for the tier ranking)
+    rows = []
     for fam, pos in sorted(roster_pos.items(), key=lambda kv: kv[1]):
         fam_exam = exam.get(fam) or {}
         if not isinstance(fam_exam, dict):
@@ -533,25 +521,49 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         if not isinstance(rec, dict):
             continue
         score = rec.get("score")
-        failed_at = ""
-        why = fail_reason(rec) if rec.get("levels") else "no record"
-        if score is not None and why not in ("no record",):
-            failed_at = f"level {score + 1}"
-        ctx = rec.get("bell_ctx")
+        # the time at the model's HIGHEST PASSED level (both parts)
+        top_time = None
+        if score is not None and score >= 0:
+            lv = (rec.get("levels") or {}).get(str(score)) or {}
+            atts = lv.get("attempts") or []
+            tot = sum(a.get("elapsed_s") or 0 for a in atts)
+            top_time = tot if atts else None
+        rows.append((fam, pos, score, top_time, fam_exam))
+    # the top tier: the global best score; rank by time at the top
+    # level, fastest first (the tiebreaker indication)
+    best = max((r[2] for r in rows if r[2] is not None), default=None)
+    tier = [r for r in rows if r[2] is not None and r[2] == best]
+    tier.sort(key=lambda r: (r[3] if r[3] is not None else float("inf")))
+    rank = {r[0]: i + 1 for i, r in enumerate(tier)}
+    lines = [
+        "# v9.1.md - the tournament ledger (v9.1: one F16 candidate per model)",
+        "",
+        "One line per model, md/models.md order (param-ascending). The F16",
+        "candidate's score IS the model's score. Eliminated = the model's",
+        "artifacts were deleted from the benchmark machine (the data always",
+        "stays in git). Time = the wall time at the model's highest passed",
+        "level (both parts). The ranking column is valid ONLY for the top",
+        "tier (tied at the global best): fastest first, the tiebreaker",
+        "indication - the human breaks ties.",
+        "",
+        "| # | model | score | paper | time @ top | rank | eliminated? |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    n_elim = 0
+    for fam, pos, score, top_time, fam_exam in rows:
+        ctx = (fam_exam.get("F16") or {}).get("bell_ctx")
         elim = "yes" if fam_exam.get("_eliminated") else "no"
         if fam_exam.get("_eliminated"):
             n_elim += 1
+        rk = rank.get(fam, "-")
         lines.append(
             f"| {pos} | {fam} | {score if score is not None else '-'} "
-            f"| {ctx if ctx is not None else '-'} | {failed_at or '-'} "
-            f"| {why if failed_at or why != 'no record' else '-'} | {elim} |"
+            f"| {ctx if ctx is not None else '-'} "
+            f"| {f'{top_time:.1f}s' if top_time is not None else '-'} "
+            f"| {rk} | {elim} |"
         )
     lines.append("")
-    n_measured = sum(
-        1
-        for fe in exam.values()
-        if isinstance(fe, dict) and isinstance(fe.get("F16"), dict)
-    )
+    n_measured = sum(1 for r in rows if r[2] is not None)
     lines.append(
         f"_{n_elim} of {n_measured} measured models eliminated; the F16 "
         "records decide everything._"
