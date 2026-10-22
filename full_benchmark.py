@@ -171,9 +171,9 @@ def preflight_selfcheck() -> None:
         # --- the gc: a beaten F16 master survives while the family lives ---
         state["exam"]["gcA"]["F16"] = {"score": 0}
         E._gc(tmp, state, exclude_fam="gcA")
-        assert os.path.isfile(
-            os.path.join(d, "gcA-F16.gguf")
-        ), "gc deleted a beaten F16 while the family lives"
+        assert os.path.isfile(os.path.join(d, "gcA-F16.gguf")), (
+            "gc deleted a beaten F16 while the family lives"
+        )
 
         # --- the gc: family completion sweeps (incl. unbuildables) ---
         d2 = os.path.join(tmp, "gcB")
@@ -334,9 +334,7 @@ def git_tail(args: argparse.Namespace) -> None:
 _SHUTTING_DOWN = False
 
 
-def sigint_shutdown(
-    _signum: int, _frame: Any, args: argparse.Namespace | None = None
-) -> None:
+def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None = None) -> None:
     """Session 38, addendum 8: Ctrl-C stops cleanly - stop llama-server,
     stop results logging, git commit and pull. os._exit, not sys.exit:
     a SystemExit inside the handler unwinds through huggingface_hub's
