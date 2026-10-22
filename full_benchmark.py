@@ -532,7 +532,16 @@ def write_v9_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         fam_exam = exam.get(fam) or {}
         if not fam_exam:
             continue
-        rungs = sorted(fam_exam.items(), key=lambda kv: -(kv[1].get("score") or -1))
+        # the family record mixes candidates with the _eliminated
+        # flag (a bool) - the ledger iterates DICT candidates only
+        rungs = sorted(
+            (
+                (rung, rec)
+                for rung, rec in fam_exam.items()
+                if not str(rung).startswith("_") and isinstance(rec, dict)
+            ),
+            key=lambda kv: -(kv[1].get("score") if kv[1].get("score") is not None else -1),
+        )
         for rung, rec in rungs:
             score = rec.get("score")
             failed_at = ""
