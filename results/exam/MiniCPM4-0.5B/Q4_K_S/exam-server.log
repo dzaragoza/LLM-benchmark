@@ -1,0 +1,401 @@
+0.00.000.885 I srv  llama_server: initializing ...
+0.00.001.820 I load_backend: loaded RPC backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-rpc.so
+0.00.021.621 D ggml_vulkan: Found 1 Vulkan devices:
+0.00.021.843 D ggml_vulkan: 0 = AMD Radeon 780M Graphics (RADV PHOENIX) (radv) | uma: 1 | fp16: dot2 | bf16: 0 | fp4: 0 | warp size: 64 | shared memory: 65536 | int dot: 1 | matrix cores: KHR_coopmat
+0.00.021.849 I load_backend: loaded Vulkan backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+0.00.026.681 I load_backend: loaded CPU backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-cpu-zen4.so
+0.00.026.771 I cmn  common_param: common_params_print_info: build 11669 (620d2225c) with GNU 11.4.0 for Linux x86_64
+0.00.026.772 I cmn  common_param: common_params_print_info: verbosity = 5 (adjust with the `-lv N` CLI arg)
+0.00.026.773 I cmn  common_param: device_info:
+0.00.027.395 I cmn  common_param:   - Vulkan0 : AMD Radeon 780M Graphics (RADV PHOENIX) (16383 MiB, 14400 MiB free)
+0.00.027.402 I cmn  common_param:   - CPU     : AMD Ryzen 7 PRO 7840U w/ Radeon 780M Graphics (30719 MiB, 30719 MiB free)
+0.00.027.452 I cmn  common_param: system_info: n_threads = 8 (n_threads_batch = 8) / 16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.00.027.519 I srv  init_listene: running without SSL
+0.00.027.607 D srv  init_listene: serve nocache for _app/version.json
+0.00.027.733 D srv  init_listene: serve nocache for build.json
+0.00.027.744 D srv  init_listene: serve nocache for manifest.webmanifest
+0.00.027.776 D srv  init_listene: serve nocache for sw.js
+0.00.027.794 I srv          init: using 15 threads for HTTP server
+0.00.027.840 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.029.577 I srv    load_model: loading model './models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf'
+0.00.029.580 I srv    load_model: local path './models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf'
+0.00.029.607 I cmn  common_init_: fitting params to device memory ...
+0.00.029.608 I cmn  common_init_: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)
+0.00.029.675 I common_params_fit_impl: getting device memory data for initial parameters:
+0.00.037.158 I llama_model_loader: loaded meta data with 33 key-value pairs and 220 tensors from ./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf (version GGUF V3 (latest))
+0.00.037.174 I llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+0.00.037.184 I llama_model_loader: - kv   0:                       general.architecture str              = minicpm
+0.00.037.185 I llama_model_loader: - kv   1:                               general.type str              = model
+0.00.037.191 I llama_model_loader: - kv   2:                     general.sampling.top_p f32              = 0.800000
+0.00.037.191 I llama_model_loader: - kv   3:                      general.sampling.temp f32              = 0.800000
+0.00.037.192 I llama_model_loader: - kv   4:                               general.name str              = MiniCPM4 0.5B
+0.00.037.192 I llama_model_loader: - kv   5:                       general.organization str              = Openbmb
+0.00.037.192 I llama_model_loader: - kv   6:                           general.basename str              = MiniCPM4
+0.00.037.192 I llama_model_loader: - kv   7:                         general.size_label str              = 0.5B
+0.00.037.194 I llama_model_loader: - kv   8:                        minicpm.block_count u32              = 24
+0.00.037.195 I llama_model_loader: - kv   9:                     minicpm.context_length u32              = 32768
+0.00.037.195 I llama_model_loader: - kv  10:                   minicpm.embedding_length u32              = 1024
+0.00.037.195 I llama_model_loader: - kv  11:                minicpm.feed_forward_length u32              = 4096
+0.00.037.196 I llama_model_loader: - kv  12:               minicpm.attention.head_count u32              = 16
+0.00.037.196 I llama_model_loader: - kv  13:            minicpm.attention.head_count_kv u32              = 2
+0.00.037.196 I llama_model_loader: - kv  14:                  minicpm.rope.scaling.type str              = longrope
+0.00.037.197 I llama_model_loader: - kv  15:   minicpm.attention.layer_norm_rms_epsilon f32              = 0.000010
+0.00.037.198 I llama_model_loader: - kv  16:                    minicpm.embedding_scale f32              = 12.000000
+0.00.037.198 I llama_model_loader: - kv  17:                     minicpm.residual_scale f32              = 0.285774
+0.00.037.198 I llama_model_loader: - kv  18:                        minicpm.logit_scale f32              = 4.000000
+0.00.037.199 I llama_model_loader: - kv  19:                       tokenizer.ggml.model str              = llama
+0.00.037.199 I llama_model_loader: - kv  20:                         tokenizer.ggml.pre str              = default
+0.00.043.263 I llama_model_loader: - kv  21:                      tokenizer.ggml.tokens arr[str,73448]   = ["<unk>", "<s>", "</s>", "<SEP>", "<C...
+0.00.053.374 I llama_model_loader: - kv  22:                      tokenizer.ggml.scores arr[f32,73448]   = [-1000.000000, -1000.000000, -1000.00...
+0.00.054.888 I llama_model_loader: - kv  23:                  tokenizer.ggml.token_type arr[i32,73448]   = [3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+0.00.054.890 I llama_model_loader: - kv  24:                tokenizer.ggml.bos_token_id u32              = 1
+0.00.054.891 I llama_model_loader: - kv  25:                tokenizer.ggml.eos_token_id u32              = 73440
+0.00.054.891 I llama_model_loader: - kv  26:            tokenizer.ggml.unknown_token_id u32              = 0
+0.00.054.891 I llama_model_loader: - kv  27:               tokenizer.ggml.add_bos_token bool             = true
+0.00.054.892 I llama_model_loader: - kv  28:               tokenizer.ggml.add_sep_token bool             = false
+0.00.054.892 I llama_model_loader: - kv  29:               tokenizer.ggml.add_eos_token bool             = false
+0.00.054.893 I llama_model_loader: - kv  30:                    tokenizer.chat_template str              = {% for message in messages %}{{'<|im_...
+0.00.054.894 I llama_model_loader: - kv  31:               general.quantization_version u32              = 2
+0.00.054.894 I llama_model_loader: - kv  32:                          general.file_type u32              = 14
+0.00.054.897 I llama_model_loader: - type  f32:   51 tensors
+0.00.054.897 I llama_model_loader: - type q4_K:  161 tensors
+0.00.054.897 I llama_model_loader: - type q5_K:    7 tensors
+0.00.054.898 I llama_model_loader: - type q6_K:    1 tensors
+0.00.054.900 I print_info: file format = GGUF V3 (latest)
+0.00.054.902 I print_info: file type   = Q4_K - Small
+0.00.054.903 I print_info: file size   = 252.97 MiB (4.89 BPW) 
+0.00.055.077 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon 780M Graphics (RADV PHOENIX)) (0000:c3:00.0) - 14400 MiB free
+0.00.062.443 D init_tokenizer: initializing tokenizer for type 1
+0.00.068.429 I load: 0 unused tokens
+0.00.068.432 D load: control token:  73444 '<|execute_end|>' is not marked as EOG
+0.00.068.432 D load: control token:  73443 '<|execute_start|>' is not marked as EOG
+0.00.068.556 D load: control token:  73445 '<|fim_prefix|>' is not marked as EOG
+0.00.068.565 D load: control token:  73442 '<|tool_call|>' is not marked as EOG
+0.00.069.361 D load: control token:  73447 '<|fim_suffix|>' is not marked as EOG
+0.00.071.848 D load: control token:  73441 '<|im_start|>' is not marked as EOG
+0.00.071.869 D load: control token:  73446 '<|fim_middle|>' is not marked as EOG
+0.00.072.807 D load: control token:      0 '<unk>' is not marked as EOG
+0.00.073.665 D load: control token:      1 '<s>' is not marked as EOG
+0.00.075.894 I load: printing all EOG tokens:
+0.00.075.896 I load:   - 2 ('</s>')
+0.00.075.896 I load:   - 73440 ('<|im_end|>')
+0.00.075.943 I load: special tokens cache size = 11
+0.00.080.566 I load: token to piece cache size = 0.4344 MB
+0.00.080.586 I print_info: arch                  = minicpm
+0.00.080.587 I print_info: vocab_only            = 0
+0.00.080.587 I print_info: no_alloc              = 1
+0.00.080.587 I print_info: n_ctx_train           = 32768
+0.00.080.589 I print_info: n_embd_inp            = 1024
+0.00.080.589 I print_info: n_embd                = 1024
+0.00.080.590 I print_info: n_embd_out            = 1024
+0.00.080.592 I print_info: n_layer               = 24
+0.00.080.592 I print_info: n_layer_all           = 24
+0.00.080.606 I print_info: n_head                = 16
+0.00.080.608 I print_info: n_head_kv             = 2
+0.00.080.608 I print_info: n_rot                 = 64
+0.00.080.608 I print_info: n_swa                 = 0
+0.00.080.610 I print_info: is_swa_any            = 0
+0.00.080.610 I print_info: non_causal_type       = 0
+0.00.080.610 I print_info: n_embd_head_k         = 64
+0.00.080.610 I print_info: n_embd_head_v         = 64
+... [14253 middle lines truncated]
+0.03.385.548 D que    start_loop: waiting for new tasks
+0.03.385.548 D que    start_loop: processing new tasks
+0.03.385.550 D que  process_new_: processing task, id = 469
+0.03.385.551 D que    start_loop: update slots
+0.03.385.551 D srv  update_slots: posting NEXT_RESPONSE
+0.03.385.553 D que          post: new task, id = 470, front = 0
+0.03.385.555 D slot handle_last_: id  0 | task 267 | slot decode token, id=59330, n_ctx = 32768, n_tokens = 1144, truncated = 0
+0.03.385.557 D set_adapters_lora: adapters = (nil)
+0.03.385.558 D adapters_lora_are_same: adapters = (nil)
+0.03.385.558 D set_embeddings: value = 0
+0.03.385.559 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.385.560 D que  yield_to_que: yielding to queue
+0.03.385.614 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"\\"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.385.618 D que  process_new_: processing task, id = 470
+0.03.385.621 D srv  process_sing: decoding, decline task, id_task = 470
+0.03.385.622 D que  process_new_: task declined, id = 470
+0.03.390.899 D que  yield_to_que: done yielding to queue
+0.03.391.223 D res          send: sending result for task id = 267
+0.03.391.227 D res          send: task id = 267 pushed to result queue
+0.03.391.231 D slot process_toke: id  0 | task 267 | n_gen = 203, n_remaining = 32299, next token: 44898 'boxed'
+0.03.391.233 D que    start_loop: waiting for new tasks
+0.03.391.233 D que    start_loop: processing new tasks
+0.03.391.235 D que  process_new_: processing task, id = 470
+0.03.391.236 D que    start_loop: update slots
+0.03.391.237 D srv  update_slots: posting NEXT_RESPONSE
+0.03.391.238 D que          post: new task, id = 471, front = 0
+0.03.391.241 D slot handle_last_: id  0 | task 267 | slot decode token, id=44898, n_ctx = 32768, n_tokens = 1145, truncated = 0
+0.03.391.243 D set_adapters_lora: adapters = (nil)
+0.03.391.244 D adapters_lora_are_same: adapters = (nil)
+0.03.391.244 D set_embeddings: value = 0
+0.03.391.245 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.391.246 D que  yield_to_que: yielding to queue
+0.03.391.293 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"boxed"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.391.301 D que  process_new_: processing task, id = 471
+0.03.391.302 D srv  process_sing: decoding, decline task, id_task = 471
+0.03.391.303 D que  process_new_: task declined, id = 471
+0.03.396.606 D que  yield_to_que: done yielding to queue
+0.03.396.924 D res          send: sending result for task id = 267
+0.03.396.928 D res          send: task id = 267 pushed to result queue
+0.03.396.932 D slot process_toke: id  0 | task 267 | n_gen = 204, n_remaining = 32298, next token: 59368 '{'
+0.03.396.933 D que    start_loop: waiting for new tasks
+0.03.396.934 D que    start_loop: processing new tasks
+0.03.396.935 D que  process_new_: processing task, id = 471
+0.03.396.936 D que    start_loop: update slots
+0.03.396.937 D srv  update_slots: posting NEXT_RESPONSE
+0.03.396.938 D que          post: new task, id = 472, front = 0
+0.03.396.941 D slot handle_last_: id  0 | task 267 | slot decode token, id=59368, n_ctx = 32768, n_tokens = 1146, truncated = 0
+0.03.396.944 D set_adapters_lora: adapters = (nil)
+0.03.396.944 D adapters_lora_are_same: adapters = (nil)
+0.03.396.945 D set_embeddings: value = 0
+0.03.396.945 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.396.946 D que  yield_to_que: yielding to queue
+0.03.397.001 D que  process_new_: processing task, id = 472
+0.03.397.003 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"{"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.397.017 D srv  process_sing: decoding, decline task, id_task = 472
+0.03.397.019 D que  process_new_: task declined, id = 472
+0.03.402.306 D que  yield_to_que: done yielding to queue
+0.03.402.638 D res          send: sending result for task id = 267
+0.03.402.642 D res          send: task id = 267 pushed to result queue
+0.03.402.646 D slot process_toke: id  0 | task 267 | n_gen = 205, n_remaining = 32297, next token:  1595 'ff'
+0.03.402.648 D que    start_loop: waiting for new tasks
+0.03.402.648 D que    start_loop: processing new tasks
+0.03.402.650 D que  process_new_: processing task, id = 472
+0.03.402.651 D que    start_loop: update slots
+0.03.402.651 D srv  update_slots: posting NEXT_RESPONSE
+0.03.402.653 D que          post: new task, id = 473, front = 0
+0.03.402.656 D slot handle_last_: id  0 | task 267 | slot decode token, id=1595, n_ctx = 32768, n_tokens = 1147, truncated = 0
+0.03.402.658 D set_adapters_lora: adapters = (nil)
+0.03.402.659 D adapters_lora_are_same: adapters = (nil)
+0.03.402.659 D set_embeddings: value = 0
+0.03.402.660 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.402.660 D que  yield_to_que: yielding to queue
+0.03.402.712 D que  process_new_: processing task, id = 473
+0.03.402.718 D srv  process_sing: decoding, decline task, id_task = 473
+0.03.402.718 D que  process_new_: task declined, id = 473
+0.03.402.725 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"ff"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.408.069 D que  yield_to_que: done yielding to queue
+0.03.408.405 D res          send: sending result for task id = 267
+0.03.408.408 D res          send: task id = 267 pushed to result queue
+0.03.408.412 D slot process_toke: id  0 | task 267 | n_gen = 206, n_remaining = 32296, next token: 59331 'h'
+0.03.408.414 D que    start_loop: waiting for new tasks
+0.03.408.414 D que    start_loop: processing new tasks
+0.03.408.416 D que  process_new_: processing task, id = 473
+0.03.408.417 D que    start_loop: update slots
+0.03.408.417 D srv  update_slots: posting NEXT_RESPONSE
+0.03.408.419 D que          post: new task, id = 474, front = 0
+0.03.408.422 D slot handle_last_: id  0 | task 267 | slot decode token, id=59331, n_ctx = 32768, n_tokens = 1148, truncated = 0
+0.03.408.424 D set_adapters_lora: adapters = (nil)
+0.03.408.425 D adapters_lora_are_same: adapters = (nil)
+0.03.408.425 D set_embeddings: value = 0
+0.03.408.426 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.408.427 D que  yield_to_que: yielding to queue
+0.03.408.476 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"h"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.408.482 D que  process_new_: processing task, id = 474
+0.03.408.484 D srv  process_sing: decoding, decline task, id_task = 474
+0.03.408.485 D que  process_new_: task declined, id = 474
+0.03.413.838 D que  yield_to_que: done yielding to queue
+0.03.414.216 D res          send: sending result for task id = 267
+0.03.414.220 D res          send: task id = 267 pushed to result queue
+0.03.414.227 D slot process_toke: id  0 | task 267 | n_gen = 207, n_remaining = 32295, next token: 59342 ','
+0.03.414.229 D que    start_loop: waiting for new tasks
+0.03.414.229 D que    start_loop: processing new tasks
+0.03.414.231 D que  process_new_: processing task, id = 474
+0.03.414.233 D que    start_loop: update slots
+0.03.414.233 D srv  update_slots: posting NEXT_RESPONSE
+0.03.414.235 D que          post: new task, id = 475, front = 0
+0.03.414.238 D slot handle_last_: id  0 | task 267 | slot decode token, id=59342, n_ctx = 32768, n_tokens = 1149, truncated = 0
+0.03.414.241 D set_adapters_lora: adapters = (nil)
+0.03.414.241 D adapters_lora_are_same: adapters = (nil)
+0.03.414.242 D set_embeddings: value = 0
+0.03.414.243 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.414.245 D que  yield_to_que: yielding to queue
+0.03.414.286 D que  process_new_: processing task, id = 475
+0.03.414.288 D srv  process_sing: decoding, decline task, id_task = 475
+0.03.414.288 D que  process_new_: task declined, id = 475
+0.03.414.421 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":","}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.419.765 D que  yield_to_que: done yielding to queue
+0.03.420.134 D res          send: sending result for task id = 267
+0.03.420.137 D res          send: task id = 267 pushed to result queue
+0.03.420.145 D slot process_toke: id  0 | task 267 | n_gen = 208, n_remaining = 32294, next token:  1376 ' b'
+0.03.420.149 D que    start_loop: waiting for new tasks
+0.03.420.149 D que    start_loop: processing new tasks
+0.03.420.151 D que  process_new_: processing task, id = 475
+0.03.420.152 D que    start_loop: update slots
+0.03.420.153 D srv  update_slots: posting NEXT_RESPONSE
+0.03.420.154 D que          post: new task, id = 476, front = 0
+0.03.420.158 D slot handle_last_: id  0 | task 267 | slot decode token, id=1376, n_ctx = 32768, n_tokens = 1150, truncated = 0
+0.03.420.161 D set_adapters_lora: adapters = (nil)
+0.03.420.162 D adapters_lora_are_same: adapters = (nil)
+0.03.420.163 D set_embeddings: value = 0
+0.03.420.164 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.420.164 D que  yield_to_que: yielding to queue
+0.03.420.220 D que  process_new_: processing task, id = 476
+0.03.420.221 D srv  process_sing: decoding, decline task, id_task = 476
+0.03.420.222 D que  process_new_: task declined, id = 476
+0.03.420.319 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":" b"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.425.617 D que  yield_to_que: done yielding to queue
+0.03.425.996 D res          send: sending result for task id = 267
+0.03.426.000 D res          send: task id = 267 pushed to result queue
+0.03.426.004 D slot process_toke: id  0 | task 267 | n_gen = 209, n_remaining = 32293, next token:  1665 'cc'
+0.03.426.006 D que    start_loop: waiting for new tasks
+0.03.426.007 D que    start_loop: processing new tasks
+0.03.426.008 D que  process_new_: processing task, id = 476
+0.03.426.009 D que    start_loop: update slots
+0.03.426.010 D srv  update_slots: posting NEXT_RESPONSE
+0.03.426.012 D que          post: new task, id = 477, front = 0
+0.03.426.015 D slot handle_last_: id  0 | task 267 | slot decode token, id=1665, n_ctx = 32768, n_tokens = 1151, truncated = 0
+0.03.426.017 D set_adapters_lora: adapters = (nil)
+0.03.426.018 D adapters_lora_are_same: adapters = (nil)
+0.03.426.018 D set_embeddings: value = 0
+0.03.426.019 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.426.020 D que  yield_to_que: yielding to queue
+0.03.426.078 D que  process_new_: processing task, id = 477
+0.03.426.080 D srv  process_sing: decoding, decline task, id_task = 477
+0.03.426.081 D que  process_new_: task declined, id = 477
+0.03.426.179 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"cc"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.431.411 D que  yield_to_que: done yielding to queue
+0.03.431.781 D res          send: sending result for task id = 267
+0.03.431.785 D res          send: task id = 267 pushed to result queue
+0.03.431.789 D slot process_toke: id  0 | task 267 | n_gen = 210, n_remaining = 32292, next token: 59342 ','
+0.03.431.791 D que    start_loop: waiting for new tasks
+0.03.431.791 D que    start_loop: processing new tasks
+0.03.431.793 D que  process_new_: processing task, id = 477
+0.03.431.794 D que    start_loop: update slots
+0.03.431.795 D srv  update_slots: posting NEXT_RESPONSE
+0.03.431.797 D que          post: new task, id = 478, front = 0
+0.03.431.800 D slot handle_last_: id  0 | task 267 | slot decode token, id=59342, n_ctx = 32768, n_tokens = 1152, truncated = 0
+0.03.431.802 D set_adapters_lora: adapters = (nil)
+0.03.431.803 D adapters_lora_are_same: adapters = (nil)
+0.03.431.803 D set_embeddings: value = 0
+0.03.431.804 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.431.805 D que  yield_to_que: yielding to queue
+0.03.431.860 D que  process_new_: processing task, id = 478
+0.03.431.862 D srv  process_sing: decoding, decline task, id_task = 478
+0.03.431.863 D que  process_new_: task declined, id = 478
+0.03.431.955 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":","}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.437.273 D que  yield_to_que: done yielding to queue
+0.03.437.656 D res          send: sending result for task id = 267
+0.03.437.660 D res          send: task id = 267 pushed to result queue
+0.03.437.665 D slot process_toke: id  0 | task 267 | n_gen = 211, n_remaining = 32291, next token:  1383 ' d'
+0.03.437.667 D que    start_loop: waiting for new tasks
+0.03.437.668 D que    start_loop: processing new tasks
+0.03.437.670 D que  process_new_: processing task, id = 478
+0.03.437.672 D que    start_loop: update slots
+0.03.437.672 D srv  update_slots: posting NEXT_RESPONSE
+0.03.437.674 D que          post: new task, id = 479, front = 0
+0.03.437.678 D slot handle_last_: id  0 | task 267 | slot decode token, id=1383, n_ctx = 32768, n_tokens = 1153, truncated = 0
+0.03.437.681 D set_adapters_lora: adapters = (nil)
+0.03.437.682 D adapters_lora_are_same: adapters = (nil)
+0.03.437.683 D set_embeddings: value = 0
+0.03.437.684 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.437.685 D que  yield_to_que: yielding to queue
+0.03.437.740 D que  process_new_: processing task, id = 479
+0.03.437.742 D srv  process_sing: decoding, decline task, id_task = 479
+0.03.437.743 D que  process_new_: task declined, id = 479
+0.03.437.749 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":" d"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.443.130 D que  yield_to_que: done yielding to queue
+0.03.443.501 D res          send: sending result for task id = 267
+0.03.443.505 D res          send: task id = 267 pushed to result queue
+0.03.443.509 D slot process_toke: id  0 | task 267 | n_gen = 212, n_remaining = 32290, next token:  2429 'dd'
+0.03.443.510 D que    start_loop: waiting for new tasks
+0.03.443.511 D que    start_loop: processing new tasks
+0.03.443.513 D que  process_new_: processing task, id = 479
+0.03.443.514 D que    start_loop: update slots
+0.03.443.515 D srv  update_slots: posting NEXT_RESPONSE
+0.03.443.517 D que          post: new task, id = 480, front = 0
+0.03.443.520 D slot handle_last_: id  0 | task 267 | slot decode token, id=2429, n_ctx = 32768, n_tokens = 1154, truncated = 0
+0.03.443.523 D set_adapters_lora: adapters = (nil)
+0.03.443.523 D adapters_lora_are_same: adapters = (nil)
+0.03.443.524 D set_embeddings: value = 0
+0.03.443.525 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.443.525 D que  yield_to_que: yielding to queue
+0.03.443.584 D que  process_new_: processing task, id = 480
+0.03.443.586 D srv  process_sing: decoding, decline task, id_task = 480
+0.03.443.586 D que  process_new_: task declined, id = 480
+0.03.443.593 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"dd"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.449.010 D que  yield_to_que: done yielding to queue
+0.03.449.403 D res          send: sending result for task id = 267
+0.03.449.407 D res          send: task id = 267 pushed to result queue
+0.03.449.412 D slot process_toke: id  0 | task 267 | n_gen = 213, n_remaining = 32289, next token: 59369 '}'
+0.03.449.413 D que    start_loop: waiting for new tasks
+0.03.449.414 D que    start_loop: processing new tasks
+0.03.449.416 D que  process_new_: processing task, id = 480
+0.03.449.417 D que    start_loop: update slots
+0.03.449.418 D srv  update_slots: posting NEXT_RESPONSE
+0.03.449.420 D que          post: new task, id = 481, front = 0
+0.03.449.423 D slot handle_last_: id  0 | task 267 | slot decode token, id=59369, n_ctx = 32768, n_tokens = 1155, truncated = 0
+0.03.449.426 D set_adapters_lora: adapters = (nil)
+0.03.449.426 D adapters_lora_are_same: adapters = (nil)
+0.03.449.427 D set_embeddings: value = 0
+0.03.449.428 D srv        decode: n_batch (effective) = 2048, off = 0
+0.03.449.428 D que  yield_to_que: yielding to queue
+0.03.449.448 D que  process_new_: processing task, id = 481
+0.03.449.450 D srv  process_sing: decoding, decline task, id_task = 481
+0.03.449.451 D que  process_new_: task declined, id = 481
+0.03.449.484 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":null,"index":0,"delta":{"content":"}"}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk"}
+
+
+0.03.454.953 D que  yield_to_que: done yielding to queue
+0.03.455.295 D res          send: sending result for task id = 267
+0.03.455.299 D res          send: task id = 267 pushed to result queue
+0.03.455.303 D slot process_toke: id  0 | task 267 | stopped by EOS
+0.03.455.304 D slot process_toke: id  0 | task 267 | n_gen = 214, n_remaining = 32288, next token: 73440 ''
+0.03.455.313 I slot print_timing: id  0 | task 267 | prompt eval time =     122.26 ms /   360 tokens (    0.34 ms per token,  2944.57 tokens per second)
+0.03.455.316 I slot print_timing: id  0 | task 267 |        eval time =    1228.35 ms /   214 tokens (    5.77 ms per token,   173.40 tokens per second)
+0.03.455.317 I slot print_timing: id  0 | task 267 |       total time =    1350.61 ms /   574 tokens
+0.03.455.319 I slot print_timing: id  0 | task 267 |    graphs reused =        475
+0.03.455.320 I slot print_timing: id  0 | task 267 |   graph reallocs =          0    /     0        (same size) / (changed size)
+0.03.455.400 D res          send: sending result for task id = 267
+0.03.455.401 D res          send: task id = 267 pushed to result queue
+0.03.455.410 I slot      release: id  0 | task 267 | stop processing: n_tokens = 1156, truncated = 0
+0.03.455.411 D slot        reset: id  0 | task 267 | 
+0.03.455.420 D que    start_loop: waiting for new tasks
+0.03.455.420 D que    start_loop: processing new tasks
+0.03.455.422 D que  process_new_: processing task, id = 481
+0.03.455.423 D que    start_loop: update slots
+0.03.455.424 I srv  update_slots: all slots are idle
+0.03.455.424 D que    start_loop: waiting for new tasks
+0.03.455.463 D Parsed message: {"role":"assistant","content":"To solve the Elevator problem, we need to determine the sequence of tokens that a person starts at \"ffh\" and ends at \"ddd\". The key steps involve understanding the chain rules and using a systematic approach to find the correct sequence.\n\n### Solution Explanation\n\n1. **Identify the Starting Token**: The person starts at \"ffh\". We need to find the token at position 2.\n2. **Determine the Last Token**: The person ends at \"ddd\". We need to find the token at position 4.\n3. **Calculate Steps**: The person moves 4 steps forward from \"ffh\" to \"ddd\".\n4. **Generate the Chain**: Starting from \"ffh\", move 4 steps forward to get \"bcc\". Then, move 4 steps forward to get \"ddd\".\n\n### Final Answer\n\nThe tokens of the chain in order are:\n\n\\boxed{ffh, bcc, ddd}"}
+0.03.455.581 D srv    operator(): http: streamed chunk: data: {"choices":[{"finish_reason":"stop","index":0,"delta":{}}],"created":1792640335,"id":"chatcmpl-AGUTKVN4j1wAR3396TVT8v2Tper6vudi","model":"./models/MiniCPM4-0.5B/MiniCPM4-0.5B-Q4_K_S.gguf","system_fingerprint":"b11669-620d2225c","object":"chat.completion.chunk","timings":{"cache_n":583,"prompt_n":360,"prompt_ms":122.259,"prompt_per_token_ms":0.33960833333333335,"prompt_per_second":2944.5684980246856,"predicted_n":214,"predicted_ms":1228.346,"predicted_per_token_ms":5.7668826291079816,"predicted_per_second":173.40391062453088}}
+
+
+0.03.455.587 D srv    operator(): all results received, terminating stream
+0.03.455.608 D srv    operator(): http: streamed chunk: data: [DONE]
+
+
+0.03.455.640 D srv    operator(): http: stream ended
+0.03.455.655 D res  remove_waiti: remove task 267 from waiting list. current waiting = 1 (before remove)
+0.03.455.656 D srv          stop: all tasks already finished, no need to cancel
+0.03.458.116 D srv          stop: all tasks already finished, no need to cancel
+0.03.649.576 D que    start_loop: processing new tasks
+0.03.649.579 D que  process_new_: terminate
+0.03.649.648 I srv    operator(): operator(): cleaning up before exit...
+0.03.650.365 I common_memory_breakdown_print: | memory breakdown [MiB]                     | total    free    self   model   context   compute    unaccounted |
+0.03.650.367 I common_memory_breakdown_print: |   - Vulkan0 (780M Graphics (RADV PHOENIX)) | 16383 = 13544 + ( 726 =   252 +     408 +      66) +        2112 |
+0.03.650.368 I common_memory_breakdown_print: |   - Host                                   |                   100 =    58 +       0 +      42                |
+0.03.650.514 D ~llama_context:    Vulkan0 compute buffer size is  66.0137 MiB, matches expectation of  66.0137 MiB
+0.03.650.517 D ~llama_context: Vulkan_Host compute buffer size is  42.0274 MiB, matches expectation of  42.0274 MiB
