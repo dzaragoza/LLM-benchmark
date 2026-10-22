@@ -107,11 +107,15 @@ def main() -> None:
         ratio = tg / first
         print(f"# {n:>7} {tg:>8.2f} {secs:>8.1f} {ratio:>9.2f}")
     if args.reference is not None and first is not None:
-        print(f"# reference sustained rate: {args.reference} "
-              f"({args.reference / first:.2f} of the n={ns[0]} burst)")
-    print("# the sweet n: the first row where the curve flattens; "
-          "still decaying at the top means the decay is thermal/time-driven, "
-          "not token-driven")
+        print(
+            f"# reference sustained rate: {args.reference} "
+            f"({args.reference / first:.2f} of the n={ns[0]} burst)"
+        )
+    print(
+        "# the sweet n: the first row where the curve flattens; "
+        "still decaying at the top means the decay is thermal/time-driven, "
+        "not token-driven"
+    )
 
 
 if __name__ == "__main__":

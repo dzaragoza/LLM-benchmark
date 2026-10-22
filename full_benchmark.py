@@ -20,7 +20,6 @@ import os
 import signal
 import sys
 import time
-from functools import partial
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -195,17 +194,16 @@ def git_tail(args: argparse.Namespace) -> None:
         + glob.glob("models/tournament-results/**/*", recursive=True)
         + glob.glob("models/*/ladder-results/*")
     )
-    paths += (
-        glob.glob("ladder-results/*")
-        + glob.glob("ruler-results/*")
-    )
+    paths += glob.glob("ladder-results/*") + glob.glob("ruler-results/*")
     existing = []
     for p in paths:
         if not os.path.exists(p):
             continue
         try:
             if os.path.getsize(p) > 48 * 1024 * 1024:
-                stamp(f"skipping {p}: {os.path.getsize(p) / 2**20:.0f} MiB exceeds github's 50 MiB limit")
+                stamp(
+                    f"skipping {p}: {os.path.getsize(p) / 2**20:.0f} MiB exceeds github's 50 MiB limit"
+                )
                 continue
         except OSError:
             continue
@@ -354,8 +352,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="READ-ONLY pre-flight: the plan, nothing downloaded, "
-        "converted, examined or written",
+        help="READ-ONLY pre-flight: the plan, nothing downloaded, converted, examined or written",
     )
     ap.add_argument(
         "--no-git",
@@ -502,7 +499,7 @@ def _run(args: argparse.Namespace) -> None:
                 fam = fam.strip()
                 if not fam:
                     continue
-                tree = (state.setdefault("exam", {}).setdefault(fam, {}))
+                tree = state.setdefault("exam", {}).setdefault(fam, {})
                 tree["_eliminated"] = True
                 famdir = os.path.join(args.models_dir, fam)
                 if os.path.isdir(famdir):
@@ -511,8 +508,10 @@ def _run(args: argparse.Namespace) -> None:
                 else:
                     stamp(f"eliminated {fam}: marked (no artifacts on disk)")
             save_state(args.state_file, state)
-            write_v9_md(state, {name: i + 1 for i, name in enumerate(
-                [n for n, _ in roster_from_models_md()])})
+            write_v9_md(
+                state,
+                {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
+            )
             if not args.no_git:
                 tee_output.uninstall()
                 git_tail(args)
@@ -528,8 +527,8 @@ def _run(args: argparse.Namespace) -> None:
             _exam_to_state_keep(state)
             save_state(args.state_file, state)
             write_v9_md(
-                state, {name: i + 1 for i, name in enumerate(
-                    [n for n, _ in roster_from_models_md()])}
+                state,
+                {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
             )
             stamp(f"family complete: {fam} - committing artifacts")
             if args.no_git or args.dry_run:
@@ -558,14 +557,13 @@ def _run(args: argparse.Namespace) -> None:
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
-        write_v9_md(state, {name: i + 1 for i, name in enumerate(
-            [n for n, _ in roster_from_models_md()])})
+        write_v9_md(
+            state, {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])}
+        )
         print()
         print("=" * 60)
         stamp("V9 EXAM SUMMARY (highest difficulty achieved per candidate)")
-        for (fam, rung), rec in sorted(
-            results.items(), key=lambda kv: -(kv[1].get("score") or -1)
-        ):
+        for (fam, rung), rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
             verdict = rec.get("error") or f"score {rec.get('score')}"
             print(f"  {fam} {rung}: {verdict}")
         if not args.no_git:

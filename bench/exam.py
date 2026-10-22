@@ -44,7 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md, window
+from bench.roster import LADDER, WINDOW_DEFAULT, roster_from_models_md
 
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
@@ -55,10 +55,12 @@ SAMPLER_SEED = 1024
 # closed, cancelling the server-side generation
 TIME_BELL_SECONDS = 1024
 
+
 # the repetition count IS the seed set: n=1 for the benchmark, so the
 # seed is 1 - one exam instance per level, identical for every model
 def exam_seeds(n: int) -> list[int]:
     return list(range(1, n + 1))
+
 
 TRIGRAMS = re.compile(r"\b[a-z]{3}\b")
 ALPHABET = "abcdefghijklmnopqrstuvwxyz"
