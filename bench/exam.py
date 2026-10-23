@@ -522,6 +522,11 @@ def run_family(
                         }
                         messages: list[dict[str, str]] = []
                         remaining = ctx
+                        # the TIME bell is PER EXAM (the paper: both
+                        # parts in one conversation), not per part -
+                        # the parts share it exactly as they share the
+                        # token budget below. Set once, before part 1.
+                        paper_deadline = time.monotonic() + TIME_BELL_SECONDS
                         part_ok = True
                         for part, prompter in (
                             ("chain", chain_prompt),
@@ -579,10 +584,9 @@ def run_family(
                                 active = rung
                             messages.append({"role": "user", "content": prompt})
                             t0 = time.monotonic()
-                            # the TIME bell: the attempt expires 32s
-                            # after the question was asked - no model
-                            # gets more than 32s to solve any exam
-                            deadline = t0 + TIME_BELL_SECONDS
+                            # the paper's SHARED deadline; what part 1
+                            # spent, part 2 no longer has
+                            deadline = paper_deadline
                             try:
                                 answer, tokens, finish = ask_exam(
                                     port, messages, remaining, deadline=deadline
