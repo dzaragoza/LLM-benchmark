@@ -70,4 +70,3 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | gemma-3-12b-it | 12.187 | 131,072 | google/gemma-3-12b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
 | Mistral-Nemo-Instruct-2407 | 12.248 | 131,072 | mistralai/Mistral-Nemo-Instruct-2407 | no | https://arxiv.org/abs/2407.03152 | unknown |
 | gemma-3-27b-it | 27.432 | 131,072 | google/gemma-3-27b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
-

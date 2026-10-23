@@ -435,6 +435,7 @@ _KINDS = (
     "replace_regex",
     "replace_regex_all",
     "replace_region",
+    "sort_table",
     "delete",
     "delete_lines",
     "insert_before",
@@ -544,6 +545,19 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
                 )
             a, b = _region_of(buf, block[1], block[2], i)
             buf = buf[:a] + block[3] + buf[b:]
+        elif kind == "sort_table":
+            if len(block) not in (2, 3, 4):
+                raise CodeEditError(
+                    f"block {i}: sort_table needs (sort_table, key_col[, numeric[, reverse]])"
+                )
+            key_col = block[1]
+            numeric = block[2] if len(block) >= 3 else True
+            reverse = block[3] if len(block) >= 4 else False
+            if not isinstance(key_col, int) or key_col < 1:
+                raise CodeEditError(
+                    f"block {i}: sort_table key_col must be a 1-based int >= 1"
+                )
+            buf = _sort_table(buf, key_col, bool(numeric), bool(reverse), i)
         elif kind == "set_lines":
             if len(block) != 4:
                 raise CodeEditError(f"block {i}: set_lines needs (set_lines, first, last, new)")
@@ -600,6 +614,79 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
             buf = block[1] + buf
         else:
             raise CodeEditError(f"block {i}: unknown kind {kind!r}")
+
+
+def _sort_table(buf: str, key_col: int, numeric: bool, reverse: bool, i: int) -> str:
+    """The markdown table sort (the roster incident). Finds THE table
+    (a header row + a separator row), verifies the key column in
+    every row, stable-sorts the DATA rows by it - the header and
+    separator stay in place, prose around the table is untouched.
+    numeric=True sorts by float(value) (a non-numeric key is a hard
+    error - a silent string sort of a numbers column is the bug
+    class this block exists to prevent); numeric=False by raw text.
+    Exactly one table must be present."""
+    lines = buf.split("\n")
+    tables = []
+    t = 0
+    while t < len(lines) - 1:
+        if (
+            lines[t].startswith("|")
+            and lines[t + 1].startswith("|")
+            and set(lines[t + 1].replace("|", "").replace(" ", "")) <= {"-"}
+            and lines[t + 1].count("-") >= 2
+        ):
+            start = t
+            t += 2
+            while t < len(lines) and lines[t].startswith("|"):
+                t += 1
+            tables.append((start, t))
+        else:
+            t += 1
+    if len(tables) != 1:
+        raise CodeEditError(
+            f"block {i}: sort_table found {len(tables)} tables - exactly one "
+            "must be present (sort each table in its own edit call)"
+        )
+    start, end = tables[0]
+    header, sep, data = lines[start], lines[start + 1], lines[start + 2 : end]
+
+    def cells(ln: str) -> list[str]:
+        return [c.strip() for c in ln.strip().strip("|").split("|")]
+
+    nhead = len(cells(header))
+    if not (1 <= key_col <= nhead):
+        raise CodeEditError(
+            f"block {i}: sort_table key column {key_col} out of range "
+            f"(the header has {nhead} columns)"
+        )
+
+    def key(ln: str):
+        parts = cells(ln)
+        if len(parts) != nhead:
+            raise CodeEditError(
+                f"block {i}: sort_table row has {len(parts)} cells, the "
+                f"header has {nhead} - ragged rows are refused, never "
+                "silently mis-sorted"
+            )
+        v = parts[key_col - 1]  # 1-based column spec -> 0-based cell
+        if numeric:
+            try:
+                return float(v.replace(",", ""))
+            except ValueError:
+                raise CodeEditError(
+                    f"block {i}: sort_table numeric key {v!r} does not "
+                    "parse as a number - fix the cell or sort as text"
+                )
+        return v
+
+    data_sorted = sorted(data, key=key, reverse=reverse)
+    out = lines[:start] + [header, sep] + data_sorted + lines[end:]
+    if buf.endswith("\n") and not out[-1] == "":
+        # the join above drops the blank line that followed the table
+        # when the file ends there - restore the trailing newline
+        out = out + [""]
+    return "\n".join(out)
+
 
 
 def _sep(anchor: str, new: str, after: bool) -> str:
@@ -698,6 +785,11 @@ def _apply(src: str, blocks: Sequence[tuple]) -> tuple[str, list[tuple[str, str]
         elif kind == "replace_region":
             a, b = _region_of(buf, block[1], block[2], 0)
             buf = buf[:a] + block[3] + buf[b:]
+        elif kind == "sort_table":
+            key_col = block[1]
+            numeric = block[2] if len(block) >= 3 else True
+            reverse = block[3] if len(block) >= 4 else False
+            buf = _sort_table(buf, key_col, bool(numeric), bool(reverse), 0)
         elif kind == "set_lines":
             lines, trailing = _lines_of(buf)
             buf = _join(lines[: block[1] - 1] + _as_lines(block[3]) + lines[block[2] :], trailing)
