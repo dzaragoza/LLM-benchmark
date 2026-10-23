@@ -667,7 +667,7 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
     """The self-cleaning sweep, v9.3 - MODEL granularity: a model is
     eliminated when its BEST rung (F16, or a recovery rung - Q8_0,
-    Q6_K - that outscored it) has a final score strictly below the
+    Q6_K, Q5_K_M, Q5_K_S - that outscored it) has a final score strictly below the
     global best (the best rung's score IS the model's max score).
     Elimination deletes the model's whole models/ directory (the
     data ALWAYS stays: answers in results/, records in state). The
@@ -772,7 +772,7 @@ def run(
             continue
         # v9.3 recovery: a candidate whose sweep ended AT the time
         # bell retries the whole exam one rung down the quant ladder
-        # (F16 -> Q8_0 -> Q6_K) - a faster quant may beat the 1024s
+        # (F16 -> Q8_0 -> Q6_K -> Q5_K_M -> Q5_K_S) - a faster quant may beat the 1024s
         # clock its predecessor could not. When every rung hit the
         # bell, the fail cause is 'out of time'. A rung that cannot
         # be built or ends for any other reason (wrong chain, out of
