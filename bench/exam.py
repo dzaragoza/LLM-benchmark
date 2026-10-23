@@ -89,6 +89,15 @@ def exam_seeds(n: int) -> list[int]:
 
 
 TRIGRAMS = re.compile(r"\b[a-z]{3}\b")
+# the relaxed-final-line grading tolerates these English stop-words as
+# prose around the chain ("the chain is", "final answer is", ...) - a
+# trigram outside the chain that is NOT a stop-word is a wrong token
+RELAX_STOPWORDS = frozenset(
+    "the and was for not but all can has its are one two six ten end so "
+    "top new now out per via yet yes who why how what when "
+    "chain final answer therefore order comma separated tokens "
+    "pairs pair start next last item first second third position".split()
+)
 ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 
 
@@ -308,15 +317,36 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     m = re.search(r"answer\s*:\s*(.+)", text)
     line = m.group(1) if m else ""
     if not m:
-        # format-instruction drift is real (KNOWLEDGE.md): accept a
-        # bare final line that starts with the chain's start token
+        # format-instruction drift is real (KNOWLEDGE.md, and the
+        # author's relaxation ruling): the FINAL non-empty line is the
+        # reply, whatever prefix it carries ("3. therefore, the chain
+        # is ...", "final chain:", brackets) - a correct chain stated on
+        # the last line is a correct answer, not a formatting fail. The
+        # reply is the last line: answers inside the thinking are NOT
+        # a reply and are never graded. The relaxed line must carry
+        # EXACTLY the chain's tokens (multiset): with prefixes
+        # tolerated, order alone cannot protect a single-token chain -
+        # "(ffh), (ffg), (fha)" must not pass for expected ["ffh"]
         lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
-        if lines and lines[-1].split(",")[0].strip() == exam["path"][0].lower():
-            line = lines[-1]
-        else:
-            return False
+        line = lines[-1] if lines else ""
     found = [t for t in TRIGRAMS.findall(line)]
     expected = [t.lower() for t in exam["path"]]
+    if not m:
+        # relaxed fallback: the line's trigrams are the chain plus at
+        # most known English stop-words from the surrounding prose
+        # ("3. therefore, the chain is ..."). A NON-stopword trigram
+        # outside the chain is a wrong token - the prompt-echo case
+        # ("<the tokens of the chain in order, comma-separated>")
+        # carries "and", "for", "not"... all stop-words, but its chain
+        # is absent, so the subsequence below rejects it. Stop-words
+        # cannot rescue a single-token chain either: "(ffh), (ffg),
+        # (fha)" has ffg/fha outside the chain - rejected here already
+        extras = [t for t in found if t not in expected and t not in RELAX_STOPWORDS]
+        if extras:
+            return False
+        if line.rstrip().endswith("?"):
+            # a question mark is a hedge ("ffh, ?"), not an answer
+            return False
     # FLEXIBLE GRADING (the trial era): the expected chain must appear
     # as an ORDERED SUBSEQUENCE of the ANSWER line - extra tokens,
     # padding (e.g. trailing end markers), and duplicates are
