@@ -368,6 +368,24 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
         os._exit(130)
     _SHUTTING_DOWN = True
     stamp("SIGINT - shutting down cleanly (addendum 8)")
+    # truncate any oversized exam log BEFORE the rail commits: the
+    # os._exit below skips run_family's finally, so a multi-hour
+    # -lv 5 log would otherwise ride the artifact push past github's
+    # limits (the 119MB granite-3.1 lesson)
+    import glob as _glob
+
+    for p in _glob.glob("results/exam/**/exam-server.log", recursive=True):
+        try:
+            if os.path.getsize(p) > 20 * 2**20:
+                with open(p, encoding="utf-8", errors="replace") as fh:
+                    lines = fh.readlines()
+                with open(p, "w", encoding="utf-8") as fh:
+                    fh.writelines(lines[:100])
+                    fh.write(f"... [SIGINT truncation: {len(lines)} lines]\n")
+                    fh.writelines(lines[-300:])
+                stamp(f"truncated oversized log {p} before commit")
+        except OSError:
+            pass
     stopped = llama_server.kill_stale_server()
     stamp("llama-server stopped" if stopped else "no llama-server to stop")
     try:

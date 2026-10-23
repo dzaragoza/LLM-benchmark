@@ -528,6 +528,19 @@ def run_family(
                 rec = {"pass": passed and not dry_run, "attempts": attempts}
                 levels[key] = rec
                 _state_store.save_state(state_file, state)
+                # mid-run log hygiene: a -lv 5 stream over hours is
+                # 100MB+; keep the banner + the latest tail under the
+                # github limits so no push can ever carry a giant blob
+                try:
+                    if os.path.isfile(log_path) and os.path.getsize(log_path) > 20 * 2**20:
+                        with open(log_path, encoding="utf-8", errors="replace") as fh:
+                            lines = fh.readlines()
+                        with open(log_path, "w", encoding="utf-8") as fh:
+                            fh.writelines(lines[:100])
+                            fh.write(f"... [mid-run truncation: {len(lines)} lines]\n")
+                            fh.writelines(lines[-300:])
+                except OSError:
+                    pass
                 if not dry_run:
                     verdict = "PASS" if rec["pass"] else "FAIL"
                     capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
