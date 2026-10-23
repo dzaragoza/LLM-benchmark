@@ -499,9 +499,9 @@
   }
  ],
  "disk": {
-  "free_gib": 206.4,
+  "free_gib": 112.4,
   "host": "T14s",
-  "at": "2026-10-23 11:32"
+  "at": "2026-10-23 16:09"
  },
  "families": {
   "AI21-Jamba-Reasoning-3B": {
@@ -289835,7 +289835,7 @@
     },
     "score": 4
    },
-   "_eliminated": true
+   "_eliminated": false
   },
   "Qwen3-0.6B": {
    "F16": {
@@ -295300,7 +295300,8 @@
     },
     "score": 5
    },
-   "_out_of_time": true
+   "_out_of_time": true,
+   "_eliminated": true
   },
   "SmolLM2-1.7B-Instruct": {
    "F16": {
@@ -299496,7 +299497,8 @@
     },
     "score": -1
    },
-   "_out_of_time": true
+   "_out_of_time": true,
+   "_eliminated": true
   },
   "granite-3.1-2b-instruct": {
    "F16": {
@@ -300709,6 +300711,155 @@
      }
     },
     "score": 5
+   }
+  },
+  "granite-3.2-2b-instruct": {
+   "F16": {
+    "rung": "F16",
+    "bell_ctx": 131072,
+    "levels": {
+     "0": {
+      "pass": true,
+      "attempts": [
+       {
+        "seed": 1,
+        "level": 0,
+        "part": "chain",
+        "expected": [
+         "qgv",
+         "qxc"
+        ],
+        "ok": true,
+        "answer_tokens": 134,
+        "finish_reason": "stop",
+        "elapsed_s": 10.3,
+        "answer": "(qgv, qxc)\n\nChain rule: after a pair (A, B), the next pair in the chain is the one whose FIRST item is B. Start at qgv: the pair (qgv, qxc) comes first; its second item is qxc, so the next pair is the one whose first item is qxc: (qxc, -).\n\nSince qxc is not a valid token, we look for the next available token that hasn't been used yet. The only token left is -, which is the dangling end of the chain.\n\nANSWER: qgv, qxc, -"
+       },
+       {
+        "seed": 1,
+        "level": 0,
+        "part": "elevator",
+        "expected": [
+         "ffh"
+        ],
+        "ok": true,
+        "answer_tokens": 192,
+        "finish_reason": "stop",
+        "elapsed_s": 14.9,
+        "answer": "1. ffh  +0\n\nChain rule: after a pair (A, B), the next pair in the chain is the one whose POSITION is one more than the current position. Start at ffh: the pair (ffh, -) comes first; its position is -1 (since we start counting from 0). The next position is -1 + 1 = 0, so the next pair is the one at position 0: ffh.\n\nSince ffh's position is already 0, we look for the next available position that hasn't been used yet. The next position is 1.\n\nThe token at position 1 is not provided, so we assume it's the next available token. Let's call it 'g'.\n\nThe chain continues with 'g' at position 2, and so on.\n\nANSWER: ffh, ffh, g, -"
+       }
+      ]
+     },
+     "1": {
+      "pass": true,
+      "attempts": [
+       {
+        "seed": 1,
+        "level": 1,
+        "part": "chain",
+        "expected": [
+         "czn",
+         "xbw",
+         "fxs"
+        ],
+        "ok": true,
+        "answer_tokens": 12,
+        "finish_reason": "stop",
+        "elapsed_s": 1.2,
+        "answer": "ANSWER: czn, xbw, fxs"
+       },
+       {
+        "seed": 1,
+        "level": 1,
+        "part": "elevator",
+        "expected": [
+         "ebt",
+         "ffx"
+        ],
+        "ok": true,
+        "answer_tokens": 9,
+        "finish_reason": "stop",
+        "elapsed_s": 1.5,
+        "answer": "ANSWER: ebt, ffx"
+       }
+      ]
+     },
+     "2": {
+      "pass": true,
+      "attempts": [
+       {
+        "seed": 1,
+        "level": 2,
+        "part": "chain",
+        "expected": [
+         "tzs",
+         "agq",
+         "pmo",
+         "otu"
+        ],
+        "ok": true,
+        "answer_tokens": 15,
+        "finish_reason": "stop",
+        "elapsed_s": 1.4,
+        "answer": "ANSWER: tzs, agq, pmo, otu"
+       },
+       {
+        "seed": 1,
+        "level": 2,
+        "part": "elevator",
+        "expected": [
+         "tic",
+         "zuh",
+         "ycr"
+        ],
+        "ok": true,
+        "answer_tokens": 12,
+        "finish_reason": "stop",
+        "elapsed_s": 1.8,
+        "answer": "ANSWER: tic, zuh, ycr"
+       }
+      ]
+     },
+     "3": {
+      "pass": false,
+      "attempts": [
+       {
+        "seed": 1,
+        "level": 3,
+        "part": "chain",
+        "expected": [
+         "shb",
+         "vxi",
+         "pem",
+         "vdy",
+         "mqz"
+        ],
+        "ok": true,
+        "answer_tokens": 293,
+        "finish_reason": "stop",
+        "elapsed_s": 22.5,
+        "answer": "1. Start at shb. The chain rule tells us to look for a pair where the first item matches the second item of the previous pair, which is vxi.\n2. The next pair is (shb, vxi). The first item of this pair is vxi, so we look for a pair where the first item matches vxi.\n3. The pair (vxi, pem) matches this criterion, so we follow this pair.\n4. The first item of this pair is vxi, so we look for a pair where the first item matches vxi.\n5. The pair (pem, vdy) matches this criterion, so we follow this pair.\n6. The first item of this pair is pem, which does not match the second item of the previous pair (vxi). So, we look for a pair where the first item matches vdy.\n7. The pair (vdy, mqz) matches this criterion, so we follow this pair.\n8. The first item of this pair is vdy, which does not match the second item of the previous pair (pem). So, we look for a pair where the first item matches mqz.\n9. The pair (mqz, shb) matches this criterion, and it's the last pair in the chain.\n\nANSWER: shb, vxi, pem, vdy, mqz"
+       },
+       {
+        "seed": 1,
+        "level": 3,
+        "part": "elevator",
+        "expected": [
+         "wde",
+         "rzb",
+         "ofn",
+         "dnj"
+        ],
+        "ok": false,
+        "answer_tokens": 114,
+        "finish_reason": "time_limit",
+        "elapsed_s": 9.5,
+        "answer": "1. Start at wde. wde's number is +2: 2 + 2 = 4, so the next pair is the one at position 4: rzb.\n2. rzb's number is -3: 4 - 3 = 1, so we look for the pair at position 1: ofn.\n3. ofn's number is +2: 1 + 2 = 3, so we look for the pair at position 3: dnj.\n4. dnj's number"
+       }
+      ]
+     }
+    },
+    "score": 2
    }
   }
  }
