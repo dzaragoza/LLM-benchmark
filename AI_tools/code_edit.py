@@ -752,12 +752,12 @@ def safe_append(path: str, addition: str) -> str:
        fsync + os.replace) - a crash mid-append cannot leave a torn
        file. For .py targets the result is compiled (ast.parse)
        BEFORE the write - a syntactically broken addition is refused
+       with the file untouched.
     4. MARKDOWN-CHECKED (session 37, addendum 13): for .md targets
        the assembled result runs the md auto-fixer and the
        no-new-violations lint gate BEFORE the write - an append can
        no longer introduce a table/fence break that the editor
        itself would have refused.
-       with the file untouched.
     Returns a report string: 'appended N line(s) to <path>' or
     'idempotent skip: addition already present in <path>'.
     """
@@ -1075,9 +1075,8 @@ if __name__ == "__main__":
         write(args.path, spec["content"])
         print(f"OK - wrote {args.path} ({len(spec['content'])} chars)")
     elif args.check:
-        with open(args.path, encoding="utf-8") as f:
-            _verify_blocks(f.read(), [tuple(b) for b in spec["blocks"]])
-        print("OK - all blocks verify")
+        check(args.path, [tuple(b) for b in spec["blocks"]])
+        print("OK - all blocks verify (full gate: verify, delimiters, syntax, markdown)")
     elif args.preview:
         sys.stdout.write(preview(args.path, [tuple(b) for b in spec["blocks"]]))
     else:
