@@ -180,34 +180,43 @@ def preflight_selfcheck() -> None:
         E._gc(tmp, state4, exclude_fam='gcC')
         assert os.path.isdir(d3), 'gc deleted the running model'
 
-        # --- v9.3: the recovery ladder helpers ---
-        assert E.next_rung('F16') == 'Q8_0'
-        assert E.next_rung('Q8_0') == 'Q6_K'
-        assert E.next_rung('Q6_K') is None
-        # hit_time_bell: only the top FAILING level's attempts count
-        belled = {'levels': {'3': {'pass': False, 'attempts': [
-            {'finish_reason': 'time_limit'}, {'finish_reason': 'stop'}]}}}
-        assert E.hit_time_bell(belled), 'a cut attempt at the top failing level is a bell hit'
-        passed_bell = {'levels': {'3': {'pass': True, 'attempts': [
-            {'finish_reason': 'time_limit'}]}}}
-        assert not E.hit_time_bell(passed_bell), 'a bell cut on a PASSED level never recovers'
-        wrong = {'levels': {'3': {'pass': False, 'attempts': [
+        # --- v9.4: the exhaustive quant walk helpers ---
+        groups = E.rung_groups()
+        assert groups[0] == ('F16', ('F16',)), 'the walk starts at F16, alone'
+        assert groups[1][0] == 'Q8' and groups[1][1] == ('Q8_0',)
+        assert groups[2][0] == 'Q6' and groups[2][1] == ('Q6_K',)
+        assert [g[0] for g in groups] == ['F16', 'Q8', 'Q6', 'Q5', 'Q4', 'Q3', 'Q2', 'Q1']
+        assert 'IQ2_M' in groups[6][1] and 'TQ2_0' in groups[6][1], 'IQ/TQ variants walk under their number'
+        # rung_verdict: pass / fail / time / unmeasured
+        vp = {'score': 3, 'levels': {'3': {'pass': True}}}
+        assert E.rung_verdict(vp) == 'pass'
+        vf = {'score': 1, 'levels': {'2': {'pass': False, 'attempts': [
             {'finish_reason': 'stop', 'ok': False}]}}}
-        assert not E.hit_time_bell(wrong), 'a wrong chain is not a bell hit'
-        lower_bell = {'levels': {'2': {'pass': False, 'attempts': [
-            {'finish_reason': 'time_limit'}]},
-        '3': {'pass': False, 'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
-        assert not E.hit_time_bell(lower_bell), 'only the TOP failing level decides recovery'
-        # best_record: the highest-scoring rung decides, F16 preferred on ties
+        assert E.rung_verdict(vf) == 'fail'
+        vt = {'score': 1, 'levels': {'2': {'pass': False, 'attempts': [
+            {'finish_reason': 'time_limit'}]}}}
+        assert E.rung_verdict(vt) == 'time'
+        assert E.rung_verdict({'score': None}) is None
+        # model_verdict: the walk's terminal states
+        assert E.model_verdict({'F16': vp}) == 'pass'
+        assert E.model_verdict({'F16': vf}) == 'fail'
+        assert E.model_verdict({'F16': vt, 'Q8_0': {'unbuildable': True}}) is None, 'quants remain - pending'
+        assert E.model_verdict({'F16': vt, '_out_of_time': True}) == 'time'
+        # only bells everywhere = out of time (a fail reason)
+        allbell = {r: dict(vt) for r, _num in
+                   [(rg, 0) for g in groups for rg in g[1]]}
+        assert E.model_verdict(allbell) == 'time', 'all-bell exhaustion is out of time'
+        # a mixed group (fail + bell) moves on; exhausted = _out_of_time wins
+        mixed = {'F16': vt, 'Q8_0': vf, '_out_of_time': True}
+        assert E.model_verdict(mixed) == 'time'
+        # best_rung: the highest-scoring rung, earlier rung on ties
         bx = {'F16': {'score': 3}, 'Q8_0': {'score': 5}}
-        assert (E.best_record(bx) or {}).get('score') == 5
+        assert E.best_rung(bx) == ('Q8_0', {'score': 5})
         bx2 = {'F16': {'score': 4}, 'Q8_0': {'score': 4}}
-        assert (E.best_record(bx2) or {}).get('score') == 4
-        assert E.best_record(bx2) == {'score': 4}
-        assert E.best_record({'F16': {'score': 2}})['score'] == 2
-        assert E.best_record({}) is None
+        assert E.best_rung(bx2)[0] == 'F16', 'ties go to the earlier rung'
+        assert E.best_rung({}) is None
 
-        # --- v9.3 gc: the BEST rung decides, recovery rungs included ---
+        # --- v9.4 gc: terminal verdicts collect, pending walks never ---
         d5 = os.path.join(tmp, 'gcR')
         os.makedirs(d5, exist_ok=True)
         open(os.path.join(d5, 'gcR-F16.gguf'), 'w', encoding='utf-8').close()
@@ -223,9 +232,7 @@ def preflight_selfcheck() -> None:
         'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state6, exclude_fam=None)
         assert not os.path.isdir(d6), 'gc kept a model every rung of failed'
-        # v9.3: a TIMED-OUT model is never eliminated - its score is a
-        # floor (the clock, not the model, set it), deleting it is a
-        # false elimination
+        # v9.4: a PENDING walk (bells, quants untried) is never touched
         d7 = os.path.join(tmp, 'gcT')
         os.makedirs(d7, exist_ok=True)
         open(os.path.join(d7, 'gcT-F16.gguf'), 'w', encoding='utf-8').close()
@@ -234,8 +241,13 @@ def preflight_selfcheck() -> None:
                 {'finish_reason': 'time_limit'}, {'finish_reason': 'time_limit'}]}}}},
             'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state7, exclude_fam=None)
-        assert os.path.isdir(d7), 'gc deleted a TIMED-OUT model'
+        assert os.path.isdir(d7), 'gc deleted a PENDING (mid-walk) model'
         assert not state7['exam']['gcT'].get('_eliminated')
+        # v9.4: quants EXHAUSTED at the bell = out of time = an exam
+        # fail - the gc collects it like any fail
+        state7['exam']['gcT']['_out_of_time'] = True
+        E._gc(tmp, state7, exclude_fam=None)
+        assert not os.path.isdir(d7), 'gc kept an out-of-time model (an exam fail)'
 
         # --- the grader: the flexible subsequence ---
         inst = {"path": ["abc", "def", "ghi"]}
@@ -248,7 +260,7 @@ def preflight_selfcheck() -> None:
         assert not E.score_exam("ANSWER: abc, def, gh", inst, "time_limit")
         assert not E.score_exam("I cannot solve this", inst, "stop")
 
-        # --- v9.1: the candidate is F16, always ---
+        # --- v9.4: the roster ladder the walk draws its variations from ---
         from bench.roster import LADDER
 
         assert LADDER[-1] == "F16" and len(LADDER) == 32
@@ -318,7 +330,7 @@ def git_tail(args: argparse.Namespace) -> None:
     paths = [args.state_file, args.results_file, "results.txt"]
     # the ledger is a first-class artifact: every commit carries the
     # latest regeneration (the per-model pushes depend on it)
-    paths += ["md/v9.1.md"]
+    paths += ["md/v9.4.md"]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split
     paths += glob.glob("results/**/*", recursive=True)
@@ -579,15 +591,17 @@ def main() -> None:
         raise
 
 
-def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
-    """md/v9.1.md - the tournament ledger, v9.1: ONE line per model
-    (its F16 candidate), in md/models.md order. The F16 score IS the
-    model's score. Eliminated = the model's artifacts were deleted
-    from the benchmark machine (the collected data always stays in
-    git). Tied top-tier models are never eliminated; their ranking
-    column shows the time order at the highest exam level (the
-    tiebreaker indication - the human breaks ties)."""
-    from bench.exam import best_record
+def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
+    """md/v9.4.md - the tournament ledger, v9.4: ONE line per model
+    (its quant walk), in md/models.md order. The deciding rung's
+    score IS the model's score; the quant column shows WHICH
+    variant carried the exam (the walk's best scorer). Eliminated =
+    the model's artifacts were deleted from the benchmark machine
+    (the collected data always stays in git). Tied top-tier models
+    are never eliminated; their ranking column shows the time order
+    at the highest exam level (the tiebreaker indication - the
+    human breaks ties)."""
+    from bench.exam import best_rung
 
     exam = state.get("exam") or {}
     # gather the measured models first (needed for the tier ranking)
@@ -596,9 +610,10 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         fam_exam = exam.get(fam) or {}
         if not isinstance(fam_exam, dict):
             continue
-        rec = best_record(fam_exam)
-        if not isinstance(rec, dict):
+        br = best_rung(fam_exam)
+        if br is None:
             continue
+        rung, rec = br
         score = rec.get("score")
         # the time + generation rate at the model's HIGHEST PASSED
         # level (both parts), and the MAX CONTEXT USED across all
@@ -617,7 +632,7 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
             if atts and tot > 0:
                 top_time = tot
                 top_tps = toks / tot
-        rows.append((fam, pos, score, top_time, top_tps, max_ctx, fam_exam))
+        rows.append((fam, pos, rung, score, top_time, top_tps, max_ctx))
     # the top tier: the global best score; rank by time at the top
     # level, fastest first (the tiebreaker indication)
     best = max((r[2] for r in rows if r[2] is not None), default=None)
@@ -625,39 +640,42 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     tier.sort(key=lambda r: (r[3] if r[3] is not None else float("inf")))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
-        "# v9.1.md - the tournament ledger (v9.2: one F16 candidate per model, the 1024s bell)",
+        "# v9.4.md - the tournament ledger (v9.4: the exhaustive quant walk, the 1024s bell)",
         "",
-        "One line per model, md/models.md order (param-ascending). The F16",
-        "candidate's score IS the model's score. The context is the model's",
-        "full training window; no model gets more than 1024s to solve any",
-        "exam. Max context used = the largest answer the model ever",
-        "produced (its real need vs its window). Time = the wall time at",
-        "the model's highest passed level (both parts). The ranking column",
-        "is valid ONLY for the top tier (tied at the global best): fastest",
-        "first, the tiebreaker indication - the human breaks ties.",
+        "One line per model, md/models.md order (param-ascending). The",
+        "deciding rung's score IS the model's score; the quant column is",
+        "the variant that carried the exam (the walk's best scorer). The",
+        "context is the model's full training window; no model gets more",
+        "than 1024s to solve any exam. Max context used = the largest",
+        "answer the model ever produced (its real need vs its window).",
+        "Time = the wall time at the model's highest passed level (both",
+        "parts). The ranking column is valid ONLY for the top tier (tied",
+        "at the global best): fastest first, the tiebreaker indication -",
+        "the human breaks ties.",
         "",
-        "| # | model | score | max context used | time @ top | tok/s @ top | rank |",
-        "|---|---|---|---|---|---|---|",
+        "| # | model | quant | score | max context used | time @ top | tok/s @ top | rank |",
+        "|---|---|---|---|---|---|---|---|",
     ]
-    for fam, pos, score, top_time, top_tps, max_ctx, fam_exam in rows:
+    for fam, pos, rung, score, top_time, top_tps, max_ctx in rows:
         rk = rank.get(fam, "-")
         lines.append(
-            f"| {pos} | {fam} | {score if score is not None else '-'} "
+            f"| {pos} | {fam} | {rung} "
+            f"| {score if score is not None else '-'} "
             f"| {max_ctx} "
             f"| {f'{top_time:.1f}s' if top_time is not None else '-'} "
             f"| {f'{top_tps:.1f}' if top_tps is not None else '-'} "
             f"| {rk} |"
         )
     lines.append("")
-    n_measured = sum(1 for r in rows if r[2] is not None)
+    n_measured = sum(1 for r in rows if r[3] is not None)
     lines.append(
-        f"_{n_measured} models measured; the F16 records decide everything. "
-        "Max context used = the largest answer the model ever produced "
-        "(its real need vs its window)._"
+        f"_{n_measured} models measured; the deciding rung's record decides "
+        "everything. Max context used = the largest answer the model ever "
+        "produced (its real need vs its window)._"
     )
-    with open(os.path.join("md", "v9.1.md"), "w", encoding="utf-8") as f:
+    with open(os.path.join("md", "v9.4.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    stamp("v9.1.md ledger rewritten")
+    stamp("v9.4.md ledger rewritten")
 
 
 def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
@@ -715,7 +733,7 @@ def _run(args: argparse.Namespace) -> None:
                 else:
                     stamp(f"eliminated {fam}: marked (no artifacts on disk)")
             save_state(args.state_file, state)
-            write_v91_md(
+            write_v94_md(
                 state,
                 {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
             )
@@ -733,7 +751,7 @@ def _run(args: argparse.Namespace) -> None:
             end."""
             _exam_to_state_keep(state)
             save_state(args.state_file, state)
-            write_v91_md(
+            write_v94_md(
                 state,
                 {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
             )
@@ -764,7 +782,7 @@ def _run(args: argparse.Namespace) -> None:
         )
         _exam_to_state(state, results)
         save_state(args.state_file, state)
-        write_v91_md(
+        write_v94_md(
             state, {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])}
         )
         print()

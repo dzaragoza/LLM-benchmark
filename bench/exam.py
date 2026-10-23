@@ -10,20 +10,26 @@ comprehensiveness yielded to efficiency.
   the bell     TOKEN and TIME: max_tokens = the window (finish_reason
               'length' = the paper filled); one attempt may run at
               most 1024s (finish_reason 'time_limit' = the bell).
-  recovery     a candidate whose sweep ended AT the time bell
-              retries the whole exam one rung down the quant
-              ladder - Q8_0, then Q6_K (a faster
-              quant may beat the clock its F16 could not). When
-              every rung hit the bell, the fail cause is
-              'out of time'.
+  recovery    v9.4 - the EXHAUSTIVE quant walk: a sweep that
+              ends at the bell is retried quant number by quant
+              number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY
+              variation of a number (roster LADDER order) before
+              the next, until a verdict lands. A clean sweep
+              PASSES the walk; a quant number whose every
+              testable variation answered and was wrong FAILS it;
+              only bells move the walk on. Quants exhausted with no
+              verdict anywhere = 'out of time', itself an exam
+              fail - recovery was exhaustive.
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
-  self-clean  MODEL granularity: a model whose F16 scored strictly
-              below the global best is eliminated - its models/
-              directory is deleted (the data always stays). Tied
-              leaders are NEVER eliminated; TIME ranks them
-              (elapsed per attempt is recorded) but decides nothing
-              - the human breaks ties.
+  self-clean  MODEL granularity: a model whose deciding rung
+              scored strictly below the global best is eliminated
+              once its walk reached a terminal verdict (pass,
+              fail, or out of time - an exam fail: recovery was
+              exhaustive). A PENDING model (walk unfinished) is
+              never touched. Tied leaders are NEVER eliminated;
+              TIME ranks them (elapsed per attempt) but decides
+              nothing - the human breaks ties.
 
 Run data is v9-compatible: the same state shape (exam.<fam>.<rung>),
 the same answers files, the same ledger - a v9.1 run resumes a v9
@@ -61,11 +67,11 @@ SAMPLER_SEED = 1024
 # breaks ties.
 TIME_BELL_SECONDS = 1024
 
-# v9.3 recovery: the rungs a bell-hit candidate retries, in order
-# (param-descending quality: each step down trades precision for
-# speed - the clock is what the candidate lost to, so the ladder
-# buys tok/s with bits until the bell is beaten)
-RUNG_ORDER = ("F16", "Q8_0", "Q6_K")
+# v9.4 recovery: the quant walk, by quant NUMBER quality-descending
+# (each step down trades precision for speed - the clock is what the
+# candidate lost to, so the walk buys tok/s with bits until a
+# verdict lands)
+QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 
 
 
@@ -314,12 +320,27 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     return all(tok in it for tok in expected)
 
 
-def next_rung(rung: str) -> str | None:
-    """v9.3 recovery: the rung a bell-hit candidate retries next -
-    F16 -> Q8_0 -> Q6_K -> None (the ladder
-    ends)."""
-    i = RUNG_ORDER.index(rung) if rung in RUNG_ORDER else -1
-    return RUNG_ORDER[i + 1] if 0 <= i < len(RUNG_ORDER) - 1 else None
+def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
+    """v9.4: the walk as (quant number, variations) pairs - F16
+    alone, then EVERY variation of each number in roster LADDER
+    order (q8_0; q6_k; q5_k_s, q5_0, q5_k_m, q5_1; ... q1)."""
+    from bench.roster import LADDER
+
+    groups: list[tuple[str, tuple[str, ...]]] = []
+    for num in QUANT_NUMBERS:
+        variants = (
+            ("F16",)
+            if num == "F16"
+            else tuple(
+                r
+                for r in LADDER
+                if r != "F16"
+                and (r.startswith(num) or r.startswith("IQ" + num) or r.startswith("T" + num))
+            )
+        )
+        if variants:
+            groups.append((num, variants))
+    return groups
 
 
 def hit_time_bell(rec: dict[str, Any]) -> bool:
@@ -338,26 +359,88 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
     )
 
 
-def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
-    """The model's DECIDING record, v9.3: the highest-scoring rung
-    among F16 and the recovery rungs (Q8_0, Q6_K).
-    Ties go to the earlier rung (F16 first) - the ladder order in
-    RUNG_ORDER."""
-    best: dict[str, Any] | None = None
-    for rung in RUNG_ORDER:
-        rec = fam_exam.get(rung)
-        if isinstance(rec, dict):
-            best = rec
-            break
-    for rung in RUNG_ORDER[1:]:
-        rec = fam_exam.get(rung)
-        if not isinstance(rec, dict):
-            continue
-        bs = (best or {}).get("score")
-        s = rec.get("score")
-        if s is not None and (bs is None or s > bs):
-            best = rec
+def rung_verdict(rec: dict[str, Any]) -> str | None:
+    """One rung record's outcome, v9.4: 'pass' (the sweep ended with
+    NO failing level - the candidate swept clean), 'fail' (the
+    sweep ended at a failing level the model ANSWERED - a
+    capability fail no faster quant rescues), 'time' (the sweep
+    ended at a failing level the BELL cut - not a verdict, the
+    walk may recover at a smaller quant). None = unmeasured."""
+    if rec.get("score") is None:
+        return None
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "pass"
+    return "time" if hit_time_bell(rec) else "fail"
+
+
+def model_verdict(fam_exam: dict[str, Any]) -> str | None:
+    """The model's terminal verdict, v9.4 - derived from the records
+    so a resumed run skips a completed walk and a crashed run
+    resumes mid-walk:
+      pass / fail    the walk's stop conditions: a clean sweep; a
+                     quant number whose every testable variation
+                     answered and was wrong
+      time           every quant was tried and only bells came
+                     back - an exam fail per the author's ruling;
+                     the live walk also certifies it with the
+                     _out_of_time flag
+      None           PENDING: an incomplete group or an errored
+                     sweep - the walk has more to try"""
+    if fam_exam.get("_out_of_time"):
+        return "time"
+    any_fail = False
+    walked_all = True
+    for _num, group in rung_groups():
+        gfail = gbell = 0
+        complete = True
+        for rung in group:
+            rec = fam_exam.get(rung)
+            if not isinstance(rec, dict):
+                complete = False
+                continue
+            v = rung_verdict(rec)
+            if v == "pass":
+                return "pass"
+            if v == "fail":
+                gfail += 1
+                any_fail = True
+            elif v == "time":
+                gbell += 1
+            elif not rec.get("unbuildable"):
+                complete = False
+        if complete and gfail and not gbell:
+            return "fail"
+        if not complete:
+            walked_all = False
+    if walked_all:
+        # every group completed: any answered-wrong anywhere makes the
+        # walk's verdict a FAIL; only bells everywhere = out of time
+        return "fail" if any_fail else "time"
+    return None
+
+
+def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """The model's DECIDING (rung, record) pair, v9.4: the
+    highest-scoring rung the walk ever recorded, ties to the earlier
+    rung in walk order. The deciding rung is the ledger's quant
+    column; the record carries the score the gc and ledger read."""
+    best: tuple[str, dict[str, Any]] | None = None
+    for _num, group in rung_groups():
+        for rung in group:
+            rec = fam_exam.get(rung)
+            if not isinstance(rec, dict) or rec.get("score") is None:
+                continue
+            if best is None or rec["score"] > best[1]["score"]:
+                best = (rung, rec)
     return best
+
+
+def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
+    """The deciding record alone (the gc's read of best_rung)."""
+    br = best_rung(fam_exam)
+    return br[1] if br else None
 
 
 def fail_reason(rec: dict[str, Any]) -> str:
@@ -421,11 +504,10 @@ def candidates(
     models_dir: str = "models",
     dry_run: bool = False,
 ) -> list[tuple[str, str]]:
-    """v9.1: the roster as (family, F16) pairs, param-ascending - ONE
-    candidate per model. The F16 candidate's max score IS the model's
-    max score (the author's v9.1 ruling: comprehensiveness yielded to
-    efficiency; the quant ablation era ended). Acquisition stays
-    lazy (the f16 is downloaded/converted on demand)."""
+    """v9.4: the roster as (family, F16) pairs, param-ascending - the
+    F16 is the walk's FIRST group; the recovery rungs are acquired
+    lazily by the walk itself. Acquisition stays lazy (the f16 is
+    downloaded/converted on demand)."""
     order = [name for name, _ in roster_from_models_md()]
     fams = order if not families else [f.split("=")[0] for f in families]
     return [(fam, "F16") for fam in fams]
@@ -665,21 +747,19 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep, v9.3 - MODEL granularity: a model is
-    eliminated when its BEST rung (F16, or a recovery rung - Q8_0,
-    Q6_K - that outscored it) has a final score strictly below the
-    global best (the best rung's score IS the model's max score).
-    Elimination deletes the model's whole models/ directory (the
-    data ALWAYS stays: answers in results/, records in state). The
-    model being examined keeps its files until its sweep
-    finishes. Unscored models (pending, interrupted) are never
-    touched. TIMED-OUT models are never eliminated either (v9.3,
-    the author's ruling): a model whose deciding record ended AT the
-    time bell was clock-limited, not capability-limited - its score
-    is a floor, not its max, so deleting it would be a false
-    elimination. Tied leaders are never
-    eliminated - time ranks them (recorded per attempt) but the
-    human breaks ties."""
+    """The self-cleaning sweep, v9.4 - MODEL granularity: a model is
+    eliminated when its deciding rung (the walk's best scorer) has
+    a final score strictly below the global best AND the walk
+    reached a terminal verdict - pass, fail, or out of time (an
+    exam fail per the author's ruling: the recovery walk is
+    EXHAUSTIVE, a timeout survived every quant). A PENDING model -
+    timeouts with quants left to try, an errored sweep - is never
+    touched: its record is not final. Elimination deletes the
+    model's whole models/ directory (the data ALWAYS stays:
+    answers in results/, records in state). The model being
+    examined keeps its files until its walk finishes. Tied leaders
+    are never eliminated - time ranks them (recorded per attempt)
+    but the human breaks ties."""
     import shutil
 
     exam = state.get("exam") or {}
@@ -687,9 +767,9 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        rec = best_record(fam_exam)
-        if isinstance(rec, dict):
-            s = rec.get("score")
+        br = best_rung(fam_exam)
+        if br is not None:
+            s = br[1].get("score")
             if s is not None and s > best:
                 best = s
     if best < 0:
@@ -697,16 +777,17 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam, fam_exam in exam.items():
         if not isinstance(fam_exam, dict) or fam == exclude_fam:
             continue
-        rec = best_record(fam_exam)
-        if not isinstance(rec, dict):
+        verdict = model_verdict(fam_exam)
+        if verdict is None:
+            continue  # PENDING - the walk has more to try
+        br = best_rung(fam_exam)
+        if br is None:
             continue
-        s = rec.get("score")
-        timed_out = hit_time_bell(rec)
-        if s is None or s >= best or timed_out:
-            # pending, a SURVIVOR, or TIMED OUT (its score is a
-            # floor, not its max): a stale _eliminated flag (e.g.
-            # a fossil of the v9 premature-elimination bug) must be
-            # CLEARED - the flag is derived state, the score is truth
+        s = br[1].get("score")
+        if s is None or s >= best:
+            # a SURVIVOR: a stale _eliminated flag (e.g. a fossil of
+            # the v9 premature-elimination bug) must be CLEARED - the
+            # flag is derived state, the score is truth
             if s is not None and fam_exam.get("_eliminated"):
                 fam_exam["_eliminated"] = False
             continue
@@ -754,67 +835,93 @@ def run(
         # a --clean-less run silently skip candidates (the
         # Qwen3.5-0.8B-first bug). --clean wipes it; without --clean
         # an old-era family record is simply not this candidate's.
-        rec = fam_exam.get(rung) or {}
-        # a stored final score is final - skip (idempotence)
-        if rec.get("score") is not None and not dry_run:
-            results[key] = rec
+        fam_tree = state.setdefault("exam", {}).setdefault(fam, {})
+        # idempotence: a walk that already reached a verdict is final
+        if not dry_run and model_verdict(fam_tree) is not None:
+            results[key] = best_record(fam_tree) or fam_tree
             continue
         if dry_run:
-            results[key] = {"planned": f"sweep 0..{max_level} on seeds {seeds}"}
+            results[key] = {"planned": f"quant walk 0..{max_level} on seeds {seeds}"}
             continue
-        gguf = _acquire(fam, rung, models_dir)
-        if not gguf:
-            rec = {"error": "candidate cannot exist on this machine (unbuildable)"}
-            results[key] = rec
-            state.setdefault("exam", {}).setdefault(fam, {})[rung] = rec
+        # v9.4: the EXHAUSTIVE quant walk - quant number by quant
+        # number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY variation
+        # of a number (roster LADDER order) before the next, until
+        # a verdict lands: a clean sweep PASSES the walk; a quant
+        # number whose every testable variation answered and was
+        # wrong FAILS it; only bells move the walk on. Quants
+        # exhausted with no verdict anywhere = out of time - itself
+        # an exam fail (recovery was exhaustive). An unbuildable
+        # variation is skipped, not a verdict; an errored sweep
+        # leaves the model PENDING, never falsely failed.
+        walk_verdict = None
+        errored = False
+        for num, group in rung_groups():
+            gfail = gbell = 0
+            for rung in group:
+                rec = fam_tree.get(rung) or {}
+                if rec.get("score") is None and not rec.get("unbuildable"):
+                    gguf = _acquire(fam, rung, models_dir)
+                    if not gguf:
+                        rec = {"unbuildable": True}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                        print(f"  {fam} {rung}: unbuildable - skipped")
+                    else:
+                        print(
+                            f"-- {fam} {rung} ({num}), paper "
+                            f"{bell_window(state, fam, models_dir)} tokens --"
+                        )
+                        # one candidate's failure never kills the exam - any
+                        # exception is recorded and the sweep moves on.
+                        try:
+                            rec = run_family(
+                                fam,
+                                rung,
+                                gguf,
+                                models_dir,
+                                state,
+                                state_file,
+                                port,
+                                seeds,
+                                max_level,
+                                0,
+                                dry_run,
+                            )
+                        except SystemExit as e:
+                            if e.code == 130:
+                                raise
+                            rec = {"error": f"exam run failed: {e.code}"}
+                        except Exception as e:
+                            rec = {"error": f"exam run failed: {e}"}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                results[(fam, rung)] = rec
+                v = rung_verdict(rec)
+                if v == "pass":
+                    walk_verdict = "pass"
+                    break
+                if v == "fail":
+                    gfail += 1
+                elif v == "time":
+                    gbell += 1
+                elif v is None and not rec.get("unbuildable"):
+                    errored = True
+            if walk_verdict == "pass":
+                break
+            if gfail and not gbell:
+                walk_verdict = "fail"
+                break
+        if walk_verdict is None and not errored:
+            # every quant was tried and only bells came back: the
+            # quants are exhausted - out of time, an exam fail
+            fam_tree["_out_of_time"] = True
             _state_store.save_state(state_file, state)
-            print(f"  {fam} {rung}: unbuildable - skipped")
-            continue
-        # v9.3 recovery: a candidate whose sweep ended AT the time
-        # bell retries the whole exam one rung down the quant ladder
-        # (F16 -> Q8_0 -> Q6_K) - a faster quant may beat the 1024s
-        # clock its predecessor could not. When every rung hit the
-        # bell, the fail cause is 'out of time'. A rung that cannot
-        # be built or ends for any other reason (wrong chain, out of
-        # context, error) ends the ladder: only the BELL recovers.
-        while True:
-            print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
-            # one candidate's failure never kills the exam - any
-            # exception is recorded and the sweep moves on.
-            try:
-                rec = run_family(
-                    fam,
-                    rung,
-                    gguf,
-                    models_dir,
-                    state,
-                    state_file,
-                    port,
-                    seeds,
-                    max_level,
-                    0,
-                    dry_run,
-                )
-            except SystemExit as e:
-                if e.code == 130:
-                    raise
-                rec = {"error": f"exam run failed: {e.code}"}
-            except Exception as e:
-                rec = {"error": f"exam run failed: {e}"}
-            results[(fam, rung)] = rec
-            nxt = next_rung(rung)
-            if dry_run or rec.get("error") or not hit_time_bell(rec) or nxt is None:
-                break
-            print(f"  {fam} {rung} hit the time bell - recovering at {nxt}")
-            gguf = _acquire(fam, nxt, models_dir)
-            if not gguf:
-                print(f"  {fam} {nxt}: unbuildable - recovery ladder ends")
-                break
-            rung = nxt
-        # the self-clean FIRST: a model whose best rung scored strictly
-        # below the global best leaves the disk (the data always
-        # stays), THEN the family push - so this model's own
-        # deletions are staged and committed in its push
+            print(f"  {fam}: quants exhausted at the bell - out of time (an exam fail)")
+        # the self-clean FIRST: a model whose deciding rung scored
+        # strictly below the global best AND whose walk reached a
+        # verdict leaves the disk (the data always stays), THEN the
+        # family push - so this model's own deletions are staged
+        # and committed in its push
         _gc(models_dir, state, fam)
         # v9.1: the F16 IS the model - the family is complete after
         # its one candidate; report and push (the watchability ruling)
