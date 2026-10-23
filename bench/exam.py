@@ -388,44 +388,47 @@ def model_verdict(fam_exam: dict[str, Any]) -> str | None:
     """The model's terminal verdict, v9.4 - derived from the records
     so a resumed run skips a completed walk and a crashed run
     resumes mid-walk:
-      pass / fail    the walk's stop conditions: a clean sweep; a
-                     quant number whose every testable variation
-                     answered and was wrong
-      time           every quant was tried and only bells came
-                     back - an exam fail per the author's ruling;
-                     the live walk also certifies it with the
-                     _out_of_time flag
-      None           PENDING: an incomplete group or an errored
+      pass / fail    the walk's stop conditions, at QUANT LEVEL
+                     granularity: a level with any passing candidate
+                     (verdict pass); a level, fully evaluated, with
+                     any wrong-answer candidate (verdict fail)
+      time           every quant level was fully evaluated and only
+                     bells came back - an exam fail per the author's
+                     ruling; the live walk also certifies it with
+                     the _out_of_time flag
+      None           PENDING: an incomplete level or an errored
                      sweep - the walk has more to try"""
     if fam_exam.get("_out_of_time"):
         return "time"
-    any_fail = False
     walked_all = True
     for _num, group in rung_groups():
-        gfail = gbell = 0
+        gpass = gfail = 0
         complete = True
         for rung in group:
             rec = fam_exam.get(rung)
             if not isinstance(rec, dict):
                 complete = False
                 continue
+            if rec.get("unbuildable"):
+                continue
             v = rung_verdict(rec)
             if v == "pass":
-                return "pass"
-            if v == "fail":
-                # ANY answered-wrong anywhere ends the walk - a mixed
-                # level (wrong + bell) is a capability fail, not a bell
-                return "fail"
-            if v == "time":
-                gbell += 1
-            elif not rec.get("unbuildable"):
+                gpass += 1
+            elif v == "fail":
+                gfail += 1
+            elif v is None:
                 complete = False
+        if gpass:
+            return "pass"
+        # the level's every candidate ran and one answered wrong: a
+        # capability fail ends the walk (all candidates of the level
+        # are always evaluated; the verdict is level-granular)
+        if gfail and complete:
+            return "fail"
         if not complete:
             walked_all = False
     if walked_all:
-        # every group completed: any answered-wrong anywhere makes the
-        # walk's verdict a FAIL; only bells everywhere = out of time
-        return "fail" if any_fail else "time"
+        return "time"
     return None
 
 
@@ -436,17 +439,24 @@ def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     column; the record carries the score the gc and ledger read."""
     best: tuple[str, dict[str, Any]] | None = None
     for _num, group in rung_groups():
+        gfail = False
         for rung in group:
             rec = fam_exam.get(rung)
             if not isinstance(rec, dict) or rec.get("score") is None:
                 continue
             if best is None or rec["score"] > best[1]["score"]:
                 best = (rung, rec)
-            # the walk STOPS at a capability fail - records beyond the
-            # terminal rung are relics of the pre-fix walk and never
-            # decide anything
             if rung_verdict(rec) == "fail":
-                return best
+                gfail = True
+        # the LEVEL decides: a failing level ends the walk AFTER all
+        # its candidates were evaluated - records beyond that level
+        # are relics of a pre-fix walk and never decide anything
+        if gfail or any(
+            isinstance(fam_exam.get(r), dict)
+            and rung_verdict(fam_exam.get(r) or {}) == "pass"
+            for r in group
+        ):
+            return best
     return best
 
 
@@ -875,6 +885,7 @@ def run(
         # leaves the model PENDING, never falsely failed.
         walk_verdict = None
         errored = False
+        gpass = gfail = gbell = 0
         # recovery KEEPS THE EXAM LEVEL: the walk advances monotonically
         # through difficulty - a rung that timed out at level 3 has
         # already proven levels 0..2 at ITS OWN quant, and the next
@@ -882,7 +893,7 @@ def run(
         # (max score + 1), never re-measuring what earlier rungs passed
         walk_level = 0
         for num, group in rung_groups():
-            gfail = gbell = 0
+            gpass = gfail = gbell = 0
             for rung in group:
                 rec = fam_tree.get(rung) or {}
                 if rec.get("score") is None and not rec.get("unbuildable"):
@@ -930,25 +941,26 @@ def run(
                     walk_level = s + 1
                 v = rung_verdict(rec)
                 if v == "pass":
-                    walk_verdict = "pass"
-                    break
-                if v == "fail":
-                    # the author's ruling: as soon as a candidate is
-                    # pass or fail, time recovery is IMPOSSIBLE - the
-                    # walk ends here; the high score is the best of
-                    # the passes so far
-                    walk_verdict = "fail"
-                    break
-                if v == "time":
+                    gpass += 1
+                elif v == "fail":
+                    gfail += 1
+                elif v == "time":
                     gbell += 1
                 elif v is None and not rec.get("unbuildable"):
                     errored = True
-            if walk_verdict == "pass":
+            # the LEVEL's verdict - decided only AFTER every candidate
+            # of the quant number was evaluated (they always all run):
+            #   any pass  -> the walk ends; the high score is the
+            #               highest score of the passes
+            #   any fail  -> the walk ends (verdict fail); the high
+            #               score is the best of the earlier passes
+            #   all bell  -> the ONLY descent: the next quant number
+            if gpass:
+                walk_verdict = "pass"
                 break
-            if walk_verdict == "fail":
+            if gfail:
+                walk_verdict = "fail"
                 break
-            # all the quants of the number timed out (or were
-            # unbuildable): descend to the next quant number
         if walk_verdict is None and not errored:
             # every quant number was tried and only bells came back: the
             # quants are exhausted - out of time, an exam fail
