@@ -12,9 +12,10 @@ comprehensiveness yielded to efficiency.
               most 1024s (finish_reason 'time_limit' = the bell).
   recovery     a candidate whose sweep ended AT the time bell
               retries the whole exam one rung down the quant
-              ladder - Q8_0, then Q6_K (a faster quant may beat
-              the clock its F16 could not). When every rung hit
-              the bell, the fail cause is 'out of time'.
+              ladder - Q8_0, Q6_K, Q5_K_M, Q5_K_S (a faster
+              quant may beat the clock its F16 could not). When
+              every rung hit the bell, the fail cause is
+              'out of time'.
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
   self-clean  MODEL granularity: a model whose F16 scored strictly
@@ -61,7 +62,10 @@ SAMPLER_SEED = 1024
 TIME_BELL_SECONDS = 1024
 
 # v9.3 recovery: the rungs a bell-hit candidate retries, in order
-RUNG_ORDER = ("F16", "Q8_0", "Q6_K")
+# (param-descending quality: each step down trades precision for
+# speed - the clock is what the candidate lost to, so the ladder
+# buys tok/s with bits until the bell is beaten)
+RUNG_ORDER = ("F16", "Q8_0", "Q6_K", "Q5_K_M", "Q5_K_S")
 
 
 
@@ -312,7 +316,8 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
 
 def next_rung(rung: str) -> str | None:
     """v9.3 recovery: the rung a bell-hit candidate retries next -
-    F16 -> Q8_0 -> Q6_K -> None (the ladder ends)."""
+    F16 -> Q8_0 -> Q6_K -> Q5_K_M -> Q5_K_S -> None (the ladder
+    ends)."""
     i = RUNG_ORDER.index(rung) if rung in RUNG_ORDER else -1
     return RUNG_ORDER[i + 1] if 0 <= i < len(RUNG_ORDER) - 1 else None
 
@@ -335,8 +340,9 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
 
 def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
     """The model's DECIDING record, v9.3: the highest-scoring rung
-    among F16 and the recovery rungs (Q8_0, Q6_K). Ties go to the
-    earlier rung (F16 first) - the ladder order in RUNG_ORDER."""
+    among F16 and the recovery rungs (Q8_0, Q6_K, Q5_K_M, Q5_K_S).
+    Ties go to the earlier rung (F16 first) - the ladder order in
+    RUNG_ORDER."""
     best: dict[str, Any] | None = None
     for rung in RUNG_ORDER:
         rec = fam_exam.get(rung)
