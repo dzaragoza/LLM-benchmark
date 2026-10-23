@@ -73,6 +73,13 @@ TIME_BELL_SECONDS = 32
 # verdict lands)
 QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 
+# v9.4 SIZE recovery (the author's ruling): a candidate's file on disk
+# may not exceed 16 GiB - too large is a condition like out of time,
+# with the SAME recovery logic: a quant level whose every candidate is
+# too large descends to the next quant number (a smaller quant is a
+# smaller file - size recovery walks the same ladder the clock does)
+MAX_CANDIDATE_GIB = 16.0
+
 
 
 # the repetition count IS the seed set: n=1 for the benchmark, so the
@@ -369,7 +376,13 @@ def rung_verdict(rec: dict[str, Any]) -> str | None:
     before the bell - and the answer was wrong: a capability fail
     no smaller quant rescues), 'time' (the failing paper has at
     least one bell-cut attempt: after the bell, rejected, the walk
-    may recover at a smaller quant). None = unmeasured."""
+    may recover at a smaller quant). None = unmeasured.
+
+    A record marked too_large (the SIZE gate, MAX_CANDIDATE_GIB)
+    reads as 'time'-grade: not a graded paper, and its level can
+    descend the same way a belled level does."""
+    if rec.get("too_large"):
+        return "time"  # the SIZE gate: same recovery grade as the bell
     if rec.get("score") is None:
         return None
     levels = rec.get("levels") or {}
@@ -756,6 +769,34 @@ def run_family(
             pass
 
 
+def _size_too_large(fam: str, rung: str, models_dir: str) -> bool | None:
+    """The SIZE gate (v9.4, the author's ruling): True when the
+    candidate's file would exceed MAX_CANDIDATE_GIB on disk. Uses
+    the exact local file when it exists, else the pre-download
+    estimate (hf_download.estimate_rung_gib - remote metadata or
+    ratio-scaled from the source). None = no estimate possible
+    (the caller then does NOT skip - never a false too_large)."""
+    import infra.hf_download as hf_download
+
+    famdir = os.path.join(models_dir, fam)
+    existing = hf_download.local_rung(famdir, rung)
+    if existing and os.path.isfile(existing):
+        return os.path.getsize(existing) / (1024**3) > MAX_CANDIDATE_GIB
+    repo = dict(roster_from_models_md()).get(fam)
+    if not repo:
+        return None
+    try:
+        list_repo_files = hf_download.list_repo_files
+        files = list_repo_files(repo)
+        sizes = hf_download.file_sizes(repo) if hasattr(hf_download, "file_sizes") else {}
+        est = hf_download.estimate_rung_gib(rung, files, files, sizes)
+        if est is None:
+            return None
+        return est > MAX_CANDIDATE_GIB
+    except Exception:
+        return None
+
+
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
     """Lazy acquisition: the candidate's file, downloaded/quantized
     on demand via the roster build path. None = the candidate cannot
@@ -923,7 +964,20 @@ def run(
             gpass = gfail = gbell = 0
             for rung in group:
                 rec = fam_tree.get(rung) or {}
+                if rec.get("too_large"):
+                    continue  # the SIZE gate already rejected this rung
                 if rec.get("score") is None and not rec.get("unbuildable"):
+                    too_large = _size_too_large(fam, rung, models_dir)
+                    if too_large:
+                        rec = {"too_large": True}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                        print(
+                            f"  {fam} {rung}: TOO LARGE (> {MAX_CANDIDATE_GIB:g} GiB) "
+                            "- size recovery: the level may descend"
+                        )
+                        results[(fam, rung)] = rec
+                        continue
                     gguf = _acquire(fam, rung, models_dir)
                     if not gguf:
                         rec = {"unbuildable": True}
@@ -966,6 +1020,9 @@ def run(
                 elif v == "fail":
                     gfail += 1
                 elif v == "time":
+                    # the bell OR the SIZE gate - both recover the same
+                    # way: the level descends when every candidate is
+                    # time/too_large
                     gbell += 1
                 elif v is None and not rec.get("unbuildable"):
                     errored = True
@@ -983,11 +1040,14 @@ def run(
                 walk_verdict = "fail"
                 break
         if walk_verdict is None and not errored:
-            # every quant number was tried and only bells came back: the
-            # quants are exhausted - out of time, an exam fail
+            # every quant number was tried and only bells/too-larges came
+            # back: the quants are exhausted - out of time, an exam fail
             fam_tree["_out_of_time"] = True
             _state_store.save_state(state_file, state)
-            print(f"  {fam}: quants exhausted at the bell - out of time (an exam fail)")
+            nlarge = sum(1 for r in fam_tree.values()
+                         if isinstance(r, dict) and r.get("too_large"))
+            why = "size" if nlarge else "the bell"
+            print(f"  {fam}: quants exhausted ({why}) - out of time (an exam fail)")
         # the self-clean FIRST: a model whose deciding rung scored
         # strictly below the global best AND whose walk reached a
         # verdict leaves the disk (the data always stays), THEN the
