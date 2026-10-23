@@ -701,17 +701,21 @@ def run_family(
                     verdict = "PASS" if rec["pass"] else "FAIL"
                     capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
                     belled = sum(1 for a in attempts if a.get("finish_reason") == "time_limit")
-                    # the fail MODE must be visible at a glance: a bell
-                    # fail recovers (time), a wrong answer ends the walk
+                    # the fail MODE must be visible at a glance, and it
+                    # MUST MATCH the verdict the walk actually applied -
+                    # the PROCTOR rule (rung_verdict): ANY belled attempt
+                    # means the paper came in after the bell - out of
+                    # time, ungraded; only papers that ENDED are graded
+                    # (pass/fail). The label and the verdict share one
+                    # source: rung_verdict on this level record.
                     mode = ""
                     if not rec["pass"]:
-                        if belled and not any(
-                            a.get("ok") is False and a.get("finish_reason") == "stop"
-                            for a in attempts
-                        ):
-                            mode = ", OUT OF TIME"
-                        else:
-                            mode = ", wrong answer"
+                        mode = (
+                            ", OUT OF TIME"
+                            if rung_verdict({"score": rec.get("score", 0),
+                                              "levels": {str(level): rec}}) == "time"
+                            else ", wrong answer"
+                        )
                     print(
                         f"  level {level}: {verdict} "
                         f"(parts {[a.get('ok') for a in attempts]}"
