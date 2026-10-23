@@ -22,6 +22,7 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | SmolLM2-1.7B-Instruct | 1.711 | 8,192 | HuggingFaceTB/SmolLM2-1.7B-Instruct | no | https://arxiv.org/abs/2502.02737v1 | unknown |
 | Qwen3-1.7B | 2.032 | 40,960 | Qwen/Qwen3-1.7B | no | https://arxiv.org/abs/2505.09388 | thinking |
 | Qwen3.5-2B | 2.274 | 262,144 | Qwen/Qwen3.5-2B | no | https://qwen.ai/blog?id=qwen3.5 | thinking |
+| Qwen3-2B | 2.274 | 262,144 | Qwen/Qwen3-2B | no | https://arxiv.org/abs/2505.09388 | thinking |
 | MiniCPM5-2B | 2.517 | 131,072 | openbmb/MiniCPM5-2B | no | https://arxiv.org/abs/2506.07900 | thinking |
 | granite-3.1-2b-instruct | 2.534 | 131,072 | ibm-granite/granite-3.1-2b-instruct | no | https://arxiv.org/abs/2502.07437 | unknown |
 | granite-3.2-2b-instruct | 2.534 | 131,072 | ibm-granite/granite-3.2-2b-instruct | no | https://arxiv.org/abs/2504.07986 | unknown |
@@ -50,12 +51,16 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | gemma-4-e2b-it | 5.123 | 131,072 | google/gemma-4-e2b-it | no | https://arxiv.org/abs/2607.02770 | thinking |
 | mistral-7b-instruct-v0.3 | 7.248 | 32,768 | mistralai/Mistral-7B-Instruct-v0.3 | no | https://arxiv.org/abs/2310.06825 | unknown |
 | OLMo-2-1124-7B-Instruct | 7.299 | 4,096 | allenai/OLMo-2-1124-7B-Instruct | no | https://arxiv.org/abs/2501.00656 | unknown |
+| Falcon3-7B-Instruct | 7.456 | 32,768 | tiiuae/Falcon3-7B-Instruct | no | https://arxiv.org/abs/2412.09524 | non-thinking |
 | Qwen2.5-7B-Instruct | 7.616 | 32,768 | Qwen/Qwen2.5-7B-Instruct | no | https://arxiv.org/abs/2309.00071 | unknown |
 | gemma-4-e4b-it | 7.996 | 131,072 | google/gemma-4-e4b-it | no | https://arxiv.org/abs/2607.02770 | thinking |
 | granite-3.3-8b-instruct | 8.171 | 131,072 | ibm-granite/granite-3.3-8b-instruct | no | https://arxiv.org/abs/2505.13411 | thinking |
 | Qwen3-8B | 8.191 | 40,960 | Qwen/Qwen3-8B | no | https://arxiv.org/abs/2309.00071 | thinking |
+| Yi-1.5-9B-Chat | 8.829 | 4,096 | 01-ai/Yi-1.5-9B-Chat | no | https://arxiv.org/abs/2403.04652 | non-thinking |
 | Ministral-3-8B-Instruct-2512 | 8.918 | 262,144 | mistralai/Ministral-3-8B-Instruct-2512 | no | https://arxiv.org/abs/2601.08584 | non-thinking |
+| gemma-2-9b-it | 9.242 | 8,192 | google/gemma-2-9b-it | yes | https://arxiv.org/abs/2408.00118 | unknown |
 | Qwen3.5-9B | 9.653 | 262,144 | Qwen/Qwen3.5-9B | no | https://qwen.ai/blog?id=qwen3.5 | thinking |
+| Falcon3-10B-Instruct | 10.306 | 32,768 | tiiuae/Falcon3-10B-Instruct | no | https://arxiv.org/abs/2412.09524 | non-thinking |
 | Phi-4-14B | 14.66 | 16,384 | microsoft/phi-4 | no | https://arxiv.org/abs/2412.08905 | unknown |
 | Qwen3-14B | 14.77 | 40,960 | Qwen/Qwen3-14B | no | https://arxiv.org/abs/2309.00071 | thinking |
 | Llama-3.1-8B-Instruct | unknown | unknown | meta-llama/Llama-3.1-8B-Instruct | yes | https://ai.meta.com/blog/meta-llama-3-1/ | unknown |
