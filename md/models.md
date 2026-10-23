@@ -49,6 +49,7 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | gemma-3-4b-it | 4.3 | unknown | google/gemma-3-4b-it | yes | https://blog.google/technology/developers/gemma-3/ | unknown |
 | Qwen3.5-4B | 4.66 | 262,144 | Qwen/Qwen3.5-4B | no | https://qwen.ai/blog?id=qwen3.5 | thinking |
 | gemma-4-e2b-it | 5.123 | 131,072 | google/gemma-4-e2b-it | no | https://arxiv.org/abs/2607.02770 | thinking |
+| Yi-1.5-6B-Chat | 6.061 | 4,096 | 01-ai/Yi-1.5-6B-Chat | no | https://arxiv.org/abs/2403.04652 | non-thinking |
 | mistral-7b-instruct-v0.3 | 7.248 | 32,768 | mistralai/Mistral-7B-Instruct-v0.3 | no | https://arxiv.org/abs/2310.06825 | unknown |
 | OLMo-2-1124-7B-Instruct | 7.299 | 4,096 | allenai/OLMo-2-1124-7B-Instruct | no | https://arxiv.org/abs/2501.00656 | unknown |
 | Falcon3-7B-Instruct | 7.456 | 32,768 | tiiuae/Falcon3-7B-Instruct | no | https://arxiv.org/abs/2412.09524 | non-thinking |
@@ -61,8 +62,7 @@ The roster for the mechanical-sweet-spot benchmark, param-ascending (smallest fi
 | gemma-2-9b-it | 9.242 | 8,192 | google/gemma-2-9b-it | yes | https://arxiv.org/abs/2408.00118 | unknown |
 | Qwen3.5-9B | 9.653 | 262,144 | Qwen/Qwen3.5-9B | no | https://qwen.ai/blog?id=qwen3.5 | thinking |
 | Falcon3-10B-Instruct | 10.306 | 32,768 | tiiuae/Falcon3-10B-Instruct | no | https://arxiv.org/abs/2412.09524 | non-thinking |
-| Phi-4-14B | 14.66 | 16,384 | microsoft/phi-4 | no | https://arxiv.org/abs/2412.08905 | unknown |
-| Qwen3-14B | 14.77 | 40,960 | Qwen/Qwen3-14B | no | https://arxiv.org/abs/2309.00071 | thinking |
+| Mistral-Nemo-Instruct-2407 | 12.248 | 131,072 | mistralai/Mistral-Nemo-Instruct-2407 | no | https://arxiv.org/abs/2407.03152 | unknown |
 | Llama-3.1-8B-Instruct | unknown | unknown | meta-llama/Llama-3.1-8B-Instruct | yes | https://ai.meta.com/blog/meta-llama-3-1/ | unknown |
 | Llama-3.2-1B-Instruct | unknown | unknown | meta-llama/Llama-3.2-1B-Instruct | yes | https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/MODEL_CARD.md | unknown |
 | Llama-3.2-3B-Instruct | unknown | unknown | meta-llama/Llama-3.2-3B-Instruct | yes | https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/MODEL_CARD.md | unknown |
