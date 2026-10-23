@@ -183,8 +183,7 @@ def preflight_selfcheck() -> None:
         # --- v9.3: the recovery ladder helpers ---
         assert E.next_rung('F16') == 'Q8_0'
         assert E.next_rung('Q8_0') == 'Q6_K'
-        assert E.next_rung('Q6_K') == 'Q5_K_M'
-        assert E.next_rung('Q5_K_M') is None
+        assert E.next_rung('Q6_K') is None
         # hit_time_bell: only the top FAILING level's attempts count
         belled = {'levels': {'3': {'pass': False, 'attempts': [
             {'finish_reason': 'time_limit'}, {'finish_reason': 'stop'}]}}}
@@ -355,7 +354,6 @@ def git_tail(args: argparse.Namespace) -> None:
         + glob.glob("models/tournament-results/**/*", recursive=True)
         + glob.glob("models/*/ladder-results/*")
     )
-    paths += glob.glob("ladder-results/*") + glob.glob("ruler-results/*")
     existing = []
     for p in paths:
         if not os.path.exists(p):

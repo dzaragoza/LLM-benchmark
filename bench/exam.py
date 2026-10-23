@@ -12,7 +12,7 @@ comprehensiveness yielded to efficiency.
               most 1024s (finish_reason 'time_limit' = the bell).
   recovery     a candidate whose sweep ended AT the time bell
               retries the whole exam one rung down the quant
-              ladder - Q8_0, Q6_K, Q5_K_M (a faster
+              ladder - Q8_0, then Q6_K (a faster
               quant may beat the clock its F16 could not). When
               every rung hit the bell, the fail cause is
               'out of time'.
@@ -65,7 +65,7 @@ TIME_BELL_SECONDS = 1024
 # (param-descending quality: each step down trades precision for
 # speed - the clock is what the candidate lost to, so the ladder
 # buys tok/s with bits until the bell is beaten)
-RUNG_ORDER = ("F16", "Q8_0", "Q6_K", "Q5_K_M")
+RUNG_ORDER = ("F16", "Q8_0", "Q6_K")
 
 
 
@@ -316,7 +316,7 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
 
 def next_rung(rung: str) -> str | None:
     """v9.3 recovery: the rung a bell-hit candidate retries next -
-    F16 -> Q8_0 -> Q6_K -> Q5_K_M -> None (the ladder
+    F16 -> Q8_0 -> Q6_K -> None (the ladder
     ends)."""
     i = RUNG_ORDER.index(rung) if rung in RUNG_ORDER else -1
     return RUNG_ORDER[i + 1] if 0 <= i < len(RUNG_ORDER) - 1 else None
@@ -340,7 +340,7 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
 
 def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
     """The model's DECIDING record, v9.3: the highest-scoring rung
-    among F16 and the recovery rungs (Q8_0, Q6_K, Q5_K_M).
+    among F16 and the recovery rungs (Q8_0, Q6_K).
     Ties go to the earlier rung (F16 first) - the ladder order in
     RUNG_ORDER."""
     best: dict[str, Any] | None = None
@@ -667,7 +667,7 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
     """The self-cleaning sweep, v9.3 - MODEL granularity: a model is
     eliminated when its BEST rung (F16, or a recovery rung - Q8_0,
-    Q6_K, Q5_K_M - that outscored it) has a final score strictly below the
+    Q6_K - that outscored it) has a final score strictly below the
     global best (the best rung's score IS the model's max score).
     Elimination deletes the model's whole models/ directory (the
     data ALWAYS stays: answers in results/, records in state). The
@@ -772,7 +772,7 @@ def run(
             continue
         # v9.3 recovery: a candidate whose sweep ended AT the time
         # bell retries the whole exam one rung down the quant ladder
-        # (F16 -> Q8_0 -> Q6_K -> Q5_K_M) - a faster quant may beat the 1024s
+        # (F16 -> Q8_0 -> Q6_K) - a faster quant may beat the 1024s
         # clock its predecessor could not. When every rung hit the
         # bell, the fail cause is 'out of time'. A rung that cannot
         # be built or ends for any other reason (wrong chain, out of
