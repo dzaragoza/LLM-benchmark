@@ -390,31 +390,19 @@ def rung_verdict(rec: dict[str, Any]) -> str | None:
     if not fail_keys:
         return "pass"
     top = max(fail_keys, key=int)
-    # THE PROCTOR, PER ATTEMPT (the granite-3.2 correction): the proctor
-    # collects what was HANDED IN before the bell - an attempt that
-    # ENDED (stop, or the paper filled: length) is a handed-in exam.
-    # At least one handed-in exam -> the proctor grades; a failing level
-    # with graded papers is FAIL - the walk ends, no descent. Only when
-    # the proctor is EMPTY-HANDED (every attempt belled away) is the
-    # level out of time and the walk may descend. A bell on the SIBLING
-    # of a handed-in exam is not the candidate's timeout - granite-3.2's
-    # q8 handed in a wrong chain at 29.2s while the elevator belled with
-    # the shared deadline's 2.8s remainder: WRONG, not out of time.
+    # THE PROCTOR, WHOLE PAPER (the author's ruling): the proctor
+    # receives an exam only when BOTH parts are answered - no candidate
+    # hands in a half-finished exam. ANY belled part means the paper
+    # was never handed in: out of time, UNGRADED (even when the sibling
+    # part ended - a wrong chain beside a belled elevator is not a
+    # graded fail; the paper as a whole came in after the bell). Only
+    # a paper with EVERY part ended (stop/length, no bell, no error) is
+    # handed in and graded: wrong answer -> capability fail, the walk
+    # ends, no descent.
     for a in levels[top].get("attempts") or []:
-        fr = a.get("finish_reason")
-        if (
-            fr not in (None, "time_limit")
-            and not str(fr or "").startswith("error")
-            and a.get("ok") is False
-        ):
-            # a handed-in exam graded WRONG: the capability fail - the
-            # walk ends, no descent
-            return "fail"
-    return "time"
-    # remaining shapes: every handed-in exam PASSED and the failure is
-    # the belled sibling (granite-3.2 f16 L3: chain stop+ok, elevator
-    # time_limit) - the candidate did not fail on capability, it ran
-    # out of runway on the sibling: out of time, the walk may descend
+        if a.get("finish_reason") == "time_limit":
+            return "time"  # the bell rang mid-paper: not handed in
+    return "fail"  # both parts answered: graded, and it failed
 
 
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
