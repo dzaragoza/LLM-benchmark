@@ -213,6 +213,20 @@ def preflight_selfcheck() -> None:
         bx2 = {'F16': {'score': 4}, 'Q8_0': {'score': 4}}
         assert E.best_rung(bx2)[0] == 'F16', 'ties go to the earlier rung'
         assert E.best_rung({}) is None
+        # the author's worked example: f16 passes 0..3 bells at 4; q8
+        # same; q6 fails at 4 - the walk ends there (q5.. never run),
+        # the verdict is fail, and the HIGH SCORE is f16's 3
+        vt = {'score': 3, 'levels': {
+            **{str(i): {'pass': True} for i in range(4)},
+            '4': {'pass': False, 'attempts': [{'finish_reason': 'time_limit'}]}}}
+        vfl = {'score': 3, 'levels': {
+            **{str(i): {'pass': True} for i in range(4)},
+            '4': {'pass': False, 'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
+        ex = {'F16': vt, 'Q8_0': dict(vt), 'Q6_K': vfl}
+        assert E.model_verdict(ex) == 'fail', 'a wrong answer ends the walk'
+        assert E.best_rung(ex)[0] == 'F16' and E.best_rung(ex)[1]['score'] == 3
+        assert E.hit_time_bell(vt), 'the bell record reads as time'
+        assert not E.hit_time_bell(vfl), 'the wrong-chain record reads as fail'
 
         # --- v9.4 gc: terminal verdicts collect, pending walks never ---
         d5 = os.path.join(tmp, 'gcR')
