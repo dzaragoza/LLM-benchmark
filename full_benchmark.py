@@ -647,9 +647,12 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         rows.append((fam, pos, rung, score, top_time, top_tps, max_ctx))
     # the top tier: the global best score; rank by time at the top
     # level, fastest first (the tiebreaker indication)
-    best = max((r[2] for r in rows if r[2] is not None), default=None)
-    tier = [r for r in rows if r[2] is not None and r[2] == best]
-    tier.sort(key=lambda r: (r[3] if r[3] is not None else float("inf")))
+    # rows are (fam, pos, rung, score, top_time, top_tps, max_ctx):
+    # the score is r[3] (r[2] is the RUNG - reading it here made the
+    # tier 'the models with the lexicographically-largest quant name')
+    best = max((r[3] for r in rows if r[3] is not None), default=None)
+    tier = [r for r in rows if r[3] is not None and r[3] == best]
+    tier.sort(key=lambda r: (r[4] if r[4] is not None else float("inf")))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
         "# v9.4.md - the tournament ledger (v9.4: the exhaustive quant walk, the 32s bell)",
