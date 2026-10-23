@@ -914,12 +914,11 @@ def run(
         walk_verdict = None
         errored = False
         gpass = gfail = gbell = 0
-        # recovery KEEPS THE EXAM LEVEL: the walk advances monotonically
-        # through difficulty - a rung that timed out at level 3 has
-        # already proven levels 0..2 at ITS OWN quant, and the next
-        # quant number's candidates start at the walk's furthest level
-        # (max score + 1), never re-measuring what earlier rungs passed
-        walk_level = 0
+        # every candidate proves ITSELF from level 0 (the author's
+        # ruling - the exam level does NOT carry across quant levels):
+        # a rung that timed out at level 3 does not hand its passes
+        # down - the next quant number's candidates take the exam from
+        # the start, because a smaller quant has not proven anything
         for num, group in rung_groups():
             gpass = gfail = gbell = 0
             for rung in group:
@@ -949,7 +948,7 @@ def run(
                                 port,
                                 seeds,
                                 max_level,
-                                walk_level,
+                                0,
                                 dry_run,
                             )
                         except SystemExit as e:
@@ -961,12 +960,6 @@ def run(
                         fam_tree[rung] = rec
                         _state_store.save_state(state_file, state)
                 results[(fam, rung)] = rec
-                # the walk's furthest exam level: this rung's score
-                # (highest PASSED level) + 1 - where the next quant
-                # number's recovery candidates pick up
-                s = rec.get("score")
-                if s is not None and s + 1 > walk_level:
-                    walk_level = s + 1
                 v = rung_verdict(rec)
                 if v == "pass":
                     gpass += 1
