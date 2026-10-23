@@ -789,6 +789,18 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     answers in results/, records in state). The model being
     examined keeps its files until its walk finishes. Tied leaders
     are never eliminated - time ranks them (recorded per attempt)
+    but the human breaks ties.
+
+    SELF-HEALING (the author's ruling, the Qwen2.5-0.5B incident): a
+    mid-run rule correction can move the global best retroactively,
+    so a model eliminated against a wrongly-inflated best can
+    re-derive as a SURVIVOR after its directory was already deleted.
+    The gc detects exactly that - a survivor with a stale
+    _eliminated flag and a missing directory - and RE-CREATES the
+    deciding rung's artifact on the spot via the lazy acquisition
+    path (download/convert/quantize as needed). The tier leaders'
+    files are the one thing the tournament must never lose.
+    are never eliminated - time ranks them (recorded per attempt)
     but the human breaks ties."""
     import shutil
 
@@ -820,6 +832,17 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             # flag is derived state, the score is truth
             if s is not None and fam_exam.get("_eliminated"):
                 fam_exam["_eliminated"] = False
+                rung_file = _acquire(fam, br[0], models_dir)
+                if rung_file:
+                    print(
+                        f"  gc: {fam} re-derives as a SURVIVOR (score {s} == best {best}) "
+                        f"but its artifacts were missing - re-created {os.path.basename(rung_file)}"
+                    )
+                else:
+                    print(
+                        f"  gc: {fam} re-derives as a SURVIVOR (score {s} == best {best}) "
+                        f"but its deciding rung {br[0]} could not be re-created on this machine"
+                    )
             continue
         famdir = os.path.join(models_dir, fam)
         if not os.path.isdir(famdir):
