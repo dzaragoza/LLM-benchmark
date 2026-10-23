@@ -186,7 +186,9 @@ def preflight_selfcheck() -> None:
         assert E.score_exam("ANSWER: x abc y def z ghi", inst, "stop")
         assert not E.score_exam("ANSWER: abc, ghi, def", inst, "stop")
         assert not E.score_exam("ANSWER: abc, def, ghi", inst, "length")
-        assert not E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
+        # v9.2: graded AT the bell - a complete answer still passes
+        assert E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
+        assert not E.score_exam("ANSWER: abc, def, gh", inst, "time_limit")
         assert not E.score_exam("I cannot solve this", inst, "stop")
 
         # --- v9.1: the candidate is F16, always ---
