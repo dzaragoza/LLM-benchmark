@@ -23,6 +23,13 @@ USAGE
       ("replace_regex", pattern, new),   # re.sub, count=1; pattern must match once
       ("replace_regex_all", pattern, new),  # re.sub, all matches (>=1 required)
       ("replace_region", start, end, new),  # replace text BETWEEN two unique anchors (exclusive)
+      ("sort_table", key_col[, numeric[, reverse]]),  # stable-sort THE markdown
+                                           # table's data rows by a 1-based column;
+                                           # numeric=True (default) hard-verifies every
+                                           # key parses as a number - a string sort of
+                                           # a numbers column is refused, never silent;
+                                           # header/separator/prose preserved; exactly
+                                           # one table per call
       ("insert_before", anchor, new),
       ("insert_after", anchor, new),
       ("delete", old),
@@ -35,6 +42,12 @@ USAGE
       ("prepend", text),                 # start of file
   ])
   code_edit.write("new_file.py", content)  # create/overwrite - same atomic write
+  code_edit.edit_json("state.json", [          # structured JSON edits, one
+      ("set", "_meta.roster_size", 64),        # transaction: parse -> mutate ->
+      ("merge", "models.a", {"window": 32768}), # verify (re-parse + read-back) ->
+      ("delete", "models.old"),                # atomic synced write -> re-read;
+  ])                                           # key collisions and bad paths are
+                                              # refused, never silently absorbed
   # -> None on success; raises CodeEditError with file state on failure.
 
 DESIGN RULES
@@ -61,6 +74,7 @@ DESIGN RULES
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 import tempfile
@@ -69,6 +83,7 @@ from collections.abc import Sequence
 __all__ = [
     "CodeEditError",
     "edit",
+    "edit_json",
     "edit_many",
     "preview",
     "write",
@@ -1067,6 +1082,143 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
             tofile=path + " (edited)",
         )
     )
+
+
+def edit_json(path: str, ops: Sequence[tuple]) -> None:
+    """Structured JSON edits as one verified transaction (the registry
+    incident: json.load + dict surgery + json.dump as an ad-hoc script
+    had NO verification - a typo'd key silently created a new entry,
+    a wrong path corrupted the tree). ops apply in order against the
+    parsed document, each a tuple:
+
+      ("set", path, value)        path = dotted keys ("_meta.roster_size")
+                                   or a list index ("rows.3.name"); creates
+                                   intermediate dicts as needed; the write
+                                   is REFUSED if the parent is not a dict
+      ("delete", path)            refuse when the path does not exist
+      ("append", path, value)      the path must be a list
+      ("merge", path, dict)        the path must be a dict; refuse on key
+                                   collision (an overwrite is a "set")
+
+    The result must re-parse as JSON and every op's effect is verified
+    post-apply (a "set" reads back the value; a "delete" reads back
+    absent) - only then the atomic synced write, then the on-disk
+    re-read comparison. Formatting: indent=1, keep the file's existing
+    style otherwise (sorted keys are NOT imposed - insertion order is
+    the document's own business)."""
+    src = open(path, encoding="utf-8").read()
+    try:
+        doc = json.loads(src)
+    except ValueError as e:
+        raise CodeEditError(f"{path}: not valid JSON ({e}) - refused, file untouched")
+
+    def resolve(parent: Any, keys: list[str], i: int, create: bool) -> Any:
+        node = parent
+        for k in keys:
+            if isinstance(node, dict):
+                if k not in node:
+                    if not create:
+                        raise CodeEditError(
+                            f"{path}: op {i}: path {'.'.join(keys)!r} - {k!r} not found"
+                        )
+                    node[k] = {}
+                node = node[k]
+            elif isinstance(node, list):
+                try:
+                    node = node[int(k)]
+                except (ValueError, IndexError):
+                    raise CodeEditError(
+                        f"{path}: op {i}: path {'.'.join(keys)!r} - {k!r} is not "
+                        "a valid index into a list"
+                    )
+            else:
+                raise CodeEditError(
+                    f"{path}: op {i}: path {'.'.join(keys)!r} - cannot descend "
+                    f"into {type(node).__name__} at {k!r}"
+                )
+        return node
+
+    for i, op in enumerate(ops):
+        kind = op[0]
+        keys = op[1].split(".")
+        if kind == "set":
+            parent = resolve(doc, keys[:-1], i, create=True)
+            leaf = keys[-1]
+            if isinstance(parent, dict):
+                parent[leaf] = op[2]
+            elif isinstance(parent, list):
+                try:
+                    parent[int(leaf)] = op[2]
+                except (ValueError, IndexError):
+                    raise CodeEditError(
+                        f"{path}: op {i}: index {leaf!r} invalid for the list"
+                    )
+            else:
+                raise CodeEditError(
+                    f"{path}: op {i}: cannot set into {type(parent).__name__}"
+                )
+        elif kind == "delete":
+            parent = resolve(doc, keys[:-1], i, create=False)
+            leaf = keys[-1]
+            if isinstance(parent, dict):
+                if leaf not in parent:
+                    raise CodeEditError(f"{path}: op {i}: {leaf!r} not present")
+                del parent[leaf]
+            elif isinstance(parent, list):
+                try:
+                    del parent[int(leaf)]
+                except (ValueError, IndexError):
+                    raise CodeEditError(f"{path}: op {i}: index {leaf!r} invalid")
+            else:
+                raise CodeEditError(f"{path}: op {i}: cannot delete from scalar")
+        elif kind == "append":
+            node = resolve(doc, keys, i, create=False)
+            if not isinstance(node, list):
+                raise CodeEditError(
+                    f"{path}: op {i}: append target is not a list"
+                )
+            node.append(op[2])
+        elif kind == "merge":
+            node = resolve(doc, keys, i, create=False)
+            if not isinstance(node, dict):
+                raise CodeEditError(
+                    f"{path}: op {i}: merge target is not a dict"
+                )
+            clash = set(node) & set(op[2])
+            if clash:
+                raise CodeEditError(
+                    f"{path}: op {i}: merge key collision {sorted(clash)} - "
+                    "an overwrite is a (set, ...), never a silent merge"
+                )
+            node.update(op[2])
+        else:
+            raise CodeEditError(f"{path}: op {i}: unknown json op {kind!r}")
+
+    # verify: the result re-parses, and every op's effect reads back
+    out = json.dumps(doc, indent=1)
+    try:
+        recheck = json.loads(out)
+    except ValueError as e:
+        raise CodeEditError(f"{path}: the edited document does not re-parse ({e})")
+    for i, op in enumerate(ops):
+        keys = op[1].split(".")
+        node = recheck
+        try:
+            for k in keys:
+                node = node[k] if isinstance(node, dict) else node[int(k)]
+        except (KeyError, IndexError, ValueError, TypeError):
+            if op[0] == "delete":
+                continue  # absent is exactly what a delete verifies
+            raise CodeEditError(f"{path}: op {i} verify failed (path not in result)")
+        if op[0] == "set" and node != op[2]:
+            raise CodeEditError(
+                f"{path}: op {i} verify failed (value mismatch after write)"
+            )
+    _atomic_write_sync(path, out)
+    with open(path, encoding="utf-8") as f:
+        if f.read() != out:
+            raise CodeEditError(f"{path}: disk content diverged after write - re-check")
+
 
 
 def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
