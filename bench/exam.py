@@ -1,6 +1,7 @@
-"""bench.exam -- THE benchmark (v9.4): the exam is the only phase.
+"""bench.exam -- THE benchmark (v9.1): the exam is the only phase.
 
-v9.4: the corrected walk - the LEVEL runs all quants, always.
+Daniela's v9.1 ruling: keep the v9 machinery, sharpen the search -
+comprehensiveness yielded to efficiency.
 
   candidates  ONE per model: (model, F16), roster order
               (param-ascending, per md/models.md). The F16
@@ -9,33 +10,30 @@ v9.4: the corrected walk - the LEVEL runs all quants, always.
   the bell     TOKEN and TIME: max_tokens = the window (finish_reason
               'length' = the paper filled); one attempt may run at
               most 32s (finish_reason 'time_limit' = the bell).
-  the walk     v9.4 corrected: the LEVEL is the outer loop -
-              every level runs ALL quants, ALWAYS (f16, then every
-              variation of q8, q6, q5, q4, q3, q2, q1 in roster
-              LADDER order). A level PASSES when any rung passes
-              it - there can be several; the deciding rung is the
-              quant with the HIGHEST score. It FAILS when none
-              does, and the sweep stops there. The fail kind is
-              classified from the level's attempts across every
-              rung: a wrong chain beats the bell; only bells =
-              'out of time' - final, an exam fail (the quants
-              were exhausted at the level by construction).
+  recovery    v9.4 - the EXHAUSTIVE quant walk: a sweep that
+              ends at the bell is retried quant number by quant
+              number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY
+              variation of a number (roster LADDER order) before
+              the next, until a verdict lands. A clean sweep
+              PASSES the walk; a quant number whose every
+              testable variation answered and was wrong FAILS it;
+              only bells move the walk on. Quants exhausted with no
+              verdict anywhere = 'out of time', itself an exam
+              fail - recovery was exhaustive.
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
-  self-clean  MODEL granularity: a model whose score is
-              strictly below the global best is eliminated once
-              its walk is DONE (a failing level reached or the
-              ceiling swept - 'out of time' is a fail kind like
-              any other). A PENDING model (walk unfinished) is
+  self-clean  MODEL granularity: a model whose deciding rung
+              scored strictly below the global best is eliminated
+              once its walk reached a terminal verdict (pass,
+              fail, or out of time - an exam fail: recovery was
+              exhaustive). A PENDING model (walk unfinished) is
               never touched. Tied leaders are NEVER eliminated;
               TIME ranks them (elapsed per attempt) but decides
               nothing - the human breaks ties.
 
-Run data (v9.4, clean run): state.exam.<fam>.levels.<level>, one
-answers file per model (results/exam/<fam>/walk/), a server log per
-rung (trimmed: the banner + the memory breakdown + the last lines).
-No compatibility with earlier eras - a clean run starts from empty
-state.
+Run data is v9-compatible: the same state shape (exam.<fam>.<rung>),
+the same answers files, the same ledger - a v9.1 run resumes a v9
+run's F16 records directly.
 
 Everything is IDEMPOTENT and RESUMABLE; every attempt is logged with
 its full prompt and answer for debugging.
@@ -43,7 +41,6 @@ its full prompt and answer for debugging.
 
 from __future__ import annotations
 
-import glob
 import json
 import os
 import random
@@ -62,19 +59,18 @@ from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 SAMPLER_SEED = 1024
 
 # the TIME bell (v9.4, the author's ruling): one exam attempt may
-# run at most 32 seconds - with every level running all quants, a
-# long bell multiplies against ~31 rungs; 32s keeps the level's
-# worst case bounded. The streamed read is cut at the wall and the
-# socket closed, cancelling the server-side generation; the attempt
-# is graded on whatever the model produced ('time_limit'). Time
-# ALSO ranks tied leaders (recorded per attempt) - but the human
-# breaks ties.
+# run at most 32 seconds - with recovery re-running the whole exam
+# per quant, a long bell multiplies against the quant ladder. The
+# streamed read is cut at the wall and the socket closed, cancelling
+# the server-side generation; the attempt is graded on whatever the
+# model produced ('time_limit'). Time ALSO ranks tied leaders
+# (recorded per attempt) - but the human breaks ties.
 TIME_BELL_SECONDS = 32
 
-# v9.4 corrected: the per-level quant walk order, by quant NUMBER
-# quality-descending (each step down trades precision for speed -
-# the clock is what a rung lost to, so the level walks on to a
-# smaller quant until one passes it)
+# v9.4 recovery: the quant walk, by quant NUMBER quality-descending
+# (each step down trades precision for speed - the clock is what the
+# candidate lost to, so the walk buys tok/s with bits until a
+# verdict lands)
 QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 
 
@@ -339,8 +335,6 @@ def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
                 r
                 for r in LADDER
                 if r != "F16"
-                # IQ2_M matches num Q2 as I+Q2 (IQ+Q2 would be IQQ2 -
-                # the selfcheck caught this exact concatenation bug)
                 and (r.startswith(num) or r.startswith("I" + num) or r.startswith("T" + num))
             )
         )
@@ -349,46 +343,122 @@ def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
     return groups
 
 
-def _walk_levels(fam_exam: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """The v9.4 level records: state.exam.<fam>.levels.<level> - one
-    dict per level with the pass flag and every attempt (each tagged
-    with its rung)."""
-    levels = fam_exam.get("levels")
-    return levels if isinstance(levels, dict) else {}
+def hit_time_bell(rec: dict[str, Any]) -> bool:
+    """True when the candidate's sweep ended AT the time bell: the
+    highest FAILING level has at least one attempt cut by the 32s
+    bell ('time_limit') - the model may simply be too slow at this
+    quant, so the recovery ladder gets a chance."""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return False
+    top = max(fail_keys, key=int)
+    return any(
+        a.get("finish_reason") == "time_limit"
+        for a in (levels[top].get("attempts") or [])
+    )
 
 
-def walk_done(fam_exam: dict[str, Any]) -> bool:
-    """True when the per-level walk finished: a recorded failing
-    level exists (the sweep stopped - pass/fail/out-of-time all
-    stop there) or every level 0..32 was passed (ceiling sweep)."""
-    levels = _walk_levels(fam_exam)
-    if any(not l.get("pass") for l in levels.values()):
-        return True
-    if fam_exam.get("_walk_ceiling"):
-        return True
-    return False
+def rung_verdict(rec: dict[str, Any]) -> str | None:
+    """One rung record's outcome, v9.4: 'pass' (the sweep ended with
+    NO failing level - the candidate swept clean), 'fail' (the
+    sweep ended at a failing level the model ANSWERED - a
+    capability fail no faster quant rescues), 'time' (the sweep
+    ended at a failing level the BELL cut - not a verdict, the
+    walk may recover at a smaller quant). None = unmeasured."""
+    if rec.get("score") is None:
+        return None
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "pass"
+    return "time" if hit_time_bell(rec) else "fail"
 
 
-def model_score(fam_exam: dict[str, Any]) -> int | None:
-    """The model's score, v9.4: the highest level whose record shows
-    a pass (some rung passed it), with all levels below also passed.
-    None while the walk is pending."""
-    levels = _walk_levels(fam_exam)
-    score = None
-    for lv in sorted(levels, key=int):
-        if not levels[lv].get("pass"):
-            break
-        score = int(lv)
-    return score
+def model_verdict(fam_exam: dict[str, Any]) -> str | None:
+    """The model's terminal verdict, v9.4 - derived from the records
+    so a resumed run skips a completed walk and a crashed run
+    resumes mid-walk:
+      pass / fail    the walk's stop conditions: a clean sweep; a
+                     quant number whose every testable variation
+                     answered and was wrong
+      time           every quant was tried and only bells came
+                     back - an exam fail per the author's ruling;
+                     the live walk also certifies it with the
+                     _out_of_time flag
+      None           PENDING: an incomplete group or an errored
+                     sweep - the walk has more to try"""
+    if fam_exam.get("_out_of_time"):
+        return "time"
+    any_fail = False
+    walked_all = True
+    for _num, group in rung_groups():
+        gfail = gbell = 0
+        complete = True
+        for rung in group:
+            rec = fam_exam.get(rung)
+            if not isinstance(rec, dict):
+                complete = False
+                continue
+            v = rung_verdict(rec)
+            if v == "pass":
+                return "pass"
+            if v == "fail":
+                gfail += 1
+                any_fail = True
+            elif v == "time":
+                gbell += 1
+            elif not rec.get("unbuildable"):
+                complete = False
+        if complete and gfail and not gbell:
+            return "fail"
+        if not complete:
+            walked_all = False
+    if walked_all:
+        # every group completed: any answered-wrong anywhere makes the
+        # walk's verdict a FAIL; only bells everywhere = out of time
+        return "fail" if any_fail else "time"
+    return None
 
 
-def level_fail_kind(level_rec: dict[str, Any]) -> str | None:
-    """Classify a FAILING level from its attempts across every rung
-    (the order is the diagnostic priority): 'wrong chain' beats
-    'out of context' beats 'out of time' - only bells at the level
-    = 'out of time', the fail reason the ledger prints."""
+def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """The model's DECIDING (rung, record) pair, v9.4: the
+    highest-scoring rung the walk ever recorded, ties to the earlier
+    rung in walk order. The deciding rung is the ledger's quant
+    column; the record carries the score the gc and ledger read."""
+    best: tuple[str, dict[str, Any]] | None = None
+    for _num, group in rung_groups():
+        for rung in group:
+            rec = fam_exam.get(rung)
+            if not isinstance(rec, dict) or rec.get("score") is None:
+                continue
+            if best is None or rec["score"] > best[1]["score"]:
+                best = (rung, rec)
+    return best
+
+
+def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
+    """The deciding record alone (the gc's read of best_rung)."""
+    br = best_rung(fam_exam)
+    return br[1] if br else None
+
+
+def fail_reason(rec: dict[str, Any]) -> str:
+    """Why the candidate failed its highest exam: read the last FAILING
+    level's attempts and classify the mode - the quick diagnostic the
+    ledger wants:
+      out of time      the conversation expired (the 32s time bell)
+      out of context   the token bell rang (the paper filled) first
+      wrong chain      an answer arrived, the tokens/order were wrong
+      error            a transport/tool failure, not the model's fault
+      no record        nothing measured (or only passes stored)"""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return "no record"
+    top = max(fail_keys, key=int)
     reasons = []
-    for a in level_rec.get("attempts") or []:
+    for a in levels[top].get("attempts") or []:
         fr = a.get("finish_reason")
         if str(fr or "").startswith("error"):
             reasons.append("error")
@@ -398,41 +468,15 @@ def level_fail_kind(level_rec: dict[str, Any]) -> str | None:
             reasons.append("out of context")
         elif a.get("ok") is False:
             reasons.append("wrong chain")
-    if "wrong chain" in reasons:
-        return "wrong chain"
-    if "out of context" in reasons:
-        return "out of context"
-    if "error" in reasons:
+    if "error" in reasons and not ({"wrong chain", "out of context", "out of time"} & set(reasons)):
         return "error"
     if "out of time" in reasons:
         return "out of time"
-    return None
-
-
-def deciding_rung(fam_exam: dict[str, Any]) -> str | None:
-    """The quant with the HIGHEST score at the walk's levels, v9.4 -
-    the ledger's quant column. Derived from the attempts: each
-    attempt records its rung, so the per-rung highest passed level
-    falls out of the record. Ties go to the earliest rung in walk
-    order (F16 first)."""
-    levels = _walk_levels(fam_exam)
-    per_rung: dict[str, int] = {}
-    for lv in sorted(levels, key=int):
-        for a in levels[lv].get("attempts") or []:
-            rung = a.get("rung")
-            if rung and a.get("ok") is True and levels[lv].get("pass"):
-                cur = per_rung.get(rung)
-                if cur is None or int(lv) > cur:
-                    per_rung[rung] = int(lv)
-    # the HIGHEST score wins; ties go to the earliest rung in walk order
-    order = [rung for _num, group in rung_groups() for rung in group]
-    best_r = None
-    best_s = -1
-    for rung in order:
-        s = per_rung.get(rung)
-        if s is not None and s > best_s:
-            best_r, best_s = rung, s
-    return best_r
+    if "out of context" in reasons:
+        return "out of context"
+    if "wrong chain" in reasons:
+        return "wrong chain"
+    return "unknown"
 
 
 def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
@@ -466,203 +510,209 @@ def candidates(
 
 def run_family(
     fam: str,
+    rung: str,
+    gguf: str,
     models_dir: str,
     state: dict[str, Any],
     state_file: str,
     port: int,
     seeds: list[int],
-    max_level: int = 32,
+    max_level: int,
+    start_level: int,
     dry_run: bool = False,
+    time_factor: int = 1024,
 ) -> dict[str, Any]:
-    """v9.4 corrected: the LEVEL is the outer loop - every level runs
-    ALL quants, always (F16, then every variation of q8..q1 in
-    roster LADDER order). A level passes when ANY rung passes it;
-    the sweep stops at the first level no rung passes. The score is
-    the highest level passed; the deciding rung is the quant with
-    the highest score. A rung that cannot exist on this machine is
-    skipped (unbuildable), never a verdict. Resumable: a recorded
-    level is never re-measured. State: exam.<fam>.levels.<level> -
-    one record per level with the per-rung pass flag and every
-    attempt (each tagged with its rung)."""
+    """One candidate's sweep - a (model, quant) pair: every level from
+    the first unrecorded one, both parts per level, until the first
+    failing level. The final score is the highest level passed (both
+    parts, every seed). Resumable: recorded levels are never
+    re-measured. State keys per candidate: exam.<fam>.<rung>."""
     ctx = bell_window(state, fam, models_dir)
     if ctx is None:
         return {"error": "no training window for the family - cannot set the paper"}
-    fam_exam = state.setdefault("exam", {}).setdefault(fam, {})
-    levels = fam_exam.setdefault("levels", {})
-    answers_dir = os.path.join("results", "exam", fam, "walk")
+    exam = state.setdefault("exam", {}).setdefault(fam, {}).setdefault(rung, {})
+    exam["rung"] = rung
+    exam["bell_ctx"] = ctx
+    # a stale error from an earlier run must not shadow this run's
+    # levels/score in the summary - the file resolution and server
+    # start already succeeded by the time we are here
+    exam.pop("error", None)
+    levels = exam.setdefault("levels", {})
+    # benchmark OUTPUTS live in the results tree (uploaded by the git
+    # rail), never under models/ - that directory holds only what can
+    # be re-downloaded or re-created (quants, sources, the imatrix)
+    answers_dir = os.path.join("results", "exam", fam, rung)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, "answers.jsonl")
-    rungs: list[tuple[str, str]] = [
-        (rung, num) for num, group in rung_groups() for rung in group
-    ]
+    log_path = os.path.join(answers_dir, "exam-server.log")
     proc = None
-    active: str | None = None
     score = None
     try:
-        level = 0
+        if not dry_run:
+            # server context: the bell + prompt headroom (the prompt
+            # and template must fit alongside the generation budget).
+            # --reasoning off --reasoning-budget 0 (the author's
+            # ruling): the exam measures the ANSWER, not a hidden
+            # reasoning budget - a model's thinking must live in the
+            # visible paper, never in a separate channel that eats
+            # tokens off-ledger
+            proc, healthy = llama_server.start_server(
+                gguf,
+                port=port,
+                extra_args=[
+                    "-c",
+                    str(ctx + 2048),
+                    "--parallel",
+                    "1",
+                    "--reasoning",
+                    "off",
+                    "--reasoning-budget",
+                    "0",
+                ],
+                log_path=log_path,
+            )
+            if not healthy or not llama_server.wait_healthy(port, proc=proc):
+                exam["error"] = "server did not come up"
+                return exam
+        level = start_level
         while level <= max_level:
             key = str(level)
-            rec = levels.get(key)
-            if rec is None:
-                attempts: list[dict[str, Any]] = []
-                passed = False
+            if key in levels:
+                rec = levels[key]
+            else:
+                attempts = []
+                passed = True
                 for seed in seeds:
-                    for rung, _num in rungs:
-                        rec_r = fam_exam.get(rung)
-                        if not isinstance(rec_r, dict):
-                            rec_r = {}
-                        if rec_r.get("unbuildable"):
-                            continue
-                        # ONE exam paper per (seed, level, rung): both
-                        # parts in the SAME context - part 1's prompt,
-                        # the model's own reasoning, then part 2's
-                        # prompt in one conversation, the generation
-                        # budget (the bell) SHARED across the parts
-                        insts = {
-                            "chain": build_chain(seed, level),
-                            "elevator": build_elevator(seed, level),
+                    # ONE exam paper per (seed, level): both parts run
+                    # in the SAME context - part 1's prompt, the
+                    # model's own reasoning, then part 2's prompt all
+                    # live in one conversation, and the generation
+                    # budget (the bell) is SHARED across the parts:
+                    # what part 1 spends, part 2 no longer has
+                    insts = {
+                        "chain": build_chain(seed, level),
+                        "elevator": build_elevator(seed, level),
+                    }
+                    messages: list[dict[str, str]] = []
+                    remaining = ctx
+                    # the TIME bell is PER EXAM (the paper: both parts
+                    # in one conversation), not per part - the parts
+                    # share it exactly as they share the token budget.
+                    # Set once, before part 1.
+                    paper_deadline = time.monotonic() + TIME_BELL_SECONDS
+                    for part, prompter in (
+                        ("chain", chain_prompt),
+                        ("elevator", elevator_prompt),
+                    ):
+                        inst = insts[part]
+                        prompt = prompter(inst)
+                        attempt: dict[str, Any] = {
+                            "seed": seed,
+                            "level": level,
+                            "part": part,
+                            "expected": inst["path"],
                         }
-                        messages: list[dict[str, str]] = []
-                        remaining = ctx
-                        # the TIME bell is PER EXAM (the paper: both
-                        # parts in one conversation), not per part -
-                        # the parts share it exactly as they share the
-                        # token budget below. Set once, before part 1.
-                        paper_deadline = time.monotonic() + TIME_BELL_SECONDS
-                        part_ok = True
-                        for part, prompter in (
-                            ("chain", chain_prompt),
-                            ("elevator", elevator_prompt),
-                        ):
-                            inst = insts[part]
-                            prompt = prompter(inst)
-                            attempt: dict[str, Any] = {
-                                "seed": seed,
-                                "level": level,
-                                "rung": rung,
-                                "part": part,
-                                "expected": inst["path"],
-                            }
-                            if dry_run:
-                                attempt["ok"] = None
-                                attempts.append(attempt)
-                                continue
-                            if remaining <= 0:
-                                attempt.update(ok=False, answer_tokens=0, finish_reason="length")
-                                attempts.append(attempt)
-                                with open(answers_path, "a", encoding="utf-8") as fh:
-                                    fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
-                                part_ok = False
-                                continue
-                            if active != rung:
-                                if proc is not None:
-                                    llama_server.stop_server(proc, port)
-                                    proc = None
-                                gguf = _acquire(fam, rung, models_dir)
-                                if not gguf:
-                                    fam_exam.setdefault(rung, {})["unbuildable"] = True
-                                    _state_store.save_state(state_file, state)
-                                    print(f"  {fam} {rung}: unbuildable - skipped")
-                                    part_ok = False
-                                    break
-                                log_path = os.path.join(answers_dir, f"exam-server-{rung}.log")
-                                proc, healthy = llama_server.start_server(
-                                    gguf,
-                                    port=port,
-                                    extra_args=[
-                                        "-c", str(ctx + 2048),
-                                        "--parallel", "1",
-                                        "--reasoning", "off",
-                                        "--reasoning-budget", "0",
-                                    ],
-                                    log_path=log_path,
-                                )
-                                if not healthy or not llama_server.wait_healthy(port, proc=proc):
-                                    attempt.update(ok=False, answer_tokens=0,
-                                                   finish_reason="error: server did not come up")
-                                    attempts.append(attempt)
-                                    part_ok = False
-                                    break
-                                active = rung
-                            messages.append({"role": "user", "content": prompt})
-                            t0 = time.monotonic()
-                            # the paper's SHARED deadline; what part 1
-                            # spent, part 2 no longer has
-                            deadline = paper_deadline
-                            try:
-                                answer, tokens, finish = ask_exam(
-                                    port, messages, remaining, deadline=deadline
-                                )
-                            except Exception as e:
-                                # one transport failure must not kill the
-                                # walk: record it, fail the part, move on
-                                answer, tokens, finish = "", 0, f"error: {e}"
-                            ok = score_exam(answer, inst, finish)
-                            attempt.update(
-                                ok=ok,
-                                answer_tokens=tokens,
-                                finish_reason=finish,
-                                elapsed_s=round(time.monotonic() - t0, 1),
-                                answer=(answer or "")[-2000:],
-                            )
+                        if dry_run:
+                            attempt["ok"] = None
+                            attempts.append(attempt)
+                            continue
+                        if remaining <= 0:
+                            # part 1 (or an earlier seed's paper) spent
+                            # the whole bell: the paper is full, this
+                            # part cannot even be asked
+                            attempt.update(ok=False, answer_tokens=0, finish_reason="length")
                             attempts.append(attempt)
                             with open(answers_path, "a", encoding="utf-8") as fh:
                                 fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
-                            if not ok:
-                                part_ok = False
-                            messages.append({"role": "assistant", "content": answer or ""})
-                            remaining -= tokens
-                        if part_ok and not dry_run:
-                            passed = True
-                        if passed and not dry_run:
-                            break
+                            passed = False
+                            continue
+                        messages.append({"role": "user", "content": prompt})
+                        t0 = time.monotonic()
+                        # the paper's SHARED deadline; what part 1
+                        # spent, part 2 no longer has
+                        deadline = paper_deadline
+                        try:
+                            answer, tokens, finish = ask_exam(
+                                port, messages, remaining, deadline=deadline
+                            )
+                        except Exception as e:
+                            # one transport failure (server hiccup, HTTP
+                            # error) must not kill the family's sweep:
+                            # record it, fail the part, keep the paper
+                            answer, tokens, finish = "", 0, f"error: {e}"
+                        ok = score_exam(answer, inst, finish)
+                        attempt.update(
+                            ok=ok,
+                            answer_tokens=tokens,
+                            finish_reason=finish,
+                            elapsed_s=round(time.monotonic() - t0, 1),
+                            answer=(answer or "")[-2000:],
+                        )
+                        attempts.append(attempt)
+                        with open(answers_path, "a", encoding="utf-8") as fh:
+                            fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+                        if not ok:
+                            passed = False
+                        # the model's own reasoning STAYS in the paper
+                        # (the shared context) for the next part to use
+                        messages.append({"role": "assistant", "content": answer or ""})
+                        remaining -= tokens
                 rec = {"pass": passed and not dry_run, "attempts": attempts}
                 levels[key] = rec
                 _state_store.save_state(state_file, state)
+                # mid-run log hygiene: a -lv 5 stream over hours is
+                # 100MB+; keep the banner + the latest tail under the
+                # github limits so no push can ever carry a giant blob
+                try:
+                    if os.path.isfile(log_path) and os.path.getsize(log_path) > 20 * 2**20:
+                        with open(log_path, encoding="utf-8", errors="replace") as fh:
+                            lines = fh.readlines()
+                        with open(log_path, "w", encoding="utf-8") as fh:
+                            fh.writelines(lines[:100])
+                            fh.write(f"... [mid-run truncation: {len(lines)} lines]\n")
+                            fh.writelines(lines[-300:])
+                except OSError:
+                    pass
                 if not dry_run:
                     verdict = "PASS" if rec["pass"] else "FAIL"
-                    kinds = {a.get("rung") for a in attempts}
+                    capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
                     print(
                         f"  level {level}: {verdict} "
-                        f"({len(kinds)} quants tried, {len(attempts)} attempts)"
+                        f"(parts {[a.get('ok') for a in attempts]}"
+                        + (f", {capped} ran out of context" if capped else "")
+                        + ")"
                     )
             if not rec.get("pass"):
+                score = level - 1
                 break
             score = level
             level += 1
-        if level > max_level and score == max_level:
-            fam_exam["_walk_ceiling"] = True
         if score is not None:
-            fam_exam["score"] = score
+            exam["score"] = score
         if dry_run:
-            fam_exam["planned"] = (
-                f"paper {ctx} tokens, levels 0..{max_level} on seeds {seeds}, "
-                f"all {len(rungs)} quants per level"
+            exam["planned"] = (
+                f"paper {ctx} tokens, sweep {start_level}..{max_level} "
+                f"on seeds {seeds}, 2 parts per level"
             )
-        return fam_exam
+        return exam
     finally:
         if proc is not None:
             llama_server.stop_server(proc, port)
-        # log hygiene (v9.4): the server log is committed, but only its
-        # INFORMATION matters - the startup banner (model, quant, ctx)
-        # and the memory breakdown table llama.cpp prints at startup.
-        # Keep those (the head) plus a small tail (the last requests),
-        # drop everything in between.
-        for lp in glob.glob(os.path.join(answers_dir, "exam-server-*.log")):
-            try:
-                with open(lp, encoding="utf-8", errors="replace") as fh:
-                    lines = fh.readlines()
-                if len(lines) > 150:
-                    with open(lp, "w", encoding="utf-8") as fh:
-                        fh.writelines(lines[:100])
-                        fh.write(
-                            f"... [{len(lines) - 140} middle lines trimmed - "
-                            "the committed log keeps the banner and the memory "
-                            "breakdown only]\n"
-                        )
-                        fh.writelines(lines[-40:])
-            except OSError:
-                pass
+        # log hygiene (v9.4): the committed log keeps only its
+        # INFORMATION - the startup banner (model, quant, ctx) and the
+        # memory breakdown table. The -lv 4 stream is already small
+        # (~16KB); this trim is the safety net that guarantees no push
+        # can ever carry a giant blob.
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.readlines()
+            if len(lines) > 500:
+                with open(log_path, "w", encoding="utf-8") as fh:
+                    fh.writelines(lines[:100])
+                    fh.write(f"... [{len(lines) - 400} middle lines truncated]\n")
+                    fh.writelines(lines[-300:])
+        except OSError:
+            pass
 
 
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
@@ -691,17 +741,19 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep, v9.4 corrected - MODEL granularity:
-    a model is eliminated when its score (the walk's highest passed
-    level) is strictly below the global best AND its walk is DONE -
-    a failing level reached or the ceiling swept ('out of time' is
-    a fail kind like any other: the level already ran every quant).
-    A PENDING model is never touched: its record is not final.
-    Elimination deletes the model's whole models/ directory (the
-    data ALWAYS stays: answers in results/, records in state). The
-    model being examined keeps its files until its walk finishes.
-    Tied leaders are never eliminated - time ranks them (recorded
-    per attempt) but the human breaks ties."""
+    """The self-cleaning sweep, v9.4 - MODEL granularity: a model is
+    eliminated when its deciding rung (the walk's best scorer) has
+    a final score strictly below the global best AND the walk
+    reached a terminal verdict - pass, fail, or out of time (an
+    exam fail per the author's ruling: the recovery walk is
+    EXHAUSTIVE, a timeout survived every quant). A PENDING model -
+    timeouts with quants left to try, an errored sweep - is never
+    touched: its record is not final. Elimination deletes the
+    model's whole models/ directory (the data ALWAYS stays:
+    answers in results/, records in state). The model being
+    examined keeps its files until its walk finishes. Tied leaders
+    are never eliminated - time ranks them (recorded per attempt)
+    but the human breaks ties."""
     import shutil
 
     exam = state.get("exam") or {}
@@ -709,17 +761,23 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        s = model_score(fam_exam)
-        if s is not None and s > best:
-            best = s
+        br = best_rung(fam_exam)
+        if br is not None:
+            s = br[1].get("score")
+            if s is not None and s > best:
+                best = s
     if best < 0:
         return  # nobody has a score yet - nothing to clean
     for fam, fam_exam in exam.items():
         if not isinstance(fam_exam, dict) or fam == exclude_fam:
             continue
-        if not walk_done(fam_exam):
+        verdict = model_verdict(fam_exam)
+        if verdict is None:
             continue  # PENDING - the walk has more to try
-        s = model_score(fam_exam)
+        br = best_rung(fam_exam)
+        if br is None:
+            continue
+        s = br[1].get("score")
         if s is None or s >= best:
             # a SURVIVOR: a stale _eliminated flag (e.g. a fossil of
             # the v9 premature-elimination bug) must be CLEARED - the
@@ -732,7 +790,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             continue
         fam_exam["_eliminated"] = True
         shutil.rmtree(famdir, ignore_errors=True)
-        print(f"  gc: {fam} eliminated (score {s} < best {best}) - artifacts deleted")
+        print(f"  gc: {fam} eliminated (best-rung score {s} < best {best}) - artifacts deleted")
 
 
 def run(
@@ -741,63 +799,129 @@ def run(
     state_file: str,
     port: int,
     families: list[str] | None,
-    n_seeds: int =  1,
+    n_seeds: int = 1,
     max_level: int = 32,
     dry_run: bool = False,
     on_family_done: Any = None,
 ) -> dict[tuple[str, str], Any]:
-    """The exam controller, v9.4 corrected: ONE straight pass over the
-    models (roster order, param-ascending) - each model's LEVEL walk
-    runs IN FULL (every level, all quants per level) before the next
-    begins. A DONE walk (failing level reached, or ceiling swept) is
-    final and never re-run; a PENDING walk resumes. After each walk
-    the self-clean deletes strictly-lower scorers from disk (the
-    data stays)."""
+    """The exam controller (v9): ONE straight pass over the
+    candidates - roster order (param-ascending) x the tg/s-sorted
+    ladder - each candidate swept 0..first-fail IN FULL before the
+    next begins (the author's efficiency ruling: an answer as soon as
+    possible, the pruning starts with the first score).
+
+    A stored score is final (idempotence): scored candidates are
+    never re-run; the pass skips them and keeps their record. After
+    each sweep the self-clean deletes strictly-lower scorers from
+    disk (the data stays)."""
     seeds = exam_seeds(n_seeds)
     cands = candidates(state, families, models_dir)
     if not cands:
         return {}
     results: dict[tuple[str, str], Any] = {}
-    for fam, _rung in cands:
-        key = (fam, "walk")
+    for fam, rung in cands:
+        key = (fam, rung)
+        fam_exam = (state.get("exam") or {}).get(fam) or {}
+        # v9 records are rung-keyed ONLY. The old family-keyed shape
+        # (a boundary record stored directly under the family) is
+        # PRE-v9 era data: it belongs to a different protocol and is
+        # NEVER inherited as this candidate's record - doing so made
+        # a --clean-less run silently skip candidates (the
+        # Qwen3.5-0.8B-first bug). --clean wipes it; without --clean
+        # an old-era family record is simply not this candidate's.
         fam_tree = state.setdefault("exam", {}).setdefault(fam, {})
-        if not dry_run and walk_done(fam_tree):
-            results[key] = fam_tree
+        # idempotence: a walk that already reached a verdict is final
+        if not dry_run and model_verdict(fam_tree) is not None:
+            results[key] = best_record(fam_tree) or fam_tree
             continue
         if dry_run:
-            results[key] = {"planned": f"level walk 0..{max_level} on seeds {seeds}, all quants"}
+            results[key] = {"planned": f"quant walk 0..{max_level} on seeds {seeds}"}
             continue
-        print(f"-- {fam}, paper {bell_window(state, fam, models_dir)} tokens --")
-        # one model's failure never kills the exam - any exception is
-        # recorded and the walk moves on.
-        try:
-            rec = run_family(
-                fam,
-                models_dir,
-                state,
-                state_file,
-                port,
-                seeds,
-                max_level,
-                dry_run,
-            )
-        except SystemExit as e:
-            if e.code == 130:
-                raise
-            rec = {"error": f"exam run failed: {e.code}"}
-        except Exception as e:
-            rec = {"error": f"exam run failed: {e}"}
-        results[key] = rec
-        # the self-clean FIRST: a model whose walk is DONE and scored
-        # strictly below the global best leaves the disk (the data
-        # always stays), THEN the family push - so this model's own
-        # deletions are staged and committed in its push
+        # v9.4: the EXHAUSTIVE quant walk - quant number by quant
+        # number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY variation
+        # of a number (roster LADDER order) before the next, until
+        # a verdict lands: a clean sweep PASSES the walk; a quant
+        # number whose every testable variation answered and was
+        # wrong FAILS it; only bells move the walk on. Quants
+        # exhausted with no verdict anywhere = out of time - itself
+        # an exam fail (recovery was exhaustive). An unbuildable
+        # variation is skipped, not a verdict; an errored sweep
+        # leaves the model PENDING, never falsely failed.
+        walk_verdict = None
+        errored = False
+        for num, group in rung_groups():
+            gfail = gbell = 0
+            for rung in group:
+                rec = fam_tree.get(rung) or {}
+                if rec.get("score") is None and not rec.get("unbuildable"):
+                    gguf = _acquire(fam, rung, models_dir)
+                    if not gguf:
+                        rec = {"unbuildable": True}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                        print(f"  {fam} {rung}: unbuildable - skipped")
+                    else:
+                        print(
+                            f"-- {fam} {rung} ({num}), paper "
+                            f"{bell_window(state, fam, models_dir)} tokens --"
+                        )
+                        # one candidate's failure never kills the exam - any
+                        # exception is recorded and the sweep moves on.
+                        try:
+                            rec = run_family(
+                                fam,
+                                rung,
+                                gguf,
+                                models_dir,
+                                state,
+                                state_file,
+                                port,
+                                seeds,
+                                max_level,
+                                0,
+                                dry_run,
+                            )
+                        except SystemExit as e:
+                            if e.code == 130:
+                                raise
+                            rec = {"error": f"exam run failed: {e.code}"}
+                        except Exception as e:
+                            rec = {"error": f"exam run failed: {e}"}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                results[(fam, rung)] = rec
+                v = rung_verdict(rec)
+                if v == "pass":
+                    walk_verdict = "pass"
+                    break
+                if v == "fail":
+                    gfail += 1
+                elif v == "time":
+                    gbell += 1
+                elif v is None and not rec.get("unbuildable"):
+                    errored = True
+            if walk_verdict == "pass":
+                break
+            if gfail and not gbell:
+                walk_verdict = "fail"
+                break
+        if walk_verdict is None and not errored:
+            # every quant was tried and only bells came back: the
+            # quants are exhausted - out of time, an exam fail
+            fam_tree["_out_of_time"] = True
+            _state_store.save_state(state_file, state)
+            print(f"  {fam}: quants exhausted at the bell - out of time (an exam fail)")
+        # the self-clean FIRST: a model whose deciding rung scored
+        # strictly below the global best AND whose walk reached a
+        # verdict leaves the disk (the data always stays), THEN the
+        # family push - so this model's own deletions are staged
+        # and committed in its push
         _gc(models_dir, state, fam)
+        # v9.1: the F16 IS the model - the family is complete after
+        # its one candidate; report and push (the watchability ruling)
         if on_family_done is not None:
             try:
                 on_family_done(fam)
             except Exception as e:
                 print(f"  family-done hook failed (ignored): {e}")
     return results
-
-
