@@ -257,6 +257,9 @@ def git_tail(args: argparse.Namespace) -> None:
     remotely."""
     stamp("committing artifacts to git (state, results, dumps, mem sidecars)")
     paths = [args.state_file, args.results_file, "results.txt"]
+    # the ledger is a first-class artifact: every commit carries the
+    # latest regeneration (the per-model pushes depend on it)
+    paths += ["md/v9.1.md"]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split
     paths += glob.glob("results/**/*", recursive=True)
