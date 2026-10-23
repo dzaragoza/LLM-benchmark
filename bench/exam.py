@@ -676,10 +676,23 @@ def run_family(
                 if not dry_run:
                     verdict = "PASS" if rec["pass"] else "FAIL"
                     capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
+                    belled = sum(1 for a in attempts if a.get("finish_reason") == "time_limit")
+                    # the fail MODE must be visible at a glance: a bell
+                    # fail recovers (time), a wrong answer ends the walk
+                    mode = ""
+                    if not rec["pass"]:
+                        if belled and not any(
+                            a.get("ok") is False and a.get("finish_reason") == "stop"
+                            for a in attempts
+                        ):
+                            mode = ", OUT OF TIME" if belled == len(attempts) else ", mixed bell"
+                        else:
+                            mode = ", wrong answer"
                     print(
                         f"  level {level}: {verdict} "
                         f"(parts {[a.get('ok') for a in attempts]}"
                         + (f", {capped} ran out of context" if capped else "")
+                        + mode
                         + ")"
                     )
             if not rec.get("pass"):
