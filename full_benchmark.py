@@ -207,10 +207,17 @@ def preflight_selfcheck() -> None:
         # a mixed group (fail + bell) moves on; exhausted = _out_of_time wins
         mixed = {'F16': vt, 'Q8_0': vf, '_out_of_time': True}
         assert E.model_verdict(mixed) == 'time'
-        # best_rung: the highest-scoring rung, earlier rung on ties
-        bx = {'F16': {'score': 3}, 'Q8_0': {'score': 5}}
-        assert E.best_rung(bx) == ('Q8_0', {'score': 5})
-        bx2 = {'F16': {'score': 4}, 'Q8_0': {'score': 4}}
+        # best_rung: the highest-scoring rung, earlier rung on ties.
+        # Records must carry LEVELS (as the walk writes them): a
+        # score with no failing level reads as a clean sweep (pass)
+        # and ends the walk at its own level - the score-only fixture
+        # of the pre-correction era is not a shape the walk produces.
+        mk_t = lambda s: {'score': s, 'levels': {
+            '0': {'pass': True}, '1': {'pass': False,
+            'attempts': [{'finish_reason': 'time_limit'}]}}}
+        bx = {'F16': mk_t(3), 'Q8_0': mk_t(5)}
+        assert E.best_rung(bx)[0] == 'Q8_0' and E.best_rung(bx)[1]['score'] == 5
+        bx2 = {'F16': mk_t(4), 'Q8_0': mk_t(4)}
         assert E.best_rung(bx2)[0] == 'F16', 'ties go to the earlier rung'
         assert E.best_rung({}) is None
         # the author's worked example: f16 passes 0..3 bells at 4; q8
