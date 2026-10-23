@@ -236,10 +236,22 @@ def preflight_selfcheck() -> None:
         assert not E.hit_time_bell(vfl), 'the wrong-chain record reads as fail'
 
         # --- v9.4 gc: terminal verdicts collect, pending walks never ---
+        # fixtures carry LEVELS (the walk's real record shape): a
+        # score-only record reads as a clean sweep (pass) under the
+        # level-granular verdict and the gc would read it differently
+        mkbell = lambda s: {'score': s, 'levels': {
+            '0': {'pass': True}, '1': {'pass': False,
+            'attempts': [{'finish_reason': 'time_limit'}]}}}
+        mkwrong = lambda s: {'score': s, 'levels': {
+            '0': {'pass': True}, '1': {'pass': False,
+            'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
         d5 = os.path.join(tmp, 'gcR')
         os.makedirs(d5, exist_ok=True)
         open(os.path.join(d5, 'gcR-F16.gguf'), 'w', encoding='utf-8').close()
-        state5 = {'exam': {'gcR': {'F16': {'score': -1}, 'Q8_0': {'score': 4}},
+        # f16 belled; q8_0 PASSED clean to 4 - the walk ended at q8_0,
+        # the model SURVIVES (4 == the global best)
+        state5 = {'exam': {'gcR': {'F16': mkbell(-1), 'Q8_0': {
+            'score': 4, 'levels': {str(i): {'pass': True} for i in range(5)}}},
         'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state5, exclude_fam=None)
         assert os.path.isdir(d5), 'gc deleted a model its Q8_0 recovery SAVED'
@@ -247,7 +259,11 @@ def preflight_selfcheck() -> None:
         d6 = os.path.join(tmp, 'gcS')
         os.makedirs(d6, exist_ok=True)
         open(os.path.join(d6, 'gcS-F16.gguf'), 'w', encoding='utf-8').close()
-        state6 = {'exam': {'gcS': {'F16': {'score': -1}, 'Q6_K': {'score': -1}},
+        # f16 answered wrong at level 0 - the walk ended there, fail, collected
+        state6 = {'exam': {'gcS': {'F16': {'score': -1, 'levels': {
+            '0': {'pass': False, 'attempts': [
+                {'finish_reason': 'stop', 'ok': False},
+                {'finish_reason': 'stop', 'ok': False}]}}}},
         'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state6, exclude_fam=None)
         assert not os.path.isdir(d6), 'gc kept a model every rung of failed'
@@ -255,10 +271,8 @@ def preflight_selfcheck() -> None:
         d7 = os.path.join(tmp, 'gcT')
         os.makedirs(d7, exist_ok=True)
         open(os.path.join(d7, 'gcT-F16.gguf'), 'w', encoding='utf-8').close()
-        state7 = {'exam': {'gcT': {'F16': {'score': 1, 'levels': {
-            '2': {'pass': False, 'attempts': [
-                {'finish_reason': 'time_limit'}, {'finish_reason': 'time_limit'}]}}}},
-            'top': {'F16': {'score': 4}}}}
+        state7 = {'exam': {'gcT': {'F16': mkbell(1)},
+        'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state7, exclude_fam=None)
         assert os.path.isdir(d7), 'gc deleted a PENDING (mid-walk) model'
         assert not state7['exam']['gcT'].get('_eliminated')
