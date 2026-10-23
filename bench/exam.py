@@ -339,7 +339,9 @@ def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
                 r
                 for r in LADDER
                 if r != "F16"
-                and (r.startswith(num) or r.startswith("IQ" + num) or r.startswith("T" + num))
+                # IQ2_M matches num Q2 as I+Q2 (IQ+Q2 would be IQQ2 -
+                # the selfcheck caught this exact concatenation bug)
+                and (r.startswith(num) or r.startswith("I" + num) or r.startswith("T" + num))
             )
         )
         if variants:
