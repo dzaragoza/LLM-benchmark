@@ -390,12 +390,31 @@ def rung_verdict(rec: dict[str, Any]) -> str | None:
     if not fail_keys:
         return "pass"
     top = max(fail_keys, key=int)
+    # THE PROCTOR, PER ATTEMPT (the granite-3.2 correction): the proctor
+    # collects what was HANDED IN before the bell - an attempt that
+    # ENDED (stop, or the paper filled: length) is a handed-in exam.
+    # At least one handed-in exam -> the proctor grades; a failing level
+    # with graded papers is FAIL - the walk ends, no descent. Only when
+    # the proctor is EMPTY-HANDED (every attempt belled away) is the
+    # level out of time and the walk may descend. A bell on the SIBLING
+    # of a handed-in exam is not the candidate's timeout - granite-3.2's
+    # q8 handed in a wrong chain at 29.2s while the elevator belled with
+    # the shared deadline's 2.8s remainder: WRONG, not out of time.
     for a in levels[top].get("attempts") or []:
-        if a.get("finish_reason") == "time_limit":
-            # the bell rang during the paper: after the bell - out of
-            # time, we do not grade exams handed in after the bell
-            return "time"
-    return "fail"
+        fr = a.get("finish_reason")
+        if (
+            fr not in (None, "time_limit")
+            and not str(fr or "").startswith("error")
+            and a.get("ok") is False
+        ):
+            # a handed-in exam graded WRONG: the capability fail - the
+            # walk ends, no descent
+            return "fail"
+    return "time"
+    # remaining shapes: every handed-in exam PASSED and the failure is
+    # the belled sibling (granite-3.2 f16 L3: chain stop+ok, elevator
+    # time_limit) - the candidate did not fail on capability, it ran
+    # out of runway on the sibling: out of time, the walk may descend
 
 
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
