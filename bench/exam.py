@@ -769,32 +769,13 @@ def run_family(
             pass
 
 
-def _size_too_large(fam: str, rung: str, models_dir: str) -> bool | None:
+def _size_too_large(path: str) -> bool:
     """The SIZE gate (v9.4, the author's ruling): True when the
-    candidate's file would exceed MAX_CANDIDATE_GIB on disk. Uses
-    the exact local file when it exists, else the pre-download
-    estimate (hf_download.estimate_rung_gib - remote metadata or
-    ratio-scaled from the source). None = no estimate possible
-    (the caller then does NOT skip - never a false too_large)."""
-    import infra.hf_download as hf_download
-
-    famdir = os.path.join(models_dir, fam)
-    existing = hf_download.local_rung(famdir, rung)
-    if existing and os.path.isfile(existing):
-        return os.path.getsize(existing) / (1024**3) > MAX_CANDIDATE_GIB
-    repo = dict(roster_from_models_md()).get(fam)
-    if not repo:
-        return None
-    try:
-        list_repo_files = hf_download.list_repo_files
-        files = list_repo_files(repo)
-        sizes = hf_download.file_sizes(repo) if hasattr(hf_download, "file_sizes") else {}
-        est = hf_download.estimate_rung_gib(rung, files, files, sizes)
-        if est is None:
-            return None
-        return est > MAX_CANDIDATE_GIB
-    except Exception:
-        return None
+    candidate's file on DISK exceeds MAX_CANDIDATE_GIB. No
+    estimates - the author's ruling: the measured file size is
+    the only truth (the file is acquired first, then measured;
+    the verdict lands BEFORE any exam attempt)."""
+    return os.path.getsize(path) / (1024**3) > MAX_CANDIDATE_GIB
 
 
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
@@ -967,23 +948,27 @@ def run(
                 if rec.get("too_large"):
                     continue  # the SIZE gate already rejected this rung
                 if rec.get("score") is None and not rec.get("unbuildable"):
-                    too_large = _size_too_large(fam, rung, models_dir)
-                    if too_large:
-                        rec = {"too_large": True}
-                        fam_tree[rung] = rec
-                        _state_store.save_state(state_file, state)
-                        print(
-                            f"  {fam} {rung}: TOO LARGE (> {MAX_CANDIDATE_GIB:g} GiB) "
-                            "- size recovery: the level may descend"
-                        )
-                        results[(fam, rung)] = rec
-                        continue
                     gguf = _acquire(fam, rung, models_dir)
                     if not gguf:
                         rec = {"unbuildable": True}
                         fam_tree[rung] = rec
                         _state_store.save_state(state_file, state)
                         print(f"  {fam} {rung}: unbuildable - skipped")
+                    elif _size_too_large(gguf):
+                        # the SIZE gate (the author's ruling): measured on
+                        # the acquired file, BEFORE any exam attempt - too
+                        # large is known and recovered before any other
+                        # pass/fail condition can exist
+                        rec = {"too_large": True}
+                        fam_tree[rung] = rec
+                        _state_store.save_state(state_file, state)
+                        print(
+                            f"  {fam} {rung}: TOO LARGE on disk "
+                            f"(> {MAX_CANDIDATE_GIB:g} GiB) - size recovery: "
+                            "the level may descend"
+                        )
+                        results[(fam, rung)] = rec
+                        continue
                     else:
                         print(
                             f"-- {fam} {rung} ({num}), paper "
