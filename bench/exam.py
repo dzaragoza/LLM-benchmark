@@ -1,7 +1,6 @@
-"""bench.exam -- THE benchmark (v9.1): the exam is the only phase.
+"""bench.exam -- THE benchmark (v9.4): the exam is the only phase.
 
-Daniela's v9.1 ruling: keep the v9 machinery, sharpen the search -
-comprehensiveness yielded to efficiency.
+v9.4: the corrected walk - the LEVEL runs all quants, always.
 
   candidates  ONE per model: (model, F16), roster order
               (param-ascending, per md/models.md). The F16
@@ -9,7 +8,7 @@ comprehensiveness yielded to efficiency.
   the paper    the full training window, as the generation budget.
   the bell     TOKEN and TIME: max_tokens = the window (finish_reason
               'length' = the paper filled); one attempt may run at
-              most 1024s (finish_reason 'time_limit' = the bell).
+              most 32s (finish_reason 'time_limit' = the bell).
   the walk     v9.4 corrected: the LEVEL is the outer loop -
               every level runs ALL quants, ALWAYS (f16, then every
               variation of q8, q6, q5, q4, q3, q2, q1 in roster
@@ -32,9 +31,11 @@ comprehensiveness yielded to efficiency.
               TIME ranks them (elapsed per attempt) but decides
               nothing - the human breaks ties.
 
-Run data is v9-compatible: the same state shape (exam.<fam>.<rung>),
-the same answers files, the same ledger - a v9.1 run resumes a v9
-run's F16 records directly.
+Run data (v9.4, clean run): state.exam.<fam>.levels.<level>, one
+answers file per model (results/exam/<fam>/walk/), a server log per
+rung (trimmed: the banner + the memory breakdown + the last lines).
+No compatibility with earlier eras - a clean run starts from empty
+state.
 
 Everything is IDEMPOTENT and RESUMABLE; every attempt is logged with
 its full prompt and answer for debugging.
@@ -42,6 +43,7 @@ its full prompt and answer for debugging.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import random
@@ -59,14 +61,15 @@ from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
 
-# the TIME bell (v9.2, the author's decision): one exam attempt
-# may run at most 1024 seconds - no model gets more than 1024s to
-# solve any exam. The streamed read is cut at the wall and the
+# the TIME bell (v9.4, the author's ruling): one exam attempt may
+# run at most 32 seconds - with every level running all quants, a
+# long bell multiplies against ~31 rungs; 32s keeps the level's
+# worst case bounded. The streamed read is cut at the wall and the
 # socket closed, cancelling the server-side generation; the attempt
 # is graded on whatever the model produced ('time_limit'). Time
 # ALSO ranks tied leaders (recorded per attempt) - but the human
 # breaks ties.
-TIME_BELL_SECONDS = 1024
+TIME_BELL_SECONDS = 32
 
 # v9.4 corrected: the per-level quant walk order, by quant NUMBER
 # quality-descending (each step down trades precision for speed -
@@ -293,7 +296,7 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     The bells: 'length' (the paper filled) FAILS even if a partial
     answer leaked - the paper was the budget and it is spent.
     'time_limit' (v9.2): the model is graded on what it produced by
-    the 1024s bell - a COMPLETE ANSWER line still passes (the model
+    the 32s bell - a COMPLETE ANSWER line still passes (the model
     answered within the bell; the cut only ended the stream), an
     unfinished one fails. The paper bell is tokens-only budget."""
     if finish_reason == "length":
@@ -344,39 +347,12 @@ def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
     return groups
 
 
-def hit_time_bell(rec: dict[str, Any]) -> bool:
-    """True when the candidate's sweep ended AT the time bell: the
-    highest FAILING level has at least one attempt cut by the 1024s
-    bell ('time_limit') - the model may simply be too slow at this
-    quant, so the recovery ladder gets a chance."""
-    levels = rec.get("levels") or {}
-    fail_keys = [k for k in levels if not levels[k].get("pass")]
-    if not fail_keys:
-        return False
-    top = max(fail_keys, key=int)
-    return any(
-        a.get("finish_reason") == "time_limit"
-        for a in (levels[top].get("attempts") or [])
-    )
-
-
 def _walk_levels(fam_exam: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """The v9.4 level records: state.exam.<fam>.levels.<level> - one
-    dict per level with a per-rung pass flag and attempt lists (the
-    flat per-rung level trees of the pre-correction era are folded
-    in - a migrated record reads the same as a fresh one)."""
+    dict per level with the pass flag and every attempt (each tagged
+    with its rung)."""
     levels = fam_exam.get("levels")
-    if isinstance(levels, dict):
-        return levels
-    migrated: dict[str, dict[str, Any]] = {}
-    for rung, rec in fam_exam.items():
-        if not isinstance(rec, dict) or rung.startswith("_"):
-            continue
-        for lv, lrec in (rec.get("levels") or {}).items():
-            slot = migrated.setdefault(str(lv), {})
-            slot.setdefault("attempts", []).extend(lrec.get("attempts") or [])
-            slot["pass"] = slot.get("pass") or bool(lrec.get("pass"))
-    return migrated
+    return levels if isinstance(levels, dict) else {}
 
 
 def walk_done(fam_exam: dict[str, Any]) -> bool:
@@ -457,52 +433,11 @@ def deciding_rung(fam_exam: dict[str, Any]) -> str | None:
     return best_r
 
 
-def fail_reason(rec: dict[str, Any]) -> str:
-    """Why the candidate failed its highest exam: read the last FAILING
-    level's attempts and classify the mode - the quick diagnostic the
-    ledger wants:
-      out of time      the conversation expired (the 1024s time bell)
-      out of context   the token bell rang (the paper filled) first
-      wrong chain      an answer arrived, the tokens/order were wrong
-      error            a transport/tool failure, not the model's fault
-      no record        nothing measured (or only passes stored)"""
-    levels = rec.get("levels") or {}
-    fail_keys = [k for k in levels if not levels[k].get("pass")]
-    if not fail_keys:
-        return "no record"
-    top = max(fail_keys, key=int)
-    reasons = []
-    for a in levels[top].get("attempts") or []:
-        fr = a.get("finish_reason")
-        if str(fr or "").startswith("error"):
-            reasons.append("error")
-        elif fr == "time_limit":
-            reasons.append("out of time")
-        elif fr == "length":
-            reasons.append("out of context")
-        elif a.get("ok") is False:
-            reasons.append("wrong chain")
-    if "error" in reasons and not ({"wrong chain", "out of context", "out of time"} & set(reasons)):
-        return "error"
-    if "out of time" in reasons:
-        return "out of time"
-    if "out of context" in reasons:
-        return "out of context"
-    if "wrong chain" in reasons:
-        return "wrong chain"
-    return "unknown"
-
-
 def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
     """The v9 bell: the FULL training window - the number of tokens
     the model was trained to hold, the whole paper. No tg/s leg, no
-    in-window rule: the time bell (1024s per attempt) is what makes
+    in-window rule: the time bell (32s per attempt) is what makes
     the fill-rate problem the model's, not the benchmark's."""
-    # the window may be cached in state (a previous era's read) -
-    # a fast path, not a dependency on the retired sweet tree
-    cached = ((state.get("sweet") or {}).get(fam) or {}).get("window")
-    if cached:
-        return int(cached)
     repo = dict(roster_from_models_md()).get(fam)
     if not repo:
         return None
@@ -644,9 +579,9 @@ def run_family(
                                 active = rung
                             messages.append({"role": "user", "content": prompt})
                             t0 = time.monotonic()
-                            # the TIME bell: the attempt expires 1024s
+                            # the TIME bell: the attempt expires 32s
                             # after the question was asked - no model
-                            # gets more than 1024s to solve any exam
+                            # gets more than 32s to solve any exam
                             deadline = t0 + TIME_BELL_SECONDS
                             try:
                                 answer, tokens, finish = ask_exam(
@@ -702,6 +637,26 @@ def run_family(
     finally:
         if proc is not None:
             llama_server.stop_server(proc, port)
+        # log hygiene (v9.4): the server log is committed, but only its
+        # INFORMATION matters - the startup banner (model, quant, ctx)
+        # and the memory breakdown table llama.cpp prints at startup.
+        # Keep those (the head) plus a small tail (the last requests),
+        # drop everything in between.
+        for lp in glob.glob(os.path.join(answers_dir, "exam-server-*.log")):
+            try:
+                with open(lp, encoding="utf-8", errors="replace") as fh:
+                    lines = fh.readlines()
+                if len(lines) > 150:
+                    with open(lp, "w", encoding="utf-8") as fh:
+                        fh.writelines(lines[:100])
+                        fh.write(
+                            f"... [{len(lines) - 140} middle lines trimmed - "
+                            "the committed log keeps the banner and the memory "
+                            "breakdown only]\n"
+                        )
+                        fh.writelines(lines[-40:])
+            except OSError:
+                pass
 
 
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:

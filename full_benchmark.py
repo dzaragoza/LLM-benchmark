@@ -2,7 +2,7 @@
 """full_benchmark.py -- the v9 benchmark: the exam is the only phase.
 
 One command: every (model, quant) candidate in the roster takes the
-exam - the full training window as the paper, the 1024-second time
+exam - the full training window as the paper, the 32-second time
 bell per attempt, PASS/FAIL chain-following sweeps of escalating
 difficulty. The roster is self-cleaning: a scored candidate strictly
 below the running best loses its artifacts from disk (the data
@@ -145,11 +145,9 @@ def preflight_selfcheck() -> None:
         os.makedirs(famdir, exist_ok=True)
         with open(os.path.join(famdir, "config.json"), "w", encoding="utf-8") as f:
             json.dump({"max_position_embeddings": 32768}, f)
-        w = E.bell_window({"sweet": {}}, fam, tmp)
+        w = E.bell_window({}, fam, tmp)
         assert w == 32768, f"bell_window config branch: {w}"
-        w = E.bell_window({"sweet": {fam: {"window": 8192}}}, fam, tmp)
-        assert w == 8192, f"bell_window cached branch: {w}"
-        assert E.bell_window({"sweet": {}}, "no-such-family-xyz", tmp) is None
+        assert E.bell_window({}, "no-such-family-xyz", tmp) is None
 
         # --- v9.1: candidates are (model, F16) only ---
         c = E.candidates({}, [fam])
@@ -172,10 +170,6 @@ def preflight_selfcheck() -> None:
                          '2': {'pass': True}}, '_walk_ceiling': True}
         assert E.model_score(w3) == 2 and E.walk_done(w3)
         assert E.model_score({'levels': {}}) is None
-        # the pre-correction per-rung records fold into the level shape
-        w4 = {'F16': {'levels': {'0': {'pass': True, 'attempts': [
-            {'rung': 'F16', 'ok': True}]}}}}
-        assert E.model_score(w4) == 0, 'a migrated per-rung record reads the same'
         # level_fail_kind: the diagnostic priority across every rung
         lk = {'attempts': [
             {'rung': 'F16', 'finish_reason': 'time_limit', 'ok': False},
@@ -491,7 +485,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="the v9 benchmark: every (model, quant) candidate "
         "takes the exam - the full training window as the paper, the "
-        "1024s time bell, self-cleaning elimination"
+        "32s time bell, self-cleaning elimination"
     )
     ap.add_argument(
         "families",
@@ -507,7 +501,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="exam",
         choices=["exam"],
         help="the benchmark: every (model, quant) candidate takes the "
-        "exam - the full training window as the paper, the 1024s time "
+        "exam - the full training window as the paper, the 32s time "
         "bell, PASS/FAIL sweeps, self-cleaning elimination",
     )
     ap.add_argument(
@@ -647,13 +641,13 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     tier.sort(key=lambda r: (r[3] if r[3] is not None else float("inf")))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
-        "# v9.4.md - the tournament ledger (v9.4: the exhaustive quant walk, the 1024s bell)",
+        "# v9.4.md - the tournament ledger (v9.4: the per-level all-quants walk, the 32s bell)",
         "",
         "One line per model, md/models.md order (param-ascending). The",
         "deciding rung's score IS the model's score; the quant column is",
         "the variant that carried the exam (the walk's best scorer). The",
         "context is the model's full training window; no model gets more",
-        "than 1024s to solve any exam. Max context used = the largest",
+        "than 32s to solve any exam. Max context used = the largest",
         "answer the model ever produced (its real need vs its window).",
         "Time = the wall time at the model's highest passed level (both",
         "parts). The ranking column is valid ONLY for the top tier (tied",
@@ -721,10 +715,10 @@ def _run(args: argparse.Namespace) -> None:
         preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.task in ("v8", "exam"):
+    if args.task == "exam":
         # v9: the exam is the only phase. No sweet walk, no in-window
         # rule, no model-count logic: every (model, quant) candidate
-        # takes the exam under the full-window paper and the 1024s
+        # takes the exam under the full-window paper and the 32s
         # time bell; the roster is self-cleaning (strictly-lower
         # scorers are deleted from disk as soon as scores exist).
         from bench.exam import run as exam_run

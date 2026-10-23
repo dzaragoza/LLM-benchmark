@@ -34,9 +34,12 @@ from typing import Any
 # session 38, addendum 5: llama's own memory accounting must land in the
 # server log (the sole per-process memory witness - session 38, addendum
 # 11 retired the smaps census; addendum 23 deletes the machinery).
+# v9.4: level 5 (the per-token debug stream - 100MB+ per run) is RETIRED;
+# level 1 keeps the startup banner and the memory breakdown table, the
+# only parts the benchmark reads, at KBs per log.
 # Single-sourced HERE - every launch site gets it,
 # no triplicated flags to drift apart.
-LOG_VERBOSITY_ARGS = ["-lv", "5"]
+LOG_VERBOSITY_ARGS = ["-lv", "1"]
 
 
 def kill_stale_server() -> bool:
