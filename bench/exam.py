@@ -416,11 +416,25 @@ def run_family(
     try:
         if not dry_run:
             # server context: the bell + prompt headroom (the prompt
-            # and template must fit alongside the generation budget)
+            # and template must fit alongside the generation budget).
+            # --reasoning off --reasoning-budget 0 (the author's
+            # ruling): the exam measures the ANSWER, not a hidden
+            # reasoning budget - a model's thinking must live in the
+            # visible paper, never in a separate channel that eats
+            # tokens off-ledger
             proc, healthy = llama_server.start_server(
                 gguf,
                 port=port,
-                extra_args=["-c", str(ctx + 2048), "--parallel", "1"],
+                extra_args=[
+                    "-c",
+                    str(ctx + 2048),
+                    "--parallel",
+                    "1",
+                    "--reasoning",
+                    "off",
+                    "--reasoning-budget",
+                    "0",
+                ],
                 log_path=log_path,
             )
             if not healthy or not llama_server.wait_healthy(port, proc=proc):
