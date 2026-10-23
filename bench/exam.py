@@ -360,28 +360,29 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
 
 
 def rung_verdict(rec: dict[str, Any]) -> str | None:
-    """One rung record's outcome, v9.4: 'pass' (the sweep ended with
-    NO failing level - the candidate swept clean), 'fail' (the
-    sweep ended at a failing level the model ANSWERED - a
-    capability fail no faster quant rescues), 'time' (the sweep
-    ended at a failing level the BELL cut - not a verdict, the
-    walk may recover at a smaller quant). None = unmeasured."""
+    """One rung record's outcome, v9.4 - the PROCTOR rule (the
+    author's ruling): one fail reason per exam, and the BELL is
+    the gate. A paper with ANY bell-cut attempt came in after the
+    bell: out of time, UNGRADED - pass/fail is reserved for papers
+    that ended before the bell. 'pass' (the sweep ended with NO
+    failing level), 'fail' (the failing paper ENDED - handed in
+    before the bell - and the answer was wrong: a capability fail
+    no smaller quant rescues), 'time' (the failing paper has at
+    least one bell-cut attempt: after the bell, rejected, the walk
+    may recover at a smaller quant). None = unmeasured."""
     if rec.get("score") is None:
         return None
     levels = rec.get("levels") or {}
     fail_keys = [k for k in levels if not levels[k].get("pass")]
     if not fail_keys:
         return "pass"
-    # the author's monotonicity ruling: ONE answered-wrong attempt at
-    # the failing level is a CAPABILITY fail - a smaller quant is
-    # strictly less precise and can only do worse; the walk ends. Only
-    # ALL-BELLED attempts are the clock, and only the clock recovers.
     top = max(fail_keys, key=int)
     for a in levels[top].get("attempts") or []:
-        fr = a.get("finish_reason")
-        if fr not in ("time_limit", "length") and not str(fr or "").startswith("error"):
-            return "fail"
-    return "time"
+        if a.get("finish_reason") == "time_limit":
+            # the bell rang during the paper: after the bell - out of
+            # time, we do not grade exams handed in after the bell
+            return "time"
+    return "fail"
 
 
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
@@ -708,7 +709,7 @@ def run_family(
                             a.get("ok") is False and a.get("finish_reason") == "stop"
                             for a in attempts
                         ):
-                            mode = ", OUT OF TIME" if belled == len(attempts) else ", mixed bell"
+                            mode = ", OUT OF TIME"
                         else:
                             mode = ", wrong answer"
                     print(
