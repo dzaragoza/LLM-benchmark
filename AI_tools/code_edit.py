@@ -817,10 +817,12 @@ def replace_verified(
     md-lint no-new-violations gate, and the delimiter balance check -
     a scripted replace can no longer smuggle a lint break into git.
     """
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
     blocks: list[tuple] = []
     for i, item in enumerate(replaces):
         old, new, pair_count = (item + (count,))[:3] if len(item) == 2 else item
-        n = src_count(path, old)
+        n = src.count(old)
         if n != pair_count:
             raise CodeEditError(
                 f"{path}: replace pair {i} assert failed: old text occurs "
@@ -961,6 +963,8 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
     _verify_blocks(src, blocks)
     out, regions = _apply(src, blocks)
     _check_delimiters(src, out, path, regions)
+    _check_python_syntax(src, out, path)
+    _verify_result(out, blocks, path)
     out = _fix_markdown(out, path)
     _check_markdown(src, out, path)
     return "".join(
