@@ -372,7 +372,16 @@ def rung_verdict(rec: dict[str, Any]) -> str | None:
     fail_keys = [k for k in levels if not levels[k].get("pass")]
     if not fail_keys:
         return "pass"
-    return "time" if hit_time_bell(rec) else "fail"
+    # the author's monotonicity ruling: ONE answered-wrong attempt at
+    # the failing level is a CAPABILITY fail - a smaller quant is
+    # strictly less precise and can only do worse; the walk ends. Only
+    # ALL-BELLED attempts are the clock, and only the clock recovers.
+    top = max(fail_keys, key=int)
+    for a in levels[top].get("attempts") or []:
+        fr = a.get("finish_reason")
+        if fr not in ("time_limit", "length") and not str(fr or "").startswith("error"):
+            return "fail"
+    return "time"
 
 
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
@@ -404,14 +413,13 @@ def model_verdict(fam_exam: dict[str, Any]) -> str | None:
             if v == "pass":
                 return "pass"
             if v == "fail":
-                gfail += 1
-                any_fail = True
-            elif v == "time":
+                # ANY answered-wrong anywhere ends the walk - a mixed
+                # level (wrong + bell) is a capability fail, not a bell
+                return "fail"
+            if v == "time":
                 gbell += 1
             elif not rec.get("unbuildable"):
                 complete = False
-        if complete and gfail and not gbell:
-            return "fail"
         if not complete:
             walked_all = False
     if walked_all:
@@ -434,6 +442,11 @@ def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
                 continue
             if best is None or rec["score"] > best[1]["score"]:
                 best = (rung, rec)
+            # the walk STOPS at a capability fail - records beyond the
+            # terminal rung are relics of the pre-fix walk and never
+            # decide anything
+            if rung_verdict(rec) == "fail":
+                return best
     return best
 
 
