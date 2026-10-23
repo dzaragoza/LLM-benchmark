@@ -524,14 +524,20 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         if not isinstance(rec, dict):
             continue
         score = rec.get("score")
-        # the time at the model's HIGHEST PASSED level (both parts)
+        # the time + generation rate at the model's HIGHEST PASSED
+        # level (both parts): tok/s exposes a suspiciously slow model
+        # next to the tier (2 tok/s vs the field's tens)
         top_time = None
+        top_tps = None
         if score is not None and score >= 0:
             lv = (rec.get("levels") or {}).get(str(score)) or {}
             atts = lv.get("attempts") or []
             tot = sum(a.get("elapsed_s") or 0 for a in atts)
-            top_time = tot if atts else None
-        rows.append((fam, pos, score, top_time, fam_exam))
+            toks = sum(a.get("answer_tokens") or 0 for a in atts)
+            if atts and tot > 0:
+                top_time = tot
+                top_tps = toks / tot
+        rows.append((fam, pos, score, top_time, top_tps, fam_exam))
     # the top tier: the global best score; rank by time at the top
     # level, fastest first (the tiebreaker indication)
     best = max((r[2] for r in rows if r[2] is not None), default=None)
@@ -549,11 +555,11 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         "tier (tied at the global best): fastest first, the tiebreaker",
         "indication - the human breaks ties.",
         "",
-        "| # | model | score | paper | time @ top | rank | eliminated? |",
-        "|---|---|---|---|---|---|---|",
+        "| # | model | score | paper | time @ top | tok/s @ top | rank | eliminated? |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     n_elim = 0
-    for fam, pos, score, top_time, fam_exam in rows:
+    for fam, pos, score, top_time, top_tps, fam_exam in rows:
         ctx = (fam_exam.get("F16") or {}).get("bell_ctx")
         elim = "yes" if fam_exam.get("_eliminated") else "no"
         if fam_exam.get("_eliminated"):
@@ -563,6 +569,7 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
             f"| {pos} | {fam} | {score if score is not None else '-'} "
             f"| {ctx if ctx is not None else '-'} "
             f"| {f'{top_time:.1f}s' if top_time is not None else '-'} "
+            f"| {f'{top_tps:.1f}' if top_tps is not None else '-'} "
             f"| {rk} | {elim} |"
         )
     lines.append("")
