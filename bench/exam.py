@@ -47,6 +47,15 @@ from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
 
+# the TIME bell (v9.2, the author's decision): one exam attempt
+# may run at most 1024 seconds - no model gets more than 1024s to
+# solve any exam. The streamed read is cut at the wall and the
+# socket closed, cancelling the server-side generation; the attempt
+# is graded on whatever the model produced ('time_limit'). Time
+# ALSO ranks tied leaders (recorded per attempt) - but the human
+# breaks ties.
+TIME_BELL_SECONDS = 1024
+
 
 
 # the repetition count IS the seed set: n=1 for the benchmark, so the
@@ -178,19 +187,20 @@ def ask_exam(
     messages: list[dict[str, str]],
     bell_tokens: int,
     no_thinking: bool = True,
+    deadline: float | None = None,
 ) -> tuple[str, int, str]:
-    """One completion under the TOKEN bell, streamed.
+    """One completion under BOTH bells, streamed (v9.2):
 
-    max_tokens = the paper's remaining generation tokens
-    (finish_reason 'length' = the paper is full). The time limit is
-    RETIRED (the author's ruling after the first time-out: an
-    arbitrary measure - the model may use its whole paper; elapsed
-    time is recorded per attempt and ranks TIED leaders, never
-    eliminates).
+    - the TOKEN bell: max_tokens = the paper's remaining generation
+      tokens (finish_reason 'length' = the paper is full)
+    - the TIME bell: the attempt expires after TIME_BELL_SECONDS;
+      the streamed read is cut and the socket closed, cancelling the
+      server-side generation (finish_reason 'time_limit'). The
+      attempt is graded on what the model produced by the bell.
 
-    Streaming stays: chunks arrive as the model writes; the socket
-    timeout is the dead-connection fallback only, not a limit.
-    Returns (text, completion_tokens, finish_reason)."""
+    Streaming: chunks arrive as the model writes and the deadline is
+    checked per chunk - the cut is clean. Returns (text,
+    completion_tokens, finish_reason)."""
     import urllib.request
 
     payload: dict[str, Any] = {
@@ -208,7 +218,10 @@ def ask_exam(
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    sock_to = 1800.0  # dead-connection fallback, not a limit
+    # the socket timeout is the remaining wall time: a read
+    # blocking that long means nothing arrived (dead connection) -
+    # and it doubles as the time-bell's last-resort cut
+    sock_to = max(30.0, deadline - time.monotonic()) if deadline else 1800.0
     text_parts: list[str] = []
     finish = ""
     usage_tokens = 0
@@ -235,8 +248,11 @@ def ask_exam(
             u = chunk.get("usage") or {}
             if u.get("completion_tokens"):
                 usage_tokens = int(u["completion_tokens"])
+            if deadline is not None and time.monotonic() >= deadline:
+                finish = "time_limit"
+                break
     except TimeoutError:
-        finish = "error: read timed out (dead connection)"
+        finish = "time_limit"
     finally:
         # closing the socket cancels the server's generation
         # (llama-server aborts the slot task on client disconnect)
@@ -254,10 +270,15 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     """PASS/FAIL on completion: the ANSWER line must carry the full
     chain in order. Graded semantically - tokens matched
     case-insensitively in order; surrounding text and separators
-    tolerated, the ORDER not. An exam that ran out of context
-    (finish_reason 'length') FAILS even if a partial answer leaked -
-    the bell rang before completion. Missing ANSWER line = fail."""
-    if finish_reason in ("length", "time_limit"):
+    tolerated, the ORDER not.
+
+    The bells: 'length' (the paper filled) FAILS even if a partial
+    answer leaked - the paper was the budget and it is spent.
+    'time_limit' (v9.2): the model is graded on what it produced by
+    the 1024s bell - a COMPLETE ANSWER line still passes (the model
+    answered within the bell; the cut only ended the stream), an
+    unfinished one fails. The paper bell is tokens-only budget."""
+    if finish_reason == "length":
         return False
     text = (answer or "").lower()
     m = re.search(r"answer\s*:\s*(.+)", text)
@@ -457,8 +478,17 @@ def run_family(
                         # the TIME bell: the conversation expires 1024s
                         # after the question is asked - the UX budget at
                         # its source, per attempt
+                        # the time bell: the attempt expires 1024s
+                        # after the question was asked - no model gets
+                        # more than 1024s to solve any exam (v9.2).
+                        # The attempt is graded on what the model
+                        # produced by the bell (a complete ANSWER
+                        # line still passes; an unfinished one fails)
+                        deadline = t0 + TIME_BELL_SECONDS
                         try:
-                            answer, tokens, finish = ask_exam(port, messages, remaining)
+                            answer, tokens, finish = ask_exam(
+                                port, messages, remaining, deadline=deadline
+                            )
                         except Exception as e:
                             # one transport failure (server hiccup, HTTP
                             # error) must not kill the family's sweep:

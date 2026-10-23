@@ -525,10 +525,14 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
             continue
         score = rec.get("score")
         # the time + generation rate at the model's HIGHEST PASSED
-        # level (both parts): tok/s exposes a suspiciously slow model
-        # next to the tier (2 tok/s vs the field's tens)
+        # level (both parts), and the MAX CONTEXT USED across all
+        # its attempts - how much of the paper the model ever needed
         top_time = None
         top_tps = None
+        max_ctx = 0
+        for lv in (rec.get("levels") or {}).values():
+            for a in lv.get("attempts") or []:
+                max_ctx = max(max_ctx, a.get("answer_tokens") or 0)
         if score is not None and score >= 0:
             lv = (rec.get("levels") or {}).get(str(score)) or {}
             atts = lv.get("attempts") or []
@@ -537,7 +541,7 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
             if atts and tot > 0:
                 top_time = tot
                 top_tps = toks / tot
-        rows.append((fam, pos, score, top_time, top_tps, fam_exam))
+        rows.append((fam, pos, score, top_time, top_tps, max_ctx, fam_exam))
     # the top tier: the global best score; rank by time at the top
     # level, fastest first (the tiebreaker indication)
     best = max((r[2] for r in rows if r[2] is not None), default=None)
@@ -545,38 +549,35 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     tier.sort(key=lambda r: (r[3] if r[3] is not None else float("inf")))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
-        "# v9.1.md - the tournament ledger (v9.1: one F16 candidate per model)",
+        "# v9.1.md - the tournament ledger (v9.2: one F16 candidate per model, the 1024s bell)",
         "",
         "One line per model, md/models.md order (param-ascending). The F16",
-        "candidate's score IS the model's score. Eliminated = the model's",
-        "artifacts were deleted from the benchmark machine (the data always",
-        "stays in git). Time = the wall time at the model's highest passed",
-        "level (both parts). The ranking column is valid ONLY for the top",
-        "tier (tied at the global best): fastest first, the tiebreaker",
-        "indication - the human breaks ties.",
+        "candidate's score IS the model's score. The context is the model's",
+        "full training window; no model gets more than 1024s to solve any",
+        "exam. Max context used = the largest answer the model ever",
+        "produced (its real need vs its window). Time = the wall time at",
+        "the model's highest passed level (both parts). The ranking column",
+        "is valid ONLY for the top tier (tied at the global best): fastest",
+        "first, the tiebreaker indication - the human breaks ties.",
         "",
-        "| # | model | score | paper | time @ top | tok/s @ top | rank | eliminated? |",
-        "|---|---|---|---|---|---|---|---|",
+        "| # | model | score | max context used | time @ top | tok/s @ top | rank |",
+        "|---|---|---|---|---|---|---|",
     ]
-    n_elim = 0
-    for fam, pos, score, top_time, top_tps, fam_exam in rows:
-        ctx = (fam_exam.get("F16") or {}).get("bell_ctx")
-        elim = "yes" if fam_exam.get("_eliminated") else "no"
-        if fam_exam.get("_eliminated"):
-            n_elim += 1
+    for fam, pos, score, top_time, top_tps, max_ctx, fam_exam in rows:
         rk = rank.get(fam, "-")
         lines.append(
             f"| {pos} | {fam} | {score if score is not None else '-'} "
-            f"| {ctx if ctx is not None else '-'} "
+            f"| {max_ctx} "
             f"| {f'{top_time:.1f}s' if top_time is not None else '-'} "
             f"| {f'{top_tps:.1f}' if top_tps is not None else '-'} "
-            f"| {rk} | {elim} |"
+            f"| {rk} |"
         )
     lines.append("")
     n_measured = sum(1 for r in rows if r[2] is not None)
     lines.append(
-        f"_{n_elim} of {n_measured} measured models eliminated; the F16 "
-        "records decide everything._"
+        f"_{n_measured} models measured; the F16 records decide everything. "
+        "Max context used = the largest answer the model ever produced "
+        "(its real need vs its window)._"
     )
     with open(os.path.join("md", "v9.1.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
