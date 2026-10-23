@@ -7,3 +7,4 @@ Immediately fix any issue encountered in code_edit.py
 Propose any needed improvements in code_edit.py and implement them immediately
 Prepend all the commands you give me with git pull
 All the shell commands should be for fish instead of bash
+Do not run linters, formatters or tests.
