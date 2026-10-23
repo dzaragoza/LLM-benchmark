@@ -571,6 +571,16 @@ def build_parser() -> argparse.ArgumentParser:
         "never leave mixed-era results; era changes only",
     )
     ap.add_argument(
+        "--regrade",
+        action="store_true",
+        help="re-score every RECORDED attempt with the CURRENT grader "
+        "(no re-measurement): each attempt's stored answer text is "
+        "graded again, the level pass flags and rung scores are "
+        "recomputed, and every walk is marked PENDING - a restart "
+        "then resumes the walks that the new grades re-opened. For "
+        "grader changes; far cheaper than --clean",
+    )
+    ap.add_argument(
         "--dry-run",
         action="store_true",
         help="READ-ONLY pre-flight: the plan, nothing downloaded, converted, examined or written",
@@ -622,6 +632,52 @@ def main() -> None:
         finally:
             sys.stdout.flush()
         raise
+
+
+def regrade_records(state: dict[str, Any]) -> int:
+    """Re-score every recorded attempt with the CURRENT grader (the
+    --regrade path, for grader changes - far cheaper than --clean):
+    the attempts' stored answer text is graded again, the level pass
+    flags and rung scores recomputed from the new ok flags, and every
+    walk's derived verdict cleared (_out_of_time dropped) so the run
+    resumes exactly the walks the new grades re-opened. Returns the
+    number of attempts whose grade flipped."""
+    from bench.exam import TIME_BELL_SECONDS, score_exam
+
+    flipped = 0
+    for fam, tree in (state.get("exam") or {}).items():
+        if not isinstance(tree, dict):
+            continue
+        tree.pop("_out_of_time", None)
+        for rung, rec in tree.items():
+            if not isinstance(rec, dict) or rung.startswith("_"):
+                continue
+            if rec.get("too_large") or rec.get("unbuildable"):
+                continue
+            levels = rec.get("levels") or {}
+            for lv, lrec in levels.items():
+                attempts = lrec.get("attempts") or []
+                for a in attempts:
+                    if a.get("answer") is None or not a.get("expected"):
+                        continue
+                    new_ok = score_exam(
+                        a.get("answer") or "",
+                        {"path": a["expected"]},
+                        a.get("finish_reason") or "stop",
+                    )
+                    if new_ok != a.get("ok"):
+                        a["ok"] = new_ok
+                        flipped += 1
+                lrec["pass"] = all(a.get("ok") for a in attempts) and bool(attempts)
+            # recompute the rung's score: the highest level with all-below passed
+            score = None
+            for lv in sorted(levels, key=int):
+                if not levels[lv].get("pass"):
+                    break
+                score = int(lv)
+            rec["score"] = score
+    return flipped
+
 
 
 def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
@@ -750,6 +806,15 @@ def _run(args: argparse.Namespace) -> None:
             state["exam"] = {}
             save_state(args.state_file, state)
             stamp("exam: all records wiped (--clean) - a full re-measure under the v9 protocol")
+
+        if args.regrade:
+            flipped = regrade_records(state)
+            save_state(args.state_file, state)
+            stamp(
+                f"exam: {flipped} attempt grade(s) re-scored with the current "
+                "grader (--regrade) - every walk is PENDING; the run resumes "
+                "exactly the walks the new grades re-opened"
+            )
 
         if args.eliminate:
             # the manual tournament cut (mostly superseded by the
