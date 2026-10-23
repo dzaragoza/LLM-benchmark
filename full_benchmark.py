@@ -180,6 +180,50 @@ def preflight_selfcheck() -> None:
         E._gc(tmp, state4, exclude_fam='gcC')
         assert os.path.isdir(d3), 'gc deleted the running model'
 
+        # --- v9.3: the recovery ladder helpers ---
+        assert E.next_rung('F16') == 'Q8_0'
+        assert E.next_rung('Q8_0') == 'Q6_K'
+        assert E.next_rung('Q6_K') is None
+        # hit_time_bell: only the top FAILING level's attempts count
+        belled = {'levels': {'3': {'pass': False, 'attempts': [
+            {'finish_reason': 'time_limit'}, {'finish_reason': 'stop'}]}}}
+        assert E.hit_time_bell(belled), 'a cut attempt at the top failing level is a bell hit'
+        passed_bell = {'levels': {'3': {'pass': True, 'attempts': [
+            {'finish_reason': 'time_limit'}]}}}
+        assert not E.hit_time_bell(passed_bell), 'a bell cut on a PASSED level never recovers'
+        wrong = {'levels': {'3': {'pass': False, 'attempts': [
+            {'finish_reason': 'stop', 'ok': False}]}}}
+        assert not E.hit_time_bell(wrong), 'a wrong chain is not a bell hit'
+        lower_bell = {'levels': {'2': {'pass': False, 'attempts': [
+            {'finish_reason': 'time_limit'}]},
+        '3': {'pass': False, 'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
+        assert not E.hit_time_bell(lower_bell), 'only the TOP failing level decides recovery'
+        # best_record: the highest-scoring rung decides, F16 preferred on ties
+        bx = {'F16': {'score': 3}, 'Q8_0': {'score': 5}}
+        assert (E.best_record(bx) or {}).get('score') == 5
+        bx2 = {'F16': {'score': 4}, 'Q8_0': {'score': 4}}
+        assert (E.best_record(bx2) or {}).get('score') == 4
+        assert E.best_record(bx2) == {'score': 4}
+        assert E.best_record({'F16': {'score': 2}})['score'] == 2
+        assert E.best_record({}) is None
+
+        # --- v9.3 gc: the BEST rung decides, recovery rungs included ---
+        d5 = os.path.join(tmp, 'gcR')
+        os.makedirs(d5, exist_ok=True)
+        open(os.path.join(d5, 'gcR-F16.gguf'), 'w', encoding='utf-8').close()
+        state5 = {'exam': {'gcR': {'F16': {'score': -1}, 'Q8_0': {'score': 4}},
+        'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state5, exclude_fam=None)
+        assert os.path.isdir(d5), 'gc deleted a model its Q8_0 recovery SAVED'
+        assert not state5['exam']['gcR'].get('_eliminated')
+        d6 = os.path.join(tmp, 'gcS')
+        os.makedirs(d6, exist_ok=True)
+        open(os.path.join(d6, 'gcS-F16.gguf'), 'w', encoding='utf-8').close()
+        state6 = {'exam': {'gcS': {'F16': {'score': -1}, 'Q6_K': {'score': -1}},
+        'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state6, exclude_fam=None)
+        assert not os.path.isdir(d6), 'gc kept a model every rung of failed'
+
         # --- the grader: the flexible subsequence ---
         inst = {"path": ["abc", "def", "ghi"]}
         assert E.score_exam("ANSWER: abc, def, ghi", inst, "stop")
@@ -531,7 +575,7 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     git). Tied top-tier models are never eliminated; their ranking
     column shows the time order at the highest exam level (the
     tiebreaker indication - the human breaks ties)."""
-    from bench.exam import fail_reason
+    from bench.exam import best_record
 
     exam = state.get("exam") or {}
     # gather the measured models first (needed for the tier ranking)
@@ -540,7 +584,7 @@ def write_v91_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         fam_exam = exam.get(fam) or {}
         if not isinstance(fam_exam, dict):
             continue
-        rec = fam_exam.get("F16")
+        rec = best_record(fam_exam)
         if not isinstance(rec, dict):
             continue
         score = rec.get("score")

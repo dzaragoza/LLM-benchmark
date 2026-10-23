@@ -7,10 +7,14 @@ comprehensiveness yielded to efficiency.
               (param-ascending, per md/models.md). The F16
               candidate's max score IS the model's max score.
   the paper    the full training window, as the generation budget.
-  the bell     TOKEN only: max_tokens = the window (finish_reason
-              'length' = the paper filled). The time limit is
-              RETIRED (the author's ruling after the first
-              time-out: an arbitrary measure).
+  the bell     TOKEN and TIME: max_tokens = the window (finish_reason
+              'length' = the paper filled); one attempt may run at
+              most 1024s (finish_reason 'time_limit' = the bell).
+  recovery     a candidate whose sweep ended AT the time bell
+              retries the whole exam one rung down the quant
+              ladder - Q8_0, then Q6_K (a faster quant may beat
+              the clock its F16 could not). When every rung hit
+              the bell, the fail cause is 'out of time'.
   grading     PASS/FAIL, both parts (chain follow + elevator) per
               level, ordered-subsequence (the flexible trial era).
   self-clean  MODEL granularity: a model whose F16 scored strictly
@@ -55,6 +59,9 @@ SAMPLER_SEED = 1024
 # ALSO ranks tied leaders (recorded per attempt) - but the human
 # breaks ties.
 TIME_BELL_SECONDS = 1024
+
+# v9.3 recovery: the rungs a bell-hit candidate retries, in order
+RUNG_ORDER = ("F16", "Q8_0", "Q6_K")
 
 
 
@@ -301,6 +308,50 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     # matures and the contestant field narrows
     it = iter(found)
     return all(tok in it for tok in expected)
+
+
+def next_rung(rung: str) -> str | None:
+    """v9.3 recovery: the rung a bell-hit candidate retries next -
+    F16 -> Q8_0 -> Q6_K -> None (the ladder ends)."""
+    i = RUNG_ORDER.index(rung) if rung in RUNG_ORDER else -1
+    return RUNG_ORDER[i + 1] if 0 <= i < len(RUNG_ORDER) - 1 else None
+
+
+def hit_time_bell(rec: dict[str, Any]) -> bool:
+    """True when the candidate's sweep ended AT the time bell: the
+    highest FAILING level has at least one attempt cut by the 1024s
+    bell ('time_limit') - the model may simply be too slow at this
+    quant, so the recovery ladder gets a chance."""
+    levels = rec.get("levels") or {}
+    fail_keys = [k for k in levels if not levels[k].get("pass")]
+    if not fail_keys:
+        return False
+    top = max(fail_keys, key=int)
+    return any(
+        a.get("finish_reason") == "time_limit"
+        for a in (levels[top].get("attempts") or [])
+    )
+
+
+def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
+    """The model's DECIDING record, v9.3: the highest-scoring rung
+    among F16 and the recovery rungs (Q8_0, Q6_K). Ties go to the
+    earlier rung (F16 first) - the ladder order in RUNG_ORDER."""
+    best: dict[str, Any] | None = None
+    for rung in RUNG_ORDER:
+        rec = fam_exam.get(rung)
+        if isinstance(rec, dict):
+            best = rec
+            break
+    for rung in RUNG_ORDER[1:]:
+        rec = fam_exam.get(rung)
+        if not isinstance(rec, dict):
+            continue
+        bs = (best or {}).get("score")
+        s = rec.get("score")
+        if s is not None and (bs is None or s > bs):
+            best = rec
+    return best
 
 
 def fail_reason(rec: dict[str, Any]) -> str:
@@ -608,12 +659,13 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep, v9.1 - MODEL granularity: a model is
-    eliminated when its F16 candidate has a final score strictly
-    below the global best (the F16 score IS the model's max score).
+    """The self-cleaning sweep, v9.3 - MODEL granularity: a model is
+    eliminated when its BEST rung (F16, or a recovery rung - Q8_0,
+    Q6_K - that outscored it) has a final score strictly below the
+    global best (the best rung's score IS the model's max score).
     Elimination deletes the model's whole models/ directory (the
     data ALWAYS stays: answers in results/, records in state). The
-    model being examined keeps its files until its F16 sweep
+    model being examined keeps its files until its sweep
     finishes. Unscored models (pending, interrupted) are never
     touched. Tied leaders are never
     eliminated - time ranks them (recorded per attempt) but the
@@ -625,7 +677,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        rec = fam_exam.get("F16")
+        rec = best_record(fam_exam)
         if isinstance(rec, dict):
             s = rec.get("score")
             if s is not None and s > best:
@@ -635,7 +687,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam, fam_exam in exam.items():
         if not isinstance(fam_exam, dict) or fam == exclude_fam:
             continue
-        rec = fam_exam.get("F16")
+        rec = best_record(fam_exam)
         if not isinstance(rec, dict):
             continue
         s = rec.get("score")
@@ -651,7 +703,7 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
             continue
         fam_exam["_eliminated"] = True
         shutil.rmtree(famdir, ignore_errors=True)
-        print(f"  gc: {fam} eliminated (F16 score {s} < best {best}) - artifacts deleted")
+        print(f"  gc: {fam} eliminated (best-rung score {s} < best {best}) - artifacts deleted")
 
 
 def run(
@@ -706,31 +758,48 @@ def run(
             _state_store.save_state(state_file, state)
             print(f"  {fam} {rung}: unbuildable - skipped")
             continue
-        print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
-        # one candidate's failure never kills the exam - any
-        # exception is recorded and the sweep moves on.
-        try:
-            rec = run_family(
-                fam,
-                rung,
-                gguf,
-                models_dir,
-                state,
-                state_file,
-                port,
-                seeds,
-                max_level,
-                0,
-                dry_run,
-            )
-        except SystemExit as e:
-            if e.code == 130:
-                raise
-            rec = {"error": f"exam run failed: {e.code}"}
-        except Exception as e:
-            rec = {"error": f"exam run failed: {e}"}
-        results[key] = rec
-        # the self-clean FIRST: a model whose F16 scored strictly
+        # v9.3 recovery: a candidate whose sweep ended AT the time
+        # bell retries the whole exam one rung down the quant ladder
+        # (F16 -> Q8_0 -> Q6_K) - a faster quant may beat the 1024s
+        # clock its predecessor could not. When every rung hit the
+        # bell, the fail cause is 'out of time'. A rung that cannot
+        # be built or ends for any other reason (wrong chain, out of
+        # context, error) ends the ladder: only the BELL recovers.
+        while True:
+            print(f"-- {fam} {rung}, paper {bell_window(state, fam, models_dir)} tokens --")
+            # one candidate's failure never kills the exam - any
+            # exception is recorded and the sweep moves on.
+            try:
+                rec = run_family(
+                    fam,
+                    rung,
+                    gguf,
+                    models_dir,
+                    state,
+                    state_file,
+                    port,
+                    seeds,
+                    max_level,
+                    0,
+                    dry_run,
+                )
+            except SystemExit as e:
+                if e.code == 130:
+                    raise
+                rec = {"error": f"exam run failed: {e.code}"}
+            except Exception as e:
+                rec = {"error": f"exam run failed: {e}"}
+            results[(fam, rung)] = rec
+            nxt = next_rung(rung)
+            if dry_run or rec.get("error") or not hit_time_bell(rec) or nxt is None:
+                break
+            print(f"  {fam} {rung} hit the time bell - recovering at {nxt}")
+            gguf = _acquire(fam, nxt, models_dir)
+            if not gguf:
+                print(f"  {fam} {nxt}: unbuildable - recovery ladder ends")
+                break
+            rung = nxt
+        # the self-clean FIRST: a model whose best rung scored strictly
         # below the global best leaves the disk (the data always
         # stays), THEN the family push - so this model's own
         # deletions are staged and committed in its push
