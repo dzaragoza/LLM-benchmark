@@ -184,8 +184,7 @@ def preflight_selfcheck() -> None:
         assert E.next_rung('F16') == 'Q8_0'
         assert E.next_rung('Q8_0') == 'Q6_K'
         assert E.next_rung('Q6_K') == 'Q5_K_M'
-        assert E.next_rung('Q5_K_M') == 'Q5_K_S'
-        assert E.next_rung('Q5_K_S') is None
+        assert E.next_rung('Q5_K_M') is None
         # hit_time_bell: only the top FAILING level's attempts count
         belled = {'levels': {'3': {'pass': False, 'attempts': [
             {'finish_reason': 'time_limit'}, {'finish_reason': 'stop'}]}}}
