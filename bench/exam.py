@@ -933,18 +933,24 @@ def run(
                     walk_verdict = "pass"
                     break
                 if v == "fail":
-                    gfail += 1
-                elif v == "time":
+                    # the author's ruling: as soon as a candidate is
+                    # pass or fail, time recovery is IMPOSSIBLE - the
+                    # walk ends here; the high score is the best of
+                    # the passes so far
+                    walk_verdict = "fail"
+                    break
+                if v == "time":
                     gbell += 1
                 elif v is None and not rec.get("unbuildable"):
                     errored = True
             if walk_verdict == "pass":
                 break
-            if gfail and not gbell:
-                walk_verdict = "fail"
+            if walk_verdict == "fail":
                 break
+            # all the quants of the number timed out (or were
+            # unbuildable): descend to the next quant number
         if walk_verdict is None and not errored:
-            # every quant was tried and only bells came back: the
+            # every quant number was tried and only bells came back: the
             # quants are exhausted - out of time, an exam fail
             fam_tree["_out_of_time"] = True
             _state_store.save_state(state_file, state)
