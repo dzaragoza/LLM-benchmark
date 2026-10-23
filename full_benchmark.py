@@ -223,6 +223,19 @@ def preflight_selfcheck() -> None:
         'top': {'F16': {'score': 4}}}}
         E._gc(tmp, state6, exclude_fam=None)
         assert not os.path.isdir(d6), 'gc kept a model every rung of failed'
+        # v9.3: a TIMED-OUT model is never eliminated - its score is a
+        # floor (the clock, not the model, set it), deleting it is a
+        # false elimination
+        d7 = os.path.join(tmp, 'gcT')
+        os.makedirs(d7, exist_ok=True)
+        open(os.path.join(d7, 'gcT-F16.gguf'), 'w', encoding='utf-8').close()
+        state7 = {'exam': {'gcT': {'F16': {'score': 1, 'levels': {
+            '2': {'pass': False, 'attempts': [
+                {'finish_reason': 'time_limit'}, {'finish_reason': 'time_limit'}]}}}},
+            'top': {'F16': {'score': 4}}}}
+        E._gc(tmp, state7, exclude_fam=None)
+        assert os.path.isdir(d7), 'gc deleted a TIMED-OUT model'
+        assert not state7['exam']['gcT'].get('_eliminated')
 
         # --- the grader: the flexible subsequence ---
         inst = {"path": ["abc", "def", "ghi"]}

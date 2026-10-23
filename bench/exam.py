@@ -667,7 +667,11 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     data ALWAYS stays: answers in results/, records in state). The
     model being examined keeps its files until its sweep
     finishes. Unscored models (pending, interrupted) are never
-    touched. Tied leaders are never
+    touched. TIMED-OUT models are never eliminated either (v9.3,
+    the author's ruling): a model whose deciding record ended AT the
+    time bell was clock-limited, not capability-limited - its score
+    is a floor, not its max, so deleting it would be a false
+    elimination. Tied leaders are never
     eliminated - time ranks them (recorded per attempt) but the
     human breaks ties."""
     import shutil
@@ -691,8 +695,10 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         if not isinstance(rec, dict):
             continue
         s = rec.get("score")
-        if s is None or s >= best:
-            # pending, or a SURVIVOR: a stale _eliminated flag (e.g.
+        timed_out = hit_time_bell(rec)
+        if s is None or s >= best or timed_out:
+            # pending, a SURVIVOR, or TIMED OUT (its score is a
+            # floor, not its max): a stale _eliminated flag (e.g.
             # a fossil of the v9 premature-elimination bug) must be
             # CLEARED - the flag is derived state, the score is truth
             if s is not None and fam_exam.get("_eliminated"):
