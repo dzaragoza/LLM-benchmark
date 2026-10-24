@@ -682,7 +682,10 @@ def main(on_progress: Any = None) -> None:
         f"dead indexes) - {live} live, ONE chance each"
     )
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
-    print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, 1s watchdog")
+    print(
+        f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, "
+        f"{GC_INTERVAL_S:g}s watchdog"
+    )
     n = len(done)
     while len(done) < len(pool):
         pick = entropy_bits(11)
