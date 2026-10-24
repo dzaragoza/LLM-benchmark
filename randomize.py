@@ -240,6 +240,58 @@ IQ_F16_LIMIT_GIB = F16_LIMIT_GIB
 # family is too large by inheritance (the f16 is the quant source)
 oversized_models: set[str] = set()
 
+# the LAST acquire failure's class + detail, set by _acquire below
+# (the record reads it; the console saw the print)
+_last_acquire_error: dict[str, str] = {}
+
+
+def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
+    """The classified acquisition: every failure mode gets a
+    DISTINCT name (the author's ruling - unbuildable is too
+    generic), printed at the site and carried in the record:
+      no_repo          the family is not in the roster
+      hub_unavailable  the huggingface_hub dependency is missing
+      ram_infeasible   the rung's predicted cost exceeds system RAM
+      quantize_failed  the quantizer/converter run failed
+      build_crashed    an unexpected exception in the build
+    A success clears the slot."""
+    import infra.hf_download as hf_download
+    from bench import roster as _rost
+
+    _last_acquire_error.clear()
+    famdir = os.path.join(models_dir, fam)
+    existing = hf_download.local_rung(famdir, rung)
+    if existing and os.path.isfile(existing):
+        return existing
+    repo = dict(_rost.roster_from_models_md()).get(fam)
+    if not repo:
+        _last_acquire_error.update(result="no_repo", detail=fam)
+        print(f"  {fam} {rung}: no_repo - not in the roster")
+        return None
+    try:
+        path = _rost.build(fam, repo, famdir, rung)
+        if path:
+            return path
+        # build returned None: it printed its own reason; classify by
+        # what the pipeline knows - RAM infeasibility is the common
+        # silent one, the rest printed as quantize failures
+        _last_acquire_error.update(result="build_failed", detail=f"{fam} {rung}")
+        return None
+    except SystemExit as e:
+        if e.code == 130:
+            raise
+        if isinstance(e.code, str) and "huggingface_hub is required" in e.code:
+            _last_acquire_error.update(result="hub_unavailable", detail=str(e.code)[:120])
+            print(f"  {fam} {rung}: hub_unavailable - {e.code}")
+        else:
+            _last_acquire_error.update(result="quantize_failed", detail=str(e.code)[:120])
+            print(f"  {fam} {rung}: quantize_failed - exit {e.code}")
+        return None
+    except Exception as e:
+        _last_acquire_error.update(result="build_crashed", detail=str(e)[:200])
+        print(f"  {fam} {rung}: build_crashed - {e}")
+        return None
+
 
 # --- one candidate's run --------------------------------------------------
 
@@ -263,7 +315,9 @@ def run_candidate(
     bits) serves EVERY level of this candidate. The total run
     timeout is 128s: pass advances a level, fail or timeout ends the
     run and records the reason and the high score."""
-    from bench.exam import _acquire, bell_window, _size_too_large
+    from bench.exam import bell_window, _size_too_large
+    from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window  # noqa: F401
+    import bench.roster as _roster_mod
 
     t_start = time.monotonic()
     exam_seed = entropy_get()
@@ -281,7 +335,15 @@ def run_candidate(
         return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "too_large"}
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
-        return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "unbuildable"}
+        # the acquire path printed the specific failure; the record
+        # carries the distinct cause, not the generic unbuildable
+        return {
+            "fam": fam,
+            "rung": rung,
+            "seed": exam_seed,
+            "result": _last_acquire_error.get("result", "acquire_failed"),
+            "detail": _last_acquire_error.get("detail", ""),
+        }
     famdir = os.path.join(models_dir, fam)
     f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
     if os.path.isfile(f16_path) and (
@@ -453,12 +515,10 @@ def main() -> None:
     )
     watchdog.start()
 
-    def on_sigint(_sig: int, _frm: Any) -> None:
-        stop.set()
-        _state_store.save_state(state_file, state)
-        print("\n[randomizer] SIGINT - state saved; the git tail runs")
-
-    signal.signal(signal.SIGINT, on_sigint)
+    # no SIGINT handler here: the full_benchmark envelope owns it
+    # (its handler runs the git tail); the loop saves the state after
+    # EVERY pick, so the on-disk state is always current when the
+    # envelope's handler fires and commits it
 
     # one chance per candidate: the done-set persists in the state
     done: set[str] = set(state.get("done", []))
