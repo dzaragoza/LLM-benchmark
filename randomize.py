@@ -135,7 +135,7 @@ def _f16_gib_from_models_md(fam: str) -> float | None:
 
 GC_THRESHOLD_GIB = 16.0
 GC_WATCH_PATH = "/home"
-GC_INTERVAL_S = 1.0
+GC_INTERVAL_S = 4.0  # the cadence (the author ruling: the disk is not even that fast)
 
 
 def _free_gib(path: str = GC_WATCH_PATH) -> float:
