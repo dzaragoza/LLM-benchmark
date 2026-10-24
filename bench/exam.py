@@ -471,8 +471,26 @@ def level_outcome(
         for lv in (rec.get("levels") or {}):
             loi = max(loi, int(lv))
     if loi < target:
-        # nobody even took the frontier exam: no competent candidates
-        return "over", target
+        # nobody took the target exam. The proctor's count (the
+        # author's ruling): a candidate that FAILED qualification
+        # (wrong answer below the target) does not count - it never
+        # handed the proctor anything; a candidate that TIMED OUT
+        # anywhere (qualification or target) is still a timeout -
+        # it has not failed, it ran out of time. The walk is OVER
+        # only when nobody counts (all failed qualification); a
+        # single timeout keeps the descent alive.
+        any_timeout = False
+        for rec in group_records.values():
+            if rec.get("unbuildable") or rec.get("too_large"):
+                continue
+            deep = (rec.get("levels") or {}).get(str(loi))
+            if deep is None:
+                continue
+            if any(a.get("finish_reason") == "time_limit" for a in (deep.get("attempts") or [])):
+                any_timeout = True
+        if any_timeout:
+            return "time", loi  # a timeout is a timeout: descend
+        return "over", target  # all failed qualification: nobody counts
     # read the verdict at the group's deepest reach (>= target: a
     # candidate that reached loi passed target on the way)
     passed = 0
