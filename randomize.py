@@ -161,7 +161,11 @@ _ACTIVE_FAMILY: list[str] = [""]
 
 # --- one candidate's run --------------------------------------------------
 
-TOTAL_TIMEOUT_S = 128.0
+# the timer is PER LEVEL (the author's clarification): each level
+# gets its own clock, started when its question is sent to the server,
+# shared across the level's two parts (one paper, one deadline - the
+# v9.5 shape). A timeout ends the run at that level.
+LEVEL_TIMEOUT_S = 128.0
 
 
 def run_candidate(
@@ -180,7 +184,6 @@ def run_candidate(
     from bench.exam import _acquire, bell_window, _size_too_large
 
     t_start = time.monotonic()
-    deadline = t_start + TOTAL_TIMEOUT_S
     exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
 
@@ -226,6 +229,9 @@ def run_candidate(
             }
         level = 0
         while True:
+            # the PER-LEVEL timer: starts when the question is sent
+            level_t0 = time.monotonic()
+            deadline = level_t0 + LEVEL_TIMEOUT_S
             insts = {
                 "chain": build_chain(exam_seed, level),
                 "elevator": build_elevator(exam_seed, level),
@@ -285,6 +291,7 @@ def run_candidate(
                     break
                 messages.append({"role": "assistant", "content": answer or ""})
                 remaining -= tokens
+            last_level_time = round(time.monotonic() - level_t0, 1)
             if not level_pass:
                 break
             high_score = level
@@ -304,6 +311,9 @@ def run_candidate(
         "high_score": high_score,
         "fail_reason": fail_reason,
         "attempts": len(attempts),
+        # the SPEED datum: the LAST level's time (the deciding level's
+        # own timer), not the whole run - per the author's clarification
+        "level_time_s": last_level_time,
         "elapsed_s": round(time.monotonic() - t_start, 1),
     }
 
@@ -352,7 +362,12 @@ def main() -> None:
         model, high score, quant @ high score, speed (fast <= 32s,
         medium <= 64s, slow <= 128s - the candidate's whole run)."""
         rows = [r for r in results if r.get("result") == "done"]
-        rows.sort(key=lambda r: (-(r.get("high_score") or -1), r.get("elapsed_s") or 1e9))
+        rows.sort(
+            key=lambda r: (
+                -(r.get("high_score") or -1),
+                r.get("level_time_s") if r.get("level_time_s") is not None else 1e9,
+            )
+        )
         lines = [
             "# randomizer.md - the randomizer ledger",
             "",
@@ -364,7 +379,7 @@ def main() -> None:
             "|---|---|---|---|---|",
         ]
         for i, r in enumerate(rows):
-            t = r.get("elapsed_s") or 0.0
+            t = r.get("level_time_s") if r.get("level_time_s") is not None else (r.get("elapsed_s") or 0.0)
             speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
             lines.append(
                 f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} "
