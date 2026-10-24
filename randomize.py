@@ -489,7 +489,13 @@ def run_candidate(
 # --- the controller --------------------------------------------------------
 
 
-def main() -> None:
+# the watchability cadence (the exam's per-family push ruling,
+# randomizer-shaped): commit + push every N candidates so a
+# multi-hour run is readable remotely as it goes
+COMMIT_EVERY = 10
+
+
+def main(on_progress: Any = None) -> None:
     # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
     # first with no fallback - a black-holed IPv6 route (curl works,
     # the library hangs, zero packets - the author's T14s case) is
@@ -611,6 +617,11 @@ def main() -> None:
         )
         print(f"[randomizer]   -> {summary} ({rec.get('fail_reason', '')})")
         n += 1
+        if on_progress is not None and n % COMMIT_EVERY == 0:
+            try:
+                on_progress(n)
+            except Exception as e:
+                print(f"[randomizer] progress push failed (ignored): {e}")
     print(f"[randomizer] the pool is drained: {len(done)} candidates, one chance each - complete")
 
 
