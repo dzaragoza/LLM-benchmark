@@ -403,87 +403,145 @@ def _top_fail_level(rec: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
 
 
 def rung_verdict(rec: dict[str, Any]) -> str | None:
-    """One rung record's outcome, v9.4 - the PROCTOR rule (the
-    author's ruling): one fail reason per exam, and the BELL is
-    the gate. A paper with ANY bell-cut attempt came in after the
-    bell: out of time, UNGRADED - pass/fail is reserved for papers
-    that ended before the bell. 'pass' (the sweep ended with NO
-    failing level), 'fail' (the failing paper ENDED - handed in
-    before the bell - and the answer was wrong: a capability fail
-    no smaller quant rescues), 'time' (the failing paper has at
-    least one bell-cut attempt: after the bell, rejected, the walk
-    may recover at a smaller quant). None = unmeasured.
+    """One rung record's outcome, v9.4 corrected - the PROCTOR rule,
+    whole paper. The bell is the gate: a paper with ANY bell-cut
+    attempt was never handed in - out of time, UNGRADED. A paper
+    with every part ended is handed in and graded. None = the rung
+    was never measured.
 
-    A record marked too_large (the SIZE gate, MAX_CANDIDATE_GIB)
-    reads as 'time'-grade: not a graded paper, and its level can
-    descend the same way a belled level does."""
+    NOTE (the author's spec correction): a candidate's graded fail
+    at level x is a CANDIDATE failure - it eliminates the candidate
+    (it did not qualify for level x+1); it is NOT a quant-level
+    failure. The quant level's verdict lives at the LEVEL OF
+    INTEREST (the highest level any candidate of the group reached)
+    and is decided by level_outcome below - rung_verdict alone no
+    longer decides the walk.
+
+    A record marked too_large (the SIZE gate) reads as 'time'-grade:
+    not a graded paper; the candidate could not sit at all."""
     if rec.get("too_large"):
         return "time"  # the SIZE gate: same recovery grade as the bell
     if rec.get("score") is None:
         return None
-    levels = rec.get("levels") or {}
-    fail_keys = [k for k in levels if not levels[k].get("pass")]
-    if not fail_keys:
-        return "pass"
-    top = max(fail_keys, key=int)
-    # THE PROCTOR, WHOLE PAPER (the author's ruling): the proctor
-    # receives an exam only when BOTH parts are answered - no candidate
-    # hands in a half-finished exam. ANY belled part means the paper
-    # was never handed in: out of time, UNGRADED (even when the sibling
-    # part ended - a wrong chain beside a belled elevator is not a
-    # graded fail; the paper as a whole came in after the bell). Only
-    # a paper with EVERY part ended (stop/length, no bell, no error) is
-    # handed in and graded: wrong answer -> capability fail, the walk
-    # ends, no descent.
-    for a in levels[top].get("attempts") or []:
+    top_fail = _top_fail_level(rec)
+    if top_fail is None:
+        return "pass"  # swept clean to its ceiling
+    for a in top_fail[1].get("attempts") or []:
         if a.get("finish_reason") == "time_limit":
             return "time"  # the bell rang mid-paper: not handed in
     return "fail"  # both parts answered: graded, and it failed
 
 
+def level_outcome(
+    group_records: dict[str, dict[str, Any]],
+    target: int,
+) -> tuple[str, int] | None:
+    """One quant level's verdict, v9.4 corrected (the author's spec
+    fix, the granite-4.0-h-micro case). TARGET is the walk's
+    LEVEL-UNDER-TEST - the frontier: the highest exam level any
+    candidate has reached so far in this walk. Every candidate
+    proves ITSELF from level 0 (linear qualification), and the
+    verdict reads at the frontier:
+
+    ('fail', L)   a candidate TOOK the frontier exam L and graded
+                  WRONG on it - a stop condition: a competent
+                  candidate proved the level beyond reach
+    ('pass', L)   a candidate PASSED the frontier level - only
+                  possible at the ceiling (a sweep continues past
+                  any lower level); the walk ends, score = max_level
+    ('time', L)   the candidates that reached the frontier belled
+                  there: nobody graded it - the walk DESCENDS, the
+                  frontier rises to the group's own deepest reach L
+    ('over', T)   the group's deepest reach is BELOW the frontier:
+                  no candidate even took the frontier exam - the
+                  walk is OVER (the author's subtle case: no
+                  competent candidates remain to evaluate)
+    None          PENDING: the group is not fully evaluated yet
+
+    The CANDIDATE rule: a graded fail BELOW the frontier is a
+    candidate-local failure - it eliminates that candidate (it did
+    not qualify further); it never fails the level. A reach DEEPER
+    than the frontier means the frontier was PASSED (linear
+    qualification) - the frontier rises to that deepest reach."""
+    if not group_records:
+        return None
+    # the group's deepest reach: the highest level ANY candidate recorded
+    loi = 0
+    for rec in group_records.values():
+        for lv in (rec.get("levels") or {}):
+            loi = max(loi, int(lv))
+    if loi < target:
+        # nobody even took the frontier exam: no competent candidates
+        return "over", target
+    # read the verdict at the group's deepest reach (>= target: a
+    # candidate that reached loi passed target on the way)
+    passed = 0
+    graded_wrong = 0
+    belled = 0
+    for rec in group_records.values():
+        if rec.get("unbuildable") or rec.get("too_large"):
+            continue  # never sat: not a candidate
+        loi_rec = (rec.get("levels") or {}).get(str(loi))
+        if loi_rec is None:
+            continue  # did not reach the group's deepest level
+        if loi_rec.get("pass"):
+            passed += 1
+            continue
+        atts = loi_rec.get("attempts") or []
+        if any(a.get("finish_reason") == "time_limit" for a in atts):
+            belled += 1  # took it, belled: out of time
+        else:
+            graded_wrong += 1  # took it, handed in, wrong
+    if passed:
+        return "pass", loi  # the ceiling: a sweep's own stop
+    if graded_wrong:
+        return "fail", loi
+    if belled:
+        return "time", loi
+    return None
+
+
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
-    """The model's terminal verdict, v9.4 - derived from the records
-    so a resumed run skips a completed walk and a crashed run
-    resumes mid-walk:
-      pass / fail    the walk's stop conditions, at QUANT LEVEL
-                     granularity: a level with any passing candidate
-                     (verdict pass); a level, fully evaluated, with
-                     any wrong-answer candidate (verdict fail)
-      time           every quant level was fully evaluated and only
-                     bells came back - an exam fail per the author's
-                     ruling; the live walk also certifies it with
-                     the _out_of_time flag
-      None           PENDING: an incomplete level or an errored
-                     sweep - the walk has more to try"""
+    """The model's terminal verdict, v9.4 corrected - derived from
+    the records so a resumed run skips a completed walk. The
+    FRONTIER is walk-persistent: it starts at 0 and rises whenever
+    a group's deepest reach exceeds it (a candidate that reached L
+    passed the frontier on the way - linear qualification).
+      fail    a level_outcome was ('fail', L): a competent
+              candidate took the frontier exam and graded wrong
+      pass    a level_outcome was ('pass', L): a candidate's sweep
+              reached the ceiling (only a pass stops a sweep)
+      time    an outcome was ('over', T) - no candidate took the
+              frontier exam, no competent candidates remain - or
+              every quant level returned 'time' to exhaustion; the
+              live walk certifies exhaustion with _out_of_time
+      None    PENDING: the walk has more to try"""
     if fam_exam.get("_out_of_time"):
         return "time"
+    frontier = 0
     walked_all = True
     for _num, group in rung_groups():
-        gpass = gfail = 0
-        complete = True
-        for rung in group:
-            rec = fam_exam.get(rung)
-            if not isinstance(rec, dict):
-                complete = False
-                continue
-            if rec.get("unbuildable"):
-                continue
-            v = rung_verdict(rec)
-            if v == "pass":
-                gpass += 1
-            elif v == "fail":
-                gfail += 1
-            elif v is None:
-                complete = False
-        if gpass:
-            return "pass"
-        # the level's every candidate ran and one answered wrong: a
-        # capability fail ends the walk (all candidates of the level
-        # are always evaluated; the verdict is level-granular)
-        if gfail and complete:
-            return "fail"
-        if not complete:
+        records = {
+            r: fam_exam[r]
+            for r in group
+            if isinstance(fam_exam.get(r), dict) and not fam_exam[r].get("unbuildable")
+        }
+        if not any((rec.get("levels") or rec.get("too_large")) for rec in records.values()):
             walked_all = False
+            continue
+        outcome = level_outcome(records, frontier)
+        if outcome is None:
+            walked_all = False
+            continue
+        kind, loi = outcome
+        if kind == "fail":
+            return "fail"
+        if kind == "pass":
+            return "pass"  # the ceiling: the sweep's own stop
+        if kind == "over":
+            return "time"  # no competent candidates: the walk is over
+        # 'time': the frontier rises to this group's deepest reach
+        frontier = loi
     if walked_all:
         return "time"
     return None
@@ -936,14 +994,19 @@ def run(
         # leaves the model PENDING, never falsely failed.
         walk_verdict = None
         errored = False
-        gpass = gfail = gbell = 0
+        # the LEVEL-UNDER-TEST, walk-persistent (the author's spec
+        # fix): the frontier starts at 0 and rises whenever a group's
+        # candidates reach deeper - a candidate that reached L passed
+        # the frontier on the way. Descent tests the SAME frontier at
+        # a smaller quant; a group that cannot even reach it ends the
+        # walk (no competent candidates remain).
+        frontier = 0
         # every candidate proves ITSELF from level 0 (the author's
         # ruling - the exam level does NOT carry across quant levels):
         # a rung that timed out at level 3 does not hand its passes
         # down - the next quant number's candidates take the exam from
         # the start, because a smaller quant has not proven anything
         for num, group in rung_groups():
-            gpass = gfail = gbell = 0
             for rung in group:
                 rec = fam_tree.get(rung) or {}
                 if rec.get("too_large"):
@@ -1000,31 +1063,41 @@ def run(
                         fam_tree[rung] = rec
                         _state_store.save_state(state_file, state)
                 results[(fam, rung)] = rec
-                v = rung_verdict(rec)
-                if v == "pass":
-                    gpass += 1
-                elif v == "fail":
-                    gfail += 1
-                elif v == "time":
-                    # the bell OR the SIZE gate - both recover the same
-                    # way: the level descends when every candidate is
-                    # time/too_large
-                    gbell += 1
-                elif v is None and not rec.get("unbuildable"):
-                    errored = True
-            # the LEVEL's verdict - decided only AFTER every candidate
-            # of the quant number was evaluated (they always all run):
-            #   any pass  -> the walk ends; the high score is the
-            #               highest score of the passes
-            #   any fail  -> the walk ends (verdict fail); the high
-            #               score is the best of the earlier passes
-            #   all bell  -> the ONLY descent: the next quant number
-            if gpass:
-                walk_verdict = "pass"
-                break
-            if gfail:
-                walk_verdict = "fail"
-                break
+                if (
+                    isinstance(rec, dict)
+                    and rec.get("error")
+                    and not rec.get("unbuildable")
+                ):
+                    errored = True  # an errored sweep never marks _out_of_time
+            # the LEVEL's verdict, at the LEVEL OF INTEREST (the
+            # author's spec fix): every candidate always runs; then
+            # level_outcome reads the group's records - a graded
+            # fail BELOW the level of interest eliminates only the
+            # candidate; the level's verdict comes from who TOOK
+            # the level of interest
+            group_records = {
+                r: fam_tree[r]
+                for r in group
+                if isinstance(fam_tree.get(r), dict) and not fam_tree[r].get("unbuildable")
+            }
+            outcome = level_outcome(group_records, frontier)
+            if outcome is not None:
+                kind, loi = outcome
+                if kind == "pass":
+                    walk_verdict = "pass"
+                    print(f"  {fam}: level {loi} PASSED at {num} - the ceiling, the walk ends (high score {loi})")
+                    break
+                if kind == "fail":
+                    walk_verdict = "fail"
+                    print(f"  {fam}: level {loi} graded WRONG at {num} - the walk ends (fail)")
+                    break
+                if kind == "over":
+                    walk_verdict = "time"
+                    print(f"  {fam}: no candidate took level {loi} at {num} - no competent candidates remain, the walk is over")
+                    break
+                # 'time': the frontier rises to this group's deepest
+                # reach; the descent tests the same frontier smaller
+                frontier = loi
         if walk_verdict is None and not errored:
             # every quant number was tried and only bells/too-larges came
             # back: the quants are exhausted - out of time, an exam fail

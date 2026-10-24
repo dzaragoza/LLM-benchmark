@@ -153,29 +153,60 @@ def preflight_selfcheck() -> None:
         c = E.candidates({}, [fam])
         assert c == [(fam, "F16")], f"candidates must be F16-only, got {c}"
 
-        # --- v9.1 gc: model granularity, F16-keyed ---
+        # --- v9.4 gc: DONE walks collect, PENDING walks never (fixtures
+        # carry LEVELS - the walk's real record shape; a record with no
+        # levels is UNMEASURED, and a walk with only such records is
+        # PENDING, never collected) ---
+        def mklevel(passed, attempts=None):
+            return {"pass": passed} if passed else {"pass": False, "attempts": attempts or []}
+
+        def sweep(levels):
+            return {"score": max([int(k) for k in levels if levels[k]["pass"]], default=-1),
+                    "levels": levels}
+
+        bell1 = [{"finish_reason": "time_limit"}]
+        wrong1 = [{"finish_reason": "stop", "ok": False}]
+        # a DONE walk (fail: the frontier graded wrong), below best: collected
         d = os.path.join(tmp, "gcA")
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "gcA-F16.gguf"), "w", encoding="utf-8").close()
-        state = {"exam": {"gcA": {"F16": {"score": -1}}, "top": {"F16": {"score": 4}}}}
+        state = {
+            "exam": {
+                "gcA": {"F16": sweep({"0": mklevel(False, wrong1)})},
+                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
+            }
+        }
         E._gc(tmp, state, exclude_fam=None)
         assert not os.path.isdir(d), "gc kept a beaten model"
         assert state["exam"]["gcA"]["_eliminated"] is True
+        # a SURVIVOR (score == the global best): never collected
         d2 = os.path.join(tmp, "gcB")
         os.makedirs(d2, exist_ok=True)
         open(os.path.join(d2, "gcB-F16.gguf"), "w", encoding="utf-8").close()
-        state2 = {"exam": {"gcB": {"F16": {"score": 4}}, "top": {"F16": {"score": 4}}}}
+        state2 = {
+            "exam": {
+                "gcB": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
+                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
+            }
+        }
         E._gc(tmp, state2, exclude_fam=None)
         assert os.path.isdir(d2), "gc deleted a survivor model"
+        # a PENDING walk (bells only - the frontier may still be taken
+        # by a smaller quant): never collected
         d3 = os.path.join(tmp, "gcC")
         os.makedirs(d3, exist_ok=True)
         open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
-        state3 = {"exam": {"gcC": {"F16": {}}, "top": {"F16": {"score": 4}}}}
+        state3 = {
+            "exam": {
+                "gcC": {"F16": sweep({"0": mklevel(False, bell1)})},
+                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
+            }
+        }
         E._gc(tmp, state3, exclude_fam=None)
         assert os.path.isdir(d3), "gc deleted a pending model"
+        # the RUNNING model is excluded regardless
         open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
-        state4 = {"exam": {"gcC": {"F16": {"score": -1}}, "top": {"F16": {"score": 4}}}}
-        E._gc(tmp, state4, exclude_fam="gcC")
+        E._gc(tmp, state3, exclude_fam="gcC")
         assert os.path.isdir(d3), "gc deleted the running model"
 
         # --- v9.4: the exhaustive quant walk helpers ---
