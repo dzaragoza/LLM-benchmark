@@ -60,9 +60,8 @@ def main() -> int:
             if wrote:
                 n_convs += 1
     size = os.path.getsize(args.output)
-    print(
-        f"{args.output}: {n_convs}/{len(convs)} conversations, {n_turns} turns, {size / 1024:.0f} KB"
-    )
+    kb = size / 1024
+    print(f"{args.output}: {n_convs}/{len(convs)} conversations, {n_turns} turns, {kb:.0f} KB")
     return 0
 
 

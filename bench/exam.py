@@ -81,7 +81,6 @@ QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 MAX_CANDIDATE_GIB = 16.0
 
 
-
 # the repetition count IS the seed set: n=1 for the benchmark, so the
 # seed is 1 - one exam instance per level, identical for every model
 def exam_seeds(n: int) -> list[int]:
@@ -390,10 +389,7 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
     if not fail_keys:
         return False
     top = max(fail_keys, key=int)
-    return any(
-        a.get("finish_reason") == "time_limit"
-        for a in (levels[top].get("attempts") or [])
-    )
+    return any(a.get("finish_reason") == "time_limit" for a in (levels[top].get("attempts") or []))
 
 
 def rung_verdict(rec: dict[str, Any]) -> str | None:
@@ -503,8 +499,7 @@ def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
         # its candidates were evaluated - records beyond that level
         # are relics of a pre-fix walk and never decide anything
         if gfail or any(
-            isinstance(fam_exam.get(r), dict)
-            and rung_verdict(fam_exam.get(r) or {}) == "pass"
+            isinstance(fam_exam.get(r), dict) and rung_verdict(fam_exam.get(r) or {}) == "pass"
             for r in group
         ):
             return best
@@ -750,7 +745,6 @@ def run_family(
                 if not dry_run:
                     verdict = "PASS" if rec["pass"] else "FAIL"
                     capped = sum(1 for a in attempts if a.get("finish_reason") == "length")
-                    belled = sum(1 for a in attempts if a.get("finish_reason") == "time_limit")
                     # the fail MODE must be visible at a glance, and it
                     # MUST MATCH the verdict the walk actually applied -
                     # the PROCTOR rule (rung_verdict): ANY belled attempt
@@ -762,8 +756,10 @@ def run_family(
                     if not rec["pass"]:
                         mode = (
                             ", OUT OF TIME"
-                            if rung_verdict({"score": rec.get("score", 0),
-                                              "levels": {str(level): rec}}) == "time"
+                            if rung_verdict(
+                                {"score": rec.get("score", 0), "levels": {str(level): rec}}
+                            )
+                            == "time"
                             else ", wrong answer"
                         )
                     print(
@@ -944,7 +940,6 @@ def run(
     results: dict[tuple[str, str], Any] = {}
     for fam, rung in cands:
         key = (fam, rung)
-        fam_exam = (state.get("exam") or {}).get(fam) or {}
         # v9 records are rung-keyed ONLY. The old family-keyed shape
         # (a boundary record stored directly under the family) is
         # PRE-v9 era data: it belongs to a different protocol and is
@@ -1066,8 +1061,7 @@ def run(
             # back: the quants are exhausted - out of time, an exam fail
             fam_tree["_out_of_time"] = True
             _state_store.save_state(state_file, state)
-            nlarge = sum(1 for r in fam_tree.values()
-                         if isinstance(r, dict) and r.get("too_large"))
+            nlarge = sum(1 for r in fam_tree.values() if isinstance(r, dict) and r.get("too_large"))
             why = "size" if nlarge else "the bell"
             print(f"  {fam}: quants exhausted ({why}) - out of time (an exam fail)")
         # the self-clean FIRST: a model whose deciding rung scored

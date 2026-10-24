@@ -79,7 +79,6 @@ ROSTER = {
     "Falcon3-10B-Instruct": "tiiuae/Falcon3-10B-Instruct",
     "Yi-1.5-6B-Chat": "01-ai/Yi-1.5-6B-Chat",
     "Mistral-Nemo-Instruct-2407": "mistralai/Mistral-Nemo-Instruct-2407",
-    "Falcon3-10B-Instruct": "tiiuae/Falcon3-10B-Instruct",
     "gemma-4-e4b-it": "google/gemma-4-e4b-it",
     "Ministral-3-8B-Instruct-2512": "mistralai/Ministral-3-8B-Instruct-2512",
     "Yi-1.5-9B-Chat": "01-ai/Yi-1.5-9B-Chat",

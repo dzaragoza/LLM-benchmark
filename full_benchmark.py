@@ -151,136 +151,179 @@ def preflight_selfcheck() -> None:
 
         # --- v9.1: candidates are (model, F16) only ---
         c = E.candidates({}, [fam])
-        assert c == [(fam, 'F16')], f'candidates must be F16-only, got {c}'
+        assert c == [(fam, "F16")], f"candidates must be F16-only, got {c}"
 
         # --- v9.1 gc: model granularity, F16-keyed ---
-        d = os.path.join(tmp, 'gcA')
+        d = os.path.join(tmp, "gcA")
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, 'gcA-F16.gguf'), 'w', encoding='utf-8').close()
-        state = {'exam': {'gcA': {'F16': {'score': -1}}, 'top': {'F16': {'score': 4}}}}
+        open(os.path.join(d, "gcA-F16.gguf"), "w", encoding="utf-8").close()
+        state = {"exam": {"gcA": {"F16": {"score": -1}}, "top": {"F16": {"score": 4}}}}
         E._gc(tmp, state, exclude_fam=None)
-        assert not os.path.isdir(d), 'gc kept a beaten model'
-        assert state['exam']['gcA']['_eliminated'] is True
-        d2 = os.path.join(tmp, 'gcB')
+        assert not os.path.isdir(d), "gc kept a beaten model"
+        assert state["exam"]["gcA"]["_eliminated"] is True
+        d2 = os.path.join(tmp, "gcB")
         os.makedirs(d2, exist_ok=True)
-        open(os.path.join(d2, 'gcB-F16.gguf'), 'w', encoding='utf-8').close()
-        state2 = {'exam': {'gcB': {'F16': {'score': 4}}, 'top': {'F16': {'score': 4}}}}
+        open(os.path.join(d2, "gcB-F16.gguf"), "w", encoding="utf-8").close()
+        state2 = {"exam": {"gcB": {"F16": {"score": 4}}, "top": {"F16": {"score": 4}}}}
         E._gc(tmp, state2, exclude_fam=None)
-        assert os.path.isdir(d2), 'gc deleted a survivor model'
-        d3 = os.path.join(tmp, 'gcC')
+        assert os.path.isdir(d2), "gc deleted a survivor model"
+        d3 = os.path.join(tmp, "gcC")
         os.makedirs(d3, exist_ok=True)
-        open(os.path.join(d3, 'gcC-F16.gguf'), 'w', encoding='utf-8').close()
-        state3 = {'exam': {'gcC': {'F16': {}}, 'top': {'F16': {'score': 4}}}}
+        open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
+        state3 = {"exam": {"gcC": {"F16": {}}, "top": {"F16": {"score": 4}}}}
         E._gc(tmp, state3, exclude_fam=None)
-        assert os.path.isdir(d3), 'gc deleted a pending model'
-        open(os.path.join(d3, 'gcC-F16.gguf'), 'w', encoding='utf-8').close()
-        state4 = {'exam': {'gcC': {'F16': {'score': -1}}, 'top': {'F16': {'score': 4}}}}
-        E._gc(tmp, state4, exclude_fam='gcC')
-        assert os.path.isdir(d3), 'gc deleted the running model'
+        assert os.path.isdir(d3), "gc deleted a pending model"
+        open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
+        state4 = {"exam": {"gcC": {"F16": {"score": -1}}, "top": {"F16": {"score": 4}}}}
+        E._gc(tmp, state4, exclude_fam="gcC")
+        assert os.path.isdir(d3), "gc deleted the running model"
 
         # --- v9.4: the exhaustive quant walk helpers ---
         groups = E.rung_groups()
-        assert groups[0] == ('F16', ('F16',)), 'the walk starts at F16, alone'
-        assert groups[1][0] == 'Q8' and groups[1][1] == ('Q8_0',)
-        assert groups[2][0] == 'Q6' and groups[2][1] == ('Q6_K',)
-        assert [g[0] for g in groups] == ['F16', 'Q8', 'Q6', 'Q5', 'Q4', 'Q3', 'Q2', 'Q1']
-        assert 'IQ2_M' in groups[6][1] and 'TQ2_0' in groups[6][1], 'IQ/TQ variants walk under their number'
+        assert groups[0] == ("F16", ("F16",)), "the walk starts at F16, alone"
+        assert groups[1][0] == "Q8" and groups[1][1] == ("Q8_0",)
+        assert groups[2][0] == "Q6" and groups[2][1] == ("Q6_K",)
+        assert [g[0] for g in groups] == ["F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1"]
+        assert "IQ2_M" in groups[6][1] and "TQ2_0" in groups[6][1], (
+            "IQ/TQ variants walk under their number"
+        )
         # rung_verdict: pass / fail / time / unmeasured
-        vp = {'score': 3, 'levels': {'3': {'pass': True}}}
-        assert E.rung_verdict(vp) == 'pass'
-        vf = {'score': 1, 'levels': {'2': {'pass': False, 'attempts': [
-            {'finish_reason': 'stop', 'ok': False}]}}}
-        assert E.rung_verdict(vf) == 'fail'
-        vt = {'score': 1, 'levels': {'2': {'pass': False, 'attempts': [
-            {'finish_reason': 'time_limit'}]}}}
-        assert E.rung_verdict(vt) == 'time'
-        assert E.rung_verdict({'score': None}) is None
+        vp = {"score": 3, "levels": {"3": {"pass": True}}}
+        assert E.rung_verdict(vp) == "pass"
+        vf = {
+            "score": 1,
+            "levels": {"2": {"pass": False, "attempts": [{"finish_reason": "stop", "ok": False}]}},
+        }
+        assert E.rung_verdict(vf) == "fail"
+        vt = {
+            "score": 1,
+            "levels": {"2": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]}},
+        }
+        assert E.rung_verdict(vt) == "time"
+        assert E.rung_verdict({"score": None}) is None
         # model_verdict: the walk's terminal states
-        assert E.model_verdict({'F16': vp}) == 'pass'
-        assert E.model_verdict({'F16': vf}) == 'fail'
-        assert E.model_verdict({'F16': vt, 'Q8_0': {'unbuildable': True}}) is None, 'quants remain - pending'
-        assert E.model_verdict({'F16': vt, '_out_of_time': True}) == 'time'
+        assert E.model_verdict({"F16": vp}) == "pass"
+        assert E.model_verdict({"F16": vf}) == "fail"
+        mv = E.model_verdict({"F16": vt, "Q8_0": {"unbuildable": True}})
+        assert mv is None, "quants remain - pending"
+        assert E.model_verdict({"F16": vt, "_out_of_time": True}) == "time"
         # only bells everywhere = out of time (a fail reason)
-        allbell = {r: dict(vt) for r, _num in
-                   [(rg, 0) for g in groups for rg in g[1]]}
-        assert E.model_verdict(allbell) == 'time', 'all-bell exhaustion is out of time'
+        allbell = {r: dict(vt) for r, _num in [(rg, 0) for g in groups for rg in g[1]]}
+        assert E.model_verdict(allbell) == "time", "all-bell exhaustion is out of time"
         # a mixed group (fail + bell) moves on; exhausted = _out_of_time wins
-        mixed = {'F16': vt, 'Q8_0': vf, '_out_of_time': True}
-        assert E.model_verdict(mixed) == 'time'
+        mixed = {"F16": vt, "Q8_0": vf, "_out_of_time": True}
+        assert E.model_verdict(mixed) == "time"
+
         # best_rung: the highest-scoring rung, earlier rung on ties.
         # Records must carry LEVELS (as the walk writes them): a
         # score with no failing level reads as a clean sweep (pass)
         # and ends the walk at its own level - the score-only fixture
         # of the pre-correction era is not a shape the walk produces.
-        mk_t = lambda s: {'score': s, 'levels': {
-            '0': {'pass': True}, '1': {'pass': False,
-            'attempts': [{'finish_reason': 'time_limit'}]}}}
-        bx = {'F16': mk_t(3), 'Q8_0': mk_t(5)}
-        assert E.best_rung(bx)[0] == 'Q8_0' and E.best_rung(bx)[1]['score'] == 5
-        bx2 = {'F16': mk_t(4), 'Q8_0': mk_t(4)}
-        assert E.best_rung(bx2)[0] == 'F16', 'ties go to the earlier rung'
+        def mk_t(s):
+            return {
+                "score": s,
+                "levels": {
+                    "0": {"pass": True},
+                    "1": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
+                },
+            }
+
+        bx = {"F16": mk_t(3), "Q8_0": mk_t(5)}
+        assert E.best_rung(bx)[0] == "Q8_0" and E.best_rung(bx)[1]["score"] == 5
+        bx2 = {"F16": mk_t(4), "Q8_0": mk_t(4)}
+        assert E.best_rung(bx2)[0] == "F16", "ties go to the earlier rung"
         assert E.best_rung({}) is None
         # the author's worked example: f16 passes 0..3 bells at 4; q8
         # same; q6 fails at 4 - the walk ends there (q5.. never run),
         # the verdict is fail, and the HIGH SCORE is f16's 3
-        vt = {'score': 3, 'levels': {
-            **{str(i): {'pass': True} for i in range(4)},
-            '4': {'pass': False, 'attempts': [{'finish_reason': 'time_limit'}]}}}
-        vfl = {'score': 3, 'levels': {
-            **{str(i): {'pass': True} for i in range(4)},
-            '4': {'pass': False, 'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
-        ex = {'F16': vt, 'Q8_0': dict(vt), 'Q6_K': vfl}
-        assert E.model_verdict(ex) == 'fail', 'a wrong answer ends the walk'
-        assert E.best_rung(ex)[0] == 'F16' and E.best_rung(ex)[1]['score'] == 3
-        assert E.hit_time_bell(vt), 'the bell record reads as time'
-        assert not E.hit_time_bell(vfl), 'the wrong-chain record reads as fail'
+        vt = {
+            "score": 3,
+            "levels": {
+                **{str(i): {"pass": True} for i in range(4)},
+                "4": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
+            },
+        }
+        vfl = {
+            "score": 3,
+            "levels": {
+                **{str(i): {"pass": True} for i in range(4)},
+                "4": {"pass": False, "attempts": [{"finish_reason": "stop", "ok": False}]},
+            },
+        }
+        ex = {"F16": vt, "Q8_0": dict(vt), "Q6_K": vfl}
+        assert E.model_verdict(ex) == "fail", "a wrong answer ends the walk"
+        assert E.best_rung(ex)[0] == "F16" and E.best_rung(ex)[1]["score"] == 3
+        assert E.hit_time_bell(vt), "the bell record reads as time"
+        assert not E.hit_time_bell(vfl), "the wrong-chain record reads as fail"
 
         # --- v9.4 gc: terminal verdicts collect, pending walks never ---
         # fixtures carry LEVELS (the walk's real record shape): a
         # score-only record reads as a clean sweep (pass) under the
         # level-granular verdict and the gc would read it differently
-        mkbell = lambda s: {'score': s, 'levels': {
-            '0': {'pass': True}, '1': {'pass': False,
-            'attempts': [{'finish_reason': 'time_limit'}]}}}
-        mkwrong = lambda s: {'score': s, 'levels': {
-            '0': {'pass': True}, '1': {'pass': False,
-            'attempts': [{'finish_reason': 'stop', 'ok': False}]}}}
-        d5 = os.path.join(tmp, 'gcR')
+        def mkbell(s):
+            return {
+                "score": s,
+                "levels": {
+                    "0": {"pass": True},
+                    "1": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
+                },
+            }
+
+        d5 = os.path.join(tmp, "gcR")
         os.makedirs(d5, exist_ok=True)
-        open(os.path.join(d5, 'gcR-F16.gguf'), 'w', encoding='utf-8').close()
+        open(os.path.join(d5, "gcR-F16.gguf"), "w", encoding="utf-8").close()
         # f16 belled; q8_0 PASSED clean to 4 - the walk ended at q8_0,
         # the model SURVIVES (4 == the global best)
-        state5 = {'exam': {'gcR': {'F16': mkbell(-1), 'Q8_0': {
-            'score': 4, 'levels': {str(i): {'pass': True} for i in range(5)}}},
-        'top': {'F16': {'score': 4}}}}
+        state5 = {
+            "exam": {
+                "gcR": {
+                    "F16": mkbell(-1),
+                    "Q8_0": {"score": 4, "levels": {str(i): {"pass": True} for i in range(5)}},
+                },
+                "top": {"F16": {"score": 4}},
+            }
+        }
         E._gc(tmp, state5, exclude_fam=None)
-        assert os.path.isdir(d5), 'gc deleted a model its Q8_0 recovery SAVED'
-        assert not state5['exam']['gcR'].get('_eliminated')
-        d6 = os.path.join(tmp, 'gcS')
+        assert os.path.isdir(d5), "gc deleted a model its Q8_0 recovery SAVED"
+        assert not state5["exam"]["gcR"].get("_eliminated")
+        d6 = os.path.join(tmp, "gcS")
         os.makedirs(d6, exist_ok=True)
-        open(os.path.join(d6, 'gcS-F16.gguf'), 'w', encoding='utf-8').close()
+        open(os.path.join(d6, "gcS-F16.gguf"), "w", encoding="utf-8").close()
         # f16 answered wrong at level 0 - the walk ended there, fail, collected
-        state6 = {'exam': {'gcS': {'F16': {'score': -1, 'levels': {
-            '0': {'pass': False, 'attempts': [
-                {'finish_reason': 'stop', 'ok': False},
-                {'finish_reason': 'stop', 'ok': False}]}}}},
-        'top': {'F16': {'score': 4}}}}
+        state6 = {
+            "exam": {
+                "gcS": {
+                    "F16": {
+                        "score": -1,
+                        "levels": {
+                            "0": {
+                                "pass": False,
+                                "attempts": [
+                                    {"finish_reason": "stop", "ok": False},
+                                    {"finish_reason": "stop", "ok": False},
+                                ],
+                            }
+                        },
+                    }
+                },
+                "top": {"F16": {"score": 4}},
+            }
+        }
         E._gc(tmp, state6, exclude_fam=None)
-        assert not os.path.isdir(d6), 'gc kept a model every rung of failed'
+        assert not os.path.isdir(d6), "gc kept a model every rung of failed"
         # v9.4: a PENDING walk (bells, quants untried) is never touched
-        d7 = os.path.join(tmp, 'gcT')
+        d7 = os.path.join(tmp, "gcT")
         os.makedirs(d7, exist_ok=True)
-        open(os.path.join(d7, 'gcT-F16.gguf'), 'w', encoding='utf-8').close()
-        state7 = {'exam': {'gcT': {'F16': mkbell(1)},
-        'top': {'F16': {'score': 4}}}}
+        open(os.path.join(d7, "gcT-F16.gguf"), "w", encoding="utf-8").close()
+        state7 = {"exam": {"gcT": {"F16": mkbell(1)}, "top": {"F16": {"score": 4}}}}
         E._gc(tmp, state7, exclude_fam=None)
-        assert os.path.isdir(d7), 'gc deleted a PENDING (mid-walk) model'
-        assert not state7['exam']['gcT'].get('_eliminated')
+        assert os.path.isdir(d7), "gc deleted a PENDING (mid-walk) model"
+        assert not state7["exam"]["gcT"].get("_eliminated")
         # v9.4: quants EXHAUSTED at the bell = out of time = an exam
         # fail - the gc collects it like any fail
-        state7['exam']['gcT']['_out_of_time'] = True
+        state7["exam"]["gcT"]["_out_of_time"] = True
         E._gc(tmp, state7, exclude_fam=None)
-        assert not os.path.isdir(d7), 'gc kept an out-of-time model (an exam fail)'
+        assert not os.path.isdir(d7), "gc kept an out-of-time model (an exam fail)"
 
         # --- the grader: the flexible subsequence ---
         inst = {"path": ["abc", "def", "ghi"]}
@@ -607,7 +650,7 @@ def main() -> None:
         _run(args)
     except SystemExit:
         raise
-    except BaseException as exc:
+    except BaseException:
         import traceback
 
         tb = traceback.format_exc()
@@ -642,10 +685,10 @@ def regrade_records(state: dict[str, Any]) -> int:
     walk's derived verdict cleared (_out_of_time dropped) so the run
     resumes exactly the walks the new grades re-opened. Returns the
     number of attempts whose grade flipped."""
-    from bench.exam import TIME_BELL_SECONDS, score_exam
+    from bench.exam import score_exam
 
     flipped = 0
-    for fam, tree in (state.get("exam") or {}).items():
+    for _fam, tree in (state.get("exam") or {}).items():
         if not isinstance(tree, dict):
             continue
         tree.pop("_out_of_time", None)
@@ -655,7 +698,7 @@ def regrade_records(state: dict[str, Any]) -> int:
             if rec.get("too_large") or rec.get("unbuildable"):
                 continue
             levels = rec.get("levels") or {}
-            for lv, lrec in levels.items():
+            for _lv, lrec in levels.items():
                 attempts = lrec.get("attempts") or []
                 for a in attempts:
                     if a.get("answer") is None or not a.get("expected"):
@@ -682,7 +725,6 @@ def regrade_records(state: dict[str, Any]) -> int:
                 score = int(lv)
             rec["score"] = score
     return flipped
-
 
 
 def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
@@ -734,7 +776,7 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     # tier 'the models with the lexicographically-largest quant name')
     best = max((r[3] for r in rows if r[3] is not None), default=None)
     tier = [r for r in rows if r[3] is not None and r[3] == best]
-    tier.sort(key=lambda r: (r[4] if r[4] is not None else float("inf")))
+    tier.sort(key=lambda r: r[4] if r[4] is not None else float("inf"))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
         "# v9.4.md - the tournament ledger (v9.4: the exhaustive quant walk, the 32s bell)",

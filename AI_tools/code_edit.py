@@ -79,6 +79,7 @@ import os
 import re
 import tempfile
 from collections.abc import Sequence
+from typing import Any
 
 __all__ = [
     "CodeEditError",
@@ -569,9 +570,7 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
             numeric = block[2] if len(block) >= 3 else True
             reverse = block[3] if len(block) >= 4 else False
             if not isinstance(key_col, int) or key_col < 1:
-                raise CodeEditError(
-                    f"block {i}: sort_table key_col must be a 1-based int >= 1"
-                )
+                raise CodeEditError(f"block {i}: sort_table key_col must be a 1-based int >= 1")
             buf = _sort_table(buf, key_col, bool(numeric), bool(reverse), i)
         elif kind == "set_lines":
             if len(block) != 4:
@@ -687,11 +686,11 @@ def _sort_table(buf: str, key_col: int, numeric: bool, reverse: bool, i: int) ->
         if numeric:
             try:
                 return float(v.replace(",", ""))
-            except ValueError:
+            except ValueError as e:
                 raise CodeEditError(
                     f"block {i}: sort_table numeric key {v!r} does not "
                     "parse as a number - fix the cell or sort as text"
-                )
+                ) from e
         return v
 
     data_sorted = sorted(data, key=key, reverse=reverse)
@@ -701,7 +700,6 @@ def _sort_table(buf: str, key_col: int, numeric: bool, reverse: bool, i: int) ->
         # when the file ends there - restore the trailing newline
         out = out + [""]
     return "\n".join(out)
-
 
 
 def _sep(anchor: str, new: str, after: bool) -> str:
@@ -1084,7 +1082,7 @@ def preview(path: str, blocks: Sequence[tuple]) -> str:
     )
 
 
-def edit_json(path: str, ops: Sequence[tuple]) -> None:
+def edit_json(path: str, ops: Sequence[tuple]) -> None:  # noqa: C901
     """Structured JSON edits as one verified transaction (the registry
     incident: json.load + dict surgery + json.dump as an ad-hoc script
     had NO verification - a typo'd key silently created a new entry,
@@ -1110,7 +1108,7 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:
     try:
         doc = json.loads(src)
     except ValueError as e:
-        raise CodeEditError(f"{path}: not valid JSON ({e}) - refused, file untouched")
+        raise CodeEditError(f"{path}: not valid JSON ({e}) - refused, file untouched") from e
 
     def resolve(parent: Any, keys: list[str], i: int, create: bool) -> Any:
         node = parent
@@ -1126,11 +1124,11 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:
             elif isinstance(node, list):
                 try:
                     node = node[int(k)]
-                except (ValueError, IndexError):
+                except (ValueError, IndexError) as e:
                     raise CodeEditError(
                         f"{path}: op {i}: path {'.'.join(keys)!r} - {k!r} is not "
                         "a valid index into a list"
-                    )
+                    ) from e
             else:
                 raise CodeEditError(
                     f"{path}: op {i}: path {'.'.join(keys)!r} - cannot descend "
@@ -1149,14 +1147,12 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:
             elif isinstance(parent, list):
                 try:
                     parent[int(leaf)] = op[2]
-                except (ValueError, IndexError):
+                except (ValueError, IndexError) as e:
                     raise CodeEditError(
                         f"{path}: op {i}: index {leaf!r} invalid for the list"
-                    )
+                    ) from e
             else:
-                raise CodeEditError(
-                    f"{path}: op {i}: cannot set into {type(parent).__name__}"
-                )
+                raise CodeEditError(f"{path}: op {i}: cannot set into {type(parent).__name__}")
         elif kind == "delete":
             parent = resolve(doc, keys[:-1], i, create=False)
             leaf = keys[-1]
@@ -1167,23 +1163,19 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:
             elif isinstance(parent, list):
                 try:
                     del parent[int(leaf)]
-                except (ValueError, IndexError):
-                    raise CodeEditError(f"{path}: op {i}: index {leaf!r} invalid")
+                except (ValueError, IndexError) as e:
+                    raise CodeEditError(f"{path}: op {i}: index {leaf!r} invalid") from e
             else:
                 raise CodeEditError(f"{path}: op {i}: cannot delete from scalar")
         elif kind == "append":
             node = resolve(doc, keys, i, create=False)
             if not isinstance(node, list):
-                raise CodeEditError(
-                    f"{path}: op {i}: append target is not a list"
-                )
+                raise CodeEditError(f"{path}: op {i}: append target is not a list")
             node.append(op[2])
         elif kind == "merge":
             node = resolve(doc, keys, i, create=False)
             if not isinstance(node, dict):
-                raise CodeEditError(
-                    f"{path}: op {i}: merge target is not a dict"
-                )
+                raise CodeEditError(f"{path}: op {i}: merge target is not a dict")
             clash = set(node) & set(op[2])
             if clash:
                 raise CodeEditError(
@@ -1199,26 +1191,23 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:
     try:
         recheck = json.loads(out)
     except ValueError as e:
-        raise CodeEditError(f"{path}: the edited document does not re-parse ({e})")
+        raise CodeEditError(f"{path}: the edited document does not re-parse ({e})") from e
     for i, op in enumerate(ops):
         keys = op[1].split(".")
         node = recheck
         try:
             for k in keys:
                 node = node[k] if isinstance(node, dict) else node[int(k)]
-        except (KeyError, IndexError, ValueError, TypeError):
+        except (KeyError, IndexError, ValueError, TypeError) as e:
             if op[0] == "delete":
                 continue  # absent is exactly what a delete verifies
-            raise CodeEditError(f"{path}: op {i} verify failed (path not in result)")
+            raise CodeEditError(f"{path}: op {i} verify failed (path not in result)") from e
         if op[0] == "set" and node != op[2]:
-            raise CodeEditError(
-                f"{path}: op {i} verify failed (value mismatch after write)"
-            )
+            raise CodeEditError(f"{path}: op {i} verify failed (value mismatch after write)")
     _atomic_write_sync(path, out)
     with open(path, encoding="utf-8") as f:
         if f.read() != out:
             raise CodeEditError(f"{path}: disk content diverged after write - re-check")
-
 
 
 def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
