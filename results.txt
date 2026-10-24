@@ -112726,3 +112726,172 @@ idempotent and will resume from this phase.
   [2] computing importance matrix from Qwen2.5-3B-Instruct-f16.gguf (output hidden; shown on error)
 
 [randomizer] SIGINT - state saved, bye
+
+===== 2026-10-24T09:33:44 | full_benchmark.py --task randomize --clean =====
+  gc: gcA eliminated (best-rung score 0 < best 4) - artifacts deleted
+  gc: gcS eliminated (best-rung score 0 < best 4) - artifacts deleted
+  gc: gcT eliminated (best-rung score 1 < best 4) - artifacts deleted
+  self-check: the gc, the paper, the grader, the ladder, the roster - OK
+[2026-10-24T09:33:44] randomizer: all records wiped (--clean) - the pool is fresh, every candidate's chance restored
+[randomizer] pool: 2048 candidates (11 bits/pick, ONE chance each)
+[randomizer] entropy: /dev/random
+[randomizer] gc: /home free > 16 GiB, 1s watchdog
+[randomizer] #1 pick=0b00011000001 -> Qwen3.5-0.8B Q2_0
+  [1] downloading safetensors from Qwen/Qwen3.5-0.8B (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Qwen3.5-0.8B-f16.gguf -> Q2_0 (output hidden; shown on error)
+  [2] computing importance matrix from Qwen3.5-0.8B-f16.gguf (output hidden; shown on error)
+  [2] using importance matrix Qwen3.5-0.8B-f16.gguf.imatrix
+[randomizer]   -> high_score=-1 (wrong answer)
+[randomizer] #2 pick=0b01111100010 -> granite-4.0-h-micro Q1_0
+  [1] downloading safetensors from ibm-granite/granite-4.0-h-micro (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing granite-4.0-h-micro-f16.gguf -> Q1_0 (output hidden; shown on error)
+  [2] computing importance matrix from granite-4.0-h-micro-f16.gguf (output hidden; shown on error)
+  [2] using importance matrix granite-4.0-h-micro-f16.gguf.imatrix
+[randomizer]   -> high_score=-1 (wrong answer)
+[randomizer] #3 pick=0b11110001110 -> Falcon3-10B-Instruct IQ3_S
+  [1] downloading safetensors from tiiuae/Falcon3-10B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Falcon3-10B-Instruct-f16.gguf -> IQ3_S (output hidden; shown on error)
+  [2] computing importance matrix from Falcon3-10B-Instruct-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/Falcon3-10B-Instruct/imatrix.log) ---
+0.01.058.753 W load: model vocab missing newline token, using special_pad_id instead
+radv/amdgpu: Not enough memory for command submission.
+0.07.084.141 E ggml_vulkan: device lost on Vulkan0
+0.07.261.896 E llama_model_load: error loading model: vk::Queue::submit: ErrorDeviceLost
+0.07.261.906 E llama_model_load_from_file_impl: failed to load model
+0.07.261.930 E cmn  common_init_: failed to load model 'models/Falcon3-10B-Instruct/Falcon3-10B-Instruct-f16.gguf'
+0.07.261.932 E main : failed to init
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/Falcon3-10B-Instruct/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> unbuildable ()
+[randomizer] #4 pick=0b10011100011 -> Phi-3.5-mini-instruct IQ2_XXS
+  [1] downloading safetensors from microsoft/Phi-3.5-mini-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Phi-3.5-mini-instruct-f16.gguf -> IQ2_XXS (output hidden; shown on error)
+  [2] computing importance matrix from Phi-3.5-mini-instruct-f16.gguf (output hidden; shown on error)
+  [2] using importance matrix Phi-3.5-mini-instruct-f16.gguf.imatrix
+[randomizer]   -> high_score=-1 (timeout)
+[randomizer] #5 pick=0b11100000011 -> Yi-1.5-9B-Chat IQ2_XXS
+  [1] downloading safetensors from 01-ai/Yi-1.5-9B-Chat (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Yi-1.5-9B-Chat-f16.gguf -> IQ2_XXS (output hidden; shown on error)
+  [2] computing importance matrix from Yi-1.5-9B-Chat-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/Yi-1.5-9B-Chat/imatrix.log) ---
+0.00.432.211 W load: control-looking token:     31 '<reponame>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.432.848 W load: control-looking token:     17 '<fim_pad>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.432.887 W load: control-looking token:     16 '<fim_suffix>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.433.042 W load: control-looking token:     14 '<fim_prefix>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.434.131 W load: control-looking token:     15 '<fim_middle>' was not control-type; this is probably a bug in the model. its type will be overridden
+radv/amdgpu: Not enough memory for command submission.
+0.03.380.930 E ggml_vulkan: device lost on Vulkan0
+0.03.423.557 E llama_model_load: error loading model: vk::Queue::submit: ErrorDeviceLost
+0.03.423.570 E llama_model_load_from_file_impl: failed to load model
+0.03.423.579 E cmn  common_init_: failed to load model 'models/Yi-1.5-9B-Chat/Yi-1.5-9B-Chat-f16.gguf'
+0.03.423.582 E main : failed to init
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/Yi-1.5-9B-Chat/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> unbuildable ()
+[randomizer] #6 pick=0b11000001100 -> mistral-7b-instruct-v0.3 IQ3_XS
+  [1] downloading safetensors from mistralai/Mistral-7B-Instruct-v0.3 (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing mistral-7b-instruct-v0.3-f16.gguf -> IQ3_XS (output hidden; shown on error)
+  [2] computing importance matrix from mistral-7b-instruct-v0.3-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/mistral-7b-instruct-v0.3/imatrix.log) ---
+0.04.197.123 I cmn          init: llama threadpool init, n_threads = 8
+0.04.197.158 I 
+0.04.197.913 I system_info: n_threads = 8 (n_threads_batch = 8) / 16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.04.197.921 I compute_imatrix: tokenizing the input ..
+0.04.319.826 I compute_imatrix: tokenization took 113.608 ms
+0.04.319.867 I compute_imatrix: computing over 134 chunks, n_ctx=512, batch_size=2048, n_seq=4
+radv/amdgpu: Not enough memory for command submission.
+0.05.393.613 E ggml_vulkan: device lost on Vulkan0
+[New LWP 28151]
+[New LWP 28150]
+[New LWP 28149]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.opensuse.org/>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+0x00007fb5df0a79d2 in __syscall_cancel_arch () from /lib64/libc.so.6
+#0  0x00007fb5df0a79d2 in __syscall_cancel_arch () from /lib64/libc.so.6
+#1  0x00007fb5df09ab98 in __internal_syscall_cancel () from /lib64/libc.so.6
+#2  0x00007fb5df09abf1 in __syscall_cancel () from /lib64/libc.so.6
+#3  0x00007fb5df10c7db in wait4 () from /lib64/libc.so.6
+#4  0x00007fb5e036921b in ggml_print_backtrace () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#5  0x00007fb5e037eadf in ggml_uncaught_exception() () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#6  0x00007fb5df4c9adc in ?? () from /lib64/libstdc++.so.6
+#7  0x00007fb5df4b6d19 in std::terminate() () from /lib64/libstdc++.so.6
+#8  0x00007fb5df4b6d32 in ?? () from /lib64/libstdc++.so.6
+#9  0x00007fb5d5824dad in vk_queue_handle_unsynchronized::submit(vk::ArrayProxy<vk::SubmitInfo const>, vk::Fence) [clone .cold] () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#10 0x00007fb5d586f890 in ggml_vk_submit(std::shared_ptr<vk_context_struct>&, vk::Fence) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#11 0x00007fb5d58707fc in ggml_vk_synchronize(ggml_backend_vk_context*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#12 0x00007fb5d5871d84 in ggml_backend_vk_synchronize(ggml_backend*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#13 0x00007fb5e0388068 in ggml_backend_sched_copy_input(ggml_backend_sched*, ggml_backend_sched_split*, ggml_tensor*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#14 0x00007fb5e03881f5 in ggml_backend_sched_graph_compute_async () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#15 0x00007fb5dfa24a0b in llama_context::graph_compute(ggml_cgraph*, bool) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#16 0x00007fb5dfa27315 in llama_context::process_ubatch(llama_ubatch const&, llm_graph_type, llama_memory_context_i*, ggml_status&) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#17 0x00007fb5dfa30cd4 in llama_context::decode(llama_batch_ext const&) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#18 0x0000559b74a4b25c in main ()
+[Inferior 1 (process 28147) detached]
+terminate called after throwing an instance of 'vk::DeviceLostError'
+  what():  vk::Queue::submit: ErrorDeviceLost
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/mistral-7b-instruct-v0.3/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> unbuildable ()
+[randomizer] #7 pick=0b11100001101 -> Yi-1.5-9B-Chat IQ4_XS
+  [2] quantizing Yi-1.5-9B-Chat-f16.gguf -> IQ4_XS (output hidden; shown on error)
+[randomizer]   -> unbuildable ()
+[randomizer] #8 pick=0b10011000101 -> Phi-3-mini-4k-instruct TQ2_0
+  [1] downloading safetensors from microsoft/Phi-3-mini-4k-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
