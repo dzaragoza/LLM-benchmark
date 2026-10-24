@@ -891,6 +891,22 @@ def _run(args: argparse.Namespace) -> None:
         # SIGINT saves, the artifact commits, the log truncation.
         import randomize as R
 
+        if args.clean:
+            # wipe the randomizer's own state (the done-set, the
+            # oversized-model rulings, the results) and its answers:
+            # a fresh pool, every candidate's chance restored. The
+            # models/ directories stay (files are re-usable; only
+            # the RECORDS start over - the exam --clean philosophy)
+            with open(R.RANDOMIZER_STATE_FILE, "w", encoding="utf-8") as fh:
+                json.dump({"done": [], "oversized": [], "results": []}, fh)
+            import shutil as _shutil
+
+            if os.path.isdir("results/randomizer"):
+                _shutil.rmtree("results/randomizer", ignore_errors=True)
+            stamp(
+                "randomizer: all records wiped (--clean) - the pool is "
+                "fresh, every candidate's chance restored"
+            )
         R.main()
         return
 

@@ -181,6 +181,10 @@ def disk_watchdog(
         stop.wait(GC_INTERVAL_S)
 
 
+# the randomizer's state file (module-level: full_benchmark's
+# --clean wipes it before main() runs)
+RANDOMIZER_STATE_FILE = "state/randomizer-state.json"
+
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
 
@@ -384,7 +388,7 @@ def run_candidate(
 
 def main() -> None:
     models_dir = "models"
-    state_file = "state/randomizer-state.json"
+    state_file = RANDOMIZER_STATE_FILE
     os.makedirs("state", exist_ok=True)
     port = int(os.environ.get("RANDOMIZER_PORT", "8210"))
 
