@@ -490,6 +490,23 @@ def run_candidate(
 
 
 def main() -> None:
+    # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
+    # first with no fallback - a black-holed IPv6 route (curl works,
+    # the library hangs, zero packets - the author's T14s case) is
+    # an infinite silent hang. Prefer AF_INET in getaddrinfo: every
+    # hub/library connection resolves IPv4 only, until the machine's
+    # IPv6 is fixed at the router level.
+    import socket
+
+    _orig_getaddrinfo = socket.getaddrinfo
+
+    def _ipv4_first(host, port, family=0, type=0, proto=0, flags=0):
+        try:
+            return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        except socket.gaierror:
+            return _orig_getaddrinfo(host, port, family, type, proto, flags)
+
+    socket.getaddrinfo = _ipv4_first
     models_dir = "models"
     state_file = RANDOMIZER_STATE_FILE
     os.makedirs("state", exist_ok=True)
