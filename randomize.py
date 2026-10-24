@@ -118,12 +118,26 @@ def _free_gib(path: str = GC_WATCH_PATH) -> float:
 def _oldest_f16(models_dir: str, exclude: set[str]) -> str | None:
     """The oldest f16 on disk (mtime), never one of the excluded
     (active) families. Returns its path, or None when nothing is
-    collectable."""
-    best_path = None
-    best_mtime = None
+    collectable.
+
+    THE RACE GUARD (the author's workaround, no lock needed): when
+    only ONE family directory exists, nothing is deleted - that
+    lone directory is almost certainly the active candidate's (or
+    the only candidate run so far), and deleting the sole model on
+    disk while the picker may be aiming at it is exactly the race.
+    A second directory on disk proves a safe alternative exists:
+    the active family is excluded by name, and the pick-vs-collect
+    window concerns only candidates that have ALREADY had their one
+    chance (their files were deleted after the run anyway - an F16
+    lingers only if its run happened to land there)."""
     if not os.path.isdir(models_dir):
         return None
-    for fam in os.listdir(models_dir):
+    fams = os.listdir(models_dir)
+    if len(fams) <= 1:
+        return None  # never delete the only directory on disk
+    best_path = None
+    best_mtime = None
+    for fam in fams:
         if fam in exclude:
             continue
         f16 = os.path.join(models_dir, fam, f"{fam}-f16.gguf")
