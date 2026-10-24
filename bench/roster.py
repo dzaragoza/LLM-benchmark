@@ -112,7 +112,9 @@ def build(fam: str, repo: str, famdir: str, rung: str) -> str | None:
     skipped, never a model verdict."""
     hf_download.require_hub()
     list_repo_files = cast("Any", hf_download.list_repo_files)
-    files = list_repo_files(repo)
+    print(f"  [hub] listing files for {repo} ...")
+    files = hf_download._with_timeout(lambda: list_repo_files(repo), f"list_repo_files {repo}")
+    print(f"  [hub] {len(files)} files listed")
     path, plan = hf_download.acquire(fam, famdir, rung, repo, files, repo, files, False)
     if path:
         return path

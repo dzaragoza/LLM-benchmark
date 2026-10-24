@@ -134,7 +134,7 @@ def free_disk_gib(path: str = ".") -> float | None:
         return None
 
 
-def remote_file_sizes(repo: str) -> dict[str, int]:
+def remote_file_sizes(repo: str) -> dict[str, int]:  # noqa: C901
     """{filename: size_in_bytes} for a repo, from the HF metadata API -
     NO file content is downloaded. Returns {} when the hub client is
     too old to expose tree listings (the caller then estimates from
@@ -143,7 +143,11 @@ def remote_file_sizes(repo: str) -> dict[str, int]:
         from huggingface_hub import HfApi
 
         sizes = {}
-        for entry in HfApi().list_repo_tree(repo, recursive=True):
+        tree = _with_timeout(
+            lambda: list(HfApi().list_repo_tree(repo, recursive=True)),
+            f"list_repo_tree {repo}",
+        )
+        for entry in tree:
             size = getattr(entry, "size", None)
             if size:
                 sizes[entry.path] = size
@@ -321,6 +325,30 @@ def resolve_f16_local(famdir: str) -> str | None:
         and not os.path.basename(h).lower().endswith(tuple(s + ".gguf" for s in quant_sufs))
     ]
     return sorted(hits)[0] if hits else None
+
+
+HUB_CALL_TIMEOUT_S = 60.0
+
+
+def _with_timeout(fn, what: str):
+    """Run a hub metadata call under a hard timeout: huggingface_hub
+    uses requests with timeout=None, so a dead connection or a
+    stalled DNS hangs FOREVER in total silence (the zero-network-
+    activity hang). On timeout, raise RuntimeError with the class
+    name the error taxonomy reads (network_failed)."""
+    import concurrent.futures
+
+    def run():
+        return fn()
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        fut = pool.submit(run)
+        return fut.result(timeout=HUB_CALL_TIMEOUT_S)
+    except concurrent.futures.TimeoutError as e:
+        raise RuntimeError(f"hub timeout ({what}, > {HUB_CALL_TIMEOUT_S:g}s)") from e
+    finally:
+        pool.shutdown(wait=False)
 
 
 def local_rung(famdir: str, rung: str) -> str | None:
