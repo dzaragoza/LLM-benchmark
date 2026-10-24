@@ -143,9 +143,18 @@ def _free_gib(path: str = GC_WATCH_PATH) -> float:
     return (st.f_bavail * st.f_frsize) / (2**30)
 
 
-def _oldest_f16(models_dir: str, exclude: set[str]) -> str | None:
-    """The oldest f16 on disk (mtime), never one of the excluded
-    (active) families. Returns its path, or None when nothing is
+def _least_likely_f16(
+    models_dir: str,
+    exclude: set[str],
+    done: set[str],
+    pool: list[tuple[str, str]],
+) -> str | None:
+    """The f16 LEAST LIKELY to be needed again (the author's
+    ruling: the state knows the future - a family with few untried
+    rungs will rarely need its f16 again; ties broken by oldest
+    mtime). The imatrix stays behind (small, very expensive);
+    ONLY the f16 is ever deleted. Never the excluded (active)
+    families. Returns its path, or None when nothing is
     collectable.
 
     THE RACE GUARD (the author's workaround, no lock needed): when
@@ -163,19 +172,28 @@ def _oldest_f16(models_dir: str, exclude: set[str]) -> str | None:
     fams = os.listdir(models_dir)
     if len(fams) <= 1:
         return None  # never delete the only directory on disk
-    best_path = None
-    best_mtime = None
+    # per family: how many of its pool rungs are still untried - the
+    # future need for its f16 (each untried rung, when picked,
+    # re-quantizes from the f16)
+    remaining: dict[str, int] = {}
+    for idx, (fam, _rung) in enumerate(pool):
+        if str(idx) in done:
+            continue
+        remaining[fam] = remaining.get(fam, 0) + 1
+    best = None  # (remaining, mtime, fam)
     for fam in fams:
         if fam in exclude:
             continue
         f16 = os.path.join(models_dir, fam, f"{fam}-f16.gguf")
         if not os.path.isfile(f16):
             continue
+        rem = remaining.get(fam, 0)
         mt = os.path.getmtime(f16)
-        if best_mtime is None or mt < best_mtime:
-            best_mtime = mt
-            best_path = f16
-    return best_path
+        if best is None or (rem, mt) < (best[0], best[1]):
+            best = (rem, mt, fam)
+    if best is None:
+        return None
+    return os.path.join(models_dir, best[2], f"{best[2]}-f16.gguf")
 
 
 def disk_watchdog(
@@ -195,13 +213,21 @@ def disk_watchdog(
                 # the active family name is carried via the shared
                 # event mechanism below - see _active_family
                 fam = _ACTIVE_FAMILY[0]
-                oldest = _oldest_f16(models_dir, {fam} if fam else set())
-                if oldest:
-                    famdir = os.path.dirname(oldest)
-                    shutil.rmtree(famdir, ignore_errors=True)
+                victim = _least_likely_f16(
+                    models_dir,
+                    {fam} if fam else set(),
+                    _GC_DONE_SET,
+                    _GC_POOL,
+                )
+                if victim:
+                    # ONLY the f16 goes (the author's ruling): the
+                    # imatrix stays behind (small, very expensive to
+                    # recompute), the family dir stays
+                    os.remove(victim)
                     log.append(
                         f"[gc] free {_free_gib():.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
-                        f"removed {famdir}"
+                        f"evicted {os.path.basename(victim)} "
+                        f"(least-likely-needed by the state)"
                     )
                     continue  # re-check immediately after a removal
         except Exception as e:  # the watchdog never dies
@@ -215,6 +241,12 @@ RANDOMIZER_STATE_FILE = "state/randomizer-state.json"
 
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
+
+# the gc's view of the state (refreshed by the main loop after every
+# pick): the done-set and the pool - what the least-likely-needed
+# policy needs to know the future
+_GC_DONE_SET: set[str] = set()
+_GC_POOL: list[tuple[str, str]] = []
 
 # the f16 family-kill threshold (the author's extra-safety ruling):
 # an f16 > 8 GiB kills the whole model - stricter than the 16 GiB
@@ -527,6 +559,8 @@ def main(on_progress: Any = None) -> None:
     oversized_models.update(state.get("oversized", []))
 
     pool = the_pool()
+    _GC_POOL.clear()
+    _GC_POOL.extend(pool)
     assert len(pool) == 2048, len(pool)
     live = 2048 - len(oversized_models) * len(LADDER)
 
@@ -547,6 +581,8 @@ def main(on_progress: Any = None) -> None:
     # one chance per candidate: the done-set persists in the state
     done: set[str] = set(state.get("done", []))
     state["done"] = sorted(done)
+    _GC_DONE_SET.clear()
+    _GC_DONE_SET.update(done)
 
     def write_ledger() -> None:
         """md/randomizer.md: rank (highest score, tiebreak by time),
@@ -603,6 +639,7 @@ def main(on_progress: Any = None) -> None:
         rec = run_candidate(fam, rung, models_dir, state, state_file, port)
         results.append(rec)
         done.add(key)
+        _GC_DONE_SET.add(key)
         state["done"] = sorted(done)
         state["oversized"] = sorted(oversized_models)
         state["results"] = results[-5000:]  # the state stays bounded
