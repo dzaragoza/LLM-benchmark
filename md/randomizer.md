@@ -2,11 +2,11 @@
 
 ## the top 5% dashboard
 
-- measured: 198 done candidates, top 9 (9 of 198)
-- params median: **2.534 B**
-- quant levels: Q5 x2, Q4 x2, Q8 x2, Q3 x1, F16 x1, IQ3 x1
-- high-score level time median: **19.6s**
-- score median: **3**
+- measured: 204 done candidates, top 10 (10 of 204)
+- params median: **2.6295 B**
+- quant levels: Q4 x3, Q5 x2, Q8 x2, Q3 x1, F16 x1, IQ3 x1
+- high-score level time median: **15.7s**
+- score median: **2.5**
 
 _the machine sweet-spot band, live as the pool fills_
 
@@ -214,5 +214,11 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 196 | Qwen3-1.7B | -1 | TQ2_0 | slow |
 | 197 | phi-1 | -1 | IQ4_XS | medium |
 | 198 | MiniCPM5-1B | -1 | IQ2_M | slow |
+| 199 | granite-4.2-3b | -1 | Q5_1 | slow |
+| 200 | granite-4.0-1b | -1 | Q2_K_S | slow |
+| 201 | granite-4.0-h-micro | -1 | IQ4_XS | slow |
+| 202 | Phi-3-mini-4k-instruct | -1 | IQ1_M | slow |
+| 203 | Qwen2.5-3B-Instruct | -1 | Q1_0 | slow |
+| 204 | phi-2 | -1 | IQ2_XS | slow |
 
-_198 candidates run of 2048; each one chance, the seed recorded in state._
+_204 candidates run of 2048; each one chance, the seed recorded in state._
