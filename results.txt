@@ -112665,3 +112665,64 @@ idempotent and will resume from this phase.
 -- MiniCPM5-1B Q4_1 (Q4), paper 131072 tokens --
 [2026-10-24T08:19:01] SIGINT - shutting down cleanly (addendum 8)
 [2026-10-24T08:19:01] llama-server stopped
+
+===== 2026-10-24T09:08:11 | full_benchmark.py --task randomize =====
+  gc: gcA eliminated (best-rung score 0 < best 4) - artifacts deleted
+  gc: gcS eliminated (best-rung score 0 < best 4) - artifacts deleted
+  gc: gcT eliminated (best-rung score 1 < best 4) - artifacts deleted
+  self-check: the gc, the paper, the grader, the ladder, the roster - OK
+[randomizer] pool: 2048 candidates (11 bits/pick, ONE chance each)
+[randomizer] entropy: /dev/random
+[randomizer] gc: /home free > 16 GiB, 1s watchdog
+[randomizer] #1 pick=0b11101101100 -> Qwen3.5-9B IQ3_XS
+  [1] downloading safetensors from Qwen/Qwen3.5-9B (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Qwen3.5-9B-f16.gguf -> IQ3_XS (output hidden; shown on error)
+  [2] computing importance matrix from Qwen3.5-9B-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/Qwen3.5-9B/imatrix.log) ---
+0.02.854.040 W model has unused tensor blk.32.attn_norm.weight (size = 16384 bytes) -- ignoring
+0.02.854.045 W model has unused tensor blk.32.post_attention_norm.weight (size = 16384 bytes) -- ignoring
+0.02.854.050 W model has unused tensor blk.32.attn_q.weight (size = 67108864 bytes) -- ignoring
+0.02.854.052 W model has unused tensor blk.32.attn_k.weight (size = 8388608 bytes) -- ignoring
+0.02.854.054 W model has unused tensor blk.32.attn_v.weight (size = 8388608 bytes) -- ignoring
+0.02.854.059 W model has unused tensor blk.32.attn_output.weight (size = 33554432 bytes) -- ignoring
+0.02.854.061 W model has unused tensor blk.32.attn_q_norm.weight (size = 1024 bytes) -- ignoring
+0.02.854.063 W model has unused tensor blk.32.attn_k_norm.weight (size = 1024 bytes) -- ignoring
+0.02.854.064 W model has unused tensor blk.32.ffn_gate.weight (size = 100663296 bytes) -- ignoring
+0.02.854.066 W model has unused tensor blk.32.ffn_down.weight (size = 100663296 bytes) -- ignoring
+0.02.854.067 W model has unused tensor blk.32.ffn_up.weight (size = 100663296 bytes) -- ignoring
+0.02.854.070 W model has unused tensor blk.32.nextn.eh_proj.weight (size = 67108864 bytes) -- ignoring
+0.02.854.072 W model has unused tensor blk.32.nextn.enorm.weight (size = 16384 bytes) -- ignoring
+0.02.854.075 W model has unused tensor blk.32.nextn.hnorm.weight (size = 16384 bytes) -- ignoring
+0.02.854.079 W model has unused tensor blk.32.nextn.shared_head_norm.weight (size = 16384 bytes) -- ignoring
+radv/amdgpu: Not enough memory for command submission.
+0.15.711.613 E ggml_vulkan: device lost on Vulkan0
+0.15.804.144 E llama_model_load: error loading model: vk::Queue::submit: ErrorDeviceLost
+0.15.804.155 E llama_model_load_from_file_impl: failed to load model
+0.15.804.162 E cmn  common_init_: failed to load model 'models/Qwen3.5-9B/Qwen3.5-9B-f16.gguf'
+0.15.804.165 E main : failed to init
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/Qwen3.5-9B/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> unbuildable ()
+[randomizer] #2 pick=0b01111011001 -> Qwen2.5-3B-Instruct TQ1_0
+  [1] downloading safetensors from Qwen/Qwen2.5-3B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing Qwen2.5-3B-Instruct-f16.gguf -> TQ1_0 (output hidden; shown on error)
+  [2] computing importance matrix from Qwen2.5-3B-Instruct-f16.gguf (output hidden; shown on error)
+
+[randomizer] SIGINT - state saved, bye
