@@ -245,25 +245,23 @@ def preflight_selfcheck() -> None:
         mixed = {"F16": vt, "Q8_0": vf, "_out_of_time": True}
         assert E.model_verdict(mixed) == "time"
 
-        # best_rung: the highest-scoring rung, earlier rung on ties.
-        # Records must carry LEVELS (as the walk writes them): a
-        # score with no failing level reads as a clean sweep (pass)
-        # and ends the walk at its own level - the score-only fixture
-        # of the pre-correction era is not a shape the walk produces.
-        def mk_t(s):
-            return {
-                "score": s,
-                "levels": {
-                    "0": {"pass": True},
-                    "1": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
-                },
-            }
+        # the frontier semantics: the score is the deepest level any
+        # candidate reached; the deciding rung is the FIRST to reach it
+        def mk_t(deep, passed=1):
+            levels = {str(i): {"pass": True} for i in range(passed)}
+            if deep >= passed:
+                levels[str(deep)] = {
+                    "pass": False,
+                    "attempts": [{"finish_reason": "time_limit"}],
+                }
+            return {"score": passed - 1, "levels": levels}
 
         bx = {"F16": mk_t(3), "Q8_0": mk_t(5)}
-        assert E.best_rung(bx)[0] == "Q8_0" and E.best_rung(bx)[1]["score"] == 5
+        assert E.model_frontier(bx) == 5
+        assert E.deciding_rung(bx)[0] == "Q8_0"
         bx2 = {"F16": mk_t(4), "Q8_0": mk_t(4)}
-        assert E.best_rung(bx2)[0] == "F16", "ties go to the earlier rung"
-        assert E.best_rung({}) is None
+        assert E.deciding_rung(bx2)[0] == "F16", "ties go to the earlier rung"
+        assert E.deciding_rung({}) is None
         # the author's worked example: f16 passes 0..3 bells at 4; q8
         # same; q6 fails at 4 - the walk ends there (q5.. never run),
         # the verdict is fail, and the HIGH SCORE is f16's 3
@@ -283,7 +281,7 @@ def preflight_selfcheck() -> None:
         }
         ex = {"F16": vt, "Q8_0": dict(vt), "Q6_K": vfl}
         assert E.model_verdict(ex) == "fail", "a wrong answer ends the walk"
-        assert E.best_rung(ex)[0] == "F16" and E.best_rung(ex)[1]["score"] == 3
+        assert E.model_frontier(ex) == 4
         assert E.hit_time_bell(vt), "the bell record reads as time"
         assert not E.hit_time_bell(vfl), "the wrong-chain record reads as fail"
 
@@ -337,7 +335,9 @@ def preflight_selfcheck() -> None:
                         },
                     }
                 },
-                "top": {"F16": {"score": 4}},
+                "top": {
+                    "F16": sweep({str(i): mklevel(True) for i in range(5)}),
+                },
             }
         }
         E._gc(tmp, state6, exclude_fam=None)
@@ -346,7 +346,12 @@ def preflight_selfcheck() -> None:
         d7 = os.path.join(tmp, "gcT")
         os.makedirs(d7, exist_ok=True)
         open(os.path.join(d7, "gcT-F16.gguf"), "w", encoding="utf-8").close()
-        state7 = {"exam": {"gcT": {"F16": mkbell(1)}, "top": {"F16": {"score": 4}}}}
+        state7 = {
+            "exam": {
+                "gcT": {"F16": mkbell(1)},
+                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
+            }
+        }
         E._gc(tmp, state7, exclude_fam=None)
         assert os.path.isdir(d7), "gc deleted a PENDING (mid-walk) model"
         assert not state7["exam"]["gcT"].get("_eliminated")
@@ -627,8 +632,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--exam-max-level",
         type=int,
-        default=32,
-        help="the sweep's hard ceiling on difficulty (hops)",
+        default=1000000,
+        help="levels are INFINITE (the author's ruling): the token "
+        "window (the paper filled) and the 32s bell terminate a "
+        "sweep naturally; this is only a runaway guard, orders of "
+        "magnitude beyond any reachable level",
     )
     ap.add_argument(
         "--eliminate",
@@ -768,7 +776,7 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     are never eliminated; their ranking column shows the time order
     at the highest exam level (the tiebreaker indication - the
     human breaks ties)."""
-    from bench.exam import best_rung
+    from bench.exam import deciding_rung, model_frontier
 
     exam = state.get("exam") or {}
     # gather the measured models first (needed for the tier ranking)
@@ -777,21 +785,24 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         fam_exam = exam.get(fam) or {}
         if not isinstance(fam_exam, dict):
             continue
-        br = best_rung(fam_exam)
-        if br is None:
-            continue
-        rung, rec = br
-        score = rec.get("score")
-        # the time + generation rate at the model's HIGHEST PASSED
-        # level (both parts), and the MAX CONTEXT USED across all
-        # its attempts - how much of the paper the model ever needed
+        score = model_frontier(fam_exam)
+        if score <= 0:
+            continue  # nothing reached: unmeasured or nothing qualified
+        dr = deciding_rung(fam_exam)
+        rung, rec = dr if dr else ("-", {})
+        # the time + generation rate at the model's FRONTIER level
+        # (both parts), and the MAX CONTEXT USED across all its
+        # attempts - how much of the paper the model ever needed
         top_time = None
         top_tps = None
         max_ctx = 0
-        for lv in (rec.get("levels") or {}).values():
-            for a in lv.get("attempts") or []:
-                max_ctx = max(max_ctx, a.get("answer_tokens") or 0)
-        if score is not None and score >= 0:
+        for r in fam_exam.values():
+            if not isinstance(r, dict):
+                continue
+            for lv in (r.get("levels") or {}).values():
+                for a in lv.get("attempts") or []:
+                    max_ctx = max(max_ctx, a.get("answer_tokens") or 0)
+        if rec:
             lv = (rec.get("levels") or {}).get(str(score)) or {}
             atts = lv.get("attempts") or []
             tot = sum(a.get("elapsed_s") or 0 for a in atts)

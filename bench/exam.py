@@ -481,41 +481,67 @@ def level_outcome(
         # single timeout keeps the descent alive.
         any_timeout = False
         for rec in group_records.values():
-            if rec.get("unbuildable") or rec.get("too_large"):
+            if rec.get("unbuildable"):
                 continue
-            deep = (rec.get("levels") or {}).get(str(loi))
+            # the candidate's OWN deepest level is its terminal
+            # (a too_large never sat: timeout-grade by definition)
+            if rec.get("too_large"):
+                any_timeout = True
+                continue
+            deep_lv = max((int(lv) for lv in (rec.get("levels") or {})), default=-1)
+            deep = (rec.get("levels") or {}).get(str(deep_lv))
             if deep is None:
                 continue
             if any(a.get("finish_reason") == "time_limit" for a in (deep.get("attempts") or [])):
                 any_timeout = True
         if any_timeout:
-            return "time", loi  # a timeout is a timeout: descend
+            return "time", target  # a timeout is a timeout: descend, T fixed
         return "over", target  # all failed qualification: nobody counts
-    # read the verdict at the group's deepest reach (>= target: a
-    # candidate that reached loi passed target on the way)
+    # THE TARGET RISE (Q2): the group's deepest reach raises the
+    # target - a candidate that reached loi passed target..loi-1 on
+    # the way (linear qualification); the proctor turns to the new
+    # target level, and fails BELOW it stop counting
+    if loi > target:
+        target = loi
+    # the verdict at the target. Per candidate at the target:
+    # fail stops the walk
+    # (bells and too-larges ignored - the proctor got his answer);
+    # pass = the ceiling only; only bells/too-larges -> descend with
+    # T FIXED; a transport error is pending, not evidence.
     passed = 0
     graded_wrong = 0
     belled = 0
+    too_large = 0
+    errored = False
     for rec in group_records.values():
-        if rec.get("unbuildable") or rec.get("too_large"):
-            continue  # never sat: not a candidate
+        if rec.get("unbuildable"):
+            continue  # never sat, never will
+        if rec.get("too_large"):
+            too_large += 1  # could not sit: timeout-grade
+            continue
         loi_rec = (rec.get("levels") or {}).get(str(loi))
         if loi_rec is None:
             continue  # did not reach the group's deepest level
         if loi_rec.get("pass"):
-            passed += 1
+            passed += 1  # the ceiling: only a pass stops a sweep
             continue
         atts = loi_rec.get("attempts") or []
-        if any(a.get("finish_reason") == "time_limit" for a in atts):
+        frs = [a.get("finish_reason") for a in atts]
+        if any(str(f or "").startswith("error") for f in frs):
+            errored = True  # transport: the paper waits for retry
+            continue
+        if any(f == "time_limit" for f in frs):
             belled += 1  # took it, belled: out of time
         else:
-            graded_wrong += 1  # took it, handed in, wrong
+            graded_wrong += 1  # handed in wrong, or the paper filled
+    if errored:
+        return None  # a transport-failed paper: the group is pending
     if passed:
         return "pass", loi  # the ceiling: a sweep's own stop
     if graded_wrong:
-        return "fail", loi
-    if belled:
-        return "time", loi
+        return "fail", loi  # bells and too-larges ignored: the proctor got his answer
+    if belled or too_large:
+        return "time", target  # descend; THE TARGET DOES NOT MOVE
     return None
 
 
@@ -557,39 +583,45 @@ def model_verdict(fam_exam: dict[str, Any]) -> str | None:
         if kind == "pass":
             return "pass"  # the ceiling: the sweep's own stop
         if kind == "over":
-            return "time"  # no competent candidates: the walk is over
-        # 'time': the frontier rises to this group's deepest reach
+            return "fail"  # nobody counts: all candidates failed (Q1)
+        # 'time': descend - the frontier stays where it is (the
+        # below-target branch returns target unchanged; the
+        # at-target branch returns target = loi == frontier)
         frontier = loi
     if walked_all:
         return "time"
     return None
 
 
-def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
-    """The model's DECIDING (rung, record) pair, v9.5: the
-    highest-scoring rung the walk ever recorded, ties to the earlier
-    rung in walk order. The deciding rung is the ledger's quant
-    column; the record carries the score the gc and ledger read."""
-    best: tuple[str, dict[str, Any]] | None = None
+def model_frontier(fam_exam: dict[str, Any]) -> int:
+    """The model's score, v9.5: the FRONTIER - the highest exam level
+    any candidate of the walk ever reached (levels are infinite;
+    qualification is linear, so reaching L means passing 0..L-1)."""
+    frontier = 0
+    for rec in fam_exam.values():
+        if not isinstance(rec, dict):
+            continue
+        for lv in (rec.get("levels") or {}):
+            frontier = max(frontier, int(lv))
+    return frontier
+
+
+def deciding_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """The model's DECIDING (rung, record) pair, v9.5: the FIRST
+    candidate (walk order) to reach the frontier. The deciding rung
+    is the ledger's quant column; later equals never displace it."""
+    frontier = model_frontier(fam_exam)
+    if frontier == 0:
+        return None
     for _num, group in rung_groups():
-        gfail = False
         for rung in group:
             rec = fam_exam.get(rung)
-            if not isinstance(rec, dict) or rec.get("score") is None:
+            if not isinstance(rec, dict):
                 continue
-            if best is None or rec["score"] > best[1]["score"]:
-                best = (rung, rec)
-            if rung_verdict(rec) == "fail":
-                gfail = True
-        # the LEVEL decides: a failing level ends the walk AFTER all
-        # its candidates were evaluated - records beyond that level
-        # are relics of a pre-fix walk and never decide anything
-        if gfail or any(
-            isinstance(fam_exam.get(r), dict) and rung_verdict(fam_exam.get(r) or {}) == "pass"
-            for r in group
-        ):
-            return best
-    return best
+            levels = rec.get("levels") or {}
+            if str(frontier) in levels:
+                return rung, rec
+    return None
 
 
 def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
@@ -702,7 +734,6 @@ def run_family(
     max_level: int,
     start_level: int,
     dry_run: bool = False,
-    time_factor: int = 1024,
 ) -> dict[str, Any]:
     """One candidate's sweep - a (model, quant) pair: every level from
     the first unrecorded one, both parts per level, until the first
@@ -914,12 +945,10 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
     for fam_exam in exam.values():
         if not isinstance(fam_exam, dict):
             continue
-        br = best_rung(fam_exam)
-        if br is not None:
-            s = br[1].get("score")
-            if s is not None and s > best:
-                best = s
-    if best < 0:
+        s = model_frontier(fam_exam)
+        if s > best:
+            best = s
+    if best <= 0:
         return  # nobody has a score yet - nothing to clean
     for fam, fam_exam in exam.items():
         if not isinstance(fam_exam, dict) or fam == exclude_fam:
@@ -927,11 +956,10 @@ def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None
         verdict = model_verdict(fam_exam)
         if verdict is None:
             continue  # PENDING - the walk has more to try
-        br = best_rung(fam_exam)
-        if br is None:
-            continue
-        s = br[1].get("score")
-        if s is None or s >= best:
+        s = model_frontier(fam_exam)
+        # a DONE walk with frontier 0 scored nothing (nobody passed
+        # even L0); against a positive global best it is beaten
+        if s >= best:
             # a SURVIVOR: a stale _eliminated flag (e.g. a fossil of
             # the v9 premature-elimination bug) must be CLEARED - the
             # flag is derived state, the score is truth
@@ -995,7 +1023,7 @@ def run(
         fam_tree = state.setdefault("exam", {}).setdefault(fam, {})
         # idempotence: a walk that already reached a verdict is final
         if not dry_run and model_verdict(fam_tree) is not None:
-            results[key] = (best_rung(fam_tree) or (None, fam_tree))[1]
+            results[key] = fam_tree
             continue
         if dry_run:
             results[key] = {"planned": f"quant walk 0..{max_level} on seeds {seeds}"}
@@ -1110,11 +1138,11 @@ def run(
                     print(f"  {fam}: level {loi} graded WRONG at {num} - the walk ends (fail)")
                     break
                 if kind == "over":
-                    walk_verdict = "time"
-                    print(f"  {fam}: no candidate took level {loi} at {num} - no competent candidates remain, the walk is over")
+                    walk_verdict = "fail"
+                    print(f"  {fam}: no candidate took level {loi} at {num} - no competent candidates remain, the walk is over (fail)")
                     break
-                # 'time': the frontier rises to this group's deepest
-                # reach; the descent tests the same frontier smaller
+                # 'time': descend; the target does NOT move (both
+                # branches return the unchanged target on descent)
                 frontier = loi
         if walk_verdict is None and not errored:
             # every quant number was tried and only bells/too-larges came
