@@ -143,6 +143,40 @@ def _free_gib(path: str = GC_WATCH_PATH) -> float:
     return (st.f_bavail * st.f_frsize) / (2**30)
 
 
+def _stranded_quants(models_dir: str, exclude: set[str]) -> list[str]:
+    """The crash-leftover sweep: per family, every QUANT gguf except
+    the NEWEST, when more than one lingers. The file rule deletes a
+    quant after its run - so two or more means an abruptly-stopped
+    run stranded the extras. Never the excluded (active) family;
+    never the f16 or the imatrix (not quant rungs). Returns the
+    paths to remove, newest-kept."""
+    from bench.roster import LADDER
+
+    quant_names = {rung.lower() for rung in LADDER if rung != "F16"}
+    victims: list[str] = []
+    if not os.path.isdir(models_dir):
+        return victims
+    for fam in os.listdir(models_dir):
+        if fam in exclude:
+            continue
+        famdir = os.path.join(models_dir, fam)
+        if not os.path.isdir(famdir):
+            continue
+        quants = []
+        for f in os.listdir(famdir):
+            if not f.endswith(".gguf"):
+                continue
+            stem = f[: -len(".gguf")]
+            # <fam>-<RUNG>.gguf: the quant rung is the last token
+            rung = stem.rsplit("-", 1)[-1].lower()
+            if rung in quant_names:
+                quants.append(os.path.join(famdir, f))
+        if len(quants) > 1:
+            quants.sort(key=os.path.getmtime)
+            victims.extend(quants[:-1])  # keep the newest
+    return victims
+
+
 def _least_likely_f16(
     models_dir: str,
     exclude: set[str],
@@ -202,20 +236,41 @@ def disk_watchdog(
     stop: threading.Event,
     log: list[str],
 ) -> None:
-    """The 1-second watchdog thread: at or below 16 GiB free on /home,
-    remove the oldest f16 (never the active candidate's) until free
-    space is above the threshold again. The f16's whole family dir
-    goes with it (a quant source without its f16 is half a model)."""
+    """The 1-second watchdog thread. The gc triggers ONLY when free
+    space on /home is at or below 16 GiB, and stops the moment it
+    is above the threshold again - it never runs under any other
+    circumstance (the author's ruling). When triggered, TWO
+    cleanups run, both inside the same trigger:
+    1. the stranded-quant sweep FIRST: per family, if more than one
+       QUANT gguf lingers (an abruptly-stopped run's leftovers -
+       the file rule deletes a quant after its run, so two means a
+       crash/interrupt stranded one), keep only the NEWEST and
+       delete the rest - never the active family's, never the f16
+       (the f16 and imatrix are not targets of this sweep).
+    2. the least-likely f16 eviction if space is STILL needed: the
+       f16 of the family with the fewest untried rungs (never the
+       active candidate's) - the imatrix stays behind."""
     while not stop.is_set():
         try:
             if _free_gib() <= GC_THRESHOLD_GIB:
-                exclude = {active.wait(0) and "" or ""}
-                # the active family name is carried via the shared
-                # event mechanism below - see _active_family
                 fam = _ACTIVE_FAMILY[0]
+                exclude = {fam} if fam else set()
+                # 1. the stranded-quant sweep (crash leftovers):
+                #    >1 quant gguf in a family -> keep the newest
+                stranded = _stranded_quants(models_dir, exclude)
+                if stranded:
+                    for p in stranded:
+                        os.remove(p)
+                        log.append(
+                            f"[gc] free {_free_gib():.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
+                            f"removed stranded {os.path.basename(p)} "
+                            "(>1 quant gguf; kept the newest)"
+                        )
+                    continue  # re-check: the sweep may have freed enough
+                # 2. the f16 eviction, still under the same trigger
                 victim = _least_likely_f16(
                     models_dir,
-                    {fam} if fam else set(),
+                    exclude,
                     _GC_DONE_SET,
                     _GC_POOL,
                 )
