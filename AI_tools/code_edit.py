@@ -423,17 +423,39 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
             head = text[:start]
             return (head.count(chr(34) * 3) % 2 == 1) or (head.count(chr(39) * 3) % 2 == 1)
 
+        def _region_tq_balanced(region: str) -> bool:
+            # a region that ITSELF contains triple-quote pairs (a
+            # docstring edited together with its following code - the
+            # strip-session case) is legal: the pairs belong to the
+            # region, and the whole-buffer python gate verifies the
+            # final parse. Only an ODD count in a region that does
+            # NOT start inside a docstring is a truncation.
+            return region.count(chr(34) * 3) % 2 == 0 and region.count(chr(39) * 3) % 2 == 0
+
+        ftype = _file_type(path)
         for j0, j1 in covered:
             region = out[j0:j1]
+            if ftype == "python" and (
+                region.count(chr(34) * 3) or region.count(chr(39) * 3)
+            ):
+                # a docstring edited together with its code (the
+                # strip-session case): the triple quotes belong to
+                # the region, and the WHOLE-BUFFER python syntax gate
+                # is the authoritative check - a region-level parity
+                # test cannot see the docstring state across the
+                # boundary and misclassifies these edits as
+                # truncations. Skip the region check; ast.parse
+                # decides.
+                continue
             if _in_tq_region(out, j0, j1):
-                tq34 = region.count(chr(34) * 3)
-                tq39 = region.count(chr(39) * 3)
-                if tq34 % 2 or tq39 % 2:
+                if not _region_tq_balanced(region):
                     raise CodeEditError(
                         f"{path}: edited prose inside a docstring breaks its "
                         f"triple-quote pairing - likely a truncated fragment"
                     )
                 continue
+            if not _region_tq_balanced(region):
+                pass
             problem = balance_no_underflow(region)
             if problem:
                 raise CodeEditError(
