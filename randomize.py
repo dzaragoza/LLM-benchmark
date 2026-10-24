@@ -67,7 +67,19 @@ from bench.roster import LADDER, roster_from_models_md
 
 # --- the entropy source: real randomness, never pseudorandom -------------
 
-_ENTROPY_DEV = "/dev/hwrng" if os.path.exists("/dev/hwrng") else "/dev/random"
+_ENTROPY_DEV = ""
+for _dev in ("/dev/hwrng", "/dev/random"):
+    # hwrng is root-only on many systems (mode 600): probe by READING,
+    # not by existence - fall back to the kernel's harvested pool
+    try:
+        with open(_dev, "rb") as _fh:
+            _fh.read(1)
+        _ENTROPY_DEV = _dev
+        break
+    except OSError:
+        continue
+if not _ENTROPY_DEV:
+    raise SystemExit("no entropy source: neither /dev/hwrng nor /dev/random readable")
 
 
 def entropy_bits(n: int) -> int:
