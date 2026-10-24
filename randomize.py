@@ -673,6 +673,46 @@ def main(on_progress: Any = None) -> None:
             )
         lines.append("")
         lines.append(f"_{len(rows)} candidates run of {len(pool)}; each one chance, the seed recorded in state._")
+        # THE TOP-5% DASHBOARD (the author's four medians: params,
+        # quant, high-score level time, score) - the machine's
+        # sweet-spot band, tracked live as the pool fills
+        import re as _re
+        import statistics as _stats
+
+        fam_meta: dict[str, float] = {}
+        for ln in open("md/models.md", encoding="utf-8"):
+            m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
+            if m:
+                fam_meta[m.group(1).strip()] = float(m.group(2))
+        k = max(1, len(rows) * 5 // 100)
+        top = rows[:k]
+        t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
+        t_quants = [r["rung"] for r in top]
+        t_times = [
+            r["high_score_time_s"]
+            for r in top
+            if r.get("high_score_time_s") is not None
+        ]
+        t_scores = [r.get("high_score") or -1 for r in top]
+        lines.append("")
+        lines.append("## the top 5% dashboard")
+        lines.append("")
+        lines.append(f"- measured: {len(rows)} done candidates, top {k} ({k} of {len(rows)})")
+        if t_params:
+            lines.append(f"- params median: **{_stats.median(t_params):g} B**")
+        if t_quants:
+            from collections import Counter as _C
+
+            qc = _C(t_quants)
+            lines.append(
+                "- quant distribution: " + ", ".join(f"{q} x{n}" for q, n in qc.most_common())
+            )
+        if t_times:
+            lines.append(f"- high-score level time median: **{_stats.median(t_times):g}s**")
+        if t_scores:
+            lines.append(f"- score median: **{_stats.median(t_scores):g}**")
+        lines.append("")
+        lines.append("_the machine sweet-spot band, live as the pool fills_")
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
