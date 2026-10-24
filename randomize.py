@@ -260,11 +260,12 @@ def disk_watchdog(
                 stranded = _stranded_quants(models_dir, exclude)
                 if stranded:
                     for p in stranded:
+                        before = _free_gib()
                         os.remove(p)
                         log.append(
-                            f"[gc] free {_free_gib():.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
+                            f"[gc] free {before:.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
                             f"removed stranded {os.path.basename(p)} "
-                            "(>1 quant gguf; kept the newest)"
+                            f"(>1 quant gguf; kept the newest; now {_free_gib():.1f} GiB)"
                         )
                     continue  # re-check: the sweep may have freed enough
                 # 2. the f16 eviction, still under the same trigger
@@ -278,11 +279,17 @@ def disk_watchdog(
                     # ONLY the f16 goes (the author's ruling): the
                     # imatrix stays behind (small, very expensive to
                     # recompute), the family dir stays
+                    before = _free_gib()
                     os.remove(victim)
+                    # log the free space BEFORE the removal (the
+                    # decision's datum) and after (the result) - the
+                    # active candidate's concurrent downloads move
+                    # free space as the gc frees it, so a single
+                    # after-only reading looks non-causal
                     log.append(
-                        f"[gc] free {_free_gib():.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
+                        f"[gc] free {before:.1f} GiB <= {GC_THRESHOLD_GIB:g}: "
                         f"evicted {os.path.basename(victim)} "
-                        f"(least-likely-needed by the state)"
+                        f"(least-likely-needed; now {_free_gib():.1f} GiB)"
                     )
                     continue  # re-check immediately after a removal
         except Exception as e:  # the watchdog never dies
