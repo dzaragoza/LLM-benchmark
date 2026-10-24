@@ -58,23 +58,6 @@ def kill_stale_server() -> bool:
     return r.returncode == 0
 
 
-def port_serves_health(port: int, timeout: float = 2) -> str | None:
-    """Probe whether a port answers /health - the stale-server refusal
-    check. Returns None when nothing answers (the port is free),
-    "ok" when /health answers 200, "error" when something is there
-    but answers with an HTTP error. Session 40 (addendum 5): moved
-    here from ruler_gate.py - llama-server HTTP is bottom-layer
-    contact."""
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout):
-            pass
-        return "ok"
-    except urllib.error.HTTPError:
-        return "error"
-    except OSError:
-        return None
-
-
 def find_server() -> str | None:
     """llama-server binary: repo-relative only. None when absent -
     the caller (check_tooling) fails loudly with install guidance.
@@ -131,36 +114,6 @@ def start_server(
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     healthy = wait_healthy(port, health_timeout, proc)
     return proc, healthy
-
-
-def peak_rss_gib(proc: Any) -> float | None:
-    """Peak resident set size (VmHWM) of the server process, in GiB.
-    DIAGNOSTIC ONLY (session 34, addendum 23): llama.cpp mmaps the
-    weights, and mmap'd file-backed pages are shared with the page
-    cache - the kernel may evict and re-fault them during the run, so
-    the per-process peak UNDERCOUNTS the whole stack at deep ctx
-    (registered pattern: peak RSS 0.27 GiB < a 0.63 GiB file). The
-    authoritative number is memory_breakdown_gib() on the server log.
-    Linux only (/proc); returns None elsewhere or after the process
-    is gone. MUST be called before stop_server terminates the process."""
-    try:
-        with open(f"/proc/{proc.pid}/status") as f:
-            for line in f:
-                if line.startswith("VmHWM:"):
-                    return int(line.split()[1]) / (1024 * 1024)
-    except Exception:
-        return None
-    return None
-
-
-MEMORY_BREAKDOWN_ROW = re.compile(
-    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*\d+\s*\+\s*"
-    r"\(\s*\d+\s*=\s*(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\)"
-)
-MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
-    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*"
-    r"(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\|"
-)
 
 
 def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
@@ -267,82 +220,3 @@ def tokenize(port: int, content: str, timeout: float = 300) -> list[Any]:
     return toks
 
 
-def trim_to_tokens(
-    port: int, text: str, target: int, tolerance: int = 8, max_iter: int = 24
-) -> tuple[str, int]:
-    """Trim text down to a token budget: returns (text, n_tokens)
-    with n_tokens <= target, within tolerance when possible.
-    Converges by bisection on character count (tokenizers are
-    near-linear in chars). Never returns over budget - the depth
-    arithmetic depends on that."""
-    n = len(tokenize(port, text))
-    if n <= target:
-        return text, n
-    lo, hi = 0, len(text)
-    best = None
-    for _ in range(max_iter):
-        mid = (lo + hi) // 2
-        cand = text[:mid]
-        n = len(tokenize(port, cand))
-        if n > target:
-            hi = mid
-        else:
-            if target - n <= tolerance:
-                return cand, n
-            if best is None or n > best[1]:
-                best = (cand, n)
-            lo = mid + 1
-        if hi - lo <= 1:
-            break
-    if best is None:
-        raise ValueError(f"cannot trim text under {target} tokens")
-    return best
-
-
-def stream_completion(
-    port: int,
-    payload: dict[str, Any],
-    timeout: float = 1800,
-    meta: dict[str, Any] | None = None,
-) -> Any:
-    """POST a streaming /v1/chat/completions request and yield content
-    deltas as they arrive, with per-delta wall arrival times (the
-    felt-experience view the non-streaming gate cannot see: TTFT and
-    the inter-token gap distribution). Yields (delta_text, t_arrival)
-    pairs; the caller assembles the full answer and its timing.
-    meta (protocol v3.0): an optional dict the caller passes in; the
-    server's final-chunk "timings"/"usage" objects are written into
-    it before the generator ends, so a streaming caller keeps the
-    law's server-side t/s and the exact token counts."""
-    url = f"http://127.0.0.1:{port}/v1/chat/completions"
-    data = json.dumps({**payload, "stream": True}).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        buf = b""
-        for chunk in resp:
-            buf += chunk
-            while b"\n\n" in buf:
-                raw, buf = buf.split(b"\n\n", 1)
-                for line in raw.decode("utf-8", "replace").splitlines():
-                    if not line.startswith("data: "):
-                        continue
-                    body = line[len("data: ") :].strip()
-                    if body == "":
-                        return
-                    try:
-                        obj = json.loads(body)
-                    except ValueError:
-                        continue
-                    if meta is not None:
-                        if obj.get("timings"):
-                            meta["timings"] = obj["timings"]
-                        if obj.get("usage"):
-                            meta["usage"] = obj["usage"]
-                    choice = (obj.get("choices") or [{}])[0]
-                    delta = choice.get("delta") or {}
-                    text = delta.get("content")
-                    rtext = delta.get("reasoning_content")
-                    if meta is not None and rtext:
-                        meta["reasoning"] = meta.get("reasoning", "") + rtext
-                    if text:
-                        yield text, time.time()

@@ -28,8 +28,9 @@ class _Tee:
         for s in self._streams:
             s.flush()
 
-    def isatty(self) -> bool:
-        return False
+    def fileno(self) -> int:
+        # not a real tty: code that probes isatty via fileno gets -1
+        return -1
 
 
 _ORIG_STDOUT = sys.stdout

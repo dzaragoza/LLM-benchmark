@@ -384,12 +384,23 @@ def hit_time_bell(rec: dict[str, Any]) -> bool:
     highest FAILING level has at least one attempt cut by the 32s
     bell ('time_limit') - the model may simply be too slow at this
     quant, so the recovery ladder gets a chance."""
+    top_fail = _top_fail_level(rec)
+    if top_fail is None:
+        return False
+    return any(a.get("finish_reason") == "time_limit" for a in (top_fail[1].get("attempts") or []))
+
+
+def _top_fail_level(rec: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """The highest FAILING level of a rung record, (key, level-record),
+    or None when the sweep is clean. The one place that knows how the
+    failing level is found."""
     levels = rec.get("levels") or {}
     fail_keys = [k for k in levels if not levels[k].get("pass")]
     if not fail_keys:
-        return False
+        return None
     top = max(fail_keys, key=int)
-    return any(a.get("finish_reason") == "time_limit" for a in (levels[top].get("attempts") or []))
+    return top, levels[top]
+
 
 
 def rung_verdict(rec: dict[str, Any]) -> str | None:
@@ -506,48 +517,6 @@ def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     return best
 
 
-def best_record(fam_exam: dict[str, Any]) -> dict[str, Any] | None:
-    """The deciding record alone (the gc's read of best_rung)."""
-    br = best_rung(fam_exam)
-    return br[1] if br else None
-
-
-def fail_reason(rec: dict[str, Any]) -> str:
-    """Why the candidate failed its highest exam: read the last FAILING
-    level's attempts and classify the mode - the quick diagnostic the
-    ledger wants:
-      out of time      the conversation expired (the 32s time bell)
-      out of context   the token bell rang (the paper filled) first
-      wrong chain      an answer arrived, the tokens/order were wrong
-      error            a transport/tool failure, not the model's fault
-      no record        nothing measured (or only passes stored)"""
-    levels = rec.get("levels") or {}
-    fail_keys = [k for k in levels if not levels[k].get("pass")]
-    if not fail_keys:
-        return "no record"
-    top = max(fail_keys, key=int)
-    reasons = []
-    for a in levels[top].get("attempts") or []:
-        fr = a.get("finish_reason")
-        if str(fr or "").startswith("error"):
-            reasons.append("error")
-        elif fr == "time_limit":
-            reasons.append("out of time")
-        elif fr == "length":
-            reasons.append("out of context")
-        elif a.get("ok") is False:
-            reasons.append("wrong chain")
-    if "error" in reasons and not ({"wrong chain", "out of context", "out of time"} & set(reasons)):
-        return "error"
-    if "out of time" in reasons:
-        return "out of time"
-    if "out of context" in reasons:
-        return "out of context"
-    if "wrong chain" in reasons:
-        return "wrong chain"
-    return "unknown"
-
-
 def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
     """The v9 bell: the FULL training window - the number of tokens
     the model was trained to hold, the whole paper. No tg/s leg, no
@@ -575,6 +544,78 @@ def candidates(
     order = [name for name, _ in roster_from_models_md()]
     fams = order if not families else [f.split("=")[0] for f in families]
     return [(fam, "F16") for fam in fams]
+
+
+def _run_paper(
+    port: int,
+    seed: int,
+    level: int,
+    ctx: int,
+    answers_path: str,
+    dry_run: bool = False,
+) -> tuple[bool, list[dict[str, Any]]]:
+    """One exam paper: both parts in ONE conversation (the shared
+    context and the shared 32s deadline - what part 1 spends, part 2
+    no longer has), the token budget shared likewise. Returns
+    (passed, attempts); every attempt is appended to answers_path as
+    it lands."""
+    insts = {
+        "chain": build_chain(seed, level),
+        "elevator": build_elevator(seed, level),
+    }
+    messages: list[dict[str, str]] = []
+    remaining = ctx
+    paper_deadline = time.monotonic() + TIME_BELL_SECONDS
+    attempts: list[dict[str, Any]] = []
+    passed = True
+    for part, prompter in (("chain", chain_prompt), ("elevator", elevator_prompt)):
+        inst = insts[part]
+        attempt: dict[str, Any] = {
+            "seed": seed,
+            "level": level,
+            "part": part,
+            "expected": inst["path"],
+        }
+        if dry_run:
+            attempt["ok"] = None
+            attempts.append(attempt)
+            continue
+        if remaining <= 0:
+            # the paper is full: this part cannot even be asked
+            attempt.update(ok=False, answer_tokens=0, finish_reason="length")
+            attempts.append(attempt)
+            with open(answers_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+            passed = False
+            continue
+        messages.append({"role": "user", "content": prompter(inst)})
+        t0 = time.monotonic()
+        try:
+            answer, tokens, finish = ask_exam(
+                port, messages, remaining, deadline=paper_deadline
+            )
+        except Exception as e:
+            # one transport failure must not kill the sweep: fail the
+            # part, keep the paper
+            answer, tokens, finish = "", 0, f"error: {e}"
+        ok = score_exam(answer, inst, finish)
+        attempt.update(
+            ok=ok,
+            answer_tokens=tokens,
+            finish_reason=finish,
+            elapsed_s=round(time.monotonic() - t0, 1),
+            answer=(answer or "")[-2000:],
+        )
+        attempts.append(attempt)
+        with open(answers_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
+        if not ok:
+            passed = False
+        # the model's own reasoning STAYS in the paper for part 2
+        messages.append({"role": "assistant", "content": answer or ""})
+        remaining -= tokens
+    return passed, attempts
+
 
 
 def run_family(
@@ -649,83 +690,15 @@ def run_family(
             if key in levels:
                 rec = levels[key]
             else:
-                attempts = []
+                attempts: list[dict[str, Any]] = []
                 passed = True
                 for seed in seeds:
-                    # ONE exam paper per (seed, level): both parts run
-                    # in the SAME context - part 1's prompt, the
-                    # model's own reasoning, then part 2's prompt all
-                    # live in one conversation, and the generation
-                    # budget (the bell) is SHARED across the parts:
-                    # what part 1 spends, part 2 no longer has
-                    insts = {
-                        "chain": build_chain(seed, level),
-                        "elevator": build_elevator(seed, level),
-                    }
-                    messages: list[dict[str, str]] = []
-                    remaining = ctx
-                    # the TIME bell is PER EXAM (the paper: both parts
-                    # in one conversation), not per part - the parts
-                    # share it exactly as they share the token budget.
-                    # Set once, before part 1.
-                    paper_deadline = time.monotonic() + TIME_BELL_SECONDS
-                    for part, prompter in (
-                        ("chain", chain_prompt),
-                        ("elevator", elevator_prompt),
-                    ):
-                        inst = insts[part]
-                        prompt = prompter(inst)
-                        attempt: dict[str, Any] = {
-                            "seed": seed,
-                            "level": level,
-                            "part": part,
-                            "expected": inst["path"],
-                        }
-                        if dry_run:
-                            attempt["ok"] = None
-                            attempts.append(attempt)
-                            continue
-                        if remaining <= 0:
-                            # part 1 (or an earlier seed's paper) spent
-                            # the whole bell: the paper is full, this
-                            # part cannot even be asked
-                            attempt.update(ok=False, answer_tokens=0, finish_reason="length")
-                            attempts.append(attempt)
-                            with open(answers_path, "a", encoding="utf-8") as fh:
-                                fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
-                            passed = False
-                            continue
-                        messages.append({"role": "user", "content": prompt})
-                        t0 = time.monotonic()
-                        # the paper's SHARED deadline; what part 1
-                        # spent, part 2 no longer has
-                        deadline = paper_deadline
-                        try:
-                            answer, tokens, finish = ask_exam(
-                                port, messages, remaining, deadline=deadline
-                            )
-                        except Exception as e:
-                            # one transport failure (server hiccup, HTTP
-                            # error) must not kill the family's sweep:
-                            # record it, fail the part, keep the paper
-                            answer, tokens, finish = "", 0, f"error: {e}"
-                        ok = score_exam(answer, inst, finish)
-                        attempt.update(
-                            ok=ok,
-                            answer_tokens=tokens,
-                            finish_reason=finish,
-                            elapsed_s=round(time.monotonic() - t0, 1),
-                            answer=(answer or "")[-2000:],
-                        )
-                        attempts.append(attempt)
-                        with open(answers_path, "a", encoding="utf-8") as fh:
-                            fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
-                        if not ok:
-                            passed = False
-                        # the model's own reasoning STAYS in the paper
-                        # (the shared context) for the next part to use
-                        messages.append({"role": "assistant", "content": answer or ""})
-                        remaining -= tokens
+                    # one paper per (seed, level): both parts in one
+                    # conversation, the bell and the token budget
+                    # shared across the parts (_run_paper)
+                    p, atts = _run_paper(port, seed, level, ctx, answers_path, dry_run)
+                    passed = passed and p
+                    attempts.extend(atts)
                 rec = {"pass": passed and not dry_run, "attempts": attempts}
                 levels[key] = rec
                 _state_store.save_state(state_file, state)
@@ -950,7 +923,7 @@ def run(
         fam_tree = state.setdefault("exam", {}).setdefault(fam, {})
         # idempotence: a walk that already reached a verdict is final
         if not dry_run and model_verdict(fam_tree) is not None:
-            results[key] = best_record(fam_tree) or fam_tree
+            results[key] = (best_rung(fam_tree) or (None, fam_tree))[1]
             continue
         if dry_run:
             results[key] = {"planned": f"quant walk 0..{max_level} on seeds {seeds}"}
