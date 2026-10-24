@@ -184,6 +184,10 @@ def disk_watchdog(
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
 
+# models whose f16 exceeded the 16 GiB hard limit: every candidate of
+# the family is too large by inheritance (the f16 is the quant source)
+oversized_models: set[str] = set()
+
 
 # --- one candidate's run --------------------------------------------------
 
@@ -213,9 +217,25 @@ def run_candidate(
     exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
 
+    # THE 16 GiB HARD LIMIT (the author's ruling): an f16 > 16 GiB is
+    # TOO LARGE for the whole MODEL - every candidate of the family
+    # dies immediately (the f16 is the quantization SOURCE, so if the
+    # source itself is too large no rung can ever be built), the
+    # model folder is deleted at once, and the family is marked in
+    # the state so every LATER pick of any of its rungs resolves to
+    # too_large BEFORE acquiring - no download is ever paid for an
+    # oversized family again. This also shortens the pool.
+    if fam in oversized_models:
+        return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "too_large"}
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
         return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "unbuildable"}
+    famdir = os.path.join(models_dir, fam)
+    f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
+    if os.path.isfile(f16_path) and _size_too_large(f16_path):
+        oversized_models.add(fam)
+        shutil.rmtree(famdir, ignore_errors=True)
+        return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "too_large"}
     if _size_too_large(gguf):
         if rung != "F16":
             os.remove(gguf)
@@ -363,6 +383,8 @@ def main() -> None:
         with open(state_file, encoding="utf-8") as fh:
             state = json.load(fh)
     results: list[dict[str, Any]] = state.setdefault("results", [])
+    # the oversized-f16 models persist across restarts
+    oversized_models.update(state.get("oversized", []))
 
     pool = the_pool()
     assert len(pool) == 2048, len(pool)
@@ -440,6 +462,7 @@ def main() -> None:
         results.append(rec)
         done.add(key)
         state["done"] = sorted(done)
+        state["oversized"] = sorted(oversized_models)
         state["results"] = results[-5000:]  # the state stays bounded
         _state_store.save_state(state_file, state)
         write_ledger()
