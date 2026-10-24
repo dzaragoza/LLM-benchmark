@@ -291,9 +291,13 @@ def run_candidate(
                     break
                 messages.append({"role": "assistant", "content": answer or ""})
                 remaining -= tokens
-            last_level_time = round(time.monotonic() - level_t0, 1)
+            level_time = round(time.monotonic() - level_t0, 1)
             if not level_pass:
                 break
+            # the SPEED datum is at the HIGH-SCORE exam (the author's
+            # clarification): the time of the level the candidate
+            # PASSED that set its high score - not the failing level
+            high_score_time = level_time
             high_score = level
             level += 1
     finally:
@@ -313,7 +317,7 @@ def run_candidate(
         "attempts": len(attempts),
         # the SPEED datum: the LAST level's time (the deciding level's
         # own timer), not the whole run - per the author's clarification
-        "level_time_s": last_level_time,
+        "high_score_time_s": high_score_time,
         "elapsed_s": round(time.monotonic() - t_start, 1),
     }
 
@@ -365,7 +369,7 @@ def main() -> None:
         rows.sort(
             key=lambda r: (
                 -(r.get("high_score") or -1),
-                r.get("level_time_s") if r.get("level_time_s") is not None else 1e9,
+                r.get("high_score_time_s") if r.get("high_score_time_s") is not None else 1e9,
             )
         )
         lines = [
@@ -379,7 +383,11 @@ def main() -> None:
             "|---|---|---|---|---|",
         ]
         for i, r in enumerate(rows):
-            t = r.get("level_time_s") if r.get("level_time_s") is not None else (r.get("elapsed_s") or 0.0)
+            t = (
+                r.get("high_score_time_s")
+                if r.get("high_score_time_s") is not None
+                else (r.get("elapsed_s") or 0.0)
+            )
             speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
             lines.append(
                 f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} "
