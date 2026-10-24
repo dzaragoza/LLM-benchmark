@@ -1,5 +1,15 @@
 # randomizer.md - the randomizer ledger
 
+## the top 5% dashboard
+
+- measured: 115 done candidates, top 5 (5 of 115)
+- params median: **3.191 B**
+- quant levels: Q4 x2, Q5 x1, Q8 x1, F16 x1
+- high-score level time median: **35s**
+- score median: **3**
+
+_the machine sweet-spot band, live as the pool fills_
+
 Every candidate gets ONE chance (no replacement). Rank:
 highest score, tiebreak by time. Speed: the candidate's
 whole run - fast <= 32s, medium <= 64s, slow <= 128s.
@@ -119,15 +129,7 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 111 | AI21-Jamba-Reasoning-3B | -1 | Q6_K | slow |
 | 112 | gemma-2-2b-it | -1 | TQ2_0 | slow |
 | 113 | granite-4.0-h-350m | -1 | Q6_K | fast |
+| 114 | MiniCPM4-0.5B | -1 | IQ3_S | slow |
+| 115 | SmolLM3-3B | -1 | IQ1_M | slow |
 
-_113 candidates run of 2048; each one chance, the seed recorded in state._
-
-## the top 5% dashboard
-
-- measured: 113 done candidates, top 5 (5 of 113)
-- params median: **3.191 B**
-- quant distribution: Q4_0 x2, Q5_1 x1, Q8_0 x1, F16 x1
-- high-score level time median: **35s**
-- score median: **3**
-
-_the machine sweet-spot band, live as the pool fills_
+_115 candidates run of 2048; each one chance, the seed recorded in state._
