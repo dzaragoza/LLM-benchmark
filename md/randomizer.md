@@ -2,11 +2,11 @@
 
 ## the top 5% dashboard
 
-- measured: 119 done candidates, top 5 (5 of 119)
-- params median: **3.191 B**
-- quant levels: Q4 x2, Q5 x1, Q8 x1, F16 x1
-- high-score level time median: **35s**
-- score median: **3**
+- measured: 120 done candidates, top 6 (6 of 120)
+- params median: **3.297 B**
+- quant levels: Q5 x2, Q4 x2, Q8 x1, F16 x1
+- high-score level time median: **25s**
+- score median: **2.5**
 
 _the machine sweet-spot band, live as the pool fills_
 
@@ -135,5 +135,6 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 117 | granite-4.0-h-350m | -1 | Q4_1 | fast |
 | 118 | granite-4.0-h-micro | -1 | IQ1_M | medium |
 | 119 | Qwen3-2B | -1 | F16 | slow |
+| 120 | granite-3.1-2b-instruct | -1 | Q4_1 | slow |
 
-_119 candidates run of 2048; each one chance, the seed recorded in state._
+_120 candidates run of 2048; each one chance, the seed recorded in state._
