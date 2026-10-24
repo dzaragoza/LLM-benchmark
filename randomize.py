@@ -184,8 +184,16 @@ def disk_watchdog(
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
 
-# models whose f16 exceeded the 16 GiB hard limit: every candidate of
-# the family is too large by inheritance (the f16 is the quant source)
+# the f16 family-kill threshold (the author's extra-safety ruling):
+# an f16 > 8 GiB kills the whole model - stricter than the 16 GiB
+# per-candidate limit, because the f16 is the quantization SOURCE
+# (every rung of the family is built from it, so the family's peak
+# disk cost scales with the f16, and 8 GiB of source means ~8+ GiB
+# of transient quant output on top)
+F16_LIMIT_GIB = 8.0
+
+# models whose f16 exceeded the hard limit: every candidate of the
+# family is too large by inheritance (the f16 is the quant source)
 oversized_models: set[str] = set()
 
 
@@ -232,7 +240,9 @@ def run_candidate(
         return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "unbuildable"}
     famdir = os.path.join(models_dir, fam)
     f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
-    if os.path.isfile(f16_path) and _size_too_large(f16_path):
+    if os.path.isfile(f16_path) and (
+        os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB
+    ):
         oversized_models.add(fam)
         shutil.rmtree(famdir, ignore_errors=True)
         return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "too_large"}
