@@ -415,10 +415,8 @@ def rung_verdict(rec: dict[str, Any]) -> str | None:
     and is decided by level_outcome below - rung_verdict alone no
     longer decides the walk.
 
-    A record marked too_large (the SIZE gate) reads as 'time'-grade:
-    not a graded paper; the candidate could not sit at all."""
-    if rec.get("too_large"):
-        return "time"  # the SIZE gate: same recovery grade as the bell
+    A stale record with the retired too_large flag reads as
+    unmeasured (the flag is the randomizer's now)."""
     if rec.get("score") is None:
         return None
     top_fail = _top_fail_level(rec)
@@ -482,10 +480,6 @@ def level_outcome(
             if rec.get("unbuildable"):
                 continue
             # the candidate's OWN deepest level is its terminal
-            # (a too_large never sat: timeout-grade by definition)
-            if rec.get("too_large"):
-                any_timeout = True
-                continue
             deep_lv = max((int(lv) for lv in (rec.get("levels") or {})), default=-1)
             deep = (rec.get("levels") or {}).get(str(deep_lv))
             if deep is None:
@@ -502,21 +496,16 @@ def level_outcome(
     if loi > target:
         target = loi
     # the verdict at the target. Per candidate at the target:
-    # fail stops the walk
-    # (bells and too-larges ignored - the proctor got his answer);
-    # pass = the ceiling only; only bells/too-larges -> descend with
+    # fail stops the walk (bells ignored - the proctor got his
+    # answer); pass = the ceiling only; only bells -> descend with
     # T FIXED; a transport error is pending, not evidence.
     passed = 0
     graded_wrong = 0
     belled = 0
-    too_large = 0
     errored = False
     for rec in group_records.values():
         if rec.get("unbuildable"):
             continue  # never sat, never will
-        if rec.get("too_large"):
-            too_large += 1  # could not sit: timeout-grade
-            continue
         loi_rec = (rec.get("levels") or {}).get(str(loi))
         if loi_rec is None:
             continue  # did not reach the group's deepest level
@@ -538,7 +527,7 @@ def level_outcome(
         return "pass", loi  # the ceiling: a sweep's own stop
     if graded_wrong:
         return "fail", loi  # bells and too-larges ignored: the proctor got his answer
-    if belled or too_large:
+    if belled:
         return "time", target  # descend; THE TARGET DOES NOT MOVE
     return None
 
@@ -568,7 +557,7 @@ def model_verdict(fam_exam: dict[str, Any]) -> str | None:
             for r in group
             if isinstance(fam_exam.get(r), dict) and not fam_exam[r].get("unbuildable")
         }
-        if not any((rec.get("levels") or rec.get("too_large")) for rec in records.values()):
+        if not any(rec.get("levels") for rec in records.values()):
             walked_all = False
             continue
         outcome = level_outcome(records, frontier)
@@ -1054,8 +1043,6 @@ def run(
         for num, group in rung_groups():
             for rung in group:
                 rec = fam_tree.get(rung) or {}
-                if rec.get("too_large"):
-                    continue  # the SIZE gate already rejected this rung
                 if rec.get("score") is None and not rec.get("unbuildable"):
                     gguf = _acquire(fam, rung, models_dir)
                     if not gguf:
@@ -1129,13 +1116,11 @@ def run(
                 # branches return the unchanged target on descent)
                 frontier = loi
         if walk_verdict is None and not errored:
-            # every quant number was tried and only bells/too-larges came
-            # back: the quants are exhausted - out of time, an exam fail
+            # every quant number was tried and only bells came back:
+            # the quants are exhausted - out of time, an exam fail
             fam_tree["_out_of_time"] = True
             _state_store.save_state(state_file, state)
-            nlarge = sum(1 for r in fam_tree.values() if isinstance(r, dict) and r.get("too_large"))
-            why = "size" if nlarge else "the bell"
-            print(f"  {fam}: quants exhausted ({why}) - out of time (an exam fail)")
+            print(f"  {fam}: quants exhausted (the bell) - out of time (an exam fail)")
         # the self-clean FIRST: a model whose deciding rung scored
         # strictly below the global best AND whose walk reached a
         # verdict leaves the disk (the data always stays), THEN the
