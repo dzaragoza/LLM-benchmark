@@ -669,10 +669,15 @@ def regrade_records(state: dict[str, Any]) -> int:
                         a["ok"] = new_ok
                         flipped += 1
                 lrec["pass"] = all(a.get("ok") for a in attempts) and bool(attempts)
-            # recompute the rung's score: the highest level with all-below passed
-            score = None
+            # recompute the rung's score EXACTLY as run_family does:
+            # the highest level passed, or -1 when level 0 itself
+            # failed (the rung IS measured - score=None would make the
+            # walk treat it as unmeasured and re-quantize everything,
+            # the regrade incident)
+            score = -1
             for lv in sorted(levels, key=int):
                 if not levels[lv].get("pass"):
+                    score = int(lv) - 1
                     break
                 score = int(lv)
             rec["score"] = score
