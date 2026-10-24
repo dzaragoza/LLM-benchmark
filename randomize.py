@@ -98,9 +98,37 @@ def entropy_bits(n: int) -> int:
 
 def the_pool() -> list[tuple[str, str]]:
     """Every (model, rung) candidate, deterministic order: the pool is
-    INDEXED by the 11-bit pick, so the index space is the pool."""
-    roster = [name for name, _repo in roster_from_models_md()]
-    return [(fam, rung) for fam in roster for rung in LADDER]
+    INDEXED by the 11-bit pick, so the index space is the pool.
+
+    THE OVERSIZED PRE-MARK (the author's simplification): the f16
+    size lives in md/models.md (the f16 (GiB) column, params x 2
+    bytes) - at startup every model whose f16 exceeds the 8 GiB
+    family-kill limit is marked oversized IMMEDIATELY, from the
+    table alone: no download, no conversion, no measurement. The
+    gate's discovery cost drops from up to 10 acquisitions to one
+    table read."""
+    roster = roster_from_models_md()
+    pool: list[tuple[str, str]] = []
+    for fam, _repo in roster:
+        if _f16_gib_from_models_md(fam) > F16_LIMIT_GIB:
+            oversized_models.add(fam)
+        for rung in LADDER:
+            pool.append((fam, rung))
+    return pool
+
+
+def _f16_gib_from_models_md(fam: str) -> float | None:
+    """The model's f16 size from the md/models.md table (the f16
+    (GiB) column). None when the row carries no number."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "md", "models.md")
+    for ln in open(path, encoding="utf-8"):
+        if ln.startswith(f"| {fam} |"):
+            parts = [p.strip() for p in ln.strip().strip("|").split("|")]
+            try:
+                return float(parts[2])
+            except (ValueError, IndexError):
+                return None
+    return None
 
 
 # --- the disk watchdog ----------------------------------------------------
@@ -402,6 +430,7 @@ def main() -> None:
 
     pool = the_pool()
     assert len(pool) == 2048, len(pool)
+    live = 2048 - len(oversized_models) * len(LADDER)
 
     stop = threading.Event()
     gc_log: list[str] = []
@@ -461,7 +490,11 @@ def main() -> None:
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
-    print(f"[randomizer] pool: {len(pool)} candidates (11 bits/pick, ONE chance each)")
+    print(
+        f"[randomizer] pool: {len(pool)} candidates, {len(oversized_models)} models "
+        f"pre-marked oversized from models.md ({len(oversized_models) * len(LADDER)} "
+        f"dead indexes) - {live} live, ONE chance each"
+    )
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
     print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, 1s watchdog")
     n = len(done)
