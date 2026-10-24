@@ -34,7 +34,7 @@ from typing import Any
 # session 38, addendum 5: llama's own memory accounting must land in the
 # server log (the sole per-process memory witness - session 38, addendum
 # 11 retired the smaps census; addendum 23 deletes the machinery).
-# v9.4: level 5 (the per-token debug stream - 100MB+ per run) is RETIRED.
+# v9.5: level 5 (the per-token debug stream - 100MB+ per run) is RETIRED.
 # Measured on the pinned build (the author's lv0..5 sweep): the memory
 # breakdown table - the only thing the benchmark reads - first appears
 # at level 4 (16KB per launch; level 5 was 440KB).

@@ -153,7 +153,7 @@ def preflight_selfcheck() -> None:
         c = E.candidates({}, [fam])
         assert c == [(fam, "F16")], f"candidates must be F16-only, got {c}"
 
-        # --- v9.4 gc: DONE walks collect, PENDING walks never (fixtures
+        # --- v9.5 gc: DONE walks collect, PENDING walks never (fixtures
         # carry LEVELS - the walk's real record shape; a record with no
         # levels is UNMEASURED, and a walk with only such records is
         # PENDING, never collected) ---
@@ -209,7 +209,7 @@ def preflight_selfcheck() -> None:
         E._gc(tmp, state3, exclude_fam="gcC")
         assert os.path.isdir(d3), "gc deleted the running model"
 
-        # --- v9.4: the exhaustive quant walk helpers ---
+        # --- v9.5: the exhaustive quant walk helpers ---
         groups = E.rung_groups()
         assert groups[0] == ("F16", ("F16",)), "the walk starts at F16, alone"
         assert groups[1][0] == "Q8" and groups[1][1] == ("Q8_0",)
@@ -287,7 +287,7 @@ def preflight_selfcheck() -> None:
         assert E.hit_time_bell(vt), "the bell record reads as time"
         assert not E.hit_time_bell(vfl), "the wrong-chain record reads as fail"
 
-        # --- v9.4 gc: terminal verdicts collect, pending walks never ---
+        # --- v9.5 gc: terminal verdicts collect, pending walks never ---
         # fixtures carry LEVELS (the walk's real record shape): a
         # score-only record reads as a clean sweep (pass) under the
         # level-granular verdict and the gc would read it differently
@@ -342,7 +342,7 @@ def preflight_selfcheck() -> None:
         }
         E._gc(tmp, state6, exclude_fam=None)
         assert not os.path.isdir(d6), "gc kept a model every rung of failed"
-        # v9.4: a PENDING walk (bells, quants untried) is never touched
+        # v9.5: a PENDING walk (bells, quants untried) is never touched
         d7 = os.path.join(tmp, "gcT")
         os.makedirs(d7, exist_ok=True)
         open(os.path.join(d7, "gcT-F16.gguf"), "w", encoding="utf-8").close()
@@ -350,7 +350,7 @@ def preflight_selfcheck() -> None:
         E._gc(tmp, state7, exclude_fam=None)
         assert os.path.isdir(d7), "gc deleted a PENDING (mid-walk) model"
         assert not state7["exam"]["gcT"].get("_eliminated")
-        # v9.4: quants EXHAUSTED at the bell = out of time = an exam
+        # v9.5: quants EXHAUSTED at the bell = out of time = an exam
         # fail - the gc collects it like any fail
         state7["exam"]["gcT"]["_out_of_time"] = True
         E._gc(tmp, state7, exclude_fam=None)
@@ -367,7 +367,7 @@ def preflight_selfcheck() -> None:
         assert not E.score_exam("ANSWER: abc, def, gh", inst, "time_limit")
         assert not E.score_exam("I cannot solve this", inst, "stop")
 
-        # --- v9.4: the roster ladder the walk draws its variations from ---
+        # --- v9.5: the roster ladder the walk draws its variations from ---
         from bench.roster import LADDER
 
         assert LADDER[-1] == "F16" and len(LADDER) == 32
@@ -437,7 +437,7 @@ def git_tail(args: argparse.Namespace) -> None:
     paths = [args.state_file, args.results_file, "results.txt"]
     # the ledger is a first-class artifact: every commit carries the
     # latest regeneration (the per-model pushes depend on it)
-    paths += ["md/v9.4.md"]
+    paths += ["md/v9.5.md"]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split
     paths += glob.glob("results/**/*", recursive=True)
@@ -759,7 +759,7 @@ def regrade_records(state: dict[str, Any]) -> int:
 
 
 def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
-    """md/v9.4.md - the tournament ledger, v9.4: ONE line per model
+    """md/v9.5.md - the tournament ledger, v9.5: ONE line per model
     (its quant walk), in md/models.md order. The deciding rung's
     score IS the model's score; the quant column shows WHICH
     variant carried the exam (the walk's best scorer). Eliminated =
@@ -810,7 +810,7 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
     tier.sort(key=lambda r: r[4] if r[4] is not None else float("inf"))
     rank = {r[0]: i + 1 for i, r in enumerate(tier)}
     lines = [
-        "# v9.4.md - the tournament ledger (v9.4: the exhaustive quant walk, the 32s bell)",
+        "# v9.5.md - the tournament ledger (v9.5: the exhaustive quant walk, the 32s bell)",
         "",
         "One line per model, md/models.md order (param-ascending). The",
         "deciding rung's score IS the model's score; the quant column is",
@@ -843,9 +843,9 @@ def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
         "everything. Max context used = the largest answer the model ever "
         "produced (its real need vs its window)._"
     )
-    with open(os.path.join("md", "v9.4.md"), "w", encoding="utf-8") as f:
+    with open(os.path.join("md", "v9.5.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    stamp("v9.4.md ledger rewritten")
+    stamp("v9.5.md ledger rewritten")
 
 
 def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:

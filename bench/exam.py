@@ -10,7 +10,7 @@ comprehensiveness yielded to efficiency.
   the bell     TOKEN and TIME: max_tokens = the window (finish_reason
               'length' = the paper filled); one attempt may run at
               most 32s (finish_reason 'time_limit' = the bell).
-  recovery    v9.4 - the EXHAUSTIVE quant walk: a sweep that
+  recovery    v9.5 - the EXHAUSTIVE quant walk: a sweep that
               ends at the bell is retried quant number by quant
               number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY
               variation of a number (roster LADDER order) before
@@ -58,7 +58,7 @@ from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window
 # protocol.md:179 - Determinism: temperature 0, seed 1024
 SAMPLER_SEED = 1024
 
-# the TIME bell (v9.4, the author's ruling): one exam attempt may
+# the TIME bell (v9.5, the author's ruling): one exam attempt may
 # run at most 32 seconds - with recovery re-running the whole exam
 # per quant, a long bell multiplies against the quant ladder. The
 # streamed read is cut at the wall and the socket closed, cancelling
@@ -67,13 +67,13 @@ SAMPLER_SEED = 1024
 # (recorded per attempt) - but the human breaks ties.
 TIME_BELL_SECONDS = 32
 
-# v9.4 recovery: the quant walk, by quant NUMBER quality-descending
+# v9.5 recovery: the quant walk, by quant NUMBER quality-descending
 # (each step down trades precision for speed - the clock is what the
 # candidate lost to, so the walk buys tok/s with bits until a
 # verdict lands)
 QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 
-# v9.4 SIZE recovery (the author's ruling): a candidate's file on disk
+# v9.5 SIZE recovery (the author's ruling): a candidate's file on disk
 # may not exceed 16 GiB - too large is a condition like out of time,
 # with the SAME recovery logic: a quant level whose every candidate is
 # too large descends to the next quant number (a smaller quant is a
@@ -357,7 +357,7 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
 
 
 def rung_groups() -> list[tuple[str, tuple[str, ...]]]:
-    """v9.4: the walk as (quant number, variations) pairs - F16
+    """v9.5: the walk as (quant number, variations) pairs - F16
     alone, then EVERY variation of each number in roster LADDER
     order (q8_0; q6_k; q5_k_s, q5_0, q5_k_m, q5_1; ... q1)."""
     from bench.roster import LADDER
@@ -403,7 +403,7 @@ def _top_fail_level(rec: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
 
 
 def rung_verdict(rec: dict[str, Any]) -> str | None:
-    """One rung record's outcome, v9.4 corrected - the PROCTOR rule,
+    """One rung record's outcome, v9.5 corrected - the PROCTOR rule,
     whole paper. The bell is the gate: a paper with ANY bell-cut
     attempt was never handed in - out of time, UNGRADED. A paper
     with every part ended is handed in and graded. None = the rung
@@ -436,7 +436,7 @@ def level_outcome(
     group_records: dict[str, dict[str, Any]],
     target: int,
 ) -> tuple[str, int] | None:
-    """One quant level's verdict, v9.4 corrected (the author's spec
+    """One quant level's verdict, v9.5 corrected (the author's spec
     fix, the granite-4.0-h-micro case). TARGET is the walk's
     LEVEL-UNDER-TEST - the frontier: the highest exam level any
     candidate has reached so far in this walk. Every candidate
@@ -520,7 +520,7 @@ def level_outcome(
 
 
 def model_verdict(fam_exam: dict[str, Any]) -> str | None:
-    """The model's terminal verdict, v9.4 corrected - derived from
+    """The model's terminal verdict, v9.5 corrected - derived from
     the records so a resumed run skips a completed walk. The
     FRONTIER is walk-persistent: it starts at 0 and rises whenever
     a group's deepest reach exceeds it (a candidate that reached L
@@ -566,7 +566,7 @@ def model_verdict(fam_exam: dict[str, Any]) -> str | None:
 
 
 def best_rung(fam_exam: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
-    """The model's DECIDING (rung, record) pair, v9.4: the
+    """The model's DECIDING (rung, record) pair, v9.5: the
     highest-scoring rung the walk ever recorded, ties to the earlier
     rung in walk order. The deciding rung is the ledger's quant
     column; the record carries the score the gc and ledger read."""
@@ -612,7 +612,7 @@ def candidates(
     models_dir: str = "models",
     dry_run: bool = False,
 ) -> list[tuple[str, str]]:
-    """v9.4: the roster as (family, F16) pairs, param-ascending - the
+    """v9.5: the roster as (family, F16) pairs, param-ascending - the
     F16 is the walk's FIRST group; the recovery rungs are acquired
     lazily by the walk itself. Acquisition stays lazy (the f16 is
     downloaded/converted on demand)."""
@@ -830,7 +830,7 @@ def run_family(
     finally:
         if proc is not None:
             llama_server.stop_server(proc, port)
-        # log hygiene (v9.4): the committed log keeps only its
+        # log hygiene (v9.5): the committed log keeps only its
         # INFORMATION - the startup banner (model, quant, ctx) and the
         # memory breakdown table. The -lv 4 stream is already small
         # (~16KB); this trim is the safety net that guarantees no push
@@ -848,7 +848,7 @@ def run_family(
 
 
 def _size_too_large(path: str) -> bool:
-    """The SIZE gate (v9.4, the author's ruling): True when the
+    """The SIZE gate (v9.5, the author's ruling): True when the
     candidate's file on DISK exceeds MAX_CANDIDATE_GIB. No
     estimates - the author's ruling: the measured file size is
     the only truth (the file is acquired first, then measured;
@@ -882,7 +882,7 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 
 
 def _gc(models_dir: str, state: dict[str, Any], exclude_fam: str | None) -> None:
-    """The self-cleaning sweep, v9.4 - MODEL granularity: a model is
+    """The self-cleaning sweep, v9.5 - MODEL granularity: a model is
     eliminated when its deciding rung (the walk's best scorer) has
     a final score strictly below the global best AND the walk
     reached a terminal verdict - pass, fail, or out of time (an
@@ -1000,7 +1000,7 @@ def run(
         if dry_run:
             results[key] = {"planned": f"quant walk 0..{max_level} on seeds {seeds}"}
             continue
-        # v9.4: the EXHAUSTIVE quant walk - quant number by quant
+        # v9.5: the EXHAUSTIVE quant walk - quant number by quant
         # number (f16, q8, q6, q5, q4, q3, q2, q1), EVERY variation
         # of a number (roster LADDER order) before the next, until
         # a verdict lands: a clean sweep PASSES the walk; a quant
