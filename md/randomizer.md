@@ -65,5 +65,11 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 57 | Qwen3-1.7B | -1 | Q5_0 | slow |
 | 58 | Qwen3-2B | -1 | Q4_K_M | slow |
 | 59 | granite-4.0-micro | -1 | Q4_0 | slow |
+| 60 | phi-2 | -1 | Q5_1 | medium |
+| 61 | Qwen3.5-2B | -1 | Q5_1 | slow |
+| 62 | Qwen2.5-1.5B-Instruct | -1 | Q1_0 | slow |
+| 63 | MiniCPM4-0.5B | -1 | Q4_K_S | fast |
+| 64 | Qwen3-2B | -1 | IQ3_XS | slow |
+| 65 | AI21-Jamba-Reasoning-3B | -1 | IQ1_S | slow |
 
-_59 candidates run of 2048; each one chance, the seed recorded in state._
+_65 candidates run of 2048; each one chance, the seed recorded in state._
