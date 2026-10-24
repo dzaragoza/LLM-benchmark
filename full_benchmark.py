@@ -894,7 +894,7 @@ def _run(args: argparse.Namespace) -> None:
         if args.clean and state.get("exam"):
             state["exam"] = {}
             save_state(args.state_file, state)
-            stamp("exam: all records wiped (--clean) - a full re-measure under the v9 protocol")
+            stamp("exam: all records wiped (--clean) - a full re-measure under the v9.5 protocol")
 
         if args.regrade:
             flipped = regrade_records(state)
