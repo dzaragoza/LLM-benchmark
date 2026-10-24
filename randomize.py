@@ -650,16 +650,66 @@ def main(on_progress: Any = None) -> None:
                 r.get("high_score_time_s") if r.get("high_score_time_s") is not None else 1e9,
             )
         )
-        lines = [
-            "# randomizer.md - the randomizer ledger",
-            "",
-            "Every candidate gets ONE chance (no replacement). Rank:",
-            "highest score, tiebreak by time. Speed: the candidate's",
-            "whole run - fast <= 32s, medium <= 64s, slow <= 128s.",
-            "",
-            "| rank | model | high score | quant @high | speed |",
-            "|---|---|---|---|---|",
+
+        def _quant_level(rung: str) -> str:
+            # the LEVEL, not the variant (the author's ruling):
+            # Q5_1 -> Q5, IQ3_S -> IQ3, TQ1_0 -> TQ1, F16 -> F16
+            import re as _re
+
+            m = _re.match(r"^(IQ|TQ|Q)?(\d)", rung)
+            if not m:
+                return rung
+            return (m.group(1) or "Q") + m.group(2)
+
+        # THE TOP-5% DASHBOARD (the author's four medians: params,
+        # quant, high-score level time, score) - computed FIRST and
+        # rendered at the TOP of the ledger (the author's ruling)
+        import re as _re
+        import statistics as _stats
+
+        fam_meta: dict[str, float] = {}
+        for ln in open("md/models.md", encoding="utf-8"):
+            m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
+            if m:
+                fam_meta[m.group(1).strip()] = float(m.group(2))
+        k = max(1, len(rows) * 5 // 100)
+        top = rows[:k]
+        t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
+        t_quants = [_quant_level(r["rung"]) for r in top]
+        t_times = [
+            r["high_score_time_s"]
+            for r in top
+            if r.get("high_score_time_s") is not None
         ]
+        t_scores = [r.get("high_score") or -1 for r in top]
+        lines = ["# randomizer.md - the randomizer ledger", ""]
+        lines.append("## the top 5% dashboard")
+        lines.append("")
+        lines.append(f"- measured: {len(rows)} done candidates, top {k} ({k} of {len(rows)})")
+        if t_params:
+            lines.append(f"- params median: **{_stats.median(t_params):g} B**")
+        if t_quants:
+            from collections import Counter as _C
+
+            qc = _C(t_quants)
+            lines.append(
+                "- quant levels: " + ", ".join(f"{q} x{n}" for q, n in qc.most_common())
+            )
+        if t_times:
+            lines.append(f"- high-score level time median: **{_stats.median(t_times):g}s**")
+        if t_scores:
+            lines.append(f"- score median: **{_stats.median(t_scores):g}**")
+        lines.append("")
+        lines.append("_the machine sweet-spot band, live as the pool fills_")
+        lines.append("")
+        lines.append(
+            "Every candidate gets ONE chance (no replacement). Rank:"
+        )
+        lines.append("highest score, tiebreak by time. Speed: the candidate's")
+        lines.append("whole run - fast <= 32s, medium <= 64s, slow <= 128s.")
+        lines.append("")
+        lines.append("| rank | model | high score | quant @high | speed |")
+        lines.append("|---|---|---|---|---|")
         for i, r in enumerate(rows):
             t = (
                 r.get("high_score_time_s")
@@ -673,46 +723,6 @@ def main(on_progress: Any = None) -> None:
             )
         lines.append("")
         lines.append(f"_{len(rows)} candidates run of {len(pool)}; each one chance, the seed recorded in state._")
-        # THE TOP-5% DASHBOARD (the author's four medians: params,
-        # quant, high-score level time, score) - the machine's
-        # sweet-spot band, tracked live as the pool fills
-        import re as _re
-        import statistics as _stats
-
-        fam_meta: dict[str, float] = {}
-        for ln in open("md/models.md", encoding="utf-8"):
-            m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
-            if m:
-                fam_meta[m.group(1).strip()] = float(m.group(2))
-        k = max(1, len(rows) * 5 // 100)
-        top = rows[:k]
-        t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
-        t_quants = [r["rung"] for r in top]
-        t_times = [
-            r["high_score_time_s"]
-            for r in top
-            if r.get("high_score_time_s") is not None
-        ]
-        t_scores = [r.get("high_score") or -1 for r in top]
-        lines.append("")
-        lines.append("## the top 5% dashboard")
-        lines.append("")
-        lines.append(f"- measured: {len(rows)} done candidates, top {k} ({k} of {len(rows)})")
-        if t_params:
-            lines.append(f"- params median: **{_stats.median(t_params):g} B**")
-        if t_quants:
-            from collections import Counter as _C
-
-            qc = _C(t_quants)
-            lines.append(
-                "- quant distribution: " + ", ".join(f"{q} x{n}" for q, n in qc.most_common())
-            )
-        if t_times:
-            lines.append(f"- high-score level time median: **{_stats.median(t_times):g}s**")
-        if t_scores:
-            lines.append(f"- score median: **{_stats.median(t_scores):g}**")
-        lines.append("")
-        lines.append("_the machine sweet-spot band, live as the pool fills_")
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
