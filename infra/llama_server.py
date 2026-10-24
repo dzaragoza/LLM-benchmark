@@ -116,6 +116,17 @@ def start_server(
     return proc, healthy
 
 
+MEMORY_BREAKDOWN_ROW = re.compile(
+    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*\d+\s*\+\s*"
+    r"\(\s*\d+\s*=\s*(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\)"
+)
+MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
+    r"\|\s*-\s*(\w[^|]*?)\s*\|\s*(\d+)\s*=\s*"
+    r"(\d+)\s*\+\s*(\d+)\s*\+\s*(\d+)\s*\|"
+)
+
+
+
 def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
     """llama.cpp's own memory accounting from the -lv 5 server log
     (session 39, addendum 11 - the smaps census retired: it can't see
@@ -218,5 +229,3 @@ def tokenize(port: int, content: str, timeout: float = 300) -> list[Any]:
     if toks is None:
         raise ValueError("no tokens field in /tokenize response")
     return toks
-
-

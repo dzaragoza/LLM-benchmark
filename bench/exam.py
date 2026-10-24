@@ -402,7 +402,6 @@ def _top_fail_level(rec: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     return top, levels[top]
 
 
-
 def rung_verdict(rec: dict[str, Any]) -> str | None:
     """One rung record's outcome, v9.4 - the PROCTOR rule (the
     author's ruling): one fail reason per exam, and the BELL is
@@ -591,9 +590,7 @@ def _run_paper(
         messages.append({"role": "user", "content": prompter(inst)})
         t0 = time.monotonic()
         try:
-            answer, tokens, finish = ask_exam(
-                port, messages, remaining, deadline=paper_deadline
-            )
+            answer, tokens, finish = ask_exam(port, messages, remaining, deadline=paper_deadline)
         except Exception as e:
             # one transport failure must not kill the sweep: fail the
             # part, keep the paper
@@ -615,7 +612,6 @@ def _run_paper(
         messages.append({"role": "assistant", "content": answer or ""})
         remaining -= tokens
     return passed, attempts
-
 
 
 def run_family(

@@ -533,5 +533,3 @@ def _http_get_json(
 
 
 ARC_NUM_DEFAULT = 1172  # full ARC-Challenge test split (author ruling 2026-09-23)
-
-
