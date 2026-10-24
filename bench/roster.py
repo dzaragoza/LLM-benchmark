@@ -76,8 +76,10 @@ def roster_from_models_md() -> list[tuple[str, str]]:
             continue
         if in_table and line.startswith("|"):
             parts = [p.strip() for p in line.strip().strip("|").split("|")]
-            if len(parts) >= 4 and parts[0] and parts[0] != "model name" and set(parts[0]) != {"-"}:
-                rows.append((parts[0], parts[3]))
+            if len(parts) >= 5 and parts[0] and parts[0] != "model name" and set(parts[0]) != {"-"}:
+                # the table: name | params | f16 (GiB) | window | repo -
+                # the repo is column 5 (the f16 column shifted it right)
+                rows.append((parts[0], parts[4]))
     return rows
 
 
