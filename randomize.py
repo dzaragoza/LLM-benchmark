@@ -579,7 +579,7 @@ def run_candidate(
 # the watchability cadence (the exam's per-family push ruling,
 # randomizer-shaped): commit + push every N candidates so a
 # multi-hour run is readable remotely as it goes
-COMMIT_EVERY = 10
+COMMIT_EVERY = 8
 
 
 def main(on_progress: Any = None) -> None:
