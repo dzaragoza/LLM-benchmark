@@ -243,6 +243,7 @@ def run_candidate(
         log_path=log_path,
     )
     high_score = -1
+    high_score_time: float | None = None
     fail_reason = ""
     attempts: list[dict[str, Any]] = []
     try:
@@ -343,7 +344,7 @@ def run_candidate(
         "attempts": len(attempts),
         # the SPEED datum: the LAST level's time (the deciding level's
         # own timer), not the whole run - per the author's clarification
-        "high_score_time_s": high_score_time,
+        "high_score_time_s": high_score_time,  # None: no level passed
         "elapsed_s": round(time.monotonic() - t_start, 1),
     }
 

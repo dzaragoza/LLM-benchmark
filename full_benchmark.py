@@ -616,7 +616,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--task",
         default="exam",
-        choices=["exam"],
+        choices=["exam", "randomize"],
         help="the benchmark: every (model, quant) candidate takes the "
         "exam - the full training window as the paper, the 32s time "
         "bell, PASS/FAIL sweeps, self-cleaning elimination",
@@ -882,6 +882,18 @@ def _run(args: argparse.Namespace) -> None:
         preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
+    if args.task == "randomize":
+        # protocol randomizer: the epitome of simplicity - every
+        # candidate of the 2048 pool (roster x LADDER = 11 bits of
+        # real entropy per pick, ONE chance each), a fresh 8-bit
+        # exam per candidate, a 128s timer PER LEVEL, results only.
+        # Runs INSIDE full_benchmark's envelope: the crash rail, the
+        # SIGINT saves, the artifact commits, the log truncation.
+        import randomize as R
+
+        R.main()
+        return
+
     if args.task in ("v8", "exam"):
         # v9: the exam is the only phase. No sweet walk, no in-window
         # rule, no model-count logic: every (model, quant) candidate
