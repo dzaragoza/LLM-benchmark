@@ -889,14 +889,17 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
         return existing
     repo = dict(roster_from_models_md()).get(fam)
     if not repo:
+        print(f"  {fam} {rung}: unbuildable - no roster repo")
         return None
     try:
         return build(fam, repo, famdir, rung)
     except SystemExit as e:
         if e.code == 130:
             raise
+        print(f"  {fam} {rung}: unbuildable - build exited ({e.code})")
         return None
-    except Exception:
+    except Exception as e:
+        print(f"  {fam} {rung}: unbuildable - {e}")
         return None
 
 

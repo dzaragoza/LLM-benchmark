@@ -911,7 +911,22 @@ def _run(args: argparse.Namespace) -> None:
                 "randomizer: all records wiped (--clean) - the pool is "
                 "fresh, every candidate's chance restored"
             )
-        R.main()
+        try:
+            R.main()
+        finally:
+            # the git tail ALWAYS runs (the envelope's ruling): the
+            # ledger, the state, and the answers are committed and
+            # pushed whether the run finished, crashed, or was
+            # SIGINTerrupted - the randomizer's own handler saves
+            # its state and defers to this tail
+            if not args.no_git and not args.dry_run:
+                tee_output.uninstall()
+                try:
+                    git_tail(args)
+                except Exception as e:
+                    stamp(f"git tail failed (ignored): {e}")
+                finally:
+                    tee_output.install()
         return
 
     if args.task in ("v8", "exam"):

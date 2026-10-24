@@ -456,8 +456,7 @@ def main() -> None:
     def on_sigint(_sig: int, _frm: Any) -> None:
         stop.set()
         _state_store.save_state(state_file, state)
-        print("\n[randomizer] SIGINT - state saved, bye")
-        os._exit(130)
+        print("\n[randomizer] SIGINT - state saved; the git tail runs")
 
     signal.signal(signal.SIGINT, on_sigint)
 
