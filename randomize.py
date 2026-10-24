@@ -224,6 +224,18 @@ _ACTIVE_FAMILY: list[str] = [""]
 # of transient quant output on top)
 F16_LIMIT_GIB = 8.0
 
+# the IQ upper bound (the author's question): the IQ rungs (IQ* in
+# the LADDER) need an importance matrix, and llama-imatrix LOADS the
+# f16 plus KV + activation working set on the calibration corpus -
+# its peak RAM is the f16 plus overhead. A model killed by the f16
+# gate can therefore still be saved for its IQ rungs ONLY if the
+# imatrix peak fits; but with the f16 > 8 GiB the imatrix peak is
+# > 8 GiB + overhead on a 32 GiB machine sharing RAM with the OS -
+# the f16 gate at 8 GiB already bounds the imatrix path safely
+# (8 + ~2 overhead < the 32 GiB machine's usable RAM). The IQ bound
+# is therefore the SAME 8 GiB f16 gate: no separate, looser bound.
+IQ_F16_LIMIT_GIB = F16_LIMIT_GIB
+
 # models whose f16 exceeded the hard limit: every candidate of the
 # family is too large by inheritance (the f16 is the quant source)
 oversized_models: set[str] = set()
