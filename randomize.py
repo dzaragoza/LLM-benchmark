@@ -259,6 +259,7 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
     from bench import roster as _rost
 
     _last_acquire_error.clear()
+    print(f"  [acquire] {fam} {rung} - (download/convert/quantize may take minutes)")
     famdir = os.path.join(models_dir, fam)
     existing = hf_download.local_rung(famdir, rung)
     if existing and os.path.isfile(existing):
