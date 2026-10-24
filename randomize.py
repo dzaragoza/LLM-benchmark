@@ -9,8 +9,12 @@ it is only interested in RESULTS.
               candidates = exactly 11 bits of entropy per pick
   the pick    11 bits of REAL entropy (/dev/hwrng if present,
               else /dev/random - the kernel's harvested pool,
-              never a pseudorandom generator); with replacement -
-              a re-picked candidate is a new experiment, re-run
+              never a pseudorandom generator). ONE CHANCE per
+              candidate, no replacement: a pick that lands on an
+              already-run candidate is re-drawn with fresh entropy
+              until an untried one comes up; the pool drains to
+              zero and the protocol is complete. The exam seed (8
+              bits) is recorded for reproducibility
   the exam    8 bits of entropy = one of 256 possible exams; the
               SAME exam seed serves every level of the candidate
   the run     the candidate takes level 0, 1, 2, ... under one
@@ -339,18 +343,56 @@ def main() -> None:
 
     signal.signal(signal.SIGINT, on_sigint)
 
-    print(f"[randomizer] pool: {len(pool)} candidates (11 bits/pick)")
+    # one chance per candidate: the done-set persists in the state
+    done: set[str] = set(state.get("done", []))
+    state["done"] = sorted(done)
+
+    def write_ledger() -> None:
+        """md/randomizer.md: rank (highest score, tiebreak by time),
+        model, high score, quant @ high score, speed (fast <= 32s,
+        medium <= 64s, slow <= 128s - the candidate's whole run)."""
+        rows = [r for r in results if r.get("result") == "done"]
+        rows.sort(key=lambda r: (-(r.get("high_score") or -1), r.get("elapsed_s") or 1e9))
+        lines = [
+            "# randomizer.md - the randomizer ledger",
+            "",
+            "Every candidate gets ONE chance (no replacement). Rank:",
+            "highest score, tiebreak by time. Speed: the candidate's",
+            "whole run - fast <= 32s, medium <= 64s, slow <= 128s.",
+            "",
+            "| rank | model | high score | quant @high | speed |",
+            "|---|---|---|---|---|",
+        ]
+        for i, r in enumerate(rows):
+            t = r.get("elapsed_s") or 0.0
+            speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
+            lines.append(
+                f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} "
+                f"| {r['rung']} | {speed} |"
+            )
+        lines.append("")
+        lines.append(f"_{len(rows)} candidates run of {len(pool)}; each one chance, the seed recorded in state._")
+        with open("md/randomizer.md", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+
+    print(f"[randomizer] pool: {len(pool)} candidates (11 bits/pick, ONE chance each)")
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
     print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, 1s watchdog")
-    n = 0
-    while True:
+    n = len(done)
+    while len(done) < len(pool):
         pick = entropy_bits(11)
+        key = f"{pick}"
+        if key in done:
+            continue  # already had its chance: fresh entropy, re-draw
         fam, rung = pool[pick]
         print(f"[randomizer] #{n + 1} pick=0b{pick:011b} -> {fam} {rung}")
         rec = run_candidate(fam, rung, models_dir, state, state_file, port)
         results.append(rec)
+        done.add(key)
+        state["done"] = sorted(done)
         state["results"] = results[-5000:]  # the state stays bounded
         _state_store.save_state(state_file, state)
+        write_ledger()
         while gc_log:
             print(gc_log.pop(0))
         summary = (
@@ -360,6 +402,7 @@ def main() -> None:
         )
         print(f"[randomizer]   -> {summary} ({rec.get('fail_reason', '')})")
         n += 1
+    print(f"[randomizer] the pool is drained: {len(done)} candidates, one chance each - complete")
 
 
 if __name__ == "__main__":
