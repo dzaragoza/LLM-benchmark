@@ -49,5 +49,12 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 41 | Qwen3.5-2B | -1 | Q3_K_L | slow |
 | 42 | phi-4-mini-instruct | -1 | Q4_K_S | slow |
 | 43 | gemma-3-1b-it | -1 | F16 | medium |
+| 44 | Qwen3-1.7B | -1 | Q4_0 | slow |
+| 45 | granite-3.2-2b-instruct | -1 | Q1_0 | slow |
+| 46 | MiniCPM-2B-sft | -1 | Q4_K_S | slow |
+| 47 | MiniCPM-1B-sft | -1 | Q2_K_S | slow |
+| 48 | granite-4.0-350m | -1 | Q5_0 | fast |
+| 49 | Phi-3-mini-4k-instruct | -1 | F16 | slow |
+| 50 | Qwen2.5-1.5B-Instruct | -1 | IQ1_M | slow |
 
-_43 candidates run of 2048; each one chance, the seed recorded in state._
+_50 candidates run of 2048; each one chance, the seed recorded in state._
