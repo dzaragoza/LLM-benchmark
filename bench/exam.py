@@ -73,12 +73,10 @@ TIME_BELL_SECONDS = 32
 # verdict lands)
 QUANT_NUMBERS = ("F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1")
 
-# v9.5 SIZE recovery (the author's ruling): a candidate's file on disk
-# may not exceed 16 GiB - too large is a condition like out of time,
-# with the SAME recovery logic: a quant level whose every candidate is
-# too large descends to the next quant number (a smaller quant is a
-# smaller file - size recovery walks the same ladder the clock does)
-MAX_CANDIDATE_GIB = 16.0
+# the per-candidate 16 GiB size cap is RETIRED (the author's
+# ruling): the randomizer's 8 GiB f16 family gate supersedes it - a
+# model whose f16 fits 8 GiB cannot produce a rung file anywhere
+# near 16 GiB, so the candidate-level gate was dead code
 
 
 # the repetition count IS the seed set: n=1 for the benchmark, so the
@@ -878,13 +876,14 @@ def run_family(
             pass
 
 
-def _size_too_large(path: str) -> bool:
-    """The SIZE gate (v9.5, the author's ruling): True when the
-    candidate's file on DISK exceeds MAX_CANDIDATE_GIB. No
-    estimates - the author's ruling: the measured file size is
-    the only truth (the file is acquired first, then measured;
-    the verdict lands BEFORE any exam attempt)."""
-    return os.path.getsize(path) / (1024**3) > MAX_CANDIDATE_GIB
+def _size_too_large(path: str, limit_gib: float = 8.0) -> bool:
+    """The SIZE gate helper: True when the file on DISK exceeds the
+    limit (default the randomizer's 8 GiB f16 family gate - the
+    v9.5 exam walk's own 16 GiB candidate cap is RETIRED, superseded
+    by the f16 gate: a model whose f16 fits 8 GiB cannot produce a
+    rung file anywhere near 16 GiB). No estimates - the measured
+    file size is the only truth."""
+    return os.path.getsize(path) / (1024**3) > limit_gib
 
 
 def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
@@ -1064,21 +1063,6 @@ def run(
                         fam_tree[rung] = rec
                         _state_store.save_state(state_file, state)
                         print(f"  {fam} {rung}: unbuildable - skipped")
-                    elif _size_too_large(gguf):
-                        # the SIZE gate (the author's ruling): measured on
-                        # the acquired file, BEFORE any exam attempt - too
-                        # large is known and recovered before any other
-                        # pass/fail condition can exist
-                        rec = {"too_large": True}
-                        fam_tree[rung] = rec
-                        _state_store.save_state(state_file, state)
-                        print(
-                            f"  {fam} {rung}: TOO LARGE on disk "
-                            f"(> {MAX_CANDIDATE_GIB:g} GiB) - size recovery: "
-                            "the level may descend"
-                        )
-                        results[(fam, rung)] = rec
-                        continue
                     else:
                         print(
                             f"-- {fam} {rung} ({num}), paper "
