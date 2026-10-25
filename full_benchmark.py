@@ -3,8 +3,9 @@
 walk is retired; the randomizer is the benchmark).
 
 One command: python full_benchmark.py --task randomize. The pool is
-the 64-model roster x the 32-rung LADDER = 2048 candidates; every
-pick is real entropy, ONE chance per candidate, a fresh 8-bit exam
+v2: (model, model-quant, k_quant, v_quant) - 64 models x 32 rungs
+x 7 k-quants x 7 v-quants = 100,352 candidates; every pick is 22
+bits of real entropy, ONE chance per candidate, a fresh 8-bit exam
 seed per candidate, a 128s timer per level, results only.
 
 The envelope owns what the randomizer must never worry about: the
@@ -159,13 +160,17 @@ def preflight_selfcheck() -> None:
     roster = roster_from_models_md()
     assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
 
-    # --- the pool: the full 2048-candidate census (the dry-run
-    # check, folded in): every family x every rung, oversized
-    # families gated, the drawn-set coherent with the state file ---
+    # --- the pool: the full v2 candidate census (the dry-run check,
+    # folded in): every family x every rung x every kv pair, the
+    # drawn-set coherent with the state file ---
     import randomize as R
 
     pool = R.the_pool()
-    assert len(pool) == 2048, f"the pool must be 2048 candidates, got {len(pool)}"
+    n_kv = len(R.KV_LADDER)
+    total = len(pool) * n_kv * n_kv
+    assert len(pool) == 2048, f"the model pool must be 2048 pairs, got {len(pool)}"
+    assert n_kv == 7, f"the KV ladder must be 7 quants, got {n_kv}"
+    assert R.PICK_BITS == 22, "the pick must be 22 bits in v2"
     fams = {f for f, _ in pool}
     assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
     assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
@@ -173,7 +178,7 @@ def preflight_selfcheck() -> None:
         with open(R.RANDOMIZER_STATE_FILE, encoding="utf-8") as fh:
             st = json.load(fh)
         drawn = set(st.get("done", []))
-        assert len(drawn) <= len(pool), "the drawn-set exceeds the pool - corrupt state"
+        assert len(drawn) <= total, "the drawn-set exceeds the pool - corrupt state"
         rec_fams = {r.get("fam") for r in st.get("results", [])}
         assert rec_fams <= fams, "results name families outside the roster - corrupt state"
 
