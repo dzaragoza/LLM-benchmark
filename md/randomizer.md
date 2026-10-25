@@ -2,7 +2,7 @@
 
 ## the top 5% dashboard
 
-- measured: 55 done candidates, top 2 (2 of 55)
+- measured: 59 done candidates, top 2 (2 of 59)
 - params median: **2.1382 B**
 - model_quant mode: **Q5_K_M**
 - k_quant mode: **q5_1**
@@ -73,5 +73,9 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 53 | phi-4-mini-instruct | -1 | IQ3_S | iq4_nl | q5_0 | slow |
 | 54 | Qwen3-4B-Instruct-2507 | -1 | TQ2_0 | q5_1 | q8_0 | slow |
 | 55 | Llama-3.2-3B-Instruct | -1 | IQ3_XS | q5_0 | q5_0 | slow |
+| 56 | granite-4.2-3b | -1 | IQ3_XS | iq4_nl | q4_0 | slow |
+| 57 | phi-1 | -1 | IQ3_M | iq4_nl | iq4_nl | slow |
+| 58 | Ministral-3-3B-Instruct-2512 | -1 | IQ4_NL | f16 | f16 | slow |
+| 59 | Qwen2.5-1.5B-Instruct | -1 | Q8_0 | q5_1 | q4_0 | slow |
 
-_55 candidates run of 100,352; each one chance, the seed recorded in state._
+_59 candidates run of 100,352; each one chance, the seed recorded in state._
