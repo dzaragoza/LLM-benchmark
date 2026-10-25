@@ -126,7 +126,6 @@ MEMORY_BREAKDOWN_ROW_FLAT = re.compile(
 )
 
 
-
 def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
     """llama.cpp's own memory accounting from the -lv 5 server log
     (session 39, addendum 11 - the smaps census retired: it can't see

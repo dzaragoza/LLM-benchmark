@@ -62,11 +62,11 @@ That single command runs the **entire study** for the four families:
 - **Stage C — ranking**: exact **McNemar** pairwise tests; the final
   output is the ranking with separation verdicts.
 
-The script is **idempotent and resumable**: `state/benchmark-state.json` is
-saved after every phase. If anything fails, it stops with guidance;
-fix the cause and **rerun the exact same command** — completed phases
-are never repeated. Use `--dry-run` to preview the plan without
-downloading anything.
+The script is **idempotent and resumable**: `state/randomizer-state.json` is
+saved after every pick. If anything fails, it stops with guidance;
+fix the cause and **rerun the exact same command** — completed picks
+are never repeated. The preflight self-check is silent unless
+something is wrong.
 
 ---
 

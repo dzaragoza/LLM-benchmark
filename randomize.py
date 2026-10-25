@@ -43,12 +43,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import signal
-import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -56,12 +53,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
 from bench.exam import (
+    ask_exam,
     build_chain,
     build_elevator,
     chain_prompt,
     elevator_prompt,
     score_exam,
-    ask_exam,
 )
 from bench.roster import LADDER, roster_from_models_md
 
@@ -110,7 +107,8 @@ def the_pool() -> list[tuple[str, str]]:
     roster = roster_from_models_md()
     pool: list[tuple[str, str]] = []
     for fam, _repo in roster:
-        if _f16_gib_from_models_md(fam) > F16_LIMIT_GIB:
+        f16_gib = _f16_gib_from_models_md(fam)
+        if f16_gib is not None and f16_gib > F16_LIMIT_GIB:
             oversized_models.add(fam)
         for rung in LADDER:
             pool.append((fam, rung))
@@ -162,7 +160,7 @@ def _stranded_quants(models_dir: str, exclude: set[str]) -> list[str]:
         famdir = os.path.join(models_dir, fam)
         if not os.path.isdir(famdir):
             continue
-        quants = []
+        quants: list[str] = []
         for f in os.listdir(famdir):
             if not f.endswith(".gguf"):
                 continue
@@ -170,7 +168,7 @@ def _stranded_quants(models_dir: str, exclude: set[str]) -> list[str]:
             # <fam>-<RUNG>.gguf: the quant rung is the last token
             rung = stem.rsplit("-", 1)[-1].lower()
             if rung in quant_names:
-                quants.append(os.path.join(famdir, f))
+                quants.append(str(os.path.join(famdir, f)))
         if len(quants) > 1:
             quants.sort(key=os.path.getmtime)
             victims.extend(quants[:-1])  # keep the newest
@@ -410,9 +408,7 @@ def run_candidate(
     bits) serves EVERY level of this candidate. The total run
     timeout is 128s: pass advances a level, fail or timeout ends the
     run and records the reason and the high score."""
-    from bench.exam import bell_window, _size_too_large
-    from bench.roster import WINDOW_DEFAULT, roster_from_models_md, window  # noqa: F401
-    import bench.roster as _roster_mod
+    from bench.exam import _size_too_large, bell_window
 
     t_start = time.monotonic()
     exam_seed = entropy_get()
@@ -441,9 +437,7 @@ def run_candidate(
         }
     famdir = os.path.join(models_dir, fam)
     f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
-    if os.path.isfile(f16_path) and (
-        os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB
-    ):
+    if os.path.isfile(f16_path) and (os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB):
         oversized_models.add(fam)
         shutil.rmtree(famdir, ignore_errors=True)
         return {"fam": fam, "rung": rung, "seed": exam_seed, "result": "too_large"}
@@ -606,7 +600,7 @@ def main(on_progress: Any = None) -> None:
         except socket.gaierror:
             return _orig_getaddrinfo(host, port, family, type, proto, flags)
 
-    socket.getaddrinfo = _ipv4_first
+    socket.getaddrinfo = _ipv4_first  # ty: ignore[invalid-assignment]
     models_dir = "models"
     state_file = RANDOMIZER_STATE_FILE
     os.makedirs("state", exist_ok=True)
@@ -683,11 +677,7 @@ def main(on_progress: Any = None) -> None:
         top = rows[:k]
         t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
         t_quants = [_quant_level(r["rung"]) for r in top]
-        t_times = [
-            r["high_score_time_s"]
-            for r in top
-            if r.get("high_score_time_s") is not None
-        ]
+        t_times = [r["high_score_time_s"] for r in top if r.get("high_score_time_s") is not None]
         t_scores = [r.get("high_score") or -1 for r in top]
         lines = ["# randomizer.md - the randomizer ledger", ""]
         lines.append("## the top 5% dashboard")
@@ -699,9 +689,7 @@ def main(on_progress: Any = None) -> None:
             from collections import Counter as _C
 
             qc = _C(t_quants)
-            lines.append(
-                "- quant levels: " + ", ".join(f"{q} x{n}" for q, n in qc.most_common())
-            )
+            lines.append("- quant levels: " + ", ".join(f"{q} x{n}" for q, n in qc.most_common()))
         if t_times:
             lines.append(f"- high-score level time median: **{_stats.median(t_times):g}s**")
         if t_scores:
@@ -709,27 +697,24 @@ def main(on_progress: Any = None) -> None:
         lines.append("")
         lines.append("_the machine sweet-spot band, live as the pool fills_")
         lines.append("")
-        lines.append(
-            "Every candidate gets ONE chance (no replacement). Rank:"
-        )
+        lines.append("Every candidate gets ONE chance (no replacement). Rank:")
         lines.append("highest score, tiebreak by time. Speed: the candidate's")
         lines.append("whole run - fast <= 32s, medium <= 64s, slow <= 128s.")
         lines.append("")
         lines.append("| rank | model | high score | quant @high | speed |")
         lines.append("|---|---|---|---|---|")
         for i, r in enumerate(rows):
-            t = (
-                r.get("high_score_time_s")
-                if r.get("high_score_time_s") is not None
-                else (r.get("elapsed_s") or 0.0)
-            )
+            raw_t = r.get("high_score_time_s")
+            t = float(raw_t) if raw_t is not None else float(r.get("elapsed_s") or 0.0)
             speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
             lines.append(
-                f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} "
-                f"| {r['rung']} | {speed} |"
+                f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} | {r['rung']} | {speed} |"
             )
         lines.append("")
-        lines.append(f"_{len(rows)} candidates run of {len(pool)}; each one chance, the seed recorded in state._")
+        lines.append(
+            f"_{len(rows)} candidates run of {len(pool)}; "
+            "each one chance, the seed recorded in state._"
+        )
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
@@ -739,10 +724,7 @@ def main(on_progress: Any = None) -> None:
         f"dead indexes) - {live} live, ONE chance each"
     )
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
-    print(
-        f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, "
-        f"{GC_INTERVAL_S:g}s watchdog"
-    )
+    print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
     while len(done) < len(pool):
         pick = entropy_bits(11)

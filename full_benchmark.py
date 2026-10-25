@@ -45,8 +45,6 @@ SERVER_BIN = llama_server.find_server()
 
 # =========================================================== state
 
-DRY_RUN_ACTIVE = False
-
 
 def stamp(msg: str) -> None:
     print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')}] {msg}")
@@ -57,9 +55,6 @@ def load_state(path: str) -> dict[str, Any]:
 
 
 def save_state(path: str, state: dict[str, Any]) -> None:
-    # --dry-run is READ-ONLY (addendum 79): never write the state file.
-    if DRY_RUN_ACTIVE:
-        return
     with open(path, "w") as f:
         json.dump(state, f, indent=1)
 
@@ -103,13 +98,11 @@ REQ_PACKAGES = [
 
 
 def check_requirements() -> None:
-    """Every requirements.txt package importable in THIS interpreter -
-    the dry run included. The interpreter path prints first so the
-    wrong-venv case is visible at a glance; a missing package is a
-    hard stop BEFORE any work begins."""
+    """Every requirements.txt package importable in THIS interpreter.
+    Silent on success; a missing package is a hard stop BEFORE any
+    work begins."""
     from importlib.metadata import PackageNotFoundError, version
 
-    print(f"  python : {sys.executable}")
     missing = []
     for name in REQ_PACKAGES:
         try:
@@ -130,9 +123,10 @@ def preflight_selfcheck() -> None:
     """The behavioral self-check (the ruff --fix lesson): syntax and
     lint cannot see the failure class that costs hours - a shadowed
     name silently returning the wrong paper. Before any candidate is
-    touched, the exam machinery the randomizer depends on runs
-    against the live code; ANY assertion failure refuses to start
-    the run. ~2s."""
+    touched, the exam machinery, the pool, the state and the disk
+    are verified against the live code. SILENT on success (the
+    quiet-preflight ruling); ANY failure refuses to start the run
+    with a printed reason. ~2s."""
     import bench.exam as E
     from bench.roster import LADDER, roster_from_models_md
 
@@ -165,9 +159,34 @@ def preflight_selfcheck() -> None:
     roster = roster_from_models_md()
     assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
 
-    print("  self-check: the grader, the papers, the ladder, the roster - OK")
+    # --- the pool: the full 2048-candidate census (the dry-run
+    # check, folded in): every family x every rung, oversized
+    # families gated, the drawn-set coherent with the state file ---
+    import randomize as R
 
+    pool = R.the_pool()
+    assert len(pool) == 2048, f"the pool must be 2048 candidates, got {len(pool)}"
+    fams = {f for f, _ in pool}
+    assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
+    assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
+    if os.path.isfile(R.RANDOMIZER_STATE_FILE):
+        with open(R.RANDOMIZER_STATE_FILE, encoding="utf-8") as fh:
+            st = json.load(fh)
+        drawn = set(st.get("done", []))
+        assert len(drawn) <= len(pool), "the drawn-set exceeds the pool - corrupt state"
+        rec_fams = {r.get("fam") for r in st.get("results", [])}
+        assert rec_fams <= fams, "results name families outside the roster - corrupt state"
 
+    # --- the disk: an f16 download needs headroom (the 8 GiB gate
+    # plus working space); a nearly-full disk fails mid-run ---
+    import infra.hf_download as hf_download
+
+    free = hf_download.free_disk_gib(".")
+    if free is not None and free < 16.0:
+        sys.exit(
+            f"only {free:.1f} GiB free - the run needs 16 GiB of "
+            "headroom for f16 downloads and quantization scratch"
+        )
 
 
 def check_tooling(args: argparse.Namespace) -> None:
@@ -192,8 +211,8 @@ def check_tooling(args: argparse.Namespace) -> None:
 
 def git_pull_head() -> None:
     """The forgotten pull, made structural (session 36, addendum 32):
-    every run starts from the freshest state. --no-git and dry runs
-    are handled by the callers; a failed pull is a HARD STOP - running
+    every run starts from the freshest state. A failed pull is a HARD
+    STOP - running
     on a diverged tree measures the wrong thing with confidence."""
     if os.environ.get("BENCH_NO_GIT_PULL"):
         return
@@ -360,11 +379,7 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
         stamp("results logging stopped")
     except Exception as e:
         stamp(f"results logging stop failed (ignored): {e}")
-    if (
-        args is not None
-        and not getattr(args, "no_git", True)
-        and not getattr(args, "dry_run", True)
-    ):
+    if args is not None:
         try:
             git_tail(args)
             git_pull_head()
@@ -398,24 +413,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--task",
         default="randomize",
         choices=["randomize"],
-        help="the benchmark: the protocol randomizer (the v9.5 exam "
-        "walk is retired)",
+        help="the benchmark: the protocol randomizer (the v9.5 exam walk is retired)",
     )
     ap.add_argument(
         "--clean",
         action="store_true",
         help="delete the randomizer state UP FRONT - a fresh pool, "
         "every chance restored; era changes only",
-    )
-    ap.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="READ-ONLY pre-flight: the plan, nothing downloaded, converted, examined or written",
-    )
-    ap.add_argument(
-        "--no-git",
-        action="store_true",
-        help="skip the git tail and the artifact commits",
     )
     return ap
 
@@ -451,29 +455,23 @@ def main() -> None:
                 stamp(f"results logging stop failed (ignored): {e}")
             with open("results.txt", "a", encoding="utf-8") as f:
                 f.write(f"\n===== CRASH {time.strftime('%Y-%m-%dT%H:%M:%S')} =====\n{tb}\n")
-            if not args.no_git:
-                try:
-                    git_tail(args)
-                except Exception as e:
-                    stamp(f"git tail after crash failed (ignored): {e}")
+            try:
+                git_tail(args)
+            except Exception as e:
+                stamp(f"git tail after crash failed (ignored): {e}")
         finally:
             sys.stdout.flush()
         raise
 
 
-
 def _run(args: argparse.Namespace) -> None:
-    global DRY_RUN_ACTIVE
-    DRY_RUN_ACTIVE = args.dry_run
     install_sigint_handler(args)
     check_requirements()
     git_pull_head()
     tee_output.install()
-    if not args.dry_run:
-        kill_stale_server()
-        check_tooling(args)
-    if not args.dry_run:
-        preflight_selfcheck()
+    kill_stale_server()
+    check_tooling(args)
+    preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
     if args.task == "randomize":
@@ -485,33 +483,17 @@ def _run(args: argparse.Namespace) -> None:
         # SIGINT saves, the artifact commits, the log truncation.
         import randomize as R
 
-        if args.dry_run:
-            # --dry-run is READ-ONLY (addendum 79): the plan and
-            # nothing else - no picks, no downloads, no state writes
-            from bench.roster import LADDER
-
-            pool = R.the_pool()
-            live = len(pool) - len(R.oversized_models) * len(LADDER)
-            done = 0
-            if os.path.isfile(R.RANDOMIZER_STATE_FILE):
-                with open(R.RANDOMIZER_STATE_FILE, encoding="utf-8") as fh:
-                    done = len(json.load(fh).get("done", []))
-            stamp(f"randomizer dry-run: {len(pool)} candidates, {live} live, {done} already drawn")
-            stamp("randomizer dry-run: read-only - no pick was drawn, nothing written")
-            return
-
         if args.clean and os.path.isfile(R.RANDOMIZER_STATE_FILE):
             # simple: delete the state file - main() treats a
             # missing file as a fresh pool, every chance restored
             os.remove(R.RANDOMIZER_STATE_FILE)
             stamp("randomizer: state deleted (--clean) - a fresh pool")
+
         def push_progress(n: int) -> None:
             # the watchability ruling, randomizer-shaped: every
             # COMMIT_EVERY candidates the ledger + state + answers
             # commit and push - a multi-hour run is readable
             # remotely as it goes, not only at the end
-            if args.no_git:
-                return
             tee_output.uninstall()
             try:
                 git_tail(args)
@@ -526,19 +508,17 @@ def _run(args: argparse.Namespace) -> None:
             # pushed whether the run finished, crashed, or was
             # SIGINTerrupted - the randomizer's own handler saves
             # its state and defers to this tail
-            if not args.no_git and not args.dry_run:
-                tee_output.uninstall()
-                try:
-                    git_tail(args)
-                except Exception as e:
-                    stamp(f"git tail failed (ignored): {e}")
-                finally:
-                    tee_output.install()
+            tee_output.uninstall()
+            try:
+                git_tail(args)
+            except Exception as e:
+                stamp(f"git tail failed (ignored): {e}")
+            finally:
+                tee_output.install()
         return
 
-    if not args.no_git:
-        tee_output.uninstall()
-        git_tail(args)
+    tee_output.uninstall()
+    git_tail(args)
     stamp("run complete")
 
 

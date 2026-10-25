@@ -435,9 +435,7 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
         ftype = _file_type(path)
         for j0, j1 in covered:
             region = out[j0:j1]
-            if ftype == "python" and (
-                region.count(chr(34) * 3) or region.count(chr(39) * 3)
-            ):
+            if ftype == "python" and (region.count(chr(34) * 3) or region.count(chr(39) * 3)):
                 # a docstring edited together with its code (the
                 # strip-session case): the triple quotes belong to
                 # the region, and the WHOLE-BUFFER python syntax gate

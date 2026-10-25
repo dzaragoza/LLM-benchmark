@@ -297,7 +297,6 @@ def score_exam(answer: str, exam: dict[str, Any], finish_reason: str) -> bool:
     return all(tok in it for tok in expected)
 
 
-
 def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> int | None:
     """The v9 bell: the FULL training window - the number of tokens
     the model was trained to hold, the whole paper. No tg/s leg, no
@@ -312,7 +311,6 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
         return WINDOW_DEFAULT
 
 
-
 def _size_too_large(path: str, limit_gib: float = 8.0) -> bool:
     """The SIZE gate helper: True when the file on DISK exceeds the
     limit (default the randomizer's 8 GiB f16 family gate - the
@@ -321,5 +319,3 @@ def _size_too_large(path: str, limit_gib: float = 8.0) -> bool:
     rung file anywhere near 16 GiB). No estimates - the measured
     file size is the only truth."""
     return os.path.getsize(path) / (1024**3) > limit_gib
-
-

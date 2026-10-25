@@ -78,10 +78,10 @@ jobs:
         id: jsonl
         continue-on-error: true
         run: python3 validate_jsonl.py
-      - name: the dry-run smoke (the orchestrator end-to-end, offline)
+      - name: the preflight smoke (the self-check, silent unless wrong)
         id: smoke
         continue-on-error: true
-        run: python3 full_benchmark.py --task randomize --dry-run --no-git
+        run: python3 -c "import full_benchmark as FB; FB.preflight_selfcheck()"
       - name: the aggregate verdict (any tool red = the run is red)
         if: always()
         run: |
