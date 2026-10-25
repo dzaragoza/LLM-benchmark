@@ -131184,3 +131184,105 @@ idempotent and will resume from this phase.
 [randomizer]   -> build_failed ()
 [randomizer] #920 pick=0b10111111010 -> Yi-1.5-6B-Chat Q5_0
 [randomizer]   -> too_large ()
+
+===== 2026-10-25T13:09:51 | full_benchmark.py --task randomize --dry-run --no-git =====
+[randomizer] #921 pick=0b11011111010 -> Qwen3-8B Q5_0
+[randomizer]   -> too_large ()
+[randomizer] #922 pick=0b11000100110 -> OLMo-2-1124-7B-Instruct IQ1_M
+[randomizer]   -> too_large ()
+[randomizer] #923 pick=0b01011111010 -> gemma-2-2b-it Q5_0
+  [acquire] gemma-2-2b-it Q5_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for google/gemma-2-2b-it ...
+  [hub] 11 files listed
+  [1] downloading safetensors from google/gemma-2-2b-it (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at Q5_0: safetensors download from google/gemma-2-2b-it failed: 401 Client Error. (Request ID: Root=1-6addff9f-5f6eee2435ce82d13660e48e;b8ff852f-5564-474e-a467-887a21a0d80f)
+
+Cannot access gated repo for url https://huggingface.co/google/gemma-2-2b-it/resolve/299a8560bedf22ed1c72a8a11e7dce4a7f9f51f8/model-00002-of-00002.safetensors.
+Access to model google/gemma-2-2b-it is restricted. You must have access to it and be authenticated to access it. Please log in.
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+  gemma-2-2b-it Q5_0: quantize_failed - exit 1
+[randomizer]   -> quantize_failed ()
+[randomizer] #924 pick=0b10011011110 -> Phi-3-mini-4k-instruct Q8_0
+  [acquire] Phi-3-mini-4k-instruct Q8_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for microsoft/Phi-3-mini-4k-instruct ...
+  [hub] 20 files listed
+  [1] Q8_0: estimated 3.8 GiB exceeds usable RAM 1.9 GiB (total 5.9 GiB - 4 reserve) - CANNOT RUN on this machine, skipping before download (addendum 35)
+[randomizer]   -> build_failed ()
+[randomizer] #925 pick=0b00100110001 -> Llama-3.2-1B-Instruct Q4_0
+  [acquire] Llama-3.2-1B-Instruct Q4_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for meta-llama/Llama-3.2-1B-Instruct ...
+  [hub] 13 files listed
+  [1] downloading safetensors from meta-llama/Llama-3.2-1B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at Q4_0: safetensors download from meta-llama/Llama-3.2-1B-Instruct failed: 401 Client Error. (Request ID: Root=1-6addffa0-6fd131d023bbe8145a71a699;ae1cf84f-71c0-497f-9d7a-6e480d000152)
+
+Cannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct/resolve/9213176726f574b556790deb65791e0c5aa438b6/config.json.
+Access to model meta-llama/Llama-3.2-1B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in.
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+  Llama-3.2-1B-Instruct Q4_0: quantize_failed - exit 1
+[randomizer]   -> quantize_failed ()
+[randomizer] #926 pick=0b01001110111 -> MiniCPM5-2B Q3_K_L
+  [acquire] MiniCPM5-2B Q3_K_L - (download/convert/quantize may take minutes)
+  [hub] listing files for openbmb/MiniCPM5-2B ...
+  [hub] 11 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/MiniCPM5-2B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q3_K_L: f16 conversion failed (full log: models/MiniCPM5-2B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #927 pick=0b00000101001 -> granite-4.0-350m Q2_K
+  [acquire] granite-4.0-350m Q2_K - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-4.0-350m ...
+  [hub] 12 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/granite-4.0-350m/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q2_K: f16 conversion failed (full log: models/granite-4.0-350m/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #928 pick=0b11001101010 -> Qwen2.5-7B-Instruct IQ3_XXS
+[randomizer]   -> too_large ()
