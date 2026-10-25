@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""full_benchmark.py -- the v9 benchmark: the exam is the only phase.
+"""full_benchmark.py -- the randomizer's envelope (the v9.5 exam
+walk is retired; the randomizer is the benchmark).
 
-One command: every (model, quant) candidate in the roster takes the
-exam - the full training window as the paper, the 32-second time
-bell per attempt, PASS/FAIL chain-following sweeps of escalating
-difficulty. The roster is self-cleaning: a scored candidate strictly
-below the running best loses its artifacts from disk (the data
-always stays in git). No pre-measurement, no model-count limits.
+One command: python full_benchmark.py --task randomize. The pool is
+the 64-model roster x the 32-rung LADDER = 2048 candidates; every
+pick is real entropy, ONE chance per candidate, a fresh 8-bit exam
+seed per candidate, a 128s timer per level, results only.
+
+The envelope owns what the randomizer must never worry about: the
+requirements check, the git pull/push rail, the crash commit, the
+SIGINT clean shutdown, the artifact ledger, the log truncation.
 
 Everything is IDEMPOTENT and RESUMABLE: the state file is rewritten
-after every attempt; rerun the same command to resume."""
+after every pick; rerun the same command to resume."""
 
 from __future__ import annotations
 
@@ -125,265 +128,46 @@ def check_requirements() -> None:
 
 def preflight_selfcheck() -> None:
     """The behavioral self-check (the ruff --fix lesson): syntax and
-    lint cannot see the failure class that cost hours - the gc
-    deleting a family mid-sweep, a shadowed name silently returning
-    the wrong paper. Before any model is touched, the exact
-    simulations run against the live code on temp dirs with fake
-    state; ANY assertion failure refuses to start the run. ~2s."""
-    import tempfile
-
+    lint cannot see the failure class that costs hours - a shadowed
+    name silently returning the wrong paper. Before any candidate is
+    touched, the exam machinery the randomizer depends on runs
+    against the live code; ANY assertion failure refuses to start
+    the run. ~2s."""
     import bench.exam as E
+    from bench.roster import LADDER, roster_from_models_md
 
-    with tempfile.TemporaryDirectory() as tmp:
-        # --- the paper: all three bell_window branches ---
-        # (the roster lookup needs a REAL roster family; use the
-        # first one, with a local config.json in the temp dir)
-        from bench.roster import roster_from_models_md as _roster
+    # --- the grader: the flexible subsequence ---
+    inst = {"path": ["abc", "def", "ghi"]}
+    assert E.score_exam("ANSWER: abc, def, ghi", inst, "stop")
+    assert E.score_exam("ANSWER: x abc y def z ghi", inst, "stop")
+    assert not E.score_exam("ANSWER: abc, ghi, def", inst, "stop")
+    assert not E.score_exam("ANSWER: abc, def, ghi", inst, "length")
+    # graded AT the bell - a complete answer still passes
+    assert E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
+    assert not E.score_exam("ANSWER: abc, def, gh", inst, "time_limit")
+    assert not E.score_exam("I cannot solve this", inst, "stop")
 
-        fam = _roster()[0][0]
-        famdir = os.path.join(tmp, fam)
-        os.makedirs(famdir, exist_ok=True)
-        with open(os.path.join(famdir, "config.json"), "w", encoding="utf-8") as f:
-            json.dump({"max_position_embeddings": 32768}, f)
-        w = E.bell_window({}, fam, tmp)
-        assert w == 32768, f"bell_window config branch: {w}"
-        assert E.bell_window({}, "no-such-family-xyz", tmp) is None
+    # --- the exam builders: deterministic, level-shaped ---
+    c0 = E.build_chain(1, 0)
+    e0 = E.build_elevator(1, 0)
+    assert c0["path"] and e0["path"], "the exam papers are empty"
+    assert E.build_chain(1, 0) == c0, "the chain exam is not deterministic"
+    assert len(E.build_chain(1, 3)["rows"]) == 4, "level d = d+1 pairs"
+    assert len(E.build_elevator(1, 3)["rows"]) == 4, "level d = d+1 pairs"
 
-        # --- v9.1: candidates are (model, F16) only ---
-        c = E.candidates({}, [fam])
-        assert c == [(fam, "F16")], f"candidates must be F16-only, got {c}"
+    # --- the paper: the unknown-family branch ---
+    assert E.bell_window({}, "no-such-family-xyz", "models") is None
 
-        # --- v9.5 gc: DONE walks collect, PENDING walks never (fixtures
-        # carry LEVELS - the walk's real record shape; a record with no
-        # levels is UNMEASURED, and a walk with only such records is
-        # PENDING, never collected) ---
-        def mklevel(passed, attempts=None):
-            return {"pass": passed} if passed else {"pass": False, "attempts": attempts or []}
+    # --- the roster ladder the pool is drawn from ---
+    assert LADDER[-1] == "F16" and len(LADDER) == 32
 
-        def sweep(levels):
-            return {"score": max([int(k) for k in levels if levels[k]["pass"]], default=-1),
-                    "levels": levels}
+    # --- the roster: readable, granite first ---
+    roster = roster_from_models_md()
+    assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
 
-        bell1 = [{"finish_reason": "time_limit"}]
-        wrong1 = [{"finish_reason": "stop", "ok": False}]
-        # a DONE walk (fail: the frontier graded wrong), below best: collected
-        d = os.path.join(tmp, "gcA")
-        os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "gcA-F16.gguf"), "w", encoding="utf-8").close()
-        state = {
-            "exam": {
-                "gcA": {"F16": sweep({"0": mklevel(False, wrong1)})},
-                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
-            }
-        }
-        E._gc(tmp, state, exclude_fam=None)
-        assert not os.path.isdir(d), "gc kept a beaten model"
-        assert state["exam"]["gcA"]["_eliminated"] is True
-        # a SURVIVOR (score == the global best): never collected
-        d2 = os.path.join(tmp, "gcB")
-        os.makedirs(d2, exist_ok=True)
-        open(os.path.join(d2, "gcB-F16.gguf"), "w", encoding="utf-8").close()
-        state2 = {
-            "exam": {
-                "gcB": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
-                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
-            }
-        }
-        E._gc(tmp, state2, exclude_fam=None)
-        assert os.path.isdir(d2), "gc deleted a survivor model"
-        # a PENDING walk (bells only - the frontier may still be taken
-        # by a smaller quant): never collected
-        d3 = os.path.join(tmp, "gcC")
-        os.makedirs(d3, exist_ok=True)
-        open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
-        state3 = {
-            "exam": {
-                "gcC": {"F16": sweep({"0": mklevel(False, bell1)})},
-                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
-            }
-        }
-        E._gc(tmp, state3, exclude_fam=None)
-        assert os.path.isdir(d3), "gc deleted a pending model"
-        # the RUNNING model is excluded regardless
-        open(os.path.join(d3, "gcC-F16.gguf"), "w", encoding="utf-8").close()
-        E._gc(tmp, state3, exclude_fam="gcC")
-        assert os.path.isdir(d3), "gc deleted the running model"
+    print("  self-check: the grader, the papers, the ladder, the roster - OK")
 
-        # --- v9.5: the exhaustive quant walk helpers ---
-        groups = E.rung_groups()
-        assert groups[0] == ("F16", ("F16",)), "the walk starts at F16, alone"
-        assert groups[1][0] == "Q8" and groups[1][1] == ("Q8_0",)
-        assert groups[2][0] == "Q6" and groups[2][1] == ("Q6_K",)
-        assert [g[0] for g in groups] == ["F16", "Q8", "Q6", "Q5", "Q4", "Q3", "Q2", "Q1"]
-        assert "IQ2_M" in groups[6][1] and "TQ2_0" in groups[6][1], (
-            "IQ/TQ variants walk under their number"
-        )
-        # rung_verdict: pass / fail / time / unmeasured
-        vp = {"score": 3, "levels": {"3": {"pass": True}}}
-        assert E.rung_verdict(vp) == "pass"
-        vf = {
-            "score": 1,
-            "levels": {"2": {"pass": False, "attempts": [{"finish_reason": "stop", "ok": False}]}},
-        }
-        assert E.rung_verdict(vf) == "fail"
-        vt = {
-            "score": 1,
-            "levels": {"2": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]}},
-        }
-        assert E.rung_verdict(vt) == "time"
-        assert E.rung_verdict({"score": None}) is None
-        # model_verdict: the walk's terminal states
-        assert E.model_verdict({"F16": vp}) == "pass"
-        assert E.model_verdict({"F16": vf}) == "fail"
-        mv = E.model_verdict({"F16": vt, "Q8_0": {"unbuildable": True}})
-        assert mv is None, "quants remain - pending"
-        assert E.model_verdict({"F16": vt, "_out_of_time": True}) == "time"
-        # only bells everywhere = out of time (a fail reason)
-        allbell = {r: dict(vt) for r, _num in [(rg, 0) for g in groups for rg in g[1]]}
-        assert E.model_verdict(allbell) == "time", "all-bell exhaustion is out of time"
-        # a mixed group (fail + bell) moves on; exhausted = _out_of_time wins
-        mixed = {"F16": vt, "Q8_0": vf, "_out_of_time": True}
-        assert E.model_verdict(mixed) == "time"
 
-        # the frontier semantics: the score is the deepest level any
-        # candidate reached; the deciding rung is the FIRST to reach it
-        def mk_t(deep, passed=1):
-            levels = {str(i): {"pass": True} for i in range(passed)}
-            if deep >= passed:
-                levels[str(deep)] = {
-                    "pass": False,
-                    "attempts": [{"finish_reason": "time_limit"}],
-                }
-            return {"score": passed - 1, "levels": levels}
-
-        bx = {"F16": mk_t(3), "Q8_0": mk_t(5)}
-        assert E.model_frontier(bx) == 5
-        assert E.deciding_rung(bx)[0] == "Q8_0"
-        bx2 = {"F16": mk_t(4), "Q8_0": mk_t(4)}
-        assert E.deciding_rung(bx2)[0] == "F16", "ties go to the earlier rung"
-        assert E.deciding_rung({}) is None
-        # the author's worked example: f16 passes 0..3 bells at 4; q8
-        # same; q6 fails at 4 - the walk ends there (q5.. never run),
-        # the verdict is fail, and the HIGH SCORE is f16's 3
-        vt = {
-            "score": 3,
-            "levels": {
-                **{str(i): {"pass": True} for i in range(4)},
-                "4": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
-            },
-        }
-        vfl = {
-            "score": 3,
-            "levels": {
-                **{str(i): {"pass": True} for i in range(4)},
-                "4": {"pass": False, "attempts": [{"finish_reason": "stop", "ok": False}]},
-            },
-        }
-        ex = {"F16": vt, "Q8_0": dict(vt), "Q6_K": vfl}
-        assert E.model_verdict(ex) == "fail", "a wrong answer ends the walk"
-        assert E.model_frontier(ex) == 4
-        assert E.hit_time_bell(vt), "the bell record reads as time"
-        assert not E.hit_time_bell(vfl), "the wrong-chain record reads as fail"
-
-        # --- v9.5 gc: terminal verdicts collect, pending walks never ---
-        # fixtures carry LEVELS (the walk's real record shape): a
-        # score-only record reads as a clean sweep (pass) under the
-        # level-granular verdict and the gc would read it differently
-        def mkbell(s):
-            return {
-                "score": s,
-                "levels": {
-                    "0": {"pass": True},
-                    "1": {"pass": False, "attempts": [{"finish_reason": "time_limit"}]},
-                },
-            }
-
-        d5 = os.path.join(tmp, "gcR")
-        os.makedirs(d5, exist_ok=True)
-        open(os.path.join(d5, "gcR-F16.gguf"), "w", encoding="utf-8").close()
-        # f16 belled; q8_0 PASSED clean to 4 - the walk ended at q8_0,
-        # the model SURVIVES (4 == the global best)
-        state5 = {
-            "exam": {
-                "gcR": {
-                    "F16": mkbell(-1),
-                    "Q8_0": {"score": 4, "levels": {str(i): {"pass": True} for i in range(5)}},
-                },
-                "top": {"F16": {"score": 4}},
-            }
-        }
-        E._gc(tmp, state5, exclude_fam=None)
-        assert os.path.isdir(d5), "gc deleted a model its Q8_0 recovery SAVED"
-        assert not state5["exam"]["gcR"].get("_eliminated")
-        d6 = os.path.join(tmp, "gcS")
-        os.makedirs(d6, exist_ok=True)
-        open(os.path.join(d6, "gcS-F16.gguf"), "w", encoding="utf-8").close()
-        # f16 answered wrong at level 0 - the walk ended there, fail, collected
-        state6 = {
-            "exam": {
-                "gcS": {
-                    "F16": {
-                        "score": -1,
-                        "levels": {
-                            "0": {
-                                "pass": False,
-                                "attempts": [
-                                    {"finish_reason": "stop", "ok": False},
-                                    {"finish_reason": "stop", "ok": False},
-                                ],
-                            }
-                        },
-                    }
-                },
-                "top": {
-                    "F16": sweep({str(i): mklevel(True) for i in range(5)}),
-                },
-            }
-        }
-        E._gc(tmp, state6, exclude_fam=None)
-        assert not os.path.isdir(d6), "gc kept a model every rung of failed"
-        # v9.5: a PENDING walk (bells, quants untried) is never touched
-        d7 = os.path.join(tmp, "gcT")
-        os.makedirs(d7, exist_ok=True)
-        open(os.path.join(d7, "gcT-F16.gguf"), "w", encoding="utf-8").close()
-        state7 = {
-            "exam": {
-                "gcT": {"F16": mkbell(1)},
-                "top": {"F16": sweep({str(i): mklevel(True) for i in range(5)})},
-            }
-        }
-        E._gc(tmp, state7, exclude_fam=None)
-        assert os.path.isdir(d7), "gc deleted a PENDING (mid-walk) model"
-        assert not state7["exam"]["gcT"].get("_eliminated")
-        # v9.5: quants EXHAUSTED at the bell = out of time = an exam
-        # fail - the gc collects it like any fail
-        state7["exam"]["gcT"]["_out_of_time"] = True
-        E._gc(tmp, state7, exclude_fam=None)
-        assert not os.path.isdir(d7), "gc kept an out-of-time model (an exam fail)"
-
-        # --- the grader: the flexible subsequence ---
-        inst = {"path": ["abc", "def", "ghi"]}
-        assert E.score_exam("ANSWER: abc, def, ghi", inst, "stop")
-        assert E.score_exam("ANSWER: x abc y def z ghi", inst, "stop")
-        assert not E.score_exam("ANSWER: abc, ghi, def", inst, "stop")
-        assert not E.score_exam("ANSWER: abc, def, ghi", inst, "length")
-        # v9.2: graded AT the bell - a complete answer still passes
-        assert E.score_exam("ANSWER: abc, def, ghi", inst, "time_limit")
-        assert not E.score_exam("ANSWER: abc, def, gh", inst, "time_limit")
-        assert not E.score_exam("I cannot solve this", inst, "stop")
-
-        # --- v9.5: the roster ladder the walk draws its variations from ---
-        from bench.roster import LADDER
-
-        assert LADDER[-1] == "F16" and len(LADDER) == 32
-
-        # --- the roster: readable, granite first ---
-        from bench.roster import roster_from_models_md
-
-        roster = roster_from_models_md()
-        assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
-
-    print("  self-check: the gc, the paper, the grader, the ladder, the roster - OK")
 
 
 def check_tooling(args: argparse.Namespace) -> None:
@@ -440,9 +224,8 @@ def git_tail(args: argparse.Namespace) -> None:
     remotely."""
     stamp("committing artifacts to git (state, results, dumps, mem sidecars)")
     paths = [args.state_file, args.results_file, "results.txt"]
-    # the ledgers are first-class artifacts: every commit carries
-    # the latest regeneration (the per-model pushes depend on it)
-    paths += ["md/v9.5.md"]
+    # the ledger is a first-class artifact: every commit carries
+    # the latest regeneration (the progress pushes depend on it)
     if os.path.isfile("md/randomizer.md"):
         paths += ["md/randomizer.md"]
     if os.path.isfile(RANDOMIZER_STATE := "state/randomizer-state.json"):
@@ -552,13 +335,13 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
         os._exit(130)
     _SHUTTING_DOWN = True
     stamp("SIGINT - shutting down cleanly (addendum 8)")
-    # truncate any oversized exam log BEFORE the rail commits: the
-    # os._exit below skips run_family's finally, so a multi-hour
-    # -lv 5 log would otherwise ride the artifact push past github's
-    # limits (the 119MB granite-3.1 lesson)
+    # truncate any oversized randomizer log BEFORE the rail commits:
+    # the os._exit below skips run_candidate's finally, so a multi-hour
+    # log would otherwise ride the artifact push past github's limits
+    # (the 119MB granite-3.1 lesson)
     import glob as _glob
 
-    for p in _glob.glob("results/exam/**/exam-server.log", recursive=True):
+    for p in _glob.glob("results/randomizer/**/exam-server-*.log", recursive=True):
         try:
             if os.path.getsize(p) > 20 * 2**20:
                 with open(p, encoding="utf-8", errors="replace") as fh:
@@ -604,67 +387,25 @@ def install_sigint_handler(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="the v9 benchmark: every (model, quant) candidate "
-        "takes the exam - the full training window as the paper, the "
-        "32s time bell, self-cleaning elimination"
-    )
-    ap.add_argument(
-        "families",
-        nargs="*",
-        help="family names, limiting the exam to these models "
-        "(param-ascending from md/models.md); omitted = the full roster",
+        description="the protocol randomizer: every candidate of the "
+        "2048 pool (roster x LADDER) gets ONE chance - a fresh 8-bit "
+        "exam seed per candidate, a 128s timer per level, results only"
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="exam",
-        choices=["exam", "randomize"],
-        help="the benchmark: every (model, quant) candidate takes the "
-        "exam - the full training window as the paper, the 32s time "
-        "bell, PASS/FAIL sweeps, self-cleaning elimination",
-    )
-    ap.add_argument(
-        "--exam-seeds",
-        type=int,
-        default=1,
-        help="the repetition count - the seed set is 1..n (the "
-        "benchmark runs n=1, so every instance is built from seed 1 "
-        "and every model takes the SAME exam)",
-    )
-    ap.add_argument(
-        "--exam-max-level",
-        type=int,
-        default=1000000,
-        help="levels are INFINITE (the author's ruling): the token "
-        "window (the paper filled) and the 32s bell terminate a "
-        "sweep naturally; this is only a runaway guard, orders of "
-        "magnitude beyond any reachable level",
-    )
-    ap.add_argument(
-        "--eliminate",
-        default=None,
-        help="mark these models ELIMINATED in the ledger and delete "
-        "their models/ artifacts (the collected data always stays in "
-        "git) - comma-separated family names; mostly superseded by "
-        "the run's self-cleaning gc",
+        default="randomize",
+        choices=["randomize"],
+        help="the benchmark: the protocol randomizer (the v9.5 exam "
+        "walk is retired)",
     )
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="wipe the stored exam records UP FRONT, then measure - "
-        "never leave mixed-era results; era changes only",
-    )
-    ap.add_argument(
-        "--regrade",
-        action="store_true",
-        help="re-score every RECORDED attempt with the CURRENT grader "
-        "(no re-measurement): each attempt's stored answer text is "
-        "graded again, the level pass flags and rung scores are "
-        "recomputed, and every walk is marked PENDING - a restart "
-        "then resumes the walks that the new grades re-opened. For "
-        "grader changes; far cheaper than --clean",
+        help="delete the randomizer state UP FRONT - a fresh pool, "
+        "every chance restored; era changes only",
     )
     ap.add_argument(
         "--dry-run",
@@ -720,157 +461,6 @@ def main() -> None:
         raise
 
 
-def regrade_records(state: dict[str, Any]) -> int:
-    """Re-score every recorded attempt with the CURRENT grader (the
-    --regrade path, for grader changes - far cheaper than --clean):
-    the attempts' stored answer text is graded again, the level pass
-    flags and rung scores recomputed from the new ok flags, and every
-    walk's derived verdict cleared (_out_of_time dropped) so the run
-    resumes exactly the walks the new grades re-opened. Returns the
-    number of attempts whose grade flipped."""
-    from bench.exam import score_exam
-
-    flipped = 0
-    for _fam, tree in (state.get("exam") or {}).items():
-        if not isinstance(tree, dict):
-            continue
-        tree.pop("_out_of_time", None)
-        for rung, rec in tree.items():
-            if not isinstance(rec, dict) or rung.startswith("_"):
-                continue
-            if rec.get("too_large") or rec.get("unbuildable"):
-                continue
-            levels = rec.get("levels") or {}
-            for _lv, lrec in levels.items():
-                attempts = lrec.get("attempts") or []
-                for a in attempts:
-                    if a.get("answer") is None or not a.get("expected"):
-                        continue
-                    new_ok = score_exam(
-                        a.get("answer") or "",
-                        {"path": a["expected"]},
-                        a.get("finish_reason") or "stop",
-                    )
-                    if new_ok != a.get("ok"):
-                        a["ok"] = new_ok
-                        flipped += 1
-                lrec["pass"] = all(a.get("ok") for a in attempts) and bool(attempts)
-            # recompute the rung's score EXACTLY as run_family does:
-            # the highest level passed, or -1 when level 0 itself
-            # failed (the rung IS measured - score=None would make the
-            # walk treat it as unmeasured and re-quantize everything,
-            # the regrade incident)
-            score = -1
-            for lv in sorted(levels, key=int):
-                if not levels[lv].get("pass"):
-                    score = int(lv) - 1
-                    break
-                score = int(lv)
-            rec["score"] = score
-    return flipped
-
-
-def write_v94_md(state: dict[str, Any], roster_pos: dict[str, int]) -> None:
-    """md/v9.5.md - the tournament ledger, v9.5: ONE line per model
-    (its quant walk), in md/models.md order. The deciding rung's
-    score IS the model's score; the quant column shows WHICH
-    variant carried the exam (the walk's best scorer). Eliminated =
-    the model's artifacts were deleted from the benchmark machine
-    (the collected data always stays in git). Tied top-tier models
-    are never eliminated; their ranking column shows the time order
-    at the highest exam level (the tiebreaker indication - the
-    human breaks ties)."""
-    from bench.exam import deciding_rung, model_frontier
-
-    exam = state.get("exam") or {}
-    # gather the measured models first (needed for the tier ranking)
-    rows = []
-    for fam, pos in sorted(roster_pos.items(), key=lambda kv: kv[1]):
-        fam_exam = exam.get(fam) or {}
-        if not isinstance(fam_exam, dict):
-            continue
-        score = model_frontier(fam_exam)
-        if score <= 0:
-            continue  # nothing reached: unmeasured or nothing qualified
-        dr = deciding_rung(fam_exam)
-        rung, rec = dr if dr else ("-", {})
-        # the time + generation rate at the model's FRONTIER level
-        # (both parts), and the MAX CONTEXT USED across all its
-        # attempts - how much of the paper the model ever needed
-        top_time = None
-        top_tps = None
-        max_ctx = 0
-        for r in fam_exam.values():
-            if not isinstance(r, dict):
-                continue
-            for lv in (r.get("levels") or {}).values():
-                for a in lv.get("attempts") or []:
-                    max_ctx = max(max_ctx, a.get("answer_tokens") or 0)
-        if rec:
-            lv = (rec.get("levels") or {}).get(str(score)) or {}
-            atts = lv.get("attempts") or []
-            tot = sum(a.get("elapsed_s") or 0 for a in atts)
-            toks = sum(a.get("answer_tokens") or 0 for a in atts)
-            if atts and tot > 0:
-                top_time = tot
-                top_tps = toks / tot
-        rows.append((fam, pos, rung, score, top_time, top_tps, max_ctx))
-    # the top tier: the global best score; rank by time at the top
-    # level, fastest first (the tiebreaker indication)
-    # rows are (fam, pos, rung, score, top_time, top_tps, max_ctx):
-    # the score is r[3] (r[2] is the RUNG - reading it here made the
-    # tier 'the models with the lexicographically-largest quant name')
-    best = max((r[3] for r in rows if r[3] is not None), default=None)
-    tier = [r for r in rows if r[3] is not None and r[3] == best]
-    tier.sort(key=lambda r: r[4] if r[4] is not None else float("inf"))
-    rank = {r[0]: i + 1 for i, r in enumerate(tier)}
-    lines = [
-        "# v9.5.md - the tournament ledger (v9.5: the exhaustive quant walk, the 32s bell)",
-        "",
-        "One line per model, md/models.md order (param-ascending). The",
-        "deciding rung's score IS the model's score; the quant column is",
-        "the variant that carried the exam (the walk's best scorer). The",
-        "context is the model's full training window; no model gets more",
-        "than 32s to solve any exam. Max context used = the largest",
-        "answer the model ever produced (its real need vs its window).",
-        "Time = the wall time at the model's highest passed level (both",
-        "parts). The ranking column is valid ONLY for the top tier (tied",
-        "at the global best): fastest first, the tiebreaker indication -",
-        "the human breaks ties.",
-        "",
-        "| # | model | quant | score | max context used | time @ top | tok/s @ top | rank |",
-        "|---|---|---|---|---|---|---|---|",
-    ]
-    for fam, pos, rung, score, top_time, top_tps, max_ctx in rows:
-        rk = rank.get(fam, "-")
-        lines.append(
-            f"| {pos} | {fam} | {rung} "
-            f"| {score if score is not None else '-'} "
-            f"| {max_ctx} "
-            f"| {f'{top_time:.1f}s' if top_time is not None else '-'} "
-            f"| {f'{top_tps:.1f}' if top_tps is not None else '-'} "
-            f"| {rk} |"
-        )
-    lines.append("")
-    n_measured = sum(1 for r in rows if r[3] is not None)
-    lines.append(
-        f"_{n_measured} models measured; the deciding rung's record decides "
-        "everything. Max context used = the largest answer the model ever "
-        "produced (its real need vs its window)._"
-    )
-    with open(os.path.join("md", "v9.5.md"), "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-    stamp("v9.5.md ledger rewritten")
-
-
-def _exam_to_state(state: dict[str, Any], results: dict[tuple[str, str], Any]) -> None:
-    """Store the exam results under state.exam with JSON-safe keys:
-    exam.<family>.<rung> - a tuple key cannot survive json.dump (it
-    would coerce to a string and break the resume path)."""
-    tree = state.setdefault("exam", {})
-    for (fam, rung), rec in results.items():
-        tree.setdefault(fam, {})[rung] = rec
-
 
 def _run(args: argparse.Namespace) -> None:
     global DRY_RUN_ACTIVE
@@ -895,6 +485,21 @@ def _run(args: argparse.Namespace) -> None:
         # SIGINT saves, the artifact commits, the log truncation.
         import randomize as R
 
+        if args.dry_run:
+            # --dry-run is READ-ONLY (addendum 79): the plan and
+            # nothing else - no picks, no downloads, no state writes
+            from bench.roster import LADDER
+
+            pool = R.the_pool()
+            live = len(pool) - len(R.oversized_models) * len(LADDER)
+            done = 0
+            if os.path.isfile(R.RANDOMIZER_STATE_FILE):
+                with open(R.RANDOMIZER_STATE_FILE, encoding="utf-8") as fh:
+                    done = len(json.load(fh).get("done", []))
+            stamp(f"randomizer dry-run: {len(pool)} candidates, {live} live, {done} already drawn")
+            stamp("randomizer dry-run: read-only - no pick was drawn, nothing written")
+            return
+
         if args.clean and os.path.isfile(R.RANDOMIZER_STATE_FILE):
             # simple: delete the state file - main() treats a
             # missing file as a fresh pool, every chance restored
@@ -905,6 +510,8 @@ def _run(args: argparse.Namespace) -> None:
             # COMMIT_EVERY candidates the ledger + state + answers
             # commit and push - a multi-hour run is readable
             # remotely as it goes, not only at the end
+            if args.no_git:
+                return
             tee_output.uninstall()
             try:
                 git_tail(args)
@@ -929,110 +536,6 @@ def _run(args: argparse.Namespace) -> None:
                     tee_output.install()
         return
 
-    if args.task in ("v8", "exam"):
-        # v9: the exam is the only phase. No sweet walk, no in-window
-        # rule, no model-count logic: every (model, quant) candidate
-        # takes the exam under the full-window paper and the 32s
-        # time bell; the roster is self-cleaning (strictly-lower
-        # scorers are deleted from disk as soon as scores exist).
-        from bench.exam import run as exam_run
-        from bench.roster import roster_from_models_md
-
-        if args.clean and state.get("exam"):
-            state["exam"] = {}
-            save_state(args.state_file, state)
-            stamp("exam: all records wiped (--clean) - a full re-measure under the v9.5 protocol")
-
-        if args.regrade:
-            flipped = regrade_records(state)
-            save_state(args.state_file, state)
-            stamp(
-                f"exam: {flipped} attempt grade(s) re-scored with the current "
-                "grader (--regrade) - every walk is PENDING; the run resumes "
-                "exactly the walks the new grades re-opened"
-            )
-
-        if args.eliminate:
-            # the manual tournament cut (mostly superseded by the
-            # self-clean; kept for the ledger bookkeeping)
-            import shutil
-
-            for fam in args.eliminate.split(","):
-                fam = fam.strip()
-                if not fam:
-                    continue
-                tree = state.setdefault("exam", {}).setdefault(fam, {})
-                tree["_eliminated"] = True
-                famdir = os.path.join(args.models_dir, fam)
-                if os.path.isdir(famdir):
-                    shutil.rmtree(famdir)
-                    stamp(f"eliminated {fam}: artifacts deleted (data kept)")
-                else:
-                    stamp(f"eliminated {fam}: marked (no artifacts on disk)")
-            save_state(args.state_file, state)
-            write_v94_md(
-                state,
-                {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
-            )
-            if not args.no_git:
-                tee_output.uninstall()
-                git_tail(args)
-            stamp("elimination complete")
-            return
-
-        def family_done(fam: str) -> None:
-            """A push every time a model completes all its candidates
-            (the author's watchability ruling): state + answers + the
-            refreshed ledger are committed and pushed, so the run is
-            readable model by model, hours apart instead of at the
-            end."""
-            _exam_to_state_keep(state)
-            save_state(args.state_file, state)
-            write_v94_md(
-                state,
-                {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])},
-            )
-            stamp(f"family complete: {fam} - committing artifacts")
-            if args.no_git or args.dry_run:
-                return
-            tee_output.uninstall()
-            try:
-                git_tail(args)
-            except Exception as e:
-                stamp(f"family push failed (ignored): {e}")
-            finally:
-                tee_output.install()
-
-        def _exam_to_state_keep(state: dict[str, Any]) -> None:
-            pass  # the exam writes state directly; nothing to merge
-
-        results = exam_run(
-            args.models_dir,
-            state,
-            args.state_file,
-            state.get("ladder_port", 8210),
-            args.families or None,
-            n_seeds=args.exam_seeds,
-            max_level=args.exam_max_level,
-            dry_run=args.dry_run,
-            on_family_done=None if args.dry_run else family_done,
-        )
-        _exam_to_state(state, results)
-        save_state(args.state_file, state)
-        write_v94_md(
-            state, {name: i + 1 for i, name in enumerate([n for n, _ in roster_from_models_md()])}
-        )
-        print()
-        print("=" * 60)
-        stamp("V9 EXAM SUMMARY (highest difficulty achieved per candidate)")
-        for (fam, rung), rec in sorted(results.items(), key=lambda kv: -(kv[1].get("score") or -1)):
-            verdict = rec.get("error") or f"score {rec.get('score')}"
-            print(f"  {fam} {rung}: {verdict}")
-        if not args.no_git:
-            tee_output.uninstall()
-            git_tail(args)
-        stamp("v9 run complete")
-        return
     if not args.no_git:
         tee_output.uninstall()
         git_tail(args)
