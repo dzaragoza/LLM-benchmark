@@ -808,9 +808,9 @@ def main(on_progress: Any = None) -> None:
         t_ram = [r["ram_gib"] for r in top if r.get("ram_gib") is not None]
         if t_ram:
             lines.append(f"- vulkan0 ram median: **{_stats.median(t_ram):.2f} GiB**")
-        t_kv = [r["kv_gib"] for r in top if r.get("kv_gib") is not None]
-        if t_kv:
-            lines.append(f"- context median: **{_stats.median(t_kv):.2f} GiB**")
+        t_ctx = [r["ctx_settled"] for r in top if r.get("ctx_settled") is not None]
+        if t_ctx:
+            lines.append(f"- context median: **{_stats.median(t_ctx):,.0f}**")
         lines.append("")
         lines.append("_the machine sweet-spot band, live as the pool fills_")
         lines.append("")
