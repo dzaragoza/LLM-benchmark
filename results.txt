@@ -148697,3 +148697,103 @@ idempotent and will resume from this phase.
 ============================================================
   gemma-3-1b-it Q5_1: quantize_failed - exit 1
 [randomizer]   -> quantize_failed ()
+
+===== 2026-10-25T13:27:52 | full_benchmark.py --task randomize --dry-run --no-git =====
+[randomizer] #2041 pick=0b00010111010 -> Qwen3-0.6B Q5_0
+  [acquire] Qwen3-0.6B Q5_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for Qwen/Qwen3-0.6B ...
+  [hub] 10 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/Qwen3-0.6B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q5_0: f16 conversion failed (full log: models/Qwen3-0.6B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #2042 pick=0b10110101111 -> Qwen3.5-4B IQ3_M
+[randomizer]   -> too_large ()
+[randomizer] #2043 pick=0b11010011110 -> gemma-4-e4b-it Q8_0
+[randomizer]   -> too_large ()
+[randomizer] #2044 pick=0b10111110100 -> Yi-1.5-6B-Chat Q4_K_S
+[randomizer]   -> too_large ()
+[randomizer] #2045 pick=0b11001001011 -> Falcon3-7B-Instruct IQ2_M
+[randomizer]   -> too_large ()
+[randomizer] #2046 pick=0b00100000101 -> MiniCPM5-1B TQ2_0
+  [acquire] MiniCPM5-1B TQ2_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for openbmb/MiniCPM5-1B ...
+  [hub] 11 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/MiniCPM5-1B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at TQ2_0: f16 conversion failed (full log: models/MiniCPM5-1B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #2047 pick=0b00100101101 -> Llama-3.2-1B-Instruct IQ4_XS
+  [acquire] Llama-3.2-1B-Instruct IQ4_XS - (download/convert/quantize may take minutes)
+  [hub] listing files for meta-llama/Llama-3.2-1B-Instruct ...
+  [hub] 13 files listed
+  [1] downloading safetensors from meta-llama/Llama-3.2-1B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at IQ4_XS: safetensors download from meta-llama/Llama-3.2-1B-Instruct failed: 401 Client Error. (Request ID: Root=1-6ade03da-2e19fd04166cc1b60904901f;14ec4f23-fe9c-4575-9af6-1239a580369a)
+
+Cannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct/resolve/9213176726f574b556790deb65791e0c5aa438b6/original/params.json.
+Access to model meta-llama/Llama-3.2-1B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in.
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+  Llama-3.2-1B-Instruct IQ4_XS: quantize_failed - exit 1
+[randomizer]   -> quantize_failed ()
+[randomizer] #2048 pick=0b00010101010 -> Qwen3-0.6B IQ3_XXS
+  [acquire] Qwen3-0.6B IQ3_XXS - (download/convert/quantize may take minutes)
+  [hub] listing files for Qwen/Qwen3-0.6B ...
+  [hub] 10 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/Qwen3-0.6B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at IQ3_XXS: f16 conversion failed (full log: models/Qwen3-0.6B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
