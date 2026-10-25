@@ -147276,3 +147276,67 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [randomizer]   -> build_failed ()
+
+===== 2026-10-25T13:26:29 | full_benchmark.py --task randomize --dry-run --no-git =====
+[randomizer] #1945 pick=0b11101000001 -> gemma-2-9b-it Q2_0
+[randomizer]   -> too_large ()
+[randomizer] #1946 pick=0b11001100101 -> Qwen2.5-7B-Instruct TQ2_0
+[randomizer]   -> too_large ()
+[randomizer] #1947 pick=0b11001110101 -> Qwen2.5-7B-Instruct Q4_1
+[randomizer]   -> too_large ()
+[randomizer] #1948 pick=0b10010110110 -> Phi-3-mini-128k-instruct Q4_K_M
+  [acquire] Phi-3-mini-128k-instruct Q4_K_M - (download/convert/quantize may take minutes)
+  [hub] listing files for microsoft/Phi-3-mini-128k-instruct ...
+  [hub] 20 files listed
+  [1] Q4_K_M: estimated 2.1 GiB exceeds usable RAM 1.9 GiB (total 5.9 GiB - 4 reserve) - CANNOT RUN on this machine, skipping before download (addendum 35)
+[randomizer]   -> build_failed ()
+[randomizer] #1949 pick=0b11010000100 -> gemma-4-e4b-it Q2_K_S
+[randomizer]   -> too_large ()
+[randomizer] #1950 pick=0b01110010111 -> AI21-Jamba2-3B Q3_K_L
+  [acquire] AI21-Jamba2-3B Q3_K_L - (download/convert/quantize may take minutes)
+  [hub] listing files for ai21labs/AI21-Jamba2-3B ...
+  [hub] 13 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/AI21-Jamba2-3B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q3_K_L: f16 conversion failed (full log: models/AI21-Jamba2-3B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #1951 pick=0b10001101000 -> granite-4.1-3b IQ2_S
+  [acquire] granite-4.1-3b IQ2_S - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-4.1-3b ...
+  [hub] 14 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/granite-4.1-3b/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at IQ2_S: f16 conversion failed (full log: models/granite-4.1-3b/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #1952 pick=0b11011111111 -> Qwen3-8B F16
+[randomizer]   -> too_large ()
