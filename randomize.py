@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import threading
@@ -562,16 +563,28 @@ def run_candidate(
                 "seed": exam_seed,
                 "result": "server_failed",
             }
-        # THE RAM DATUM: llama-server's own memory breakdown, parsed
-        # from its log - the VULKAN0 total only (model + context +
-        # compute on the iGPU), the device the candidate actually
-        # runs on (GiB)
+        # THE RAM + SETTLED-CONTEXT DATUMS: llama-server's own
+        # numbers. ctx 0 (load from model) lets the server AUTO-SHRINK
+        # the context until model + KV + compute fit the device; the
+        # SETTLED context is the last n_ctx printed, after any
+        # resize. The LAST memory breakdown block is the settled
+        # state (the first is the pre-shrink wish - the device-lost
+        # lesson: first-block numbers can exceed the device). The
+        # VULKAN0 row alone - the device the candidate runs on.
         ram_gib: float | None = None
+        ctx_settled: int | None = None
+        kv_gib: float | None = None
+        with open(log_path, errors="replace") as fh:
+            for ln in fh:
+                m = re.search(r"llama_context: n_ctx\s*=\s*(\d+)", ln)
+                if m:
+                    ctx_settled = int(m.group(1))
         mem = llama_server.memory_breakdown_gib(log_path)
         if mem is not None:
             vk = (mem.get("devices") or {}).get("Vulkan0")
             if vk is not None:
                 ram_gib = round(vk["model_gib"] + vk["context_gib"] + vk["compute_gib"], 3)
+                kv_gib = round(vk["context_gib"], 3)
         level = 0
         while True:
             # the PER-LEVEL timer: starts when the question is sent
@@ -664,6 +677,8 @@ def run_candidate(
         "high_score": high_score,
         "fail_reason": fail_reason,
         "ram_gib": ram_gib,
+        "ctx_settled": ctx_settled,
+        "kv_gib": kv_gib,
         "attempts": len(attempts),
         # the SPEED datum: the LAST level's time (the deciding level's
         # own timer), not the whole run - per the author's clarification
@@ -793,6 +808,9 @@ def main(on_progress: Any = None) -> None:
         t_ram = [r["ram_gib"] for r in top if r.get("ram_gib") is not None]
         if t_ram:
             lines.append(f"- vulkan0 ram median: **{_stats.median(t_ram):.2f} GiB**")
+        t_kv = [r["kv_gib"] for r in top if r.get("kv_gib") is not None]
+        if t_kv:
+            lines.append(f"- context median: **{_stats.median(t_kv):.2f} GiB**")
         lines.append("")
         lines.append("_the machine sweet-spot band, live as the pool fills_")
         lines.append("")
@@ -800,18 +818,22 @@ def main(on_progress: Any = None) -> None:
         lines.append("highest score, tiebreak by time. Speed: the candidate's")
         lines.append("whole run - fast <= 32s, medium <= 64s, slow <= 128s.")
         lines.append("")
-        lines.append("| rank | model | high score | quant @high | k | v | vulkan0 ram | speed |")
-        lines.append("|---|---|---|---|---|---|---|---|")
+        lines.append(
+            "| rank | model | high score | quant @high | k | v | vulkan0 ram | ctx | speed |"
+        )
+        lines.append("|---|---|---|---|---|---|---|---|---|")
         for i, r in enumerate(rows):
             raw_t = r.get("high_score_time_s")
             t = float(raw_t) if raw_t is not None else float(r.get("elapsed_s") or 0.0)
             speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
             ram = r.get("ram_gib")
             ram_s = f"{ram:.2f}" if ram is not None else "-"
+            ctx = r.get("ctx_settled")
+            ctx_s = f"{ctx:,}" if ctx is not None else "-"
             lines.append(
                 f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} | {r['rung']} "
                 f"| {r.get('k_quant', 'f16')} | {r.get('v_quant', 'f16')} "
-                f"| {ram_s} | {speed} |"
+                f"| {ram_s} | {ctx_s} | {speed} |"
             )
         lines.append("")
         lines.append(

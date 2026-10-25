@@ -160,8 +160,7 @@ def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
             "context_gib": round(context / 1024, 3),
             "compute_gib": round(compute / 1024, 3),
         }
-        if dev not in devices:
-            devices[dev] = row
+        devices[dev] = row  # the LAST block wins: the settled state
     if not devices and weights_mib == 0.0:
         return None
     model_gib = round(sum(d["model_gib"] for d in devices.values()), 3)
