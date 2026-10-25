@@ -130047,3 +130047,104 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [randomizer]   -> build_failed ()
+
+===== 2026-10-25T13:06:22 | full_benchmark.py --task randomize --dry-run --no-git =====
+[randomizer] #849 pick=0b11000111110 -> OLMo-2-1124-7B-Instruct Q8_0
+[randomizer]   -> too_large ()
+[randomizer] #850 pick=0b01100011100 -> granite-3.0-2b-instruct Q5_1
+  [acquire] granite-3.0-2b-instruct Q5_1 - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-3.0-2b-instruct ...
+  [hub] 12 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/granite-3.0-2b-instruct/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q5_1: f16 conversion failed (full log: models/granite-3.0-2b-instruct/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #851 pick=0b10001000011 -> granite-4.0-micro IQ2_XXS
+  [acquire] granite-4.0-micro IQ2_XXS - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-4.0-micro ...
+  [hub] 14 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/granite-4.0-micro/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at IQ2_XXS: f16 conversion failed (full log: models/granite-4.0-micro/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #852 pick=0b11011001011 -> granite-3.3-8b-instruct IQ2_M
+[randomizer]   -> too_large ()
+[randomizer] #853 pick=0b11111110010 -> gemma-3-27b-it IQ4_NL
+[randomizer]   -> too_large ()
+[randomizer] #854 pick=0b11101000100 -> gemma-2-9b-it Q2_K_S
+[randomizer]   -> too_large ()
+[randomizer] #855 pick=0b00100111011 -> Llama-3.2-1B-Instruct Q5_K_M
+  [acquire] Llama-3.2-1B-Instruct Q5_K_M - (download/convert/quantize may take minutes)
+  [hub] listing files for meta-llama/Llama-3.2-1B-Instruct ...
+  [hub] 13 files listed
+  [1] downloading safetensors from meta-llama/Llama-3.2-1B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+
+============================================================
+PHASE 1 FAILED at Q5_K_M: safetensors download from meta-llama/Llama-3.2-1B-Instruct failed: 401 Client Error. (Request ID: Root=1-6addfed0-6ea505fe06e3aa0378c6f544;3c2db70c-c741-4d47-9348-169989d899b2)
+
+Cannot access gated repo for url https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct/resolve/9213176726f574b556790deb65791e0c5aa438b6/config.json.
+Access to model meta-llama/Llama-3.2-1B-Instruct is restricted. You must have access to it and be authenticated to access it. Please log in.
+Possible causes and fixes:
+  - gated repo: accept the license on hf.co and log in (hf auth login)
+  - wrong repo id: verify it exists at https://huggingface.co/<repo>
+  - network / disk space: check the download progress and df -h
+  - python deps: pip install -r requirements.txt (huggingface_hub)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+  Llama-3.2-1B-Instruct Q5_K_M: quantize_failed - exit 1
+[randomizer]   -> quantize_failed ()
+[randomizer] #856 pick=0b01110110000 -> SmolLM3-3B Q3_K_S
+  [acquire] SmolLM3-3B Q3_K_S - (download/convert/quantize may take minutes)
+  [hub] listing files for HuggingFaceTB/SmolLM3-3B ...
+  [hub] 12 files listed
+  [1] downloading safetensors from HuggingFaceTB/SmolLM3-3B (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/SmolLM3-3B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q3_K_S: f16 conversion failed (full log: models/SmolLM3-3B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
