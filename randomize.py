@@ -555,12 +555,15 @@ def run_candidate(
                 "result": "server_failed",
             }
         # THE RAM DATUM: llama-server's own memory breakdown, parsed
-        # from its log - weights + KV context + compute, the total
-        # the candidate actually occupies (GiB)
+        # from its log - the VULKAN0 total only (model + context +
+        # compute on the iGPU), the device the candidate actually
+        # runs on (GiB)
         ram_gib: float | None = None
         mem = llama_server.memory_breakdown_gib(log_path)
         if mem is not None:
-            ram_gib = mem["total_gib"]
+            vk = (mem.get("devices") or {}).get("Vulkan0")
+            if vk is not None:
+                ram_gib = round(vk["model_gib"] + vk["context_gib"] + vk["compute_gib"], 3)
         level = 0
         while True:
             # the PER-LEVEL timer: starts when the question is sent
@@ -781,7 +784,7 @@ def main(on_progress: Any = None) -> None:
             lines.append(f"- score median: **{_stats.median(t_scores):g}**")
         t_ram = [r["ram_gib"] for r in top if r.get("ram_gib") is not None]
         if t_ram:
-            lines.append(f"- ram median: **{_stats.median(t_ram):.2f} GiB**")
+            lines.append(f"- vulkan0 ram median: **{_stats.median(t_ram):.2f} GiB**")
         lines.append("")
         lines.append("_the machine sweet-spot band, live as the pool fills_")
         lines.append("")
@@ -789,7 +792,7 @@ def main(on_progress: Any = None) -> None:
         lines.append("highest score, tiebreak by time. Speed: the candidate's")
         lines.append("whole run - fast <= 32s, medium <= 64s, slow <= 128s.")
         lines.append("")
-        lines.append("| rank | model | high score | quant @high | k | v | ram | speed |")
+        lines.append("| rank | model | high score | quant @high | k | v | vulkan0 ram | speed |")
         lines.append("|---|---|---|---|---|---|---|---|")
         for i, r in enumerate(rows):
             raw_t = r.get("high_score_time_s")
