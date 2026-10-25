@@ -2,10 +2,10 @@
 
 ## the top 5% dashboard
 
-- measured: 455 done candidates, top 22 (22 of 455)
-- params median: **2.6695 B**
-- quant levels: Q5 x8, Q4 x4, Q8 x4, Q3 x2, Q6 x2, IQ3 x1, F16 x1
-- high-score level time median: **20.05s**
+- measured: 461 done candidates, top 23 (23 of 461)
+- params median: **2.614 B**
+- quant levels: Q5 x8, Q4 x4, Q8 x4, IQ3 x2, Q3 x2, Q6 x2, F16 x1
+- high-score level time median: **19.6s**
 - score median: **3**
 
 _the machine sweet-spot band, live as the pool fills_
@@ -471,5 +471,11 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 453 | granite-3.3-2b-instruct | -1 | IQ3_XS | slow |
 | 454 | Llama-3.2-1B-Instruct | -1 | Q4_K_M | slow |
 | 455 | phi-4-mini-instruct | -1 | IQ1_S | slow |
+| 456 | SmolLM3-3B | -1 | IQ2_M | slow |
+| 457 | Llama-3.2-3B-Instruct | -1 | Q2_0 | slow |
+| 458 | SmolLM2-1.7B-Instruct | -1 | Q2_0 | slow |
+| 459 | AI21-Jamba-Reasoning-3B | -1 | IQ3_M | slow |
+| 460 | granite-4.0-h-micro | -1 | IQ3_S | slow |
+| 461 | granite-4.1-3b | -1 | IQ2_XXS | slow |
 
-_455 candidates run of 2048; each one chance, the seed recorded in state._
+_461 candidates run of 2048; each one chance, the seed recorded in state._
