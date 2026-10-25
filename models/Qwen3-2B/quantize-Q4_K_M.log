@@ -46,9 +46,12 @@ llama_model_loader: - kv  34:                    tokenizer.chat_template str    
 llama_model_loader: - type  f32:  140 tensors
 llama_model_loader: - type  f16:  195 tensors
 llama_tensor_get_type: blk.24.attn_k.weight                 - applying manual override: q4_K -> q8_0
+llama_tensor_get_type: blk.24.attn_output.weight            - applying manual override: q4_K -> q8_0
 llama_tensor_get_type: blk.24.attn_q.weight                 - applying manual override: q4_K -> q8_0
 llama_tensor_get_type: blk.24.ffn_down.weight               - applying manual override: q4_K -> q8_0
 llama_tensor_get_type: blk.24.ffn_gate.weight               - applying manual override: q4_K -> q8_0
+llama_tensor_get_type: blk.24.ffn_up.weight                 - applying manual override: q4_K -> q8_0
+llama_tensor_get_type: blk.24.nextn.eh_proj.weight          - applying manual override: q4_K -> q8_0
 [   1/ 335] output_norm.weight                   - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
 [   2/ 335] token_embd.weight                    - [  2048, 248320,      1,      1], type =    f16, converting to q6_K .. size =   970.00 MiB ->   397.85 MiB
 [   3/ 335] blk.0.attn_gate.weight               - [  2048,   2048,      1,      1], type =    f16, converting to q4_K .. size =     8.00 MiB ->     2.25 MiB
@@ -372,20 +375,20 @@ llama_tensor_get_type: blk.24.ffn_gate.weight               - applying manual ov
 [ 321/ 335] blk.24.attn_k.weight                 - [  2048,    512,      1,      1], type =    f16, converting to q8_0 .. size =     2.00 MiB ->     1.06 MiB
 [ 322/ 335] blk.24.attn_k_norm.weight            - [   256,      1,      1,      1], type =    f32, size =    0.001 MiB
 [ 323/ 335] blk.24.attn_norm.weight              - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
-[ 324/ 335] blk.24.attn_output.weight            - [  2048,   2048,      1,      1], type =    f16, converting to q4_K .. size =     8.00 MiB ->     2.25 MiB
+[ 324/ 335] blk.24.attn_output.weight            - [  2048,   2048,      1,      1], type =    f16, converting to q8_0 .. size =     8.00 MiB ->     4.25 MiB
 [ 325/ 335] blk.24.attn_q.weight                 - [  2048,   4096,      1,      1], type =    f16, converting to q8_0 .. size =    16.00 MiB ->     8.50 MiB
 [ 326/ 335] blk.24.attn_q_norm.weight            - [   256,      1,      1,      1], type =    f32, size =    0.001 MiB
 [ 327/ 335] blk.24.attn_v.weight                 - [  2048,    512,      1,      1], type =    f16, converting to q6_K .. size =     2.00 MiB ->     0.82 MiB
 [ 328/ 335] blk.24.ffn_down.weight               - [  6144,   2048,      1,      1], type =    f16, converting to q8_0 .. size =    24.00 MiB ->    12.75 MiB
 [ 329/ 335] blk.24.ffn_gate.weight               - [  2048,   6144,      1,      1], type =    f16, converting to q8_0 .. size =    24.00 MiB ->    12.75 MiB
-[ 330/ 335] blk.24.ffn_up.weight                 - [  2048,   6144,      1,      1], type =    f16, converting to q4_K .. size =    24.00 MiB ->     6.75 MiB
-[ 331/ 335] blk.24.nextn.eh_proj.weight          - [  4096,   2048,      1,      1], type =    f16, converting to q4_K .. size =    16.00 MiB ->     4.50 MiB
+[ 330/ 335] blk.24.ffn_up.weight                 - [  2048,   6144,      1,      1], type =    f16, converting to q8_0 .. size =    24.00 MiB ->    12.75 MiB
+[ 331/ 335] blk.24.nextn.eh_proj.weight          - [  4096,   2048,      1,      1], type =    f16, converting to q8_0 .. size =    16.00 MiB ->     8.50 MiB
 [ 332/ 335] blk.24.nextn.enorm.weight            - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
 [ 333/ 335] blk.24.nextn.hnorm.weight            - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
 [ 334/ 335] blk.24.nextn.shared_head_norm.weight - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
 [ 335/ 335] blk.24.post_attention_norm.weight    - [  2048,      1,      1,      1], type =    f32, size =    0.008 MiB
 llama_model_quantize_impl: model size  =  3706.38 MiB (16.00 BPW)
-llama_model_quantize_impl: quant size  =  1254.33 MiB (5.42 BPW)
+llama_model_quantize_impl: quant size  =  1266.33 MiB (5.47 BPW)
 
-llama_quantize: quantize time = 16462.68 ms
-llama_quantize:    total time = 16462.68 ms
+llama_quantize: quantize time = 13276.92 ms
+llama_quantize:    total time = 13276.92 ms
