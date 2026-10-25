@@ -452,12 +452,16 @@ def run_candidate(
     answers_path = os.path.join(answers_dir, f"{rung}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{rung}.log")
 
+    # the bell_window IS the training window, EXACTLY: the paper is
+    # the full window, and requesting more than n_ctx_train is an
+    # error (the device-lost lesson: ctx > the trained window can
+    # push the KV allocation past what the device allows)
     proc, healthy = llama_server.start_server(
         gguf,
         port=port,
         extra_args=[
             "-c",
-            str(ctx + 2048),
+            str(ctx),
             "--parallel",
             "1",
             "--reasoning",
