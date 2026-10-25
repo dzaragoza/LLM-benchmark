@@ -138499,3 +138499,92 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [randomizer]   -> build_failed ()
+
+===== 2026-10-25T13:17:41 | full_benchmark.py --task randomize --dry-run --no-git =====
+[randomizer] #1393 pick=0b11100000111 -> Yi-1.5-9B-Chat IQ2_XS
+[randomizer]   -> too_large ()
+[randomizer] #1394 pick=0b10111010000 -> gemma-4-e2b-it Q3_K_S
+[randomizer]   -> too_large ()
+[randomizer] #1395 pick=0b00101010110 -> MiniCPM-1B-sft Q4_K_M
+  [acquire] MiniCPM-1B-sft Q4_K_M - (download/convert/quantize may take minutes)
+  [hub] listing files for openbmb/MiniCPM-1B-sft-bf16 ...
+  [hub] 11 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/MiniCPM-1B-sft/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q4_K_M: f16 conversion failed (full log: models/MiniCPM-1B-sft/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #1396 pick=0b10100011101 -> phi-4-mini-instruct Q6_K
+  [acquire] phi-4-mini-instruct Q6_K - (download/convert/quantize may take minutes)
+  [hub] listing files for microsoft/phi-4-mini-instruct ...
+  [hub] 21 files listed
+  [1] Q6_K: estimated 2.9 GiB exceeds usable RAM 1.9 GiB (total 5.9 GiB - 4 reserve) - CANNOT RUN on this machine, skipping before download (addendum 35)
+[randomizer]   -> build_failed ()
+[randomizer] #1397 pick=0b01000011000 -> Qwen3-1.7B Q5_K_S
+  [acquire] Qwen3-1.7B Q5_K_S - (download/convert/quantize may take minutes)
+  [hub] listing files for Qwen/Qwen3-1.7B ...
+  [hub] 12 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/Qwen3-1.7B/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q5_K_S: f16 conversion failed (full log: models/Qwen3-1.7B/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #1398 pick=0b11000010101 -> mistral-7b-instruct-v0.3 Q4_1
+[randomizer]   -> too_large ()
+[randomizer] #1399 pick=0b01010111010 -> granite-3.2-2b-instruct Q5_0
+  [acquire] granite-3.2-2b-instruct Q5_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-3.2-2b-instruct ...
+  [hub] 13 files listed
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+
+--- output of the failed safetensors -> f16 conversion (full log: models/granite-3.2-2b-instruct/convert-f16.log) ---
+/usr/local/bin/python3: can't open file '/workspace/github__dzaragoza__LLM-benchmark/./llama.cpp/convert_hf_to_gguf.py': [Errno 2] No such file or directory
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q5_0: f16 conversion failed (full log: models/granite-3.2-2b-instruct/convert-f16.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #1400 pick=0b01101111011 -> RWKV7-World-2.9B Q5_K_M
+  [acquire] RWKV7-World-2.9B Q5_K_M - (download/convert/quantize may take minutes)
+  [hub] listing files for RWKV/RWKV7-Goose-World3-2.9B-HF ...
+  [hub] 15 files listed
+  [1] Q5_K_M: estimated 3.9 GiB exceeds usable RAM 1.9 GiB (total 5.9 GiB - 4 reserve) - CANNOT RUN on this machine, skipping before download (addendum 35)
+[randomizer]   -> build_failed ()
