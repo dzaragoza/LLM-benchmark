@@ -861,7 +861,7 @@ def main(on_progress: Any = None) -> None:
         lines.append("")
         lines.append(
             f"_{len(rows)} candidates run of {len(pool) * n_kv * n_kv:,} "
-            f"({len(done_pairs)} of {len(pool):,} pairs swept); "
+            f"({done_pairs:,} of {len(pool):,} pairs swept); "
             "each pair one acquisition, the seed recorded in state._"
         )
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
