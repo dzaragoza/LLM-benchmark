@@ -526,10 +526,18 @@ def run_candidate(
         kv_args += ["--cache-type-k", k_quant]
     if v_quant != "f16":
         kv_args += ["--cache-type-v", v_quant]
+    # FULL GPU OFFLOAD, always: --n-gpu-layers 999 forces every
+    # layer onto the iGPU - the CPU is useless for this experiment.
+    # With ctx 0 (load from model) llama-server then auto-shrinks
+    # the context until model + KV + compute fit the device; a
+    # candidate that cannot fit even shrunk fails at launch (the
+    # honest verdict: this machine cannot run it on the GPU)
     proc, healthy = llama_server.start_server(
         gguf,
         port=port,
         extra_args=[
+            "--n-gpu-layers",
+            "999",
             "--parallel",
             "1",
             "--reasoning",
