@@ -127286,3 +127286,114 @@ idempotent and will resume from this phase.
   [2] quantizing SmolLM3-3B-f16.gguf -> TQ2_0 (output hidden; shown on error)
   [2] using importance matrix SmolLM3-3B-f16.gguf.imatrix
 [randomizer]   -> high_score=-1 (timeout)
+
+===== 2026-10-25T08:53:42 | full_benchmark.py --task randomize =====
+[randomizer] #609 pick=0b11000010001 -> mistral-7b-instruct-v0.3 Q4_0
+[randomizer]   -> too_large ()
+[randomizer] #610 pick=0b10111111011 -> Yi-1.5-6B-Chat Q5_K_M
+[randomizer]   -> too_large ()
+[randomizer] #611 pick=0b00110001000 -> granite-4.0-h-1b IQ2_S
+  [acquire] granite-4.0-h-1b IQ2_S - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-4.0-h-1b ...
+  [hub] 10 files listed
+  [2] quantizing granite-4.0-h-1b-f16.gguf -> IQ2_S (output hidden; shown on error)
+  [2] using importance matrix granite-4.0-h-1b-f16.gguf.imatrix
+[randomizer]   -> high_score=-1 (wrong answer)
+[randomizer] #612 pick=0b10000000010 -> AI21-Jamba-Reasoning-3B Q1_0
+  [acquire] AI21-Jamba-Reasoning-3B Q1_0 - (download/convert/quantize may take minutes)
+  [hub] listing files for ai21labs/AI21-Jamba-Reasoning-3B ...
+  [hub] 13 files listed
+  [2] quantizing AI21-Jamba-Reasoning-3B-f16.gguf -> Q1_0 (output hidden; shown on error)
+  [2] using importance matrix AI21-Jamba-Reasoning-3B-f16.gguf.imatrix
+
+--- output of the failed llama-quantize run (full log: models/AI21-Jamba-Reasoning-3B/quantize-Q1_0.log) ---
+load_backend: loaded RPC backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-rpc.so
+ggml_vulkan: Found 1 Vulkan devices:
+ggml_vulkan: 0 = AMD Radeon 780M Graphics (RADV PHOENIX) (radv) | uma: 1 | fp16: dot2 | bf16: 0 | fp4: 0 | warp size: 64 | shared memory: 65536 | int dot: 1 | matrix cores: KHR_coopmat
+load_backend: loaded Vulkan backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+load_backend: loaded CPU backend from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-cpu-zen4.so
+version: 0.7.0-dev (build 11669, commit 620d2225c)
+built with GNU 11.4.0 for Linux x86_64
+llama_quantize: quantizing 'models/AI21-Jamba-Reasoning-3B/AI21-Jamba-Reasoning-3B-f16.gguf' to 'models/AI21-Jamba-Reasoning-3B/AI21-Jamba-Reasoning-3B-Q1_0.gguf' as Q1_0
+llama_model_loader: loaded meta data with 33 key-value pairs and 463 tensors from models/AI21-Jamba-Reasoning-3B/AI21-Jamba-Reasoning-3B-f16.gguf (version GGUF V3 (latest))
+llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+llama_model_loader: - kv   0:                       general.architecture str              = jamba
+llama_model_loader: - kv   1:                               general.type str              = model
+llama_model_loader: - kv   2:                               general.name str              = Safetensors Source
+llama_model_loader: - kv   3:                         general.size_label str              = 3.2B
+llama_model_loader: - kv   4:                          jamba.block_count u32              = 28
+llama_model_loader: - kv   5:                       jamba.context_length u32              = 262144
+llama_model_loader: - kv   6:                     jamba.embedding_length u32              = 2560
+llama_model_loader: - kv   7:                  jamba.feed_forward_length u32              = 8192
+llama_model_loader: - kv   8:                 jamba.attention.head_count u32              = 20
+llama_model_loader: - kv   9:              jamba.attention.head_count_kv arr[i32,28]      = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, ...
+llama_model_loader: - kv  10:                      jamba.ssm.conv_kernel u32              = 4
+llama_model_loader: - kv  11:                       jamba.ssm.inner_size u32              = 5120
+llama_model_loader: - kv  12:                       jamba.ssm.state_size u32              = 16
+llama_model_loader: - kv  13:                   jamba.ssm.time_step_rank u32              = 160
+llama_model_loader: - kv  14:     jamba.attention.layer_norm_rms_epsilon f32              = 0.000001
+llama_model_loader: - kv  15:                         jamba.expert_count u32              = 1
+llama_model_loader: - kv  16:                    jamba.expert_used_count u32              = 1
+llama_model_loader: - kv  17:                          general.file_type u32              = 1
+llama_model_loader: - kv  18:               general.quantization_version u32              = 2
+llama_model_loader: - kv  19:                       tokenizer.ggml.model str              = llama
+llama_model_loader: - kv  20:                         tokenizer.ggml.pre str              = default
+llama_model_loader: - kv  21:                      tokenizer.ggml.tokens arr[str,65536]   = ["<|pad|>", "<|startoftext|>", "<|end...
+llama_model_loader: - kv  22:                      tokenizer.ggml.scores arr[f32,65536]   = [-1000.000000, -1000.000000, -1000.00...
+llama_model_loader: - kv  23:                  tokenizer.ggml.token_type arr[i32,65536]   = [3, 3, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, ...
+llama_model_loader: - kv  24:                tokenizer.ggml.bos_token_id u32              = 1
+llama_model_loader: - kv  25:                tokenizer.ggml.eos_token_id u32              = 519
+llama_model_loader: - kv  26:            tokenizer.ggml.unknown_token_id u32              = 3
+llama_model_loader: - kv  27:            tokenizer.ggml.padding_token_id u32              = 0
+llama_model_loader: - kv  28:               tokenizer.ggml.add_bos_token bool             = true
+llama_model_loader: - kv  29:               tokenizer.ggml.add_sep_token bool             = false
+llama_model_loader: - kv  30:               tokenizer.ggml.add_eos_token bool             = false
+llama_model_loader: - kv  31:                    tokenizer.chat_template str              = \n{%- set thinking_prefix = thinking_p...
+llama_model_loader: - kv  32:            tokenizer.ggml.add_space_prefix bool             = false
+llama_model_loader: - type  f32:  265 tensors
+llama_model_loader: - type  f16:  198 tensors
+
+llama_model_quantize_impl: have importance matrix data with 196 entries
+warning: blk.0.ssm_dt.weight                  - ncols    160 not divisible by 128 (required for type    q1_0) llama_model_quantize: failed to quantize: no tensor type fallback is defined for type q1_0
+llama_quantize: failed to quantize model from 'models/AI21-Jamba-Reasoning-3B/AI21-Jamba-Reasoning-3B-f16.gguf'
+load_imatrix: imatrix datasets=['models/AI21-Jamba-Reasoning-3B/imatrix-calib.txt']
+load_imatrix: loaded 196 importance matrix entries from models/AI21-Jamba-Reasoning-3B/AI21-Jamba-Reasoning-3B-f16.gguf.imatrix computed on 129 chunks
+prepare_imatrix: have 196 importance matrix entries
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at Q1_0: llama-quantize failed (full log: models/AI21-Jamba-Reasoning-3B/quantize-Q1_0.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[randomizer]   -> build_failed ()
+[randomizer] #613 pick=0b00111001011 -> granite-4.0-1b IQ2_M
+  [acquire] granite-4.0-1b IQ2_M - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-4.0-1b ...
+  [hub] 12 files listed
+  [1] downloading safetensors from ibm-granite/granite-4.0-1b (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing granite-4.0-1b-f16.gguf -> IQ2_M (output hidden; shown on error)
+  [2] using importance matrix granite-4.0-1b-f16.gguf.imatrix
+[randomizer]   -> high_score=-1 (timeout)
+[randomizer] #614 pick=0b10011010010 -> Phi-3-mini-4k-instruct IQ4_NL
+  [acquire] Phi-3-mini-4k-instruct IQ4_NL - (download/convert/quantize may take minutes)
+  [hub] listing files for microsoft/Phi-3-mini-4k-instruct ...
+  [hub] 20 files listed
+  [2] quantizing Phi-3-mini-4k-instruct-f16.gguf -> IQ4_NL (output hidden; shown on error)
+  [2] using importance matrix Phi-3-mini-4k-instruct-f16.gguf.imatrix
+[gc] free 14.3 GiB <= 16: evicted Qwen3-0.6B-f16.gguf (least-likely-needed by the state)
+[gc] free 15.7 GiB <= 16: evicted gemma-3-1b-it-f16.gguf (least-likely-needed by the state)
+[randomizer]   -> high_score=1 (wrong answer)
+[randomizer] #615 pick=0b10110101010 -> Qwen3.5-4B IQ3_XXS
+[randomizer]   -> too_large ()
+[randomizer] #616 pick=0b11010101101 -> Llama-3.1-8B-Instruct IQ4_XS
+[randomizer]   -> too_large ()
