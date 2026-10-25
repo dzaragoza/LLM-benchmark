@@ -2,7 +2,7 @@
 
 ## the top 5% dashboard
 
-- measured: 537 done candidates, top 26 (26 of 537)
+- measured: 539 done candidates, top 26 (26 of 539)
 - params median: **2.614 B**
 - quant levels: Q5 x8, Q4 x5, Q8 x4, Q3 x3, IQ3 x2, Q6 x2, IQ2 x1, F16 x1
 - high-score level time median: **19.4s**
@@ -553,5 +553,7 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 535 | phi-2 | -1 | Q5_K_M | slow |
 | 536 | MiniCPM3-4B | -1 | Q4_K_M | medium |
 | 537 | Qwen2.5-3B-Instruct | -1 | Q2_K | slow |
+| 538 | Phi-3.5-mini-instruct | -1 | Q1_0 | slow |
+| 539 | AI21-Jamba2-3B | -1 | IQ2_XXS | slow |
 
-_537 candidates run of 2048; each one chance, the seed recorded in state._
+_539 candidates run of 2048; each one chance, the seed recorded in state._
