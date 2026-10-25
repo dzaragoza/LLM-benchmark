@@ -711,9 +711,10 @@ def _run_combo(
 
 
 # the watchability cadence (the exam's per-family push ruling,
-# randomizer-shaped): commit + push every N candidates so a
-# multi-hour run is readable remotely as it goes
-COMMIT_EVERY = 8
+# randomizer-shaped): commit + push after EVERY pair - the full
+# 49-combination (k, v) sweep of the model-quant lands in the
+# ledger as one unit, a multi-hour run is readable remotely pair
+# by pair
 
 
 def main(on_progress: Any = None) -> None:
@@ -915,7 +916,7 @@ def main(on_progress: Any = None) -> None:
         )
         print(f"[randomizer]   -> {summary}")
         n += 1
-        if on_progress is not None and n % COMMIT_EVERY == 0:
+        if on_progress is not None:
             try:
                 on_progress(n)
             except Exception as e:

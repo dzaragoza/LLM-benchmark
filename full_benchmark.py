@@ -496,10 +496,10 @@ def _run(args: argparse.Namespace) -> None:
             stamp("randomizer: state deleted (--clean) - a fresh pool")
 
         def push_progress(n: int) -> None:
-            # the watchability ruling, randomizer-shaped: every
-            # COMMIT_EVERY candidates the ledger + state + answers
-            # commit and push - a multi-hour run is readable
-            # remotely as it goes, not only at the end
+            # the watchability ruling, randomizer-shaped: after every
+            # pair the ledger + state + all 49 (k, v) answers commit
+            # and push - the full model-quant sweep lands as one
+            # unit, a multi-hour run is readable remotely as it goes
             tee_output.uninstall()
             try:
                 git_tail(args)
