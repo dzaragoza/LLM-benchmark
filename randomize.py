@@ -5,23 +5,28 @@ Reuses the v9.5 machinery (the exam papers, the grader, the bells,
 the acquisition pipeline, the server) and disposes of the rules -
 it is only interested in RESULTS.
 
-  the pool    v2: the candidate is (model, model-quant, k_quant,
-              v_quant) - 64 models x 32 model rungs x 7 k-quants
-              x 7 v-quants = 100,352 candidates
-  the pick    22 bits of REAL entropy (/dev/hwrng if present,
+  the pool    the candidate PAIR is (model, model-quant) - 64
+              models x 32 rungs = 2,048 pairs. A pair's pick
+              evaluates ALL 49 (k, v) cache-quant combinations
+              (7 x 7) in one acquisition: no constant quant
+              re-calculation, the file is acquired once
+  the pick    16 bits of REAL entropy (/dev/hwrng if present,
               else /dev/random - the kernel's harvested pool,
               never a pseudorandom generator): 11 bits the model
-              index, 5 bits the model rung, 3 bits the k quant,
-              3 bits the v quant. ONE CHANCE per candidate, no
-              replacement: a pick that lands on an already-run
-              candidate is re-drawn with fresh entropy until an
-              untried one comes up; the pool drains to zero and
-              the protocol is complete. The exam seed (8 bits) is
-              recorded for reproducibility
-  the kv      the K and V cache quants are the candidate's own:
-              KV_LADDER = f16, q8_0, q4_0, q4_1, iq4_nl, q5_0,
-              q5_1 (3 bits each); the server gets --cache-type-k
-              and --cache-type-v; f16 means no flag (the default)
+              index, 5 bits the model rung. ONE CHANCE per PAIR,
+              no replacement: a pick that lands on an already-run
+              pair is re-drawn with fresh entropy; the pool
+              drains to zero and the protocol is complete. A
+              fresh 8-bit exam seed serves EVERY candidate of the
+              sweep, recorded for reproducibility
+  the kv      per pair, EVERY combination of KV_LADDER x
+              KV_LADDER (f16, q8_0, q4_0, q4_1, iq4_nl, q5_0,
+              q5_1) takes the exam - 49 candidates per pick; the
+              server gets --cache-type-k and --cache-type-v, f16
+              means no flag (the default). A quant file that has
+              been fully swept can be safely deleted: no kv
+              combination of it remains, it will never be needed
+              again. The gc deals with the f16s and any leftover
   the exam    8 bits of entropy = one of 256 possible exams; the
               SAME exam seed serves every level of the candidate
   the run     the candidate takes level 0, 1, 2, ... under one
@@ -98,10 +103,10 @@ def entropy_bits(n: int) -> int:
     return val
 
 
-# --- the pool, v2: (model, rung, k_quant, v_quant) ------------------------
-# the 11-bit model index space: roster x LADDER = 64 x 32 = 2048
-# the candidate adds two 3-bit draws: k_quant and v_quant, each one
-# of KV_LADDER (f16 first, so 000 = the default cache)
+# --- the pool, v3: (model, rung) pairs, kv-swept at pick time -------------
+# the 16-bit pick: 11 bits the model index (the pool index), 5 bits
+# the model rung (LADDER). One chance per PAIR; the pair's pick
+# sweeps every KV_LADDER x KV_LADDER combination (49 candidates).
 KV_LADDER = [
     "f16",
     "q8_0",
@@ -111,15 +116,13 @@ KV_LADDER = [
     "q5_0",
     "q5_1",
 ]
-assert len(KV_LADDER) <= 8  # 3 bits
-PICK_BITS = 22  # 11 model index + 5 rung + 3 k + 3 v
+PICK_BITS = 16  # 11 model index + 5 rung
 
 
 def the_pool() -> list[tuple[str, str]]:
-    """Every (model, rung) pair, deterministic order - the 11-bit
-    model-index space the pick lands in. The candidate is completed
-    at pick time by two 3-bit kv draws; the pool of CANDIDATES is
-    model_index x KV_LADDER x KV_LADDER = 2048 x 49 = 100,352.
+    """Every (model, rung) pair, deterministic order - the 16-bit
+    pick space. One chance per pair; the pick sweeps all 49 kv
+    combinations, so the pool of CANDIDATES is 2048 x 49 = 100,352.
 
     THE OVERSIZED PRE-MARK (the author's simplification): the f16
     size lives in md/models.md (the f16 (GiB) column, params x 2
@@ -228,26 +231,15 @@ def _least_likely_f16(
     fams = os.listdir(models_dir)
     if len(fams) <= 1:
         return None  # never delete the only directory on disk
-    # per family: how many of its (model, quant) pairs still have
-    # untried kv combinations - the future need for its f16 (each
-    # untried pair, when picked, re-quantizes from the f16). A v2
-    # done-key packs fam_pos(6) rung(5) k(3) v(3): a pair is
-    # exhausted only when every kv combination of it is drawn.
-    n_kv = len(KV_LADDER)
-    exhausted: set[tuple[int, int]] = set()
-    for fam_pos in range(len(pool) // 32):
-        for rung_pos in range(32):
-            combos = sum(
-                1
-                for ki in range(n_kv)
-                for vi in range(n_kv)
-                if f"{(fam_pos << 11) | (rung_pos << 6) | (ki << 3) | vi}" in done
-            )
-            if combos >= n_kv * n_kv:
-                exhausted.add((fam_pos, rung_pos))
+    # per family: how many of its (model, quant) pairs are still
+    # untried - the future need for its f16 (each untried pair,
+    # when picked, re-quantizes from the f16 and sweeps all its kv
+    # combinations in that one acquisition). A v3 done-key is the
+    # pool index of the pair: a swept pair's whole 49-combination
+    # space went with its one acquisition.
     remaining: dict[str, int] = {}
-    for idx, (fam, _rung) in enumerate(pool):
-        if (idx // 32, idx % 32) in exhausted:
+    for pair_key, (fam, _rung) in enumerate(pool):
+        if str(pair_key) in done:
             continue
         remaining[fam] = remaining.get(fam, 0) + 1
     best = None  # (remaining, mtime, fam)
@@ -433,25 +425,22 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 LEVEL_TIMEOUT_S = 128.0
 
 
-def run_candidate(
+def run_pair(
     fam: str,
     rung: str,
-    k_quant: str,
-    v_quant: str,
     models_dir: str,
     state: dict[str, Any],
-    state_file: str,
     port: int,
     entropy_get=lambda: entropy_bits(8),
-) -> dict[str, Any]:
-    """One candidate, one exam, a clock, a result. The candidate is
-    (model, model-quant, k_quant, v_quant). The exam seed (8 bits)
-    serves EVERY level of this candidate. The total run timeout is
-    128s: pass advances a level, fail or timeout ends the run and
-    records the reason and the high score."""
+) -> list[dict[str, Any]]:
+    """One (model, model-quant) pair, ONE acquisition, the FULL 49-
+    combination (k, v) cache-quant sweep. Every combination takes
+    its own exam under its own 8-bit seed. Returns one record per
+    combination; the pair's quant file is deleted at the end (every
+    kv combination of it has been exhausted - it will never be
+    needed again; the gc deals with the f16s and any leftover)."""
     from bench.exam import _size_too_large, bell_window
 
-    t_start = time.monotonic()
     exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
 
@@ -463,57 +452,92 @@ def run_candidate(
     # the state so every LATER pick of any of its rungs resolves to
     # too_large BEFORE acquiring - no download is ever paid for an
     # oversized family again. This also shortens the pool.
+    def _fail_all(result: str, detail: str = "") -> list[dict[str, Any]]:
+        return [
+            {
+                "fam": fam,
+                "rung": rung,
+                "k_quant": k_quant,
+                "v_quant": v_quant,
+                "seed": exam_seed,
+                "result": result,
+                "detail": detail,
+            }
+            for k_quant in KV_LADDER
+            for v_quant in KV_LADDER
+        ]
+
     if fam in oversized_models:
-        return {
-            "fam": fam,
-            "rung": rung,
-            "k_quant": k_quant,
-            "v_quant": v_quant,
-            "seed": exam_seed,
-            "result": "too_large",
-        }
+        return _fail_all("too_large")
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
-        # the acquire path printed the specific failure; the record
-        # carries the distinct cause, not the generic unbuildable
-        return {
-            "fam": fam,
-            "rung": rung,
-            "k_quant": k_quant,
-            "v_quant": v_quant,
-            "seed": exam_seed,
-            "result": _last_acquire_error.get("result", "acquire_failed"),
-            "detail": _last_acquire_error.get("detail", ""),
-        }
+        # the acquire path printed the specific failure; the records
+        # carry the distinct cause, not the generic unbuildable
+        return _fail_all(
+            _last_acquire_error.get("result", "acquire_failed"),
+            _last_acquire_error.get("detail", ""),
+        )
     famdir = os.path.join(models_dir, fam)
     f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
     if os.path.isfile(f16_path) and (os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB):
         oversized_models.add(fam)
         shutil.rmtree(famdir, ignore_errors=True)
-        return {
-            "fam": fam,
-            "rung": rung,
-            "k_quant": k_quant,
-            "v_quant": v_quant,
-            "seed": exam_seed,
-            "result": "too_large",
-        }
+        return _fail_all("too_large")
     if _size_too_large(gguf):
         if rung != "F16":
             os.remove(gguf)
-        return {
-            "fam": fam,
-            "rung": rung,
-            "k_quant": k_quant,
-            "v_quant": v_quant,
-            "seed": exam_seed,
-            "result": "too_large",
-        }
+        return _fail_all("too_large")
 
     # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from the model, so the
     # window is exactly n_ctx_train, one parameter less to worry
     ctx = bell_window(state, fam, models_dir) or 262144
+    records: list[dict[str, Any]] = []
+    try:
+        for k_quant in KV_LADDER:
+            for v_quant in KV_LADDER:
+                rec = _run_combo(
+                    fam,
+                    rung,
+                    k_quant,
+                    v_quant,
+                    gguf,
+                    ctx,
+                    models_dir,
+                    port,
+                    entropy_get,
+                )
+                records.append(rec)
+    finally:
+        # THE FILE RULE: a fully swept quant is deleted - no kv
+        # combination of it remains, it will never be needed again.
+        # The f16 stays (the quantization source); the gc deals with
+        # the f16s and any leftover.
+        if rung != "F16" and os.path.isfile(gguf):
+            os.remove(gguf)
+        _ACTIVE_FAMILY[0] = ""
+    return records
+
+
+def _run_combo(
+    fam: str,
+    rung: str,
+    k_quant: str,
+    v_quant: str,
+    gguf: str,
+    ctx: int,
+    models_dir: str,
+    port: int,
+    entropy_get: Any,
+) -> dict[str, Any]:
+    """One (k, v) combination of the pair's sweep: one exam, a
+    clock, a result. The exam seed (8 bits) serves EVERY level of
+    this candidate. The total run timeout is 128s: pass advances a
+    level, fail or timeout ends the run and records the reason and
+    the high score."""
+    t_start = time.monotonic()
+    exam_seed = entropy_get()
+
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
     answers_dir = os.path.join("results", "randomizer", fam)
     os.makedirs(answers_dir, exist_ok=True)
@@ -662,10 +686,6 @@ def run_candidate(
             level += 1
     finally:
         llama_server.stop_server(proc, port)
-        # the file rule: an F16 stays, a quant goes
-        if rung != "F16" and os.path.isfile(gguf):
-            os.remove(gguf)
-        _ACTIVE_FAMILY[0] = ""
 
     return {
         "fam": fam,
@@ -732,9 +752,10 @@ def main(on_progress: Any = None) -> None:
     _GC_POOL.extend(pool)
     assert len(pool) == 2048, len(pool)
     n_kv = len(KV_LADDER)
-    total = len(pool) * n_kv * n_kv
-    dead = len(oversized_models) * len(LADDER) * n_kv * n_kv
-    live = total - dead
+    total_pairs = len(pool)
+    dead_pairs = len(oversized_models) * len(LADDER)
+    live_pairs = total_pairs - dead_pairs
+    total = total_pairs * n_kv * n_kv  # candidates: pairs x 49 combos
 
     stop = threading.Event()
     gc_log: list[str] = []
@@ -761,6 +782,7 @@ def main(on_progress: Any = None) -> None:
         model, high score, quant @ high score, speed (fast <= 32s,
         medium <= 64s, slow <= 128s - the candidate's whole run)."""
         rows = [r for r in results if r.get("result") == "done"]
+        done_pairs = len(done)
         rows.sort(
             key=lambda r: (
                 -(r.get("high_score") or -1),
@@ -837,51 +859,44 @@ def main(on_progress: Any = None) -> None:
             )
         lines.append("")
         lines.append(
-            f"_{len(rows)} candidates run of {len(pool) * n_kv * n_kv:,}; "
-            "each one chance, the seed recorded in state._"
+            f"_{len(rows)} candidates run of {len(pool) * n_kv * n_kv:,} "
+            f"({len(done_pairs)} of {len(pool):,} pairs swept); "
+            "each pair one acquisition, the seed recorded in state._"
         )
         with open("md/randomizer.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
     print(
-        f"[randomizer] pool: {total:,} candidates "
-        f"({len(pool)} model x rung x {n_kv} k-quants x {n_kv} v-quants), "
+        f"[randomizer] pool: {total_pairs:,} (model, rung) pairs "
+        f"(each pick sweeps {n_kv} x {n_kv} = {n_kv * n_kv} kv combinations), "
         f"{len(oversized_models)} models pre-marked oversized from models.md "
-        f"({dead:,} dead indexes) - {live:,} live, ONE chance each"
+        f"({dead_pairs:,} dead pairs) - {live_pairs:,} live, ONE chance each"
     )
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
     print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
-    while len(done) < total:
-        # the pick, v2: 22 bits = 11 model + 5 model-quant + 3 k + 3 v.
-        # The 11-bit draw is the pool index: every index is valid and
-        # uniform over the 64 families (32 indexes per family); the
-        # pair's rung component is IGNORED - the model-quant comes from
-        # the 5-bit draw over LADDER. The done-key is the CANDIDATE,
-        # packed fam(6) rung(5) k(3) v(3): one chance per tuple, so
-        # two picks landing on the same tuple re-draw.
+    while len(done) < len(pool):
+        # the pick, v3: 16 bits = 11 model index + 5 model-quant. The
+        # 11-bit draw is the pool index (uniform over the 64
+        # families); the rung comes from the 5-bit draw over LADDER.
+        # The done-key is the PAIR, the pool index of the (fam, rung)
+        # combination: one chance per pair, and a pick that re-draws
+        # an already-swept pair re-draws with fresh entropy.
         pick = entropy_bits(PICK_BITS)
         model_idx = pick & 0x7FF
         rung_idx = (pick >> 11) & 0x1F
-        k_idx = (pick >> 16) & 0x7
-        v_idx = (pick >> 19) & 0x7
-        if k_idx >= n_kv or v_idx >= n_kv:
-            continue  # the unused tail of the 3-bit space: re-draw
-        fam = pool[model_idx][0]
-        fam_pos = model_idx // 32
-        cand = (fam_pos << 11) | (rung_idx << 6) | (k_idx << 3) | v_idx
-        key = f"{cand}"
+        fam, _pool_rung = pool[model_idx]
+        pair_key = model_idx * 32 + rung_idx
+        key = f"{pair_key}"
         if key in done:
-            continue  # already had its chance: fresh entropy, re-draw
+            continue  # the pair already had its chance: re-draw
         rung = LADDER[rung_idx]
-        k_quant = KV_LADDER[k_idx]
-        v_quant = KV_LADDER[v_idx]
         print(
-            f"[randomizer] #{n + 1} pick=0b{pick:022b} "
-            f"-> {fam} {rung} k={k_quant} v={v_quant}"
+            f"[randomizer] #{n + 1} pick=0b{pick:016b} "
+            f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
         )
-        rec = run_candidate(fam, rung, k_quant, v_quant, models_dir, state, state_file, port)
-        results.append(rec)
+        recs = run_pair(fam, rung, models_dir, state, port)
+        results.extend(recs)
         done.add(key)
         _GC_DONE_SET.add(key)
         state["done"] = sorted(done)
@@ -891,19 +906,21 @@ def main(on_progress: Any = None) -> None:
         write_ledger()
         while gc_log:
             print(gc_log.pop(0))
+        done_recs = [r for r in recs if r.get("result") == "done"]
+        best = max((r.get("high_score") or -1 for r in done_recs), default=None)
         summary = (
-            f"high_score={rec.get('high_score')}"
-            if rec.get("result") == "done"
-            else rec.get("result", "?")
+            f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
+            if done_recs
+            else recs[0].get("result", "?")
         )
-        print(f"[randomizer]   -> {summary} ({rec.get('fail_reason', '')})")
+        print(f"[randomizer]   -> {summary}")
         n += 1
         if on_progress is not None and n % COMMIT_EVERY == 0:
             try:
                 on_progress(n)
             except Exception as e:
                 print(f"[randomizer] progress push failed (ignored): {e}")
-    print(f"[randomizer] the pool is drained: {len(done)} candidates, one chance each - complete")
+    print(f"[randomizer] the pool is drained: {len(done)} pairs, one chance each - complete")
 
 
 if __name__ == "__main__":

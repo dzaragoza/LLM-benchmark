@@ -3,10 +3,11 @@
 walk is retired; the randomizer is the benchmark).
 
 One command: python full_benchmark.py --task randomize. The pool is
-v2: (model, model-quant, k_quant, v_quant) - 64 models x 32 rungs
-x 7 k-quants x 7 v-quants = 100,352 candidates; every pick is 22
-bits of real entropy, ONE chance per candidate, a fresh 8-bit exam
-seed per candidate, a 128s timer per level, results only.
+v3: (model, model-quant) pairs - 64 models x 32 rungs = 2,048
+pairs; every pick is 16 bits of real entropy, ONE chance per pair,
+and the pick sweeps all 49 (k, v) cache-quant combinations in one
+acquisition (a fresh 8-bit exam seed each, a 128s timer per
+level), results only.
 
 The envelope owns what the randomizer must never worry about: the
 requirements check, the git pull/push rail, the crash commit, the
@@ -170,7 +171,7 @@ def preflight_selfcheck() -> None:
     total = len(pool) * n_kv * n_kv
     assert len(pool) == 2048, f"the model pool must be 2048 pairs, got {len(pool)}"
     assert n_kv == 7, f"the KV ladder must be 7 quants, got {n_kv}"
-    assert R.PICK_BITS == 22, "the pick must be 22 bits in v2"
+    assert R.PICK_BITS == 16, "the pick must be 16 bits in v3"
     fams = {f for f, _ in pool}
     assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
     assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
