@@ -756,7 +756,6 @@ def main(on_progress: Any = None) -> None:
     total_pairs = len(pool)
     dead_pairs = len(oversized_models) * len(LADDER)
     live_pairs = total_pairs - dead_pairs
-    total = total_pairs * n_kv * n_kv  # candidates: pairs x 49 combos
 
     stop = threading.Event()
     gc_log: list[str] = []
@@ -802,13 +801,13 @@ def main(on_progress: Any = None) -> None:
             m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
             if m:
                 fam_meta[m.group(1).strip()] = float(m.group(2))
-        k = max(1, len(rows) * 5 // 100)
+        k = min(3, len(rows)) if rows else 0
         top = rows[:k]
         t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
         t_times = [r["high_score_time_s"] for r in top if r.get("high_score_time_s") is not None]
         t_scores = [r.get("high_score") or -1 for r in top]
         lines = ["# randomizer.md - the randomizer ledger", ""]
-        lines.append("## the top 5% dashboard")
+        lines.append("## the top 3 dashboard")
         lines.append("")
         lines.append(f"- measured: {len(rows)} done candidates, top {k} ({k} of {len(rows)})")
         if t_params:
