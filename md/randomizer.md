@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 736 done candidates, top 3 score levels (5 candidates of 736, ties included)
+- measured: 737 done candidates, top 3 score levels (5 candidates of 737, ties included)
 - params median: **3.403 B**
 - model_quant mode: **Q6_K**
 - k_quant mode: **q5_1**
@@ -756,5 +756,6 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 734 | Qwen3.5-0.8B | -1 | IQ3_S | q5_1 | q4_1 | 1.74 | 262,144 | slow |
 | 735 | Qwen3.5-0.8B | -1 | IQ3_S | q5_1 | q5_0 | 1.79 | 262,144 | slow |
 | 736 | Qwen3.5-0.8B | -1 | IQ3_S | q5_1 | q5_1 | 1.83 | 262,144 | slow |
+| 737 | phi-2 | -1 | IQ1_M | f16 | f16 | 1.32 | 2,048 | medium |
 
-_736 candidates run of 100,352 (16 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_737 candidates run of 100,352 (17 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
