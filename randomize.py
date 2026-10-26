@@ -537,6 +537,26 @@ def _run_combo(
     attempts: list[dict[str, Any]] = []
     try:
         if not healthy or not llama_server.wait_healthy(port, proc=proc):
+            # THE DIAGNOSIS rides the record (the phi-2 lesson: a
+            # quantized KV cache needs head_dim divisible by 32 -
+            # 'K cache type q4_0 with block size 32 does not divide
+            # n_embd_head_k=80' - an architecture verdict, not a
+            # device-fit one; the ledger must tell them apart)
+            diag = ""
+            try:
+                with open(log_path, errors="replace") as fh:
+                    errs = [
+                        ln.strip()
+                        for ln in fh
+                        if (" E " in ln or "device lost" in ln.lower())
+                        and any(
+                            w in ln.lower()
+                            for w in ("failed", "error", "does not divide", "device lost")
+                        )
+                    ]
+                diag = errs[-1][-200:] if errs else ""
+            except OSError:
+                pass
             return {
                 "fam": fam,
                 "rung": rung,
@@ -544,6 +564,7 @@ def _run_combo(
                 "v_quant": v_quant,
                 "seed": exam_seed,
                 "result": "server_failed",
+                "detail": diag,
             }
         # THE RAM + SETTLED-CONTEXT DATUMS: llama-server's own
         # numbers. ctx 0 (load from model) lets the server AUTO-SHRINK
