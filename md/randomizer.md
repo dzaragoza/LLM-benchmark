@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 589 done candidates, top 3 score levels (56 candidates of 589, ties included)
+- measured: 638 done candidates, top 3 score levels (56 candidates of 638, ties included)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
 - k_quant mode: **q5_1**
@@ -609,5 +609,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 587 | granite-4.0-350m | -1 | IQ1_S | q5_1 | iq4_nl | 0.45 | 32,768 | slow |
 | 588 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q5_0 | 0.48 | 32,768 | fast |
 | 589 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q5_1 | 0.49 | 32,768 | fast |
+| 590 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | f16 | 1.46 | 1,048,576 | fast |
+| 591 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | q8_0 | 1.46 | 1,048,576 | fast |
+| 592 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | q4_0 | 1.46 | 1,048,576 | fast |
+| 593 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | q4_1 | 1.46 | 1,048,576 | fast |
+| 594 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 595 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | q5_0 | 1.46 | 1,048,576 | fast |
+| 596 | RWKV7-World-2.9B | -1 | IQ3_M | f16 | q5_1 | 1.46 | 1,048,576 | fast |
+| 597 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | f16 | 1.46 | 1,048,576 | fast |
+| 598 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | q8_0 | 1.46 | 1,048,576 | fast |
+| 599 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | q4_0 | 1.46 | 1,048,576 | fast |
+| 600 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | q4_1 | 1.46 | 1,048,576 | fast |
+| 601 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 602 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | q5_0 | 1.46 | 1,048,576 | fast |
+| 603 | RWKV7-World-2.9B | -1 | IQ3_M | q8_0 | q5_1 | 1.46 | 1,048,576 | fast |
+| 604 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | f16 | 1.46 | 1,048,576 | fast |
+| 605 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | q8_0 | 1.46 | 1,048,576 | fast |
+| 606 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | q4_0 | 1.46 | 1,048,576 | fast |
+| 607 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | q4_1 | 1.46 | 1,048,576 | fast |
+| 608 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 609 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | q5_0 | 1.46 | 1,048,576 | fast |
+| 610 | RWKV7-World-2.9B | -1 | IQ3_M | q4_0 | q5_1 | 1.46 | 1,048,576 | fast |
+| 611 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | f16 | 1.46 | 1,048,576 | fast |
+| 612 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | q8_0 | 1.46 | 1,048,576 | fast |
+| 613 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | q4_0 | 1.46 | 1,048,576 | fast |
+| 614 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | q4_1 | 1.46 | 1,048,576 | fast |
+| 615 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 616 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | q5_0 | 1.46 | 1,048,576 | fast |
+| 617 | RWKV7-World-2.9B | -1 | IQ3_M | q4_1 | q5_1 | 1.46 | 1,048,576 | fast |
+| 618 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | f16 | 1.46 | 1,048,576 | fast |
+| 619 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | q8_0 | 1.46 | 1,048,576 | fast |
+| 620 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | q4_0 | 1.46 | 1,048,576 | fast |
+| 621 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | q4_1 | 1.46 | 1,048,576 | fast |
+| 622 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | iq4_nl | 1.46 | 1,048,576 | fast |
+| 623 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | q5_0 | 1.46 | 1,048,576 | fast |
+| 624 | RWKV7-World-2.9B | -1 | IQ3_M | iq4_nl | q5_1 | 1.46 | 1,048,576 | fast |
+| 625 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | f16 | 1.46 | 1,048,576 | fast |
+| 626 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | q8_0 | 1.46 | 1,048,576 | fast |
+| 627 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | q4_0 | 1.46 | 1,048,576 | fast |
+| 628 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | q4_1 | 1.46 | 1,048,576 | fast |
+| 629 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 630 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | q5_0 | 1.46 | 1,048,576 | fast |
+| 631 | RWKV7-World-2.9B | -1 | IQ3_M | q5_0 | q5_1 | 1.46 | 1,048,576 | fast |
+| 632 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | f16 | 1.46 | 1,048,576 | fast |
+| 633 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | q8_0 | 1.46 | 1,048,576 | fast |
+| 634 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | q4_0 | 1.46 | 1,048,576 | fast |
+| 635 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | q4_1 | 1.46 | 1,048,576 | fast |
+| 636 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | iq4_nl | 1.46 | 1,048,576 | fast |
+| 637 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | q5_0 | 1.46 | 1,048,576 | fast |
+| 638 | RWKV7-World-2.9B | -1 | IQ3_M | q5_1 | q5_1 | 1.46 | 1,048,576 | fast |
 
-_589 candidates run of 100,352 (13 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_638 candidates run of 100,352 (14 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
