@@ -512,4 +512,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 490 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_0 | 2.06 | 262,144 | slow |
 | 491 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_1 | 2.06 | 262,144 | slow |
 
-_491 candidates run of 100,352 (15 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_491 candidates run of 100,352 (16 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
