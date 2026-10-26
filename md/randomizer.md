@@ -2,7 +2,7 @@
 
 ## the top 5% dashboard
 
-- measured: 392 done candidates, top 19 (19 of 392)
+- measured: 393 done candidates, top 19 (19 of 393)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
 - k_quant mode: **q8_0**
@@ -412,5 +412,6 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 390 | granite-4.0-350m | -1 | IQ3_XXS | q5_1 | iq4_nl | 0.49 | 32,768 | fast |
 | 391 | granite-4.0-350m | -1 | IQ3_XXS | q5_1 | q5_0 | 0.52 | 32,768 | fast |
 | 392 | granite-4.0-350m | -1 | IQ3_XXS | q5_1 | q5_1 | 0.53 | 32,768 | fast |
+| 393 | phi-2 | -1 | Q4_1 | f16 | f16 | 2.25 | 2,048 | medium |
 
-_392 candidates run of 100,352 (9 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_393 candidates run of 100,352 (10 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
