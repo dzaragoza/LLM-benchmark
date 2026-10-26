@@ -2,14 +2,14 @@
 
 ## the top 5% dashboard
 
-- measured: 393 done candidates, top 19 (19 of 393)
+- measured: 442 done candidates, top 22 (22 of 442)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
 - k_quant mode: **q8_0**
-- v_quant mode: **q4_1**
-- high-score level time median: **8.9s**
+- v_quant mode: **f16**
+- high-score level time median: **9.4s**
 - score median: **2**
-- vulkan0 ram median: **2.01 GiB**
+- vulkan0 ram median: **2.02 GiB**
 - context median: **8,192**
 
 _the machine sweet-spot band, live as the pool fills_
@@ -413,5 +413,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 391 | granite-4.0-350m | -1 | IQ3_XXS | q5_1 | q5_0 | 0.52 | 32,768 | fast |
 | 392 | granite-4.0-350m | -1 | IQ3_XXS | q5_1 | q5_1 | 0.53 | 32,768 | fast |
 | 393 | phi-2 | -1 | Q4_1 | f16 | f16 | 2.25 | 2,048 | medium |
+| 394 | MiniCPM4-0.5B | -1 | F16 | f16 | f16 | 1.25 | 32,768 | fast |
+| 395 | MiniCPM4-0.5B | -1 | F16 | f16 | q8_0 | 1.16 | 32,768 | fast |
+| 396 | MiniCPM4-0.5B | -1 | F16 | f16 | q4_0 | 1.11 | 32,768 | fast |
+| 397 | MiniCPM4-0.5B | -1 | F16 | f16 | q4_1 | 1.12 | 32,768 | fast |
+| 398 | MiniCPM4-0.5B | -1 | F16 | f16 | iq4_nl | 1.11 | 32,768 | fast |
+| 399 | MiniCPM4-0.5B | -1 | F16 | f16 | q5_0 | 1.12 | 32,768 | fast |
+| 400 | MiniCPM4-0.5B | -1 | F16 | f16 | q5_1 | 1.13 | 32,768 | fast |
+| 401 | MiniCPM4-0.5B | -1 | F16 | q8_0 | f16 | 1.16 | 32,768 | fast |
+| 402 | MiniCPM4-0.5B | -1 | F16 | q8_0 | q8_0 | 1.07 | 32,768 | fast |
+| 403 | MiniCPM4-0.5B | -1 | F16 | q8_0 | q4_0 | 1.02 | 32,768 | fast |
+| 404 | MiniCPM4-0.5B | -1 | F16 | q8_0 | q4_1 | 1.03 | 32,768 | fast |
+| 405 | MiniCPM4-0.5B | -1 | F16 | q8_0 | iq4_nl | 1.02 | 32,768 | fast |
+| 406 | MiniCPM4-0.5B | -1 | F16 | q8_0 | q5_0 | 1.03 | 32,768 | fast |
+| 407 | MiniCPM4-0.5B | -1 | F16 | q8_0 | q5_1 | 1.04 | 32,768 | fast |
+| 408 | MiniCPM4-0.5B | -1 | F16 | q4_0 | f16 | 1.11 | 32,768 | fast |
+| 409 | MiniCPM4-0.5B | -1 | F16 | q4_0 | q8_0 | 1.02 | 32,768 | fast |
+| 410 | MiniCPM4-0.5B | -1 | F16 | q4_0 | q4_0 | 0.97 | 32,768 | slow |
+| 411 | MiniCPM4-0.5B | -1 | F16 | q4_0 | q4_1 | 0.98 | 32,768 | fast |
+| 412 | MiniCPM4-0.5B | -1 | F16 | q4_0 | iq4_nl | 0.97 | 32,768 | fast |
+| 413 | MiniCPM4-0.5B | -1 | F16 | q4_0 | q5_0 | 0.99 | 32,768 | fast |
+| 414 | MiniCPM4-0.5B | -1 | F16 | q4_0 | q5_1 | 0.99 | 32,768 | fast |
+| 415 | MiniCPM4-0.5B | -1 | F16 | q4_1 | f16 | 1.12 | 32,768 | fast |
+| 416 | MiniCPM4-0.5B | -1 | F16 | q4_1 | q8_0 | 1.03 | 32,768 | fast |
+| 417 | MiniCPM4-0.5B | -1 | F16 | q4_1 | q4_0 | 0.98 | 32,768 | fast |
+| 418 | MiniCPM4-0.5B | -1 | F16 | q4_1 | q4_1 | 0.99 | 32,768 | fast |
+| 419 | MiniCPM4-0.5B | -1 | F16 | q4_1 | iq4_nl | 0.98 | 32,768 | fast |
+| 420 | MiniCPM4-0.5B | -1 | F16 | q4_1 | q5_0 | 0.99 | 32,768 | fast |
+| 421 | MiniCPM4-0.5B | -1 | F16 | q4_1 | q5_1 | 1.00 | 32,768 | fast |
+| 422 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | f16 | 1.11 | 32,768 | slow |
+| 423 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | q8_0 | 1.02 | 32,768 | fast |
+| 424 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | q4_0 | 0.97 | 32,768 | fast |
+| 425 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | q4_1 | 0.98 | 32,768 | fast |
+| 426 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | iq4_nl | 0.97 | 32,768 | fast |
+| 427 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | q5_0 | 0.99 | 32,768 | fast |
+| 428 | MiniCPM4-0.5B | -1 | F16 | iq4_nl | q5_1 | 0.99 | 32,768 | fast |
+| 429 | MiniCPM4-0.5B | -1 | F16 | q5_0 | f16 | 1.12 | 32,768 | fast |
+| 430 | MiniCPM4-0.5B | -1 | F16 | q5_0 | q8_0 | 1.03 | 32,768 | fast |
+| 431 | MiniCPM4-0.5B | -1 | F16 | q5_0 | q4_0 | 0.99 | 32,768 | fast |
+| 432 | MiniCPM4-0.5B | -1 | F16 | q5_0 | q4_1 | 0.99 | 32,768 | slow |
+| 433 | MiniCPM4-0.5B | -1 | F16 | q5_0 | iq4_nl | 0.99 | 32,768 | fast |
+| 434 | MiniCPM4-0.5B | -1 | F16 | q5_0 | q5_0 | 1.00 | 32,768 | fast |
+| 435 | MiniCPM4-0.5B | -1 | F16 | q5_0 | q5_1 | 1.00 | 32,768 | fast |
+| 436 | MiniCPM4-0.5B | -1 | F16 | q5_1 | f16 | 1.13 | 32,768 | fast |
+| 437 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q8_0 | 1.04 | 32,768 | fast |
+| 438 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q4_0 | 0.99 | 32,768 | fast |
+| 439 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q4_1 | 1.00 | 32,768 | fast |
+| 440 | MiniCPM4-0.5B | -1 | F16 | q5_1 | iq4_nl | 0.99 | 32,768 | fast |
+| 441 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q5_0 | 1.00 | 32,768 | fast |
+| 442 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q5_1 | 1.01 | 32,768 | fast |
 
-_393 candidates run of 100,352 (11 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_442 candidates run of 100,352 (12 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
