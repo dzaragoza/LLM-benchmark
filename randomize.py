@@ -338,13 +338,12 @@ _ACTIVE_FAMILY: list[str] = [""]
 _GC_DONE_SET: set[str] = set()
 _GC_POOL: list[tuple[str, str]] = []
 
-# the f16 family-kill threshold (the author's extra-safety ruling):
-# an f16 > 8 GiB kills the whole model - stricter than the 16 GiB
-# per-candidate limit, because the f16 is the quantization SOURCE
+# the f16 family-kill threshold (the author's ruling): an f16 >
+# 16 GiB kills the whole model - the f16 is the quantization SOURCE
 # (every rung of the family is built from it, so the family's peak
-# disk cost scales with the f16, and 8 GiB of source means ~8+ GiB
-# of transient quant output on top)
-F16_LIMIT_GIB = 8.0
+# disk cost scales with the f16, and 16 GiB of source means ~16+
+# GiB of transient quant output on top)
+F16_LIMIT_GIB = 16.0
 
 # the IQ upper bound (the author's question): the IQ rungs (IQ* in
 # the LADDER) need an importance matrix, and llama-imatrix LOADS the
@@ -467,8 +466,13 @@ def run_pair(
             for v_quant in KV_LADDER
         ]
 
+    # TOO LARGE = A SKIP, NOT A RECORD (the author's ruling): the
+    # pre-download detection is the pool's oversized mark (the
+    # md/models.md f16 column, checked before any download); the
+    # in-run gates mark the family and return EMPTY - the pair is
+    # dead, the pick loop moves on, no result is ever recorded
     if fam in oversized_models:
-        return _fail_all("too_large")
+        return []
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
         # the acquire path printed the specific failure; the records
@@ -482,11 +486,11 @@ def run_pair(
     if os.path.isfile(f16_path) and (os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB):
         oversized_models.add(fam)
         shutil.rmtree(famdir, ignore_errors=True)
-        return _fail_all("too_large")
-    if _size_too_large(gguf):
+        return []
+    if _size_too_large(gguf, F16_LIMIT_GIB):
         if rung != "F16":
             os.remove(gguf)
-        return _fail_all("too_large")
+        return []
 
     # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from the model, so the
@@ -894,8 +898,13 @@ def main(on_progress: Any = None) -> None:
         pick = entropy_bits(PICK_BITS)
         model_idx = pick & 0x7FF
         rung_idx = (pick >> 11) & 0x1F
-        fam, _pool_rung = pool[model_idx]
-        pair_key = model_idx * 32 + rung_idx
+        fam = pool[model_idx][0]
+        # THE PAIR KEY IS THE POOL INDEX of the (fam, rung) actually
+        # evaluated: fam_pos = model_idx // 32 (the pool is fam-major,
+        # 32 rungs per family), so the key space is 0..2047 - the
+        # same space the gc and the drain condition count in
+        fam_pos = model_idx // 32
+        pair_key = fam_pos * 32 + rung_idx
         key = f"{pair_key}"
         if key in done:
             continue  # the pair already had its chance: re-draw
@@ -915,14 +924,18 @@ def main(on_progress: Any = None) -> None:
         write_ledger()
         while gc_log:
             print(gc_log.pop(0))
-        done_recs = [r for r in recs if r.get("result") == "done"]
-        best = max((r.get("high_score") or -1 for r in done_recs), default=None)
-        summary = (
-            f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
-            if done_recs
-            else recs[0].get("result", "?")
-        )
-        print(f"[randomizer]   -> {summary}")
+        if not recs:
+            # the too-large skip: dead pair, no records, nothing logged
+            print("[randomizer]   -> skipped (too large)")
+        else:
+            done_recs = [r for r in recs if r.get("result") == "done"]
+            best = max((r.get("high_score") or -1 for r in done_recs), default=None)
+            summary = (
+                f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
+                if done_recs
+                else recs[0].get("result", "?")
+            )
+            print(f"[randomizer]   -> {summary}")
         n += 1
         if on_progress is not None:
             try:
