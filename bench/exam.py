@@ -3,8 +3,7 @@
 The exam papers (chain follow + elevator, both parts per level),
 the prompts, the two bells (TOKEN: max_tokens = the window;
 TIME: the caller's deadline), the grader (ordered-subsequence),
-plus the paper-size and gate helpers the randomizer needs:
-bell_window and _size_too_large.
+and the paper-size helper the randomizer needs: bell_window.
 
 Everything is IDEMPOTENT and RESUMABLE; every attempt is logged with
 its full prompt and answer for debugging.
@@ -309,13 +308,3 @@ def bell_window(state: dict[str, Any], fam: str, models_dir: str = "models") -> 
         return window(repo, os.path.join(models_dir, fam))
     except Exception:
         return WINDOW_DEFAULT
-
-
-def _size_too_large(path: str, limit_gib: float = 8.0) -> bool:
-    """The SIZE gate helper: True when the file on DISK exceeds the
-    limit (default the randomizer's 8 GiB f16 family gate - the
-    v9.5 exam walk's own 16 GiB candidate cap is RETIRED, superseded
-    by the f16 gate: a model whose f16 fits 8 GiB cannot produce a
-    rung file anywhere near 16 GiB). No estimates - the measured
-    file size is the only truth."""
-    return os.path.getsize(path) / (1024**3) > limit_gib

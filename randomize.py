@@ -55,7 +55,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import sys
 import threading
 import time
@@ -124,19 +123,16 @@ def the_pool() -> list[tuple[str, str]]:
     pick space. One chance per pair; the pick sweeps all 49 kv
     combinations, so the pool of CANDIDATES is 2048 x 49 = 100,352.
 
-    THE OVERSIZED PRE-MARK (the author's simplification): the f16
-    size lives in md/models.md (the f16 (GiB) column, params x 2
-    bytes) - at startup every model whose f16 exceeds the 8 GiB
-    family-kill limit is marked oversized IMMEDIATELY, from the
-    table alone: no download, no conversion, no measurement. The
-    gate's discovery cost drops from up to 10 acquisitions to one
-    table read."""
+    NO SIZE GATE (the author's ruling): every pair is live - the
+    f16 table column stays in md/models.md for the ledger's
+    reference, but no model is pre-marked dead. A candidate too
+    large for the device dies at the llama-server launch, its
+    honest recorded verdict: server_failed - the server auto-shrinks
+    the context to fit when it can, and fails outright when it
+    cannot."""
     roster = roster_from_models_md()
     pool: list[tuple[str, str]] = []
     for fam, _repo in roster:
-        f16_gib = _f16_gib_from_models_md(fam)
-        if f16_gib is not None and f16_gib > F16_LIMIT_GIB:
-            oversized_models.add(fam)
         for rung in LADDER:
             pool.append((fam, rung))
     return pool
@@ -338,28 +334,11 @@ _ACTIVE_FAMILY: list[str] = [""]
 _GC_DONE_SET: set[str] = set()
 _GC_POOL: list[tuple[str, str]] = []
 
-# the f16 family-kill threshold (the author's ruling): an f16 >
-# 16 GiB kills the whole model - the f16 is the quantization SOURCE
-# (every rung of the family is built from it, so the family's peak
-# disk cost scales with the f16, and 16 GiB of source means ~16+
-# GiB of transient quant output on top)
-F16_LIMIT_GIB = 16.0
-
-# the IQ upper bound (the author's question): the IQ rungs (IQ* in
-# the LADDER) need an importance matrix, and llama-imatrix LOADS the
-# f16 plus KV + activation working set on the calibration corpus -
-# its peak RAM is the f16 plus overhead. A model killed by the f16
-# gate can therefore still be saved for its IQ rungs ONLY if the
-# imatrix peak fits; but with the f16 > 8 GiB the imatrix peak is
-# > 8 GiB + overhead on a 32 GiB machine sharing RAM with the OS -
-# the f16 gate at 8 GiB already bounds the imatrix path safely
-# (8 + ~2 overhead < the 32 GiB machine's usable RAM). The IQ bound
-# is therefore the SAME 8 GiB f16 gate: no separate, looser bound.
-IQ_F16_LIMIT_GIB = F16_LIMIT_GIB
-
-# models whose f16 exceeded the hard limit: every candidate of the
-# family is too large by inheritance (the f16 is the quant source)
-oversized_models: set[str] = set()
+# NO SIZE LIMIT (the author's ruling): llama-server handles quants
+# too large for the device itself - it auto-shrinks the context to
+# fit (ctx 0 = load from model) or fails the launch, and the failed
+# launch is the candidate's honest recorded verdict (server_failed).
+# The disk gc keeps the models/ tree bounded regardless.
 
 # the LAST acquire failure's class + detail, set by _acquire below
 # (the record reads it; the console saw the print)
@@ -438,19 +417,11 @@ def run_pair(
     combination; the pair's quant file is deleted at the end (every
     kv combination of it has been exhausted - it will never be
     needed again; the gc deals with the f16s and any leftover)."""
-    from bench.exam import _size_too_large, bell_window
+    from bench.exam import bell_window
 
     exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
 
-    # THE 16 GiB HARD LIMIT (the author's ruling): an f16 > 16 GiB is
-    # TOO LARGE for the whole MODEL - every candidate of the family
-    # dies immediately (the f16 is the quantization SOURCE, so if the
-    # source itself is too large no rung can ever be built), the
-    # model folder is deleted at once, and the family is marked in
-    # the state so every LATER pick of any of its rungs resolves to
-    # too_large BEFORE acquiring - no download is ever paid for an
-    # oversized family again. This also shortens the pool.
     def _fail_all(result: str, detail: str = "") -> list[dict[str, Any]]:
         return [
             {
@@ -466,13 +437,6 @@ def run_pair(
             for v_quant in KV_LADDER
         ]
 
-    # TOO LARGE = A SKIP, NOT A RECORD (the author's ruling): the
-    # pre-download detection is the pool's oversized mark (the
-    # md/models.md f16 column, checked before any download); the
-    # in-run gates mark the family and return EMPTY - the pair is
-    # dead, the pick loop moves on, no result is ever recorded
-    if fam in oversized_models:
-        return []
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
         # the acquire path printed the specific failure; the records
@@ -481,16 +445,6 @@ def run_pair(
             _last_acquire_error.get("result", "acquire_failed"),
             _last_acquire_error.get("detail", ""),
         )
-    famdir = os.path.join(models_dir, fam)
-    f16_path = os.path.join(famdir, f"{fam}-f16.gguf")
-    if os.path.isfile(f16_path) and (os.path.getsize(f16_path) / (2**30) > F16_LIMIT_GIB):
-        oversized_models.add(fam)
-        shutil.rmtree(famdir, ignore_errors=True)
-        return []
-    if _size_too_large(gguf, F16_LIMIT_GIB):
-        if rung != "F16":
-            os.remove(gguf)
-        return []
 
     # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from the model, so the
@@ -749,8 +703,6 @@ def main(on_progress: Any = None) -> None:
         with open(state_file, encoding="utf-8") as fh:
             state = json.load(fh)
     results: list[dict[str, Any]] = state.setdefault("results", [])
-    # the oversized-f16 models persist across restarts
-    oversized_models.update(state.get("oversized", []))
 
     pool = the_pool()
     _GC_POOL.clear()
@@ -758,8 +710,6 @@ def main(on_progress: Any = None) -> None:
     assert len(pool) == 2048, len(pool)
     n_kv = len(KV_LADDER)
     total_pairs = len(pool)
-    dead_pairs = len(oversized_models) * len(LADDER)
-    live_pairs = total_pairs - dead_pairs
 
     stop = threading.Event()
     gc_log: list[str] = []
@@ -882,8 +832,7 @@ def main(on_progress: Any = None) -> None:
     print(
         f"[randomizer] pool: {total_pairs:,} (model, rung) pairs "
         f"(each pick sweeps {n_kv} x {n_kv} = {n_kv * n_kv} kv combinations), "
-        f"{len(oversized_models)} models pre-marked oversized from models.md "
-        f"({dead_pairs:,} dead pairs) - {live_pairs:,} live, ONE chance each"
+        f"no size gate - llama-server decides at launch, ONE chance each"
     )
     print(f"[randomizer] entropy: {_ENTROPY_DEV}")
     print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
@@ -918,24 +867,19 @@ def main(on_progress: Any = None) -> None:
         done.add(key)
         _GC_DONE_SET.add(key)
         state["done"] = sorted(done)
-        state["oversized"] = sorted(oversized_models)
         state["results"] = results[-5000:]  # the state stays bounded
         _state_store.save_state(state_file, state)
         write_ledger()
         while gc_log:
             print(gc_log.pop(0))
-        if not recs:
-            # the too-large skip: dead pair, no records, nothing logged
-            print("[randomizer]   -> skipped (too large)")
-        else:
-            done_recs = [r for r in recs if r.get("result") == "done"]
-            best = max((r.get("high_score") or -1 for r in done_recs), default=None)
-            summary = (
-                f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
-                if done_recs
-                else recs[0].get("result", "?")
-            )
-            print(f"[randomizer]   -> {summary}")
+        done_recs = [r for r in recs if r.get("result") == "done"]
+        best = max((r.get("high_score") or -1 for r in done_recs), default=None)
+        summary = (
+            f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
+            if done_recs
+            else recs[0].get("result", "?")
+        )
+        print(f"[randomizer]   -> {summary}")
         n += 1
         if on_progress is not None:
             try:
