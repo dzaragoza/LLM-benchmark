@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 540 done candidates, top 3 score levels (56 candidates of 540, ties included)
+- measured: 589 done candidates, top 3 score levels (56 candidates of 589, ties included)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
 - k_quant mode: **q5_1**
@@ -560,5 +560,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 538 | gemma-3-4b-it | -1 | IQ3_M | q5_1 | q8_0 | 3.26 | 131,072 | slow |
 | 539 | gemma-3-4b-it | -1 | IQ3_M | q5_1 | q4_1 | 2.97 | 131,072 | slow |
 | 540 | gemma-3-4b-it | -1 | IQ3_M | q5_1 | q5_1 | 3.06 | 131,072 | slow |
+| 541 | granite-4.0-350m | -1 | IQ1_S | f16 | f16 | 1.04 | 32,768 | slow |
+| 542 | granite-4.0-350m | -1 | IQ1_S | f16 | q8_0 | 0.84 | 32,768 | fast |
+| 543 | granite-4.0-350m | -1 | IQ1_S | f16 | q4_0 | 0.73 | 32,768 | fast |
+| 544 | granite-4.0-350m | -1 | IQ1_S | f16 | q4_1 | 0.74 | 32,768 | medium |
+| 545 | granite-4.0-350m | -1 | IQ1_S | f16 | iq4_nl | 0.73 | 32,768 | fast |
+| 546 | granite-4.0-350m | -1 | IQ1_S | f16 | q5_0 | 0.76 | 32,768 | slow |
+| 547 | granite-4.0-350m | -1 | IQ1_S | f16 | q5_1 | 0.77 | 32,768 | fast |
+| 548 | granite-4.0-350m | -1 | IQ1_S | q8_0 | f16 | 0.84 | 32,768 | fast |
+| 549 | granite-4.0-350m | -1 | IQ1_S | q8_0 | q8_0 | 0.63 | 32,768 | fast |
+| 550 | granite-4.0-350m | -1 | IQ1_S | q8_0 | q4_0 | 0.52 | 32,768 | slow |
+| 551 | granite-4.0-350m | -1 | IQ1_S | q8_0 | q4_1 | 0.53 | 32,768 | fast |
+| 552 | granite-4.0-350m | -1 | IQ1_S | q8_0 | iq4_nl | 0.52 | 32,768 | fast |
+| 553 | granite-4.0-350m | -1 | IQ1_S | q8_0 | q5_0 | 0.55 | 32,768 | slow |
+| 554 | granite-4.0-350m | -1 | IQ1_S | q8_0 | q5_1 | 0.56 | 32,768 | fast |
+| 555 | granite-4.0-350m | -1 | IQ1_S | q4_0 | f16 | 0.73 | 32,768 | fast |
+| 556 | granite-4.0-350m | -1 | IQ1_S | q4_0 | q8_0 | 0.52 | 32,768 | fast |
+| 557 | granite-4.0-350m | -1 | IQ1_S | q4_0 | q4_0 | 0.41 | 32,768 | fast |
+| 558 | granite-4.0-350m | -1 | IQ1_S | q4_0 | q4_1 | 0.42 | 32,768 | fast |
+| 559 | granite-4.0-350m | -1 | IQ1_S | q4_0 | iq4_nl | 0.41 | 32,768 | fast |
+| 560 | granite-4.0-350m | -1 | IQ1_S | q4_0 | q5_0 | 0.44 | 32,768 | fast |
+| 561 | granite-4.0-350m | -1 | IQ1_S | q4_0 | q5_1 | 0.45 | 32,768 | fast |
+| 562 | granite-4.0-350m | -1 | IQ1_S | q4_1 | f16 | 0.74 | 32,768 | fast |
+| 563 | granite-4.0-350m | -1 | IQ1_S | q4_1 | q8_0 | 0.53 | 32,768 | medium |
+| 564 | granite-4.0-350m | -1 | IQ1_S | q4_1 | q4_0 | 0.42 | 32,768 | fast |
+| 565 | granite-4.0-350m | -1 | IQ1_S | q4_1 | q4_1 | 0.44 | 32,768 | fast |
+| 566 | granite-4.0-350m | -1 | IQ1_S | q4_1 | iq4_nl | 0.42 | 32,768 | fast |
+| 567 | granite-4.0-350m | -1 | IQ1_S | q4_1 | q5_0 | 0.45 | 32,768 | medium |
+| 568 | granite-4.0-350m | -1 | IQ1_S | q4_1 | q5_1 | 0.46 | 32,768 | fast |
+| 569 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | f16 | 0.73 | 32,768 | slow |
+| 570 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | q8_0 | 0.52 | 32,768 | medium |
+| 571 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | q4_0 | 0.41 | 32,768 | medium |
+| 572 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | q4_1 | 0.42 | 32,768 | fast |
+| 573 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | iq4_nl | 0.41 | 32,768 | fast |
+| 574 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | q5_0 | 0.44 | 32,768 | fast |
+| 575 | granite-4.0-350m | -1 | IQ1_S | iq4_nl | q5_1 | 0.45 | 32,768 | fast |
+| 576 | granite-4.0-350m | -1 | IQ1_S | q5_0 | f16 | 0.76 | 32,768 | slow |
+| 577 | granite-4.0-350m | -1 | IQ1_S | q5_0 | q8_0 | 0.55 | 32,768 | slow |
+| 578 | granite-4.0-350m | -1 | IQ1_S | q5_0 | q4_0 | 0.44 | 32,768 | fast |
+| 579 | granite-4.0-350m | -1 | IQ1_S | q5_0 | q4_1 | 0.45 | 32,768 | fast |
+| 580 | granite-4.0-350m | -1 | IQ1_S | q5_0 | iq4_nl | 0.44 | 32,768 | fast |
+| 581 | granite-4.0-350m | -1 | IQ1_S | q5_0 | q5_0 | 0.46 | 32,768 | medium |
+| 582 | granite-4.0-350m | -1 | IQ1_S | q5_0 | q5_1 | 0.48 | 32,768 | slow |
+| 583 | granite-4.0-350m | -1 | IQ1_S | q5_1 | f16 | 0.77 | 32,768 | fast |
+| 584 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q8_0 | 0.56 | 32,768 | fast |
+| 585 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q4_0 | 0.45 | 32,768 | slow |
+| 586 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q4_1 | 0.46 | 32,768 | fast |
+| 587 | granite-4.0-350m | -1 | IQ1_S | q5_1 | iq4_nl | 0.45 | 32,768 | slow |
+| 588 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q5_0 | 0.48 | 32,768 | fast |
+| 589 | granite-4.0-350m | -1 | IQ1_S | q5_1 | q5_1 | 0.49 | 32,768 | fast |
 
-_540 candidates run of 100,352 (12 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_589 candidates run of 100,352 (13 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
