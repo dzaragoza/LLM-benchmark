@@ -2,14 +2,14 @@
 
 ## the top 5% dashboard
 
-- measured: 442 done candidates, top 22 (22 of 442)
+- measured: 491 done candidates, top 24 (24 of 491)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
 - k_quant mode: **q8_0**
-- v_quant mode: **f16**
-- high-score level time median: **9.4s**
+- v_quant mode: **q4_1**
+- high-score level time median: **9.05s**
 - score median: **2**
-- vulkan0 ram median: **2.02 GiB**
+- vulkan0 ram median: **2.03 GiB**
 - context median: **8,192**
 
 _the machine sweet-spot band, live as the pool fills_
@@ -462,5 +462,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 440 | MiniCPM4-0.5B | -1 | F16 | q5_1 | iq4_nl | 0.99 | 32,768 | fast |
 | 441 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q5_0 | 1.00 | 32,768 | fast |
 | 442 | MiniCPM4-0.5B | -1 | F16 | q5_1 | q5_1 | 1.01 | 32,768 | fast |
+| 443 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | f16 | 2.22 | 262,144 | slow |
+| 444 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | q8_0 | 2.16 | 262,144 | slow |
+| 445 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | q4_0 | 2.13 | 262,144 | slow |
+| 446 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | q4_1 | 2.13 | 262,144 | slow |
+| 447 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | iq4_nl | 2.13 | 262,144 | slow |
+| 448 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | q5_0 | 2.14 | 262,144 | slow |
+| 449 | AI21-Jamba2-3B | -1 | Q4_0 | f16 | q5_1 | 2.14 | 262,144 | slow |
+| 450 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | f16 | 2.16 | 262,144 | slow |
+| 451 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | q8_0 | 2.10 | 262,144 | slow |
+| 452 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | q4_0 | 2.07 | 262,144 | slow |
+| 453 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | q4_1 | 2.07 | 262,144 | slow |
+| 454 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | iq4_nl | 2.07 | 262,144 | slow |
+| 455 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | q5_0 | 2.08 | 262,144 | slow |
+| 456 | AI21-Jamba2-3B | -1 | Q4_0 | q8_0 | q5_1 | 2.08 | 262,144 | slow |
+| 457 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | f16 | 2.13 | 262,144 | slow |
+| 458 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | q8_0 | 2.07 | 262,144 | slow |
+| 459 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | q4_0 | 2.04 | 262,144 | slow |
+| 460 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | q4_1 | 2.04 | 262,144 | slow |
+| 461 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | iq4_nl | 2.04 | 262,144 | slow |
+| 462 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | q5_0 | 2.05 | 262,144 | slow |
+| 463 | AI21-Jamba2-3B | -1 | Q4_0 | q4_0 | q5_1 | 2.05 | 262,144 | slow |
+| 464 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | f16 | 2.13 | 262,144 | slow |
+| 465 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | q8_0 | 2.07 | 262,144 | slow |
+| 466 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | q4_0 | 2.04 | 262,144 | slow |
+| 467 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | q4_1 | 2.05 | 262,144 | slow |
+| 468 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | iq4_nl | 2.04 | 262,144 | slow |
+| 469 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | q5_0 | 2.05 | 262,144 | slow |
+| 470 | AI21-Jamba2-3B | -1 | Q4_0 | q4_1 | q5_1 | 2.05 | 262,144 | slow |
+| 471 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | f16 | 2.13 | 262,144 | slow |
+| 472 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | q8_0 | 2.07 | 262,144 | slow |
+| 473 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | q4_0 | 2.04 | 262,144 | slow |
+| 474 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | q4_1 | 2.04 | 262,144 | slow |
+| 475 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | iq4_nl | 2.04 | 262,144 | slow |
+| 476 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | q5_0 | 2.05 | 262,144 | slow |
+| 477 | AI21-Jamba2-3B | -1 | Q4_0 | iq4_nl | q5_1 | 2.05 | 262,144 | slow |
+| 478 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | f16 | 2.14 | 262,144 | slow |
+| 479 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | q8_0 | 2.08 | 262,144 | slow |
+| 480 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | q4_0 | 2.05 | 262,144 | slow |
+| 481 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | q4_1 | 2.05 | 262,144 | slow |
+| 482 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | iq4_nl | 2.05 | 262,144 | slow |
+| 483 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | q5_0 | 2.05 | 262,144 | slow |
+| 484 | AI21-Jamba2-3B | -1 | Q4_0 | q5_0 | q5_1 | 2.06 | 262,144 | slow |
+| 485 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | f16 | 2.14 | 262,144 | slow |
+| 486 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q8_0 | 2.08 | 262,144 | slow |
+| 487 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q4_0 | 2.05 | 262,144 | slow |
+| 488 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q4_1 | 2.05 | 262,144 | slow |
+| 489 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | iq4_nl | 2.05 | 262,144 | slow |
+| 490 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_0 | 2.06 | 262,144 | slow |
+| 491 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_1 | 2.06 | 262,144 | slow |
 
-_442 candidates run of 100,352 (12 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_491 candidates run of 100,352 (13 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
