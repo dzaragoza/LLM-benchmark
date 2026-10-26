@@ -1,14 +1,14 @@
 # randomizer.md - the randomizer ledger
 
-## the top 5% dashboard
+## the top 3 dashboard
 
-- measured: 491 done candidates, top 24 (24 of 491)
+- measured: 491 done candidates, top 3 (3 of 491)
 - params median: **2.614 B**
 - model_quant mode: **IQ4_NL**
-- k_quant mode: **q8_0**
-- v_quant mode: **q4_1**
-- high-score level time median: **9.05s**
-- score median: **2**
+- k_quant mode: **q5_1**
+- v_quant mode: **q5_1**
+- high-score level time median: **10.9s**
+- score median: **3**
 - vulkan0 ram median: **2.03 GiB**
 - context median: **8,192**
 
@@ -512,4 +512,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 490 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_0 | 2.06 | 262,144 | slow |
 | 491 | AI21-Jamba2-3B | -1 | Q4_0 | q5_1 | q5_1 | 2.06 | 262,144 | slow |
 
-_491 candidates run of 100,352 (14 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_491 candidates run of 100,352 (15 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
