@@ -801,15 +801,24 @@ def main(on_progress: Any = None) -> None:
             m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
             if m:
                 fam_meta[m.group(1).strip()] = float(m.group(2))
-        k = min(3, len(rows)) if rows else 0
-        top = rows[:k]
+        # THE TOP 3 (the author's ruling): the three highest SCORE
+        # LEVELS, ties included - every candidate whose high_score is
+        # one of the three highest distinct scores (score 3, 2, 1
+        # when the best is 3; all the tied candidates of each level)
+        scores_desc = sorted({r.get("high_score") or -1 for r in rows}, reverse=True)
+        top_scores = set(scores_desc[:3])
+        top = [r for r in rows if (r.get("high_score") or -1) in top_scores]
+        k = len(top)
         t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
         t_times = [r["high_score_time_s"] for r in top if r.get("high_score_time_s") is not None]
         t_scores = [r.get("high_score") or -1 for r in top]
         lines = ["# randomizer.md - the randomizer ledger", ""]
         lines.append("## the top 3 dashboard")
         lines.append("")
-        lines.append(f"- measured: {len(rows)} done candidates, top {k} ({k} of {len(rows)})")
+        lines.append(
+            f"- measured: {len(rows)} done candidates, top 3 score levels "
+            f"({k} candidates of {len(rows)}, ties included)"
+        )
         if t_params:
             lines.append(f"- params median: **{_stats.median(t_params):g} B**")
         from collections import Counter as _C
