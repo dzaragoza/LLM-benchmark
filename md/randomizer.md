@@ -2,13 +2,13 @@
 
 ## the top 5% dashboard
 
-- measured: 98 done candidates, top 4 (4 of 98)
+- measured: 147 done candidates, top 7 (7 of 147)
 - params median: **0.3403 B**
 - model_quant mode: **Q2_K_S**
 - k_quant mode: **f16**
 - v_quant mode: **f16**
 - score median: **-1**
-- vulkan0 ram median: **4.03 GiB**
+- vulkan0 ram median: **3.87 GiB**
 - context median: **1,048,576**
 
 _the machine sweet-spot band, live as the pool fills_
@@ -117,5 +117,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 96 | MiniCPM5-1B | -1 | Q3_K_L | q5_1 | iq4_nl | 1.63 | 131,072 | slow |
 | 97 | MiniCPM5-1B | -1 | Q3_K_L | q5_1 | q5_0 | 1.73 | 131,072 | slow |
 | 98 | MiniCPM5-1B | -1 | Q3_K_L | q5_1 | q5_1 | 1.77 | 131,072 | slow |
+| 99 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | f16 | 10.73 | 131,072 | slow |
+| 100 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | q8_0 | 8.39 | 131,072 | slow |
+| 101 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | q4_0 | 7.14 | 131,072 | slow |
+| 102 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | q4_1 | 7.29 | 131,072 | slow |
+| 103 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | iq4_nl | 7.14 | 131,072 | slow |
+| 104 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | q5_0 | 7.45 | 131,072 | slow |
+| 105 | granite-3.1-2b-instruct | -1 | IQ1_S | f16 | q5_1 | 7.61 | 131,072 | slow |
+| 106 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | f16 | 8.39 | 131,072 | slow |
+| 107 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | q8_0 | 6.04 | 131,072 | slow |
+| 108 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | q4_0 | 4.79 | 131,072 | slow |
+| 109 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | q4_1 | 4.95 | 131,072 | slow |
+| 110 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | iq4_nl | 4.79 | 131,072 | slow |
+| 111 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | q5_0 | 5.11 | 131,072 | slow |
+| 112 | granite-3.1-2b-instruct | -1 | IQ1_S | q8_0 | q5_1 | 5.26 | 131,072 | slow |
+| 113 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | f16 | 7.14 | 131,072 | slow |
+| 114 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | q8_0 | 4.79 | 131,072 | slow |
+| 115 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | q4_0 | 3.54 | 131,072 | slow |
+| 116 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | q4_1 | 3.70 | 131,072 | slow |
+| 117 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | iq4_nl | 3.54 | 131,072 | slow |
+| 118 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | q5_0 | 3.85 | 131,072 | slow |
+| 119 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_0 | q5_1 | 4.01 | 131,072 | slow |
+| 120 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | f16 | 7.29 | 131,072 | slow |
+| 121 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | q8_0 | 4.95 | 131,072 | slow |
+| 122 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | q4_0 | 3.70 | 131,072 | slow |
+| 123 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | q4_1 | 3.85 | 131,072 | slow |
+| 124 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | iq4_nl | 3.70 | 131,072 | slow |
+| 125 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | q5_0 | 4.01 | 131,072 | slow |
+| 126 | granite-3.1-2b-instruct | -1 | IQ1_S | q4_1 | q5_1 | 4.17 | 131,072 | slow |
+| 127 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | f16 | 7.14 | 131,072 | slow |
+| 128 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | q8_0 | 4.79 | 131,072 | slow |
+| 129 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | q4_0 | 3.54 | 131,072 | slow |
+| 130 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | q4_1 | 3.70 | 131,072 | slow |
+| 131 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | iq4_nl | 3.54 | 131,072 | slow |
+| 132 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | q5_0 | 3.85 | 131,072 | slow |
+| 133 | granite-3.1-2b-instruct | -1 | IQ1_S | iq4_nl | q5_1 | 4.01 | 131,072 | slow |
+| 134 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | f16 | 7.45 | 131,072 | slow |
+| 135 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | q8_0 | 5.11 | 131,072 | slow |
+| 136 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | q4_0 | 3.85 | 131,072 | slow |
+| 137 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | q4_1 | 4.01 | 131,072 | slow |
+| 138 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | iq4_nl | 3.85 | 131,072 | slow |
+| 139 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | q5_0 | 4.17 | 131,072 | slow |
+| 140 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_0 | q5_1 | 4.32 | 131,072 | slow |
+| 141 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | f16 | 7.61 | 131,072 | slow |
+| 142 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | q8_0 | 5.26 | 131,072 | slow |
+| 143 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | q4_0 | 4.01 | 131,072 | slow |
+| 144 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | q4_1 | 4.17 | 131,072 | slow |
+| 145 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | iq4_nl | 4.01 | 131,072 | slow |
+| 146 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | q5_0 | 4.32 | 131,072 | slow |
+| 147 | granite-3.1-2b-instruct | -1 | IQ1_S | q5_1 | q5_1 | 4.48 | 131,072 | slow |
 
-_98 candidates run of 100,352 (3 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_147 candidates run of 100,352 (4 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
