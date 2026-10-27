@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 1129 done candidates, top 3 score levels (6 candidates of 1129, ties included)
+- measured: 1178 done candidates, top 3 score levels (6 candidates of 1178, ties included)
 - params median: **3.403 B**
 - model_quant mode: **Q6_K**
 - k_quant mode: **q5_1**
@@ -1149,5 +1149,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1127 | MiniCPM5-2B | -1 | IQ2_S | q5_1 | iq4_nl | 2.64 | 131,072 | slow |
 | 1128 | MiniCPM5-2B | -1 | IQ2_S | q5_1 | q5_0 | 2.81 | 131,072 | slow |
 | 1129 | MiniCPM5-2B | -1 | IQ2_S | q5_1 | q5_1 | 2.89 | 131,072 | slow |
+| 1130 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | f16 | 0.58 | 32,768 | slow |
+| 1131 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | q8_0 | 0.49 | 32,768 | slow |
+| 1132 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | q4_0 | 0.45 | 32,768 | slow |
+| 1133 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | q4_1 | 0.45 | 32,768 | slow |
+| 1134 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | iq4_nl | 0.45 | 32,768 | slow |
+| 1135 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | q5_0 | 0.46 | 32,768 | slow |
+| 1136 | MiniCPM4-0.5B | -1 | IQ2_XS | f16 | q5_1 | 0.47 | 32,768 | slow |
+| 1137 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | f16 | 0.49 | 32,768 | slow |
+| 1138 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | q8_0 | 0.41 | 32,768 | slow |
+| 1139 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | q4_0 | 0.36 | 32,768 | slow |
+| 1140 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | q4_1 | 0.37 | 32,768 | slow |
+| 1141 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | iq4_nl | 0.36 | 32,768 | slow |
+| 1142 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | q5_0 | 0.37 | 32,768 | slow |
+| 1143 | MiniCPM4-0.5B | -1 | IQ2_XS | q8_0 | q5_1 | 0.38 | 32,768 | slow |
+| 1144 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | f16 | 0.45 | 32,768 | slow |
+| 1145 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | q8_0 | 0.36 | 32,768 | slow |
+| 1146 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | q4_0 | 0.31 | 32,768 | slow |
+| 1147 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | q4_1 | 0.32 | 32,768 | slow |
+| 1148 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | iq4_nl | 0.31 | 32,768 | slow |
+| 1149 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | q5_0 | 0.33 | 32,768 | slow |
+| 1150 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_0 | q5_1 | 0.33 | 32,768 | slow |
+| 1151 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | f16 | 0.45 | 32,768 | slow |
+| 1152 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | q8_0 | 0.37 | 32,768 | slow |
+| 1153 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | q4_0 | 0.32 | 32,768 | slow |
+| 1154 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | q4_1 | 0.33 | 32,768 | slow |
+| 1155 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | iq4_nl | 0.32 | 32,768 | slow |
+| 1156 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | q5_0 | 0.33 | 32,768 | slow |
+| 1157 | MiniCPM4-0.5B | -1 | IQ2_XS | q4_1 | q5_1 | 0.34 | 32,768 | slow |
+| 1158 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | f16 | 0.45 | 32,768 | slow |
+| 1159 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | q8_0 | 0.36 | 32,768 | slow |
+| 1160 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | q4_0 | 0.31 | 32,768 | fast |
+| 1161 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | q4_1 | 0.32 | 32,768 | slow |
+| 1162 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | iq4_nl | 0.31 | 32,768 | slow |
+| 1163 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | q5_0 | 0.33 | 32,768 | slow |
+| 1164 | MiniCPM4-0.5B | -1 | IQ2_XS | iq4_nl | q5_1 | 0.33 | 32,768 | slow |
+| 1165 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | f16 | 0.46 | 32,768 | slow |
+| 1166 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | q8_0 | 0.37 | 32,768 | slow |
+| 1167 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | q4_0 | 0.33 | 32,768 | slow |
+| 1168 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | q4_1 | 0.33 | 32,768 | slow |
+| 1169 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | iq4_nl | 0.33 | 32,768 | slow |
+| 1170 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | q5_0 | 0.34 | 32,768 | slow |
+| 1171 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_0 | q5_1 | 0.34 | 32,768 | slow |
+| 1172 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | f16 | 0.47 | 32,768 | slow |
+| 1173 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q8_0 | 0.38 | 32,768 | slow |
+| 1174 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q4_0 | 0.33 | 32,768 | fast |
+| 1175 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q4_1 | 0.34 | 32,768 | slow |
+| 1176 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | iq4_nl | 0.33 | 32,768 | slow |
+| 1177 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q5_0 | 0.34 | 32,768 | slow |
+| 1178 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q5_1 | 0.35 | 32,768 | fast |
 
-_1129 candidates run of 100,352 (25 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1178 candidates run of 100,352 (26 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
