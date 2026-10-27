@@ -1377,4 +1377,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1355 | gemma-3-27b-it | -1 | Q2_K | q5_1 | q5_1 | 14.05 | 131,072 | slow |
 | 1356 | Mistral-Nemo-Instruct-2407 | -1 | Q2_K | f16 | q8_0 | 4.85 | 82,176 | fast |
 
-_1356 candidates run of 100,352 (45 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1356 candidates run of 100,352 (46 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
