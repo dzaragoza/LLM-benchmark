@@ -1427,4 +1427,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1405 | Mistral-Nemo-Instruct-2407 | -1 | Q5_1 | iq4_nl | iq4_nl | 8.41 | 122,880 | slow |
 | 1406 | Mistral-Nemo-Instruct-2407 | -1 | Q5_1 | iq4_nl | q5_0 | 8.43 | 110,848 | slow |
 
-_1406 candidates run of 100,352 (76 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1406 candidates run of 100,352 (77 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
