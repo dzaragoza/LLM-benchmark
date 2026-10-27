@@ -61,21 +61,53 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bench.roster import LADDER, roster_from_models_md
+from infra.hf_download import DEVICE_LIMIT_GIB
 
-# THE SEED GRID (the author's ruling): ONE global set of 3 quants.
-# Every lineage's largest model is measured with THE SAME three
-# quants - a balanced block design (lineage x quant). The grid starts
-# pre-selected and SELF-REPAIRS: when a model fails a grid quant
-# (quantize or launch failure), the replacement search tries
-# candidates coarser-first until the failed model runs with one, and
-# the winner replaces the slot GLOBALLY - every model is then
-# measured with the same three quants again.
-SEED_GRID_INITIAL = ["Q8_0", "Q5_K_M", "IQ3_XS"]
-# the replacement candidates, coarser-first (bpw descending)
-SEED_GRID_CANDIDATES = [
-    "Q6_K", "Q4_K_M", "Q4_K_S", "Q3_K_M", "IQ4_NL", "Q3_K_S",
-    "IQ3_M", "Q2_K", "IQ2_M", "Q2_K_S", "IQ2_S", "Q1_0", "IQ1_M",
-]
+# THE SEED BANDS (the author's ruling): ONE global set of 3 FILE-SIZE
+# BANDS, derived from the device budget - DEVICE/8, DEVICE/4,
+# DEVICE/2 - no hand-picked numbers. Every lineage's largest model is
+# measured at THE SAME THREE BANDS: the rung closest to each band
+# (and feasible: est size <= DEVICE_LIMIT) fills the slot for that
+# model - equal MEMORY COST for every model, the exam's RAM and time
+# constraints held constant, so scores compare capability at matched
+# device budgets (the author's fairness: same quants is NOT fair -
+# the big models settle on the tiny quants that ruin the small
+# models; same file size is).
+SEED_BANDS_GIB = [DEVICE_LIMIT_GIB / 8, DEVICE_LIMIT_GIB / 4, DEVICE_LIMIT_GIB / 2]
+
+
+def _est_size_gib(f16_gib: float | None, rung: str) -> float | None:
+    """the estimated rung file size: f16 x bpw/16."""
+    if f16_gib is None:
+        return None
+    return f16_gib * _bpw(rung) / 16.0
+
+
+def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | None]:
+    """THE BAND RESOLUTION: for each band, the rung whose estimated
+    size is closest to the band (and feasible <= DEVICE_LIMIT), not
+    already used by another band. None for a band no feasible rung
+    can fill (a model whose f16 is so large even the coarsest rung
+    exceeds the device, or all candidates excluded)."""
+    from bench.roster import LADDER
+
+    out: list[str | None] = []
+    used: set[str] = set(exclude)
+    for band in SEED_BANDS_GIB:
+        cands = [
+            (abs(size - band), r)
+            for r in LADDER
+            if r not in used
+            and (size := _est_size_gib(f16_gib, r)) is not None
+            and size <= DEVICE_LIMIT_GIB
+        ]
+        if not cands:
+            out.append(None)
+            continue
+        cands.sort()
+        used.add(cands[0][1])
+        out.append(cands[0][1])
+    return out
 
 # the thresholds: P(score >= t), t = 0..MAX_T. The top threshold is
 # always one full point ABOVE the best observed (the PoI target) and
@@ -364,25 +396,6 @@ def surrogate_predict(
 # ---------------------------------------------------------- acquisition
 
 
-def load_seed_grid(state_file: str) -> list[str]:
-    """the global 3-quant seed grid, from the state (persisted across
-    restarts); the initial grid on first sight."""
-    with open(state_file, encoding="utf-8") as fh:
-        st = json.load(fh)
-    grid = st.get("seed_grid")
-    if grid and len(grid) == len(SEED_GRID_INITIAL):
-        return list(grid)
-    return list(SEED_GRID_INITIAL)
-
-
-def save_seed_grid(state_file: str, grid: list[str]) -> None:
-    with open(state_file, encoding="utf-8") as fh:
-        st = json.load(fh)
-    st["seed_grid"] = list(grid)
-    with open(state_file, "w", encoding="utf-8") as fh:
-        json.dump(st, fh, indent=1)
-
-
 def pair_state(state_file: str) -> dict[tuple[str, str], str]:
     """(fam, rung) -> 'done' | 'failed' | None, from the records: a
     pair is done when ANY of its kv combos ran, failed when its sweep
@@ -404,100 +417,76 @@ def pair_state(state_file: str) -> dict[tuple[str, str], str]:
 
 
 def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
-    """THE DETERMINISTIC SEED: every lineage's LARGEST model,
-    measured with THE SAME three global quants (seed_grid in the
-    state). The seeding SUCCEEDS when every lineage's largest model
-    has all grid quants measured (done) at the current grid.
+    """THE DETERMINISTIC SEED: every lineage's LARGEST model, measured
+    at THE SAME THREE FILE-SIZE BANDS (2 / 4 / 8 GiB - the device
+    budget /8, /4, /2, no hand-picked numbers). Each model's bands
+    resolve to the rung closest to the band it can carry: equal
+    MEMORY COST for every model, the exam's RAM/time constraints
+    held constant (the author's fairness ruling). The seeding
+    SUCCEEDS when every lineage's largest model has all three bands
+    measured (done).
 
     THE FAILURE DISTINCTION (the author's ruling): a kv failure is
     NOT a quant failure. As long as ANY of the 49 (k, v) combinations
-    ran, the (model, model_quant) pair is SUCCESSFUL - per-combo
-    failures (an architecture that cannot hold a quantized cache,
-    one device-fit miss) are outcomes, not verdicts; only a sweep
-    with ZERO done records means the quant is unusable for the model
-    and the recovery fires. The replaced slot's data is never wasted:
-    every swept pair's 49 records stay in the results - pre-computed
-    for whatever needs them later (the risk of the repair is
-    mitigated by the data it already collected).
+    ran, the pair is SUCCESSFUL; only a zero-done sweep means the
+    rung is unusable for the model and the recovery fires. The
+    replaced slot's data is never wasted - every swept pair's 49
+    records stay in the results, pre-computed for later.
 
-    THE RECOVERY: when a grid quant is unusable for a model (zero
-    done records in its sweep), the slot is not skipped but
-    REPLACED: the next candidate quant (coarser-first, from
-    SEED_GRID_CANDIDATES, not already in the grid) that the failed
-    model CAN run replaces it GLOBALLY - the failed pair is re-picked
-    with it, and every other model measures with the new grid too,
-    keeping the same-three-quants invariant.
+    THE RECOVERY: when a band's rung fails for a model (zero done
+    records), the slot RE-RESOLVES for that model - the failed rungs
+    are excluded, and the next-closest feasible rung to the band
+    fills the slot. The bands themselves are FIXED for everyone (the
+    fairness invariant is the memory cost, not the rung); the
+    per-model resolution adapts. The failed pair is re-armed and
+    re-swept at the replacement; a second failure moves the slot
+    again; all-rungs-failed leaves the lineage short (its largest
+    model is unusable quantized - the seed proceeds around it).
 
-    Returns the next (largest-model, grid-quant) pair to sweep, or
-    None when every lineage's block is complete at the current grid."""
+    Returns the next (largest-model, band-rung) pair to sweep, or
+    None when every lineage's block is complete."""
     models, _quants = catalog()
     states = pair_state(state_file)
-    grid = load_seed_grid(state_file)
     # the largest model per lineage
     by_fam: dict[str, list] = {}
     for m in models:
         by_fam.setdefault(m["family"], []).append(m)
     largest = {f: max(ms, key=lambda m: m["params_b"]) for f, ms in by_fam.items()}
     pool_index = _pool_index()
-    # THE SEED ORDER: DESCENDING PARAMS across all lineages (the
-    # author's ruling) - the biggest models first, the worst cases
-    # first: an early grid repair invalidates almost nothing
+    # THE SEED ORDER: DESCENDING PARAMS across all lineages - the
+    # biggest models first, the worst cases first: an early repair
+    # invalidates almost nothing
     for m in sorted(largest.values(), key=lambda m: -m["params_b"]):
-        for slot, q in enumerate(grid):
-            pi = pool_index.get((m["id"], q))
-            if pi is None:
-                continue  # the model does not carry this rung (never for LADDER)
+        # this model's failed rungs (the recovery's exclusion list)
+        failed_rungs = {
+            rung for (fam, rung), s in states.items()
+            if fam == m["id"] and s == "failed"
+        }
+        clean = band_rungs(m["f16_gib"])
+        rungs = band_rungs(m["f16_gib"], exclude=failed_rungs)
+        for band, q_clean, q in zip(SEED_BANDS_GIB, clean, rungs):
+            if q is None:
+                continue  # no feasible rung for this band after exclusions
             state = states.get((m["id"], q))
             if state == "done":
-                continue  # measured at this grid quant
+                continue  # measured at this band
+            pi = pool_index.get((m["id"], q))
+            if pi is None:
+                continue
             if state == "failed":
-                # THE RECOVERY: replace the slot globally with a
-                # candidate the failed model can run. Candidates are
-                # tried in order; 'can run' is decided by the records:
-                # the first candidate with NO failed record for this
-                # model wins the slot (it will be picked next and its
-                # sweep decides - a second failure moves the slot
-                # again).
-                replacement = None
-                for cand in SEED_GRID_CANDIDATES:
-                    if cand in grid:
-                        continue
-                    if states.get((m["id"], cand)) == "failed":
-                        continue  # already known unusable for this model
-                    replacement = cand
-                    break
-                if replacement is None:
-                    # every candidate failed for this model - the
-                    # model cannot run quantized at all; leave the
-                    # slot, the lineage stays short (its largest
-                    # model is simply unusable - the seed proceeds
-                    # around it)
-                    continue
-                grid[slot] = replacement
-                save_seed_grid(state_file, grid)
-                pi2 = pool_index.get((m["id"], replacement))
-                if pi2 is None or states.get((m["id"], replacement)) == "done":
-                    continue  # already measured at the replacement
-                return {
-                    "index": pi2,
-                    "fam": m["id"],
-                    "rung": replacement,
-                    "p": None,
-                    "probs": None,
-                    "phase": "seed-recovery",
-                    "cost_gib": _f16_gib_from_models_md(m["id"]),
-                }
-            # state is None: not measured - pick it
+                continue  # excluded rung, the resolution already moved past it
+            phase = "seed" if q == q_clean else "seed-recovery"
             return {
                 "index": pi,
                 "fam": m["id"],
                 "rung": q,
+                "band_gib": band,
                 "p": None,
                 "probs": None,
-                "phase": "seed",
+                "phase": phase,
                 "cost_gib": _f16_gib_from_models_md(m["id"]),
             }
-    return None  # every lineage's block is complete at the current grid
+    return None  # every lineage's block is complete
 
 
 def adaptive_epsilon(state_file: str) -> float:
