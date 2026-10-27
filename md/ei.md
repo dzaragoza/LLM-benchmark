@@ -1297,4 +1297,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1275 | granite-4.1-3b | -1 | Q5_K_S | q5_0 | q8_0 | 6.78 | 131,072 | slow |
 | 1276 | granite-4.1-3b | -1 | Q5_K_S | q5_1 | q8_0 | 6.93 | 131,072 | slow |
 
-_1276 candidates run of 100,352 (30 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1276 candidates run of 100,352 (31 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
