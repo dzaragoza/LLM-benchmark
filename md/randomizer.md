@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 1178 done candidates, top 3 score levels (6 candidates of 1178, ties included)
+- measured: 1227 done candidates, top 3 score levels (6 candidates of 1227, ties included)
 - params median: **3.403 B**
 - model_quant mode: **Q6_K**
 - k_quant mode: **q5_1**
@@ -1198,5 +1198,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1176 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | iq4_nl | 0.33 | 32,768 | slow |
 | 1177 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q5_0 | 0.34 | 32,768 | slow |
 | 1178 | MiniCPM4-0.5B | -1 | IQ2_XS | q5_1 | q5_1 | 0.35 | 32,768 | fast |
+| 1179 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | f16 | 1.52 | 126,976 | slow |
+| 1180 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | q8_0 | 1.41 | 165,632 | slow |
+| 1181 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | q4_0 | 1.36 | 197,632 | slow |
+| 1182 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | q4_1 | 1.37 | 192,768 | slow |
+| 1183 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | iq4_nl | 1.36 | 197,632 | slow |
+| 1184 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | q5_0 | 1.37 | 188,416 | slow |
+| 1185 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | f16 | q5_1 | 1.38 | 184,320 | slow |
+| 1186 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | f16 | 1.41 | 165,632 | slow |
+| 1187 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | q8_0 | 1.32 | 237,568 | slow |
+| 1188 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | q4_0 | 11.91 | 262,144 | slow |
+| 1189 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | q4_1 | 12.32 | 262,144 | slow |
+| 1190 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | iq4_nl | 11.91 | 262,144 | slow |
+| 1191 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | q5_0 | 12.72 | 262,144 | slow |
+| 1192 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q8_0 | q5_1 | 13.13 | 262,144 | slow |
+| 1193 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | f16 | 1.36 | 197,632 | slow |
+| 1194 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | q8_0 | 11.91 | 262,144 | slow |
+| 1195 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | q4_0 | 8.66 | 262,144 | slow |
+| 1196 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | q4_1 | 9.07 | 262,144 | slow |
+| 1197 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | iq4_nl | 8.66 | 262,144 | slow |
+| 1198 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | q5_0 | 9.47 | 262,144 | slow |
+| 1199 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_0 | q5_1 | 9.88 | 262,144 | slow |
+| 1200 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | f16 | 1.37 | 192,768 | slow |
+| 1201 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | q8_0 | 12.32 | 262,144 | slow |
+| 1202 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | q4_0 | 9.07 | 262,144 | slow |
+| 1203 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | q4_1 | 9.47 | 262,144 | slow |
+| 1204 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | iq4_nl | 9.07 | 262,144 | slow |
+| 1205 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | q5_0 | 9.88 | 262,144 | slow |
+| 1206 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q4_1 | q5_1 | 10.29 | 262,144 | slow |
+| 1207 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | f16 | 1.36 | 197,632 | slow |
+| 1208 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | q8_0 | 11.91 | 262,144 | slow |
+| 1209 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | q4_0 | 8.66 | 262,144 | slow |
+| 1210 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | q4_1 | 9.07 | 262,144 | slow |
+| 1211 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | iq4_nl | 8.66 | 262,144 | slow |
+| 1212 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | q5_0 | 9.47 | 262,144 | slow |
+| 1213 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | iq4_nl | q5_1 | 9.88 | 262,144 | slow |
+| 1214 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | f16 | 1.37 | 188,672 | slow |
+| 1215 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | q8_0 | 12.72 | 262,144 | slow |
+| 1216 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | q4_0 | 9.47 | 262,144 | slow |
+| 1217 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | q4_1 | 9.88 | 262,144 | slow |
+| 1218 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | iq4_nl | 9.47 | 262,144 | slow |
+| 1219 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | q5_0 | 10.29 | 262,144 | slow |
+| 1220 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_0 | q5_1 | 10.69 | 262,144 | slow |
+| 1221 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | f16 | 1.38 | 184,576 | slow |
+| 1222 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | q8_0 | 13.13 | 262,144 | slow |
+| 1223 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | q4_0 | 9.88 | 262,144 | slow |
+| 1224 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | q4_1 | 10.29 | 262,144 | slow |
+| 1225 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | iq4_nl | 9.88 | 262,144 | slow |
+| 1226 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | q5_0 | 10.69 | 262,144 | slow |
+| 1227 | Ministral-3-3B-Instruct-2512 | -1 | TQ2_0 | q5_1 | q5_1 | 11.10 | 262,144 | slow |
 
-_1178 candidates run of 100,352 (26 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1227 candidates run of 100,352 (27 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
