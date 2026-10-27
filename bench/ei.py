@@ -1,7 +1,7 @@
-"""bench.ei -- the expected-improvement steering for the randomizer.
+"""bench.ei -- the expected-improvement steering for the ei.
 
 The search space is the 2,048 (model, model-quant) pairs - the
-randomizer's own pool (roster x LADDER, the stable index the state's
+ei's own pool (roster x LADDER, the stable index the state's
 done-set already keys on). The kv cache quants are NOT searched: a
 picked pair sweeps all 49 (k, v) combinations in one acquisition
 (quantize once, measure everything, the pair is never needed again).
@@ -28,9 +28,24 @@ PoI-per-cost would over-rank the small models we already know are
 weak); the expected acquisition cost is REPORTED next to the pick but
 never enters the ranking.
 
-Everything derives from state/randomizer-state.json - the single
-source of truth, restart-safe, crash-railed. The import is the
-warm start: every fully-swept pair becomes a training point.
+The SEED phase is DETERMINISTIC, not random (the author's ruling):
+for each lineage, the LARGEST model is probed first (the worst case
+- if the biggest model runs at a quant level, every smaller model
+in the lineage can too), at a FIXED quant grid, and the grid is
+DERIVED from what works: the probe quant launches and measures; if
+the launch fails, the next-coarser quant replaces it. The seed ends
+when every lineage has SEED_PER_LINEAGE swept pairs at the largest
+model - a balanced block design (lineage x quant grid).
+
+The EXPLORATION RATE is ADAPTIVE (the author's ruling: values are
+derived, not picked): epsilon = the trailing rate at which PoI
+picks scored at or below the population median - when the
+surrogate's picks stop outperforming, exploration rises; when PoI
+is winning, it fades toward zero. No hand-picked constant.
+
+Everything derives from state/ei-state.json - the single source of
+truth, restart-safe, crash-railed. The import is the warm start:
+every fully-swept pair becomes a training point.
 """
 
 from __future__ import annotations
@@ -47,11 +62,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bench.roster import LADDER, roster_from_models_md
 
-# below this many swept pairs, picks stay uniform-random (the seed
-# phase - the logistic needs roughly n ~ d/2..d before its ranking
-# means anything; d is ~71 here). NOT a ratio of the space: the
-# draft's 40 was for 65,536 combos; ours is about the feature count
-SEED_N = 40
+# the seed phase: every lineage's LARGEST model, at a derived quant
+# grid, SEED_PER_LINEAGE swept pairs each - a balanced block design.
+# The largest model first is the worst-case probe: if it runs, every
+# smaller sibling can; if it cannot, the grid coarsens.
+SEED_PER_LINEAGE = 3
+# the probe grid, coarse-first (the fallback ladder when a launch
+# fails - each level must be strictly smaller than the previous)
+PROBE_GRID = ["Q8_0", "Q5_K_M", "IQ3_XS", "Q3_K_S", "IQ2_XS", "Q2_K_S", "IQ1_S"]
 
 # the thresholds: P(score >= t), t = 0..MAX_T. The top threshold is
 # always one full point ABOVE the best observed (the PoI target) and
@@ -85,6 +103,7 @@ def catalog() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "params_b": params,
                 "f16_gib": meta,
                 "window": _window_from_models_md(fam),
+                "arch": _arch_of(fam),
             }
         )
     quants = []
@@ -139,6 +158,18 @@ def _window_from_models_md(fam: str) -> int | None:
         return None
 
 
+def _arch_of(fam: str) -> str:
+    """the architecture class: hybrid (jamba), rwkv, or attention -
+    cuts ACROSS lineages (the feature the lineage one-hots cannot
+    express)."""
+    low = fam.lower()
+    if "rwkv" in low:
+        return "rwkv"
+    if "jamba" in low:
+        return "hybrid"
+    return "attention"
+
+
 def _family_of(fam: str) -> str:
     # the lineage prefix: qwen / granite / gemma / phi / minicpm /
     # smollm / llama / ai21 / rwkv / mistral / falcon / olmo / yi ...
@@ -183,21 +214,26 @@ def _method_of(rung: str) -> str:
 
 def feature_matrix() -> np.ndarray:
     """X of shape (2048, d): one-hot family, standardized log(params),
-    standardized bpw, one-hot quant method, log(params) x bpw. Row i is
-    the pool index i (models.md order x LADDER order)."""
+    standardized log(window), one-hot architecture, standardized bpw,
+    one-hot quant method, log(params) x bpw. Row i is the pool index i
+    (models.md order x LADDER order)."""
     models, quants = catalog()
     fams = sorted({m["family"] for m in models})
+    archs = ["attention", "hybrid", "rwkv"]
     methods = ["f16", "k", "iq", "tq", "legacy"]
     log_p = np.log([m["params_b"] if m["params_b"] > 0 else 1e-3 for m in models])
     lp = (log_p - log_p.mean()) / (log_p.std() or 1.0)
+    log_w = np.log([m["window"] if m["window"] else 8192 for m in models])
+    lw = (log_w - log_w.mean()) / (log_w.std() or 1.0)
     bpws = np.array([q["bpw"] for q in quants])
     b = (bpws - bpws.mean()) / (bpws.std() or 1.0)
     rows = []
     for mi, m in enumerate(models):
         fam_oh = [1.0 if m["family"] == f else 0.0 for f in fams]
+        arch_oh = [1.0 if m["arch"] == a else 0.0 for a in archs]
         for qi, q in enumerate(quants):
             m_oh = [1.0 if q["method"] == meth else 0.0 for meth in methods]
-            rows.append(fam_oh + [lp[mi], b[qi], lp[mi] * b[qi]] + m_oh)
+            rows.append(fam_oh + arch_oh + [lp[mi], lw[mi], b[qi], lp[mi] * b[qi]] + m_oh)
     X = np.array(rows, dtype=np.float64)
     return X
 
@@ -206,7 +242,7 @@ def feature_matrix() -> np.ndarray:
 
 
 def load_results(state_file: str) -> dict[int, int]:
-    """pair index -> best score, from the randomizer state: every
+    """pair index -> best score, from the ei state: every
     fully-swept pair (49 records) contributes its max; partial sweeps
     (crash leftovers) contribute their max too - a data point is a
     data point."""
@@ -322,39 +358,94 @@ def surrogate_predict(
 # ---------------------------------------------------------- acquisition
 
 
+def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
+    """THE DETERMINISTIC SEED: every lineage's LARGEST model, at the
+    quant grid, SEED_PER_LINEAGE pairs per lineage - a balanced block
+    design. The largest model first is the worst-case probe: if it
+    runs at a quant, every smaller sibling can. THE DERIVED GRID: a
+    level whose pair was swept (done OR server_failed) counts toward
+    the block; a server_failed level COARSENS the grid - the seed
+    then takes the next-coarser quant for the same slot, so every
+    lineage ends with SEED_PER_LINEAGE MEASURED pairs no matter what
+    the device could hold. Returns None when every lineage's block is
+    complete."""
+    models, _quants = catalog()
+    tested = set(load_results(state_file))
+    # the largest model per lineage
+    by_fam: dict[str, list] = {}
+    for m in models:
+        by_fam.setdefault(m["family"], []).append(m)
+    largest = {f: max(ms, key=lambda m: m["params_b"]) for f, ms in by_fam.items()}
+    pool_index = _pool_index()
+    for fam_name in sorted(largest):
+        m = largest[fam_name]
+        swept = sum(
+            1 for q in PROBE_GRID if pool_index.get((m["id"], q)) in tested
+        )
+        if swept >= SEED_PER_LINEAGE:
+            continue  # this lineage's block is complete
+        for q in PROBE_GRID:
+            pi = pool_index.get((m["id"], q))
+            if pi is None or pi in tested:
+                continue
+            return {
+                "index": pi,
+                "fam": m["id"],
+                "rung": q,
+                "p": None,
+                "probs": None,
+                "phase": "seed",
+                "cost_gib": _f16_gib_from_models_md(m["id"]),
+            }
+    return None  # every lineage has its seed block swept
+
+
+def adaptive_epsilon(state_file: str) -> float:
+    """EPSILON, DERIVED NOT PICKED: the trailing rate at which PoI
+    picks scored at or below the population median. Each PoI pick's
+    outcome is compared with the median score of the pairs measured
+    so far (the surrogate's own training data at pick time is
+    approximated by the full tested set - conservative): the rate of
+    PoI picks that did NOT beat the median is the exploration rate.
+    No PoI history yet -> 0.0 (pure PoI). Clamped to [0, 0.5]."""
+    with open(state_file, encoding="utf-8") as fh:
+        st = json.load(fh)
+    picks = st.get("picks", [])
+    poi = [p for p in picks if p.get("phase", "").startswith("poi")]
+    if not poi:
+        return 0.0
+    scores = [p.get("score") for p in poi if p.get("score") is not None]
+    if not scores:
+        return 0.0
+    all_scores = [r.get("high_score") for r in st.get("results", [])
+                  if r.get("result") == "done" and r.get("high_score") is not None]
+    if not all_scores:
+        return 0.5
+    med = float(np.median(all_scores))
+    below = sum(1 for s in scores if s <= med)
+    return float(min(0.5, max(0.0, below / len(scores))))
+
+
 def next_pair(
     state_file: str,
     seed_get: Any = None,
     n_pairs: int = 2048,
 ) -> dict[str, Any] | None:
-    """THE PICK. Below SEED_N swept pairs: uniform random over the
-    untested (the seed phase - the pluggable entropy source is the
-    randomizer's own). Above: PoI - the untested pair maximizing
-    P(score >= y_best + 1). Returns {'index', 'fam', 'rung', 'p',
+    """THE PICK. Seed phase (every lineage short of its block): the
+    deterministic largest-model grid. Above: PoI with the ADAPTIVE
+    epsilon - with probability eps the pick is the max-predictive-
+    entropy pair instead (eps derived from the trailing PoI failure
+    rate, not picked). Returns {'index', 'fam', 'rung', 'p',
     'probs', 'phase', 'cost_gib'} or None when the pool is drained."""
+    seed = seed_pair(state_file, n_pairs)
+    if seed is not None:
+        return seed
     best = load_results(state_file)
     tested = set(best)
     untested = [i for i in range(n_pairs) if i not in tested]
     if not untested:
         return None
 
-    if len(tested) < SEED_N:
-        # seed phase: uniform random, the randomizer's entropy
-        if seed_get is None:
-            pick = int.from_bytes(os.urandom(2), "little") % len(untested)
-        else:
-            pick = seed_get() % len(untested)
-        idx = untested[pick]
-        fam, rung = _pair_of(idx)
-        return {
-            "index": idx,
-            "fam": fam,
-            "rung": rung,
-            "p": None,
-            "probs": None,
-            "phase": "seed",
-            "cost_gib": _f16_gib_from_models_md(fam),
-        }
 
     # the surrogate: fit on all tested, predict all
     X = feature_matrix()
@@ -367,17 +458,13 @@ def next_pair(
     p = probs[:, t_target]
     cand = np.array(untested)
     pc = p[cand]
-    if pc.max() < 1e-6:
-        # THE DRAFT'S FALLBACK: every untested p(x) ~ 0 - the target
-        # level has no training signal anywhere (the phantom band).
-        # Rank by PREDICTIVE ENTROPY instead: the untested pair whose
-        # level distribution the surrogate is least sure about - the
-        # most informative next measurement, so the next fit can
-        # start separating candidates at the real frontier.
+
+    def _entropy_pick() -> dict[str, Any]:
+        # the max-predictive-entropy untested pair: the most
+        # informative next measurement
         lvl = level_probs(probs[cand])
         ent = -(lvl * np.log(np.clip(lvl, 1e-15, None))).sum(axis=1)
-        order = np.argsort(-ent)
-        idx = int(cand[order[0]])
+        idx = int(cand[np.argmax(ent)])
         fam, rung = _pair_of(idx)
         levels = level_probs(probs[idx])
         return {
@@ -389,6 +476,24 @@ def next_pair(
             "phase": "poi-entropy",
             "cost_gib": _f16_gib_from_models_md(fam),
         }
+
+    if pc.max() < 1e-6:
+        # THE DRAFT'S FALLBACK: every untested p(x) ~ 0 - the target
+        # level has no training signal anywhere (the phantom band).
+        # Entropy instead - the most informative next measurement.
+        return _entropy_pick()
+
+    # THE ADAPTIVE EPSILON (derived, never picked): the trailing rate
+    # at which PoI picks failed to beat the population median. With
+    # probability eps, inject an entropy pick - exploration rises
+    # exactly as fast as the surrogate's picks stop outperforming.
+    eps = adaptive_epsilon(state_file)
+    if eps > 0.0 and np.random.default_rng(BOOT_SEED ^ len(best)).random() < eps:
+        pick = _entropy_pick()
+        pick["phase"] = "poi-explore"
+        pick["epsilon"] = eps
+        return pick
+
     # random tie-break among the top (deterministic given the data)
     top = cand[pc >= pc.max() - 1e-12]
     rng = np.random.default_rng(BOOT_SEED)
@@ -402,6 +507,7 @@ def next_pair(
         "p": float(p[idx]),
         "probs": [float(x) for x in levels],
         "phase": "poi",
+        "epsilon": eps,
         "cost_gib": _f16_gib_from_models_md(fam),
     }
 
@@ -425,7 +531,7 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
             _pair_of(i) for i, s in sorted(best.items(), key=lambda kv: -kv[1]) if s == max(best.values())
         ][:5],
     }
-    if len(tested) < SEED_N:
+    if seed_pair(state_file, n_pairs) is not None:
         out["phase"] = "seed"
         out["p_better_remains"] = None
         return out
@@ -492,7 +598,7 @@ def _calibration(X: np.ndarray, ys: dict[int, int], tested: set[int]) -> dict[st
 
 
 if __name__ == "__main__":
-    state = os.environ.get("EI_STATE", "state/randomizer-state.json")
+    state = os.environ.get("EI_STATE", "state/ei-state.json")
     t0 = time.time()
     models, quants = catalog()
     X = feature_matrix()

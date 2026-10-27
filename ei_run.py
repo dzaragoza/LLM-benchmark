@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""randomize.py - protocol randomizer: the epitome of simplicity.
+"""ei_run.py - protocol ei: the epitome of simplicity.
 
 Reuses the v9.5 machinery (the exam papers, the grader, the bells,
 the acquisition pipeline, the server) and disposes of the rules -
@@ -321,9 +321,9 @@ def disk_watchdog(
         stop.wait(GC_INTERVAL_S)
 
 
-# the randomizer's state file (module-level: full_benchmark's
+# the ei's state file (module-level: full_benchmark's
 # --clean wipes it before main() runs)
-RANDOMIZER_STATE_FILE = "state/randomizer-state.json"
+EI_STATE_FILE = "state/ei-state.json"
 
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
@@ -497,7 +497,7 @@ def _run_combo(
     exam_seed = entropy_get()
 
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
-    answers_dir = os.path.join("results", "randomizer", fam)
+    answers_dir = os.path.join("results", "ei", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, f"{kv_tag}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{kv_tag}.log")
@@ -690,7 +690,7 @@ def _run_combo(
 
 
 # the watchability cadence (the exam's per-family push ruling,
-# randomizer-shaped): commit + push after EVERY pair - the full
+# ei-shaped): commit + push after EVERY pair - the full
 # 49-combination (k, v) sweep of the model-quant lands in the
 # ledger as one unit, a multi-hour run is readable remotely pair
 # by pair
@@ -753,7 +753,7 @@ def main(on_progress: Any = None) -> None:
     _GC_DONE_SET.update(done)
 
     def write_ledger() -> None:
-        """md/randomizer.md: rank (highest score, tiebreak by time),
+        """md/ei.md: rank (highest score, tiebreak by time),
         model, high score, quant @ high score, speed (fast <= 32s,
         medium <= 64s, slow <= 128s - the candidate's whole run)."""
         rows = [r for r in results if r.get("result") == "done"]
@@ -787,7 +787,7 @@ def main(on_progress: Any = None) -> None:
         t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
         t_times = [r["high_score_time_s"] for r in top if r.get("high_score_time_s") is not None]
         t_scores = [r.get("high_score") or -1 for r in top]
-        lines = ["# randomizer.md - the randomizer ledger", ""]
+        lines = ["# ei.md - the ei ledger", ""]
         lines.append("## the top 3 dashboard")
         lines.append("")
         lines.append(
@@ -847,16 +847,16 @@ def main(on_progress: Any = None) -> None:
             f"({done_pairs:,} of {len(pool):,} pairs swept); "
             "each pair one acquisition, the seed recorded in state._"
         )
-        with open("md/randomizer.md", "w", encoding="utf-8") as fh:
+        with open("md/ei.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
     print(
-        f"[randomizer] pool: {total_pairs:,} (model, rung) pairs "
+        f"[ei] pool: {total_pairs:,} (model, rung) pairs "
         f"(each pick sweeps {n_kv} x {n_kv} = {n_kv * n_kv} kv combinations), "
         f"no size gate - llama-server decides at launch, ONE chance each"
     )
-    print(f"[randomizer] entropy: {_ENTROPY_DEV}")
-    print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
+    print(f"[ei] entropy: {_ENTROPY_DEV}")
+    print(f"[ei] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
     while len(done) < len(pool):
         # THE PICK, v4: expected-improvement steers the pair choice
@@ -877,18 +877,45 @@ def main(on_progress: Any = None) -> None:
         fam = rec_pick["fam"]
         rung = rec_pick["rung"]
         key = f"{pair_key}"
-        if rec_pick["phase"] == "poi":
+        phase = rec_pick.get("phase", "seed")
+        eps = rec_pick.get("epsilon")
+        if phase.startswith("poi"):
+            tag = (
+                f"eps={eps:.2f}" if eps is not None else "eps=0.00 (adaptive)"
+            ) if phase == "poi" else phase
             print(
-                f"[ei] PoI pick: p(score >= best+1) = {rec_pick['p']:.4f}, "
+                f"[ei] {tag}: p(score >= best+1) = {rec_pick['p']:.4f}, "
                 f"acquisition ~{rec_pick['cost_gib']} GiB"
             )
         if key in done:
             continue  # the pair already had its chance: re-draw
         print(
-            f"[randomizer] #{n + 1} pair={key} "
+            f"[ei] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
         )
         recs = run_pair(fam, rung, models_dir, state, port)
+        # THE PICK LEDGER: each pick's phase and outcome ride the
+        # state - the adaptive epsilon's raw material (the trailing
+        # rate at which PoI picks failed to beat the median)
+        done_recs = [r for r in recs if r.get("result") == "done"]
+        pick_score = (
+            max((r.get("high_score") or -1 for r in done_recs), default=None)
+            if done_recs
+            else None
+        )
+        state.setdefault("picks", []).append(
+            {
+                "index": pair_key,
+                "fam": fam,
+                "rung": rung,
+                "phase": phase,
+                "epsilon": eps,
+                "p": rec_pick.get("p"),
+                "score": pick_score,
+                "n_recs": len(recs),
+            }
+        )
+        state["picks"] = state["picks"][-2000:]  # bounded
         results.extend(recs)
         done.add(key)
         _GC_DONE_SET.add(key)
@@ -905,14 +932,14 @@ def main(on_progress: Any = None) -> None:
             if done_recs
             else recs[0].get("result", "?")
         )
-        print(f"[randomizer]   -> {summary}")
+        print(f"[ei]   -> {summary}")
         n += 1
         if on_progress is not None:
             try:
                 on_progress(n)
             except Exception as e:
-                print(f"[randomizer] progress push failed (ignored): {e}")
-    print(f"[randomizer] the pool is drained: {len(done)} pairs, one chance each - complete")
+                print(f"[ei] progress push failed (ignored): {e}")
+    print(f"[ei] the pool is drained: {len(done)} pairs, one chance each - complete")
 
 
 if __name__ == "__main__":

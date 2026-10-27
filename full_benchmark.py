@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""full_benchmark.py -- the randomizer's envelope (the v9.5 exam
-walk is retired; the randomizer is the benchmark).
+"""full_benchmark.py -- the ei's envelope (the v9.5 exam
+walk is retired; the ei is the benchmark).
 
-One command: python full_benchmark.py --task randomize. The pool is
+One command: python full_benchmark.py --task ei. The pool is
 v3: (model, model-quant) pairs - 64 models x 32 rungs = 2,048
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
 acquisition (a fresh 8-bit exam seed each, a 128s timer per
 level), results only.
 
-The envelope owns what the randomizer must never worry about: the
+The envelope owns what the ei must never worry about: the
 requirements check, the git pull/push rail, the crash commit, the
 SIGINT clean shutdown, the artifact ledger, the log truncation.
 
@@ -164,7 +164,7 @@ def preflight_selfcheck() -> None:
     # --- the pool: the full v2 candidate census (the dry-run check,
     # folded in): every family x every rung x every kv pair, the
     # drawn-set coherent with the state file ---
-    import randomize as R
+    import ei_run as R
 
     pool = R.the_pool()
     n_kv = len(R.KV_LADDER)
@@ -175,8 +175,8 @@ def preflight_selfcheck() -> None:
     fams = {f for f, _ in pool}
     assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
     assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
-    if os.path.isfile(R.RANDOMIZER_STATE_FILE):
-        with open(R.RANDOMIZER_STATE_FILE, encoding="utf-8") as fh:
+    if os.path.isfile(R.EI_STATE_FILE):
+        with open(R.EI_STATE_FILE, encoding="utf-8") as fh:
             st = json.load(fh)
         drawn = set(st.get("done", []))
         assert len(drawn) <= total, "the drawn-set exceeds the pool - corrupt state"
@@ -251,10 +251,10 @@ def git_tail(args: argparse.Namespace) -> None:
     paths = [args.state_file, args.results_file, "results.txt"]
     # the ledger is a first-class artifact: every commit carries
     # the latest regeneration (the progress pushes depend on it)
-    if os.path.isfile("md/randomizer.md"):
-        paths += ["md/randomizer.md"]
-    if os.path.isfile(RANDOMIZER_STATE := "state/randomizer-state.json"):
-        paths += [RANDOMIZER_STATE]
+    if os.path.isfile("md/ei.md"):
+        paths += ["md/ei.md"]
+    if os.path.isfile(EI_STATE := "state/ei-state.json"):
+        paths += [EI_STATE]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split
     paths += glob.glob("results/**/*", recursive=True)
@@ -360,13 +360,13 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
         os._exit(130)
     _SHUTTING_DOWN = True
     stamp("SIGINT - shutting down cleanly (addendum 8)")
-    # truncate any oversized randomizer log BEFORE the rail commits:
+    # truncate any oversized ei log BEFORE the rail commits:
     # the os._exit below skips run_candidate's finally, so a multi-hour
     # log would otherwise ride the artifact push past github's limits
     # (the 119MB granite-3.1 lesson)
     import glob as _glob
 
-    for p in _glob.glob("results/randomizer/**/exam-server-*.log", recursive=True):
+    for p in _glob.glob("results/ei/**/exam-server-*.log", recursive=True):
         try:
             if os.path.getsize(p) > 20 * 2**20:
                 with open(p, encoding="utf-8", errors="replace") as fh:
@@ -408,7 +408,7 @@ def install_sigint_handler(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="the protocol randomizer: every candidate of the "
+        description="the protocol ei: every candidate of the "
         "2048 pool (roster x LADDER) gets ONE chance - a fresh 8-bit "
         "exam seed per candidate, a 128s timer per level, results only"
     )
@@ -417,14 +417,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="randomize",
-        choices=["randomize"],
-        help="the benchmark: the protocol randomizer (the v9.5 exam walk is retired)",
+        default="ei",
+        choices=["ei"],
+        help="the benchmark: the protocol ei (the v9.5 exam walk is retired)",
     )
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="delete the randomizer state UP FRONT - a fresh pool, "
+        help="delete the ei state UP FRONT - a fresh pool, "
         "every chance restored; era changes only",
     )
     return ap
@@ -480,23 +480,23 @@ def _run(args: argparse.Namespace) -> None:
     preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.task == "randomize":
-        # protocol randomizer: the epitome of simplicity - every
+    if args.task == "ei":
+        # protocol ei: the epitome of simplicity - every
         # candidate of the 2048 pool (roster x LADDER = 11 bits of
         # real entropy per pick, ONE chance each), a fresh 8-bit
         # exam per candidate, a 128s timer PER LEVEL, results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
-        import randomize as R
+        import ei_run as R
 
-        if args.clean and os.path.isfile(R.RANDOMIZER_STATE_FILE):
+        if args.clean and os.path.isfile(R.EI_STATE_FILE):
             # simple: delete the state file - main() treats a
             # missing file as a fresh pool, every chance restored
-            os.remove(R.RANDOMIZER_STATE_FILE)
-            stamp("randomizer: state deleted (--clean) - a fresh pool")
+            os.remove(R.EI_STATE_FILE)
+            stamp("ei: state deleted (--clean) - a fresh pool")
 
         def push_progress(n: int) -> None:
-            # the watchability ruling, randomizer-shaped: after every
+            # the watchability ruling, ei-shaped: after every
             # pair the ledger + state + all 49 (k, v) answers commit
             # and push - the full model-quant sweep lands as one
             # unit, a multi-hour run is readable remotely as it goes
@@ -512,7 +512,7 @@ def _run(args: argparse.Namespace) -> None:
             # the git tail ALWAYS runs (the envelope's ruling): the
             # ledger, the state, and the answers are committed and
             # pushed whether the run finished, crashed, or was
-            # SIGINTerrupted - the randomizer's own handler saves
+            # SIGINTerrupted - the ei's own handler saves
             # its state and defers to this tail
             tee_output.uninstall()
             try:
