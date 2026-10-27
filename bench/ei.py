@@ -62,14 +62,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bench.roster import LADDER, roster_from_models_md
 
-# the seed phase: every lineage's LARGEST model, at a derived quant
-# grid, SEED_PER_LINEAGE swept pairs each - a balanced block design.
-# The largest model first is the worst-case probe: if it runs, every
-# smaller sibling can; if it cannot, the grid coarsens.
-SEED_PER_LINEAGE = 3
-# the probe grid, coarse-first (the fallback ladder when a launch
-# fails - each level must be strictly smaller than the previous)
-PROBE_GRID = ["Q8_0", "Q5_K_M", "IQ3_XS", "Q3_K_S", "IQ2_XS", "Q2_K_S", "IQ1_S"]
+# THE SEED GRID (the author's ruling): ONE global set of 3 quants.
+# Every lineage's largest model is measured with THE SAME three
+# quants - a balanced block design (lineage x quant). The grid starts
+# pre-selected and SELF-REPAIRS: when a model fails a grid quant
+# (quantize or launch failure), the replacement search tries
+# candidates coarser-first until the failed model runs with one, and
+# the winner replaces the slot GLOBALLY - every model is then
+# measured with the same three quants again.
+SEED_GRID_INITIAL = ["Q8_0", "Q5_K_M", "IQ3_XS"]
+# the replacement candidates, coarser-first (bpw descending)
+SEED_GRID_CANDIDATES = [
+    "Q6_K", "Q4_K_M", "Q4_K_S", "Q3_K_M", "IQ4_NL", "Q3_K_S",
+    "IQ3_M", "Q2_K", "IQ2_M", "Q2_K_S", "IQ2_S", "Q1_0", "IQ1_M",
+]
 
 # the thresholds: P(score >= t), t = 0..MAX_T. The top threshold is
 # always one full point ABOVE the best observed (the PoI target) and
@@ -358,19 +364,65 @@ def surrogate_predict(
 # ---------------------------------------------------------- acquisition
 
 
+def load_seed_grid(state_file: str) -> list[str]:
+    """the global 3-quant seed grid, from the state (persisted across
+    restarts); the initial grid on first sight."""
+    with open(state_file, encoding="utf-8") as fh:
+        st = json.load(fh)
+    grid = st.get("seed_grid")
+    if grid and len(grid) == len(SEED_GRID_INITIAL):
+        return list(grid)
+    return list(SEED_GRID_INITIAL)
+
+
+def save_seed_grid(state_file: str, grid: list[str]) -> None:
+    with open(state_file, encoding="utf-8") as fh:
+        st = json.load(fh)
+    st["seed_grid"] = list(grid)
+    with open(state_file, "w", encoding="utf-8") as fh:
+        json.dump(st, fh, indent=1)
+
+
+def pair_state(state_file: str) -> dict[tuple[str, str], str]:
+    """(fam, rung) -> 'done' | 'failed' | None, from the records: a
+    pair is done when ANY of its kv combos ran, failed when its sweep
+    ended without a single done record (quantize_failed,
+    server_failed, ...)."""
+    out: dict[tuple[str, str], str] = {}
+    with open(state_file, encoding="utf-8") as fh:
+        st = json.load(fh)
+    for r in st.get("results", []):
+        fam, rung = r.get("fam"), r.get("rung")
+        if not fam or not rung:
+            continue
+        key = (fam, rung)
+        if r.get("result") == "done":
+            out[key] = "done"
+        elif key not in out or out[key] is None:
+            out[key] = "failed"
+    return out
+
+
 def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
-    """THE DETERMINISTIC SEED: every lineage's LARGEST model, at the
-    quant grid, SEED_PER_LINEAGE pairs per lineage - a balanced block
-    design. The largest model first is the worst-case probe: if it
-    runs at a quant, every smaller sibling can. THE DERIVED GRID: a
-    level whose pair was swept (done OR server_failed) counts toward
-    the block; a server_failed level COARSENS the grid - the seed
-    then takes the next-coarser quant for the same slot, so every
-    lineage ends with SEED_PER_LINEAGE MEASURED pairs no matter what
-    the device could hold. Returns None when every lineage's block is
-    complete."""
+    """THE DETERMINISTIC SEED: every lineage's LARGEST model,
+    measured with THE SAME three global quants (seed_grid in the
+    state). The seeding SUCCEEDS when every lineage's largest model
+    has all grid quants measured (done) at the current grid.
+
+    THE RECOVERY (the author's ruling): when a grid quant is unusable
+    for a model - the pair's sweep produced no single done record
+    (quantize failure or launch failure) - the slot is not skipped
+    but REPLACED: the next candidate quant (coarser-first, from
+    SEED_GRID_CANDIDATES, not already in the grid) that the failed
+    model CAN run replaces it GLOBALLY - the failed pair is re-picked
+    with it, and every other model measures with the new grid too,
+    keeping the same-three-quants invariant.
+
+    Returns the next (largest-model, grid-quant) pair to sweep, or
+    None when every lineage's block is complete at the current grid."""
     models, _quants = catalog()
-    tested = set(load_results(state_file))
+    states = pair_state(state_file)
+    grid = load_seed_grid(state_file)
     # the largest model per lineage
     by_fam: dict[str, list] = {}
     for m in models:
@@ -379,15 +431,51 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
     pool_index = _pool_index()
     for fam_name in sorted(largest):
         m = largest[fam_name]
-        swept = sum(
-            1 for q in PROBE_GRID if pool_index.get((m["id"], q)) in tested
-        )
-        if swept >= SEED_PER_LINEAGE:
-            continue  # this lineage's block is complete
-        for q in PROBE_GRID:
+        for slot, q in enumerate(grid):
             pi = pool_index.get((m["id"], q))
-            if pi is None or pi in tested:
-                continue
+            if pi is None:
+                continue  # the model does not carry this rung (never for LADDER)
+            state = states.get((m["id"], q))
+            if state == "done":
+                continue  # measured at this grid quant
+            if state == "failed":
+                # THE RECOVERY: replace the slot globally with a
+                # candidate the failed model can run. Candidates are
+                # tried in order; 'can run' is decided by the records:
+                # the first candidate with NO failed record for this
+                # model wins the slot (it will be picked next and its
+                # sweep decides - a second failure moves the slot
+                # again).
+                replacement = None
+                for cand in SEED_GRID_CANDIDATES:
+                    if cand in grid:
+                        continue
+                    if states.get((m["id"], cand)) == "failed":
+                        continue  # already known unusable for this model
+                    replacement = cand
+                    break
+                if replacement is None:
+                    # every candidate failed for this model - the
+                    # model cannot run quantized at all; leave the
+                    # slot, the lineage stays short (its largest
+                    # model is simply unusable - the seed proceeds
+                    # around it)
+                    continue
+                grid[slot] = replacement
+                save_seed_grid(state_file, grid)
+                pi2 = pool_index.get((m["id"], replacement))
+                if pi2 is None or states.get((m["id"], replacement)) == "done":
+                    continue  # already measured at the replacement
+                return {
+                    "index": pi2,
+                    "fam": m["id"],
+                    "rung": replacement,
+                    "p": None,
+                    "probs": None,
+                    "phase": "seed-recovery",
+                    "cost_gib": _f16_gib_from_models_md(m["id"]),
+                }
+            # state is None: not measured - pick it
             return {
                 "index": pi,
                 "fam": m["id"],
@@ -397,7 +485,7 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
                 "phase": "seed",
                 "cost_gib": _f16_gib_from_models_md(m["id"]),
             }
-    return None  # every lineage has its seed block swept
+    return None  # every lineage's block is complete at the current grid
 
 
 def adaptive_epsilon(state_file: str) -> float:

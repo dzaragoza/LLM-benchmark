@@ -888,7 +888,16 @@ def main(on_progress: Any = None) -> None:
                 f"acquisition ~{rec_pick['cost_gib']} GiB"
             )
         if key in done:
-            continue  # the pair already had its chance: re-draw
+            if phase == "seed-recovery":
+                # THE RECOVERY RE-ARM: the grid slot was replaced and
+                # the failed pair gets its chance again - the failed
+                # sweep's records stay (the failure evidence), the
+                # done-key leaves so the sweep re-runs at the new quant
+                done.discard(key)
+                _GC_DONE_SET.discard(key)
+                print(f"[ei] seed-recovery: re-arming {fam} {rung}")
+            else:
+                continue  # the pair already had its chance: re-draw
         print(
             f"[ei] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
