@@ -450,15 +450,35 @@ def run_pair(
     # llama-server defaults ctx to 0 = load from the model, so the
     # window is exactly n_ctx_train, one parameter less to worry
     ctx = bell_window(state, fam, models_dir) or 262144
-    records: list[dict[str, Any]] = []
+
+    # THE SWEEP RESUME (the author's ruling): the state's results ARE
+    # the kv-combo memory - every completed combo's record is in the
+    # state the moment it lands (saved per combo below), so a stop
+    # mid-sweep re-picks the pair and SKIPS the combos whose records
+    # already exist; the sweep resumes at the next untested (k, v)
+    # instead of starting from 0. The answer files stay too (per
+    # combo, on disk), but the RECORD is the resume's truth: it
+    # carries the verdict, not just the prose.
+    prior_records = [
+        r
+        for r in state.get("results", [])
+        if r.get("fam") == fam and r.get("rung") == rung
+    ]
+    done_combos = {(r.get("k_quant"), r.get("v_quant")) for r in prior_records}
+    records: list[dict[str, Any]] = list(prior_records)
+    n_resume = len(done_combos)
+
     # THE KV PROGRESS (the author's ruling): a dot per combination,
     # the count at every multiple of 7 - the 49-combo sweep reads
-    # as ......7......14......21 ......49, live in the console
+    # as ......7......14......21 ......49, live in the console.
+    # A resumed sweep continues the count from its true position.
     n_kv_ladder = len(KV_LADDER)
     try:
         n_combo = 0
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
+                if (k_quant, v_quant) in done_combos:
+                    continue  # already measured: the resume skips it
                 rec = _run_combo(
                     fam,
                     rung,
@@ -471,11 +491,22 @@ def run_pair(
                     entropy_get,
                 )
                 records.append(rec)
+                # THE PER-COMBO PERSISTENCE: the record lands in the
+                # state NOW - a crash after this combo keeps it, the
+                # resume after the crash never re-runs it
+                state.setdefault("results", []).append(rec)
+                state["results"] = state["results"][-5000:]
+                _state_store.save_state(state_file, state)
                 n_combo += 1
                 print(".", end="", flush=True)
-                if n_combo % n_kv_ladder == 0:
-                    print(n_combo, end="", flush=True)
+                if (n_resume + n_combo) % n_kv_ladder == 0:
+                    print(n_resume + n_combo, end="", flush=True)
         print()  # the sweep's line ends
+        if n_resume:
+            print(
+                f"[ei] sweep resumed: {n_resume} combos already done, "
+                f"{n_combo} run"
+            )
     finally:
         # THE FILE RULE: a fully swept quant is deleted - no kv
         # combination of it remains, it will never be needed again.
@@ -733,7 +764,10 @@ def main(on_progress: Any = None) -> None:
     if os.path.isfile(state_file):
         with open(state_file, encoding="utf-8") as fh:
             state = json.load(fh)
-    results: list[dict[str, Any]] = state.setdefault("results", [])
+    # the state's results list IS the ledger's memory; run_pair
+    # appends per combo and may rebind the list on trim, so every
+    # consumer re-reads state["results"] instead of caching a handle
+    results: list[dict[str, Any]] = state["results"]
 
     pool = the_pool()
     _GC_POOL.clear()
@@ -766,7 +800,7 @@ def main(on_progress: Any = None) -> None:
         """md/ei.md: rank (highest score, tiebreak by time),
         model, high score, quant @ high score, speed (fast <= 32s,
         medium <= 64s, slow <= 128s - the candidate's whole run)."""
-        rows = [r for r in results if r.get("result") == "done"]
+        rows = [r for r in state["results"] if r.get("result") == "done"]
         done_pairs = len(done)
         rows.sort(
             key=lambda r: (
@@ -935,11 +969,24 @@ def main(on_progress: Any = None) -> None:
             }
         )
         state["picks"] = state["picks"][-2000:]  # bounded
-        results.extend(recs)
+        # THE RESUME-SAFE EXTEND: the resumed records are ALREADY in
+        # state["results"] (run_pair persisted them per combo), so
+        # only the records NOT yet in the state extend it - the
+        # fresh-sweep path (recs == all new) appends all, the
+        # resumed path appends only what actually ran
+        have = {
+            (r.get("fam"), r.get("rung"), r.get("k_quant"), r.get("v_quant"), r.get("seed"))
+            for r in state["results"]
+        }
+        for r in recs:
+            k = (r.get("fam"), r.get("rung"), r.get("k_quant"), r.get("v_quant"), r.get("seed"))
+            if k not in have:
+                state["results"].append(r)
+                have.add(k)
+        state["results"] = state["results"][-5000:]  # the state stays bounded
         done.add(key)
         _GC_DONE_SET.add(key)
         state["done"] = sorted(done)
-        state["results"] = results[-5000:]  # the state stays bounded
         _state_store.save_state(state_file, state)
         write_ledger()
         while gc_log:
