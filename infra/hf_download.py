@@ -207,10 +207,13 @@ def estimate_rung_gib(
     return None
 
 
-# system-RAM reserve for the OS + the KV cache at the 4096 reference
-# depth (addendum 35): a rung is feasible only if its file fits in
-# total RAM minus this reserve (the T14s: 32 - 4 = 28 GiB usable).
-RAM_RESERVE_GIB = 4.0
+# THE DEVICE CEILING (the author's ruling, addendum 35 tightened):
+# llama-server can only use the iGPU's carve-out - ~16 GiB of
+# unified memory - not the whole 30 GiB of system RAM. A rung whose
+# file exceeds the device budget CANNOT RUN regardless of system
+# RAM (the GPU can never hold it, and the CPU is useless for this
+# experiment); skip before any download.
+DEVICE_LIMIT_GIB = 16.0
 
 
 def find_rung_file(names: list[str] | tuple[str, ...], rung: str) -> str | None:
@@ -399,17 +402,14 @@ def acquire(
     # feasibility shortcut, before any network traffic
     sizes = remote_file_sizes(source_repo) or remote_file_sizes(model_repo)
     rung_est = estimate_rung_gib(rung, model_files, source_files, sizes)
-    ram = system_ram_gib()
-    if rung_est is not None and ram is not None:
-        usable = ram - RAM_RESERVE_GIB
-        if rung_est > usable:
-            print(
-                f"  [1] {rung}: estimated {rung_est:.1f} GiB exceeds "
-                f"usable RAM {usable:.1f} GiB (total {ram:.1f} GiB - "
-                f"{RAM_RESERVE_GIB:g} reserve) - CANNOT RUN on this "
-                "machine, skipping before download (addendum 35)"
-            )
-            return None, "infeasible: exceeds system RAM"
+    if rung_est is not None and rung_est > DEVICE_LIMIT_GIB:
+        print(
+            f"  [1] {rung}: estimated {rung_est:.1f} GiB exceeds the "
+            f"device budget {DEVICE_LIMIT_GIB:.0f} GiB (the iGPU "
+            "carve-out llama-server can use) - CANNOT RUN on this "
+            "machine, skipping before download (addendum 35, tightened)"
+        )
+        return None, "infeasible: exceeds the device budget"
     disk = free_disk_gib(famdir)
     if rung_est is not None and disk is not None:
         need = rung_est * 2 if rung_est else 0
