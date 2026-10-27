@@ -451,7 +451,12 @@ def run_pair(
     # window is exactly n_ctx_train, one parameter less to worry
     ctx = bell_window(state, fam, models_dir) or 262144
     records: list[dict[str, Any]] = []
+    # THE KV PROGRESS (the author's ruling): a dot per combination,
+    # the count at every multiple of 7 - the 49-combo sweep reads
+    # as ......7......14......21 ......49, live in the console
+    n_kv_ladder = len(KV_LADDER)
     try:
+        n_combo = 0
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
                 rec = _run_combo(
@@ -466,6 +471,11 @@ def run_pair(
                     entropy_get,
                 )
                 records.append(rec)
+                n_combo += 1
+                print(".", end="", flush=True)
+                if n_combo % n_kv_ladder == 0:
+                    print(n_combo, end="", flush=True)
+        print()  # the sweep's line ends
     finally:
         # THE FILE RULE: a fully swept quant is deleted - no kv
         # combination of it remains, it will never be needed again.
