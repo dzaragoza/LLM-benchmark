@@ -859,28 +859,33 @@ def main(on_progress: Any = None) -> None:
     print(f"[randomizer] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
     while len(done) < len(pool):
-        # the pick, v3: 16 bits = 11 model index + 5 model-quant. The
-        # 11-bit draw is the pool index (uniform over the 64
-        # families); the rung comes from the 5-bit draw over LADDER.
-        # The done-key is the PAIR, the pool index of the (fam, rung)
-        # combination: one chance per pair, and a pick that re-draws
-        # an already-swept pair re-draws with fresh entropy.
-        pick = entropy_bits(PICK_BITS)
-        model_idx = pick & 0x7FF
-        rung_idx = (pick >> 11) & 0x1F
-        fam = pool[model_idx][0]
-        # THE PAIR KEY IS THE POOL INDEX of the (fam, rung) actually
-        # evaluated: fam_pos = model_idx // 32 (the pool is fam-major,
-        # 32 rungs per family), so the key space is 0..2047 - the
-        # same space the gc and the drain condition count in
-        fam_pos = model_idx // 32
-        pair_key = fam_pos * 32 + rung_idx
+        # THE PICK, v4: expected-improvement steers the pair choice
+        # (bench/ei.py - the monotone-logistic surrogate with PoI;
+        # below SEED_N swept pairs it IS uniform random, the same
+        # entropy draw as before, so the seed phase changes nothing).
+        # kv quants are NOT searched: the picked pair sweeps all 49
+        # (k, v) combinations in one acquisition, then the pair is
+        # never needed again. The done-key is the pair's pool index.
+        from bench import ei
+
+        rec_pick = ei.next_pair(
+            state_file, seed_get=lambda: entropy_bits(16), n_pairs=len(pool)
+        )
+        if rec_pick is None:
+            break
+        pair_key = rec_pick["index"]
+        fam = rec_pick["fam"]
+        rung = rec_pick["rung"]
         key = f"{pair_key}"
+        if rec_pick["phase"] == "poi":
+            print(
+                f"[ei] PoI pick: p(score >= best+1) = {rec_pick['p']:.4f}, "
+                f"acquisition ~{rec_pick['cost_gib']} GiB"
+            )
         if key in done:
             continue  # the pair already had its chance: re-draw
-        rung = LADDER[rung_idx]
         print(
-            f"[randomizer] #{n + 1} pick=0b{pick:016b} "
+            f"[randomizer] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
         )
         recs = run_pair(fam, rung, models_dir, state, port)
