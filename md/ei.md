@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 1356 done candidates, top 3 score levels (10 candidates of 1356, ties included)
+- measured: 1357 done candidates, top 3 score levels (10 candidates of 1357, ties included)
 - params median: **3.403 B**
 - model_quant mode: **Q6_K**
 - k_quant mode: **q5_1**
@@ -1376,5 +1376,6 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1354 | gemma-3-27b-it | -1 | Q2_K | q5_1 | iq4_nl | 13.56 | 131,072 | slow |
 | 1355 | gemma-3-27b-it | -1 | Q2_K | q5_1 | q5_1 | 14.05 | 131,072 | slow |
 | 1356 | Mistral-Nemo-Instruct-2407 | -1 | Q2_K | f16 | q8_0 | 4.85 | 82,176 | fast |
+| 1357 | gemma-3-27b-it | -1 | Q3_K_L | q4_1 | q4_1 | 14.01 | 17,664 | slow |
 
-_1356 candidates run of 100,352 (55 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1357 candidates run of 100,352 (56 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
