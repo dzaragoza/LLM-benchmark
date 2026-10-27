@@ -84,20 +84,22 @@ def _est_size_gib(f16_gib: float | None, rung: str) -> float | None:
 
 
 def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | None]:
-    """THE BAND RESOLUTION: for each band, the rung whose estimated
-    size is closest to the band (and feasible <= DEVICE_LIMIT), not
-    already used by another band. None for a band no feasible rung
-    can fill (a model whose f16 is so large even the coarsest rung
-    exceeds the device, or all candidates excluded)."""
+    """THE BAND RESOLUTION (the author's ruling): for each band, the
+    rung whose estimated size is CLOSEST to the band - the actual
+    closest value, no tolerance percentage, repeats allowed across
+    bands (a tiny model's closest pick for all three bands may be
+    its own F16; the dedupe happens at pick time - a repeated rung
+    is measured once). Feasible = est size <= DEVICE_LIMIT. Excluded
+    rungs (the recovery's failed list) are skipped; None for a band
+    no feasible rung can fill."""
     from bench.roster import LADDER
 
     out: list[str | None] = []
-    used: set[str] = set(exclude)
     for band in SEED_BANDS_GIB:
         cands = [
             (abs(size - band), r)
             for r in LADDER
-            if r not in used
+            if r not in exclude
             and (size := _est_size_gib(f16_gib, r)) is not None
             and size <= DEVICE_LIMIT_GIB
         ]
@@ -105,9 +107,9 @@ def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | N
             out.append(None)
             continue
         cands.sort()
-        used.add(cands[0][1])
         out.append(cands[0][1])
     return out
+
 
 # the thresholds: P(score >= t), t = 0..MAX_T. The top threshold is
 # always one full point ABOVE the best observed (the PoI target) and
@@ -462,20 +464,27 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
             rung for (fam, rung), s in states.items()
             if fam == m["id"] and s == "failed"
         }
+        # THE CLOSEST-VALUE RESOLUTION, repeats allowed: the same
+        # rung may serve several bands - a repeated rung is
+        # measured ONCE (the dedupe), so a tiny model whose closest
+        # pick for every band is its own F16 seeds with one sweep
         clean = band_rungs(m["f16_gib"])
         rungs = band_rungs(m["f16_gib"], exclude=failed_rungs)
+        seen: set[str] = set()
         for band, q_clean, q in zip(SEED_BANDS_GIB, clean, rungs):
-            if q is None:
-                continue  # no feasible rung for this band after exclusions
+            if q is None or q in seen:
+                continue  # repeated rung: measured once, this band rides along
             state = states.get((m["id"], q))
             if state == "done":
-                continue  # measured at this band
+                seen.add(q)  # measured - and it covers its bands
+                continue
             pi = pool_index.get((m["id"], q))
             if pi is None:
                 continue
             if state == "failed":
                 continue  # excluded rung, the resolution already moved past it
             phase = "seed" if q == q_clean else "seed-recovery"
+            seen.add(q)
             return {
                 "index": pi,
                 "fam": m["id"],
