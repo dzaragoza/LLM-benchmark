@@ -409,10 +409,20 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
     state). The seeding SUCCEEDS when every lineage's largest model
     has all grid quants measured (done) at the current grid.
 
-    THE RECOVERY (the author's ruling): when a grid quant is unusable
-    for a model - the pair's sweep produced no single done record
-    (quantize failure or launch failure) - the slot is not skipped
-    but REPLACED: the next candidate quant (coarser-first, from
+    THE FAILURE DISTINCTION (the author's ruling): a kv failure is
+    NOT a quant failure. As long as ANY of the 49 (k, v) combinations
+    ran, the (model, model_quant) pair is SUCCESSFUL - per-combo
+    failures (an architecture that cannot hold a quantized cache,
+    one device-fit miss) are outcomes, not verdicts; only a sweep
+    with ZERO done records means the quant is unusable for the model
+    and the recovery fires. The replaced slot's data is never wasted:
+    every swept pair's 49 records stay in the results - pre-computed
+    for whatever needs them later (the risk of the repair is
+    mitigated by the data it already collected).
+
+    THE RECOVERY: when a grid quant is unusable for a model (zero
+    done records in its sweep), the slot is not skipped but
+    REPLACED: the next candidate quant (coarser-first, from
     SEED_GRID_CANDIDATES, not already in the grid) that the failed
     model CAN run replaces it GLOBALLY - the failed pair is re-picked
     with it, and every other model measures with the new grid too,
@@ -429,8 +439,10 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
         by_fam.setdefault(m["family"], []).append(m)
     largest = {f: max(ms, key=lambda m: m["params_b"]) for f, ms in by_fam.items()}
     pool_index = _pool_index()
-    for fam_name in sorted(largest):
-        m = largest[fam_name]
+    # THE SEED ORDER: DESCENDING PARAMS across all lineages (the
+    # author's ruling) - the biggest models first, the worst cases
+    # first: an early grid repair invalidates almost nothing
+    for m in sorted(largest.values(), key=lambda m: -m["params_b"]):
         for slot, q in enumerate(grid):
             pi = pool_index.get((m["id"], q))
             if pi is None:
