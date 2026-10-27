@@ -715,9 +715,9 @@ def main(on_progress: Any = None) -> None:
 
     socket.getaddrinfo = _ipv4_first  # ty: ignore[invalid-assignment]
     models_dir = "models"
-    state_file = RANDOMIZER_STATE_FILE
+    state_file = EI_STATE_FILE
     os.makedirs("state", exist_ok=True)
-    port = int(os.environ.get("RANDOMIZER_PORT", "8210"))
+    port = int(os.environ.get("EI_PORT", "8210"))
 
     state: dict[str, Any] = {}
     if os.path.isfile(state_file):
