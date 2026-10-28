@@ -818,12 +818,13 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     return _trek_size(r)
 
 
-def main(on_progress: Any = None, time_ceiling_s: float | None = None) -> None:
-    """The trek's run loop. time_ceiling_s: the sanity-check wall
-    clock - when the ceiling passes, the run stops GRACEFULLY at
-    the next loop boundary (the in-flight sweep has completed and
-    committed; the trek resumes where it stood on the next
-    launch). None: no ceiling, the trek runs to convergence."""
+def main(
+    on_progress: Any = None,
+    level_time_s: float | None = None,
+) -> None:
+    """The trek's run loop. level_time_s: THE EXAM CLOCK - the
+    per-level time limit (--time), the protocol's patience
+    definition. None: the default LEVEL_TIMEOUT_S (128s)."""
     # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
     # first with no fallback - a black-holed IPv6 route (curl works,
     # the library hangs, zero packets - the author's T14s case) is
@@ -982,18 +983,14 @@ def main(on_progress: Any = None, time_ceiling_s: float | None = None) -> None:
     )
     print(f"[trek] entropy: {_ENTROPY_DEV}")
     print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
+    # THE EXAM CLOCK (--time): the per-level limit, overridable per
+    # run - the practitioner's patience parameter
+    global LEVEL_TIMEOUT_S
+    if level_time_s is not None:
+        LEVEL_TIMEOUT_S = float(level_time_s)
+        print(f"[trek] the exam clock: {LEVEL_TIMEOUT_S:g}s per level (--time)")
     n = len(done)
-    t_start = time.monotonic()
     while len(done) < len(pool):
-        # THE SANITY-CHECK CEILING (--time): stop gracefully at the
-        # next loop boundary - the in-flight sweep has completed
-        # and committed; the trek resumes where it stood
-        if time_ceiling_s is not None and time.monotonic() - t_start >= time_ceiling_s:
-            print(
-                f"[trek] the --time ceiling ({time_ceiling_s:g}s) reached - "
-                "stopping gracefully (the trek resumes on the next launch)"
-            )
-            break
         # THE TREK STEP: bench/trek.py's deterministic walker - it
         # replays the walk from (0, 0) through the cached cells
         # (free) and hands back the FIRST cell needing evaluation.

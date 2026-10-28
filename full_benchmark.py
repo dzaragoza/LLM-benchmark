@@ -431,9 +431,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--time",
         type=float,
         default=None,
-        help="the sanity-check ceiling: stop the run gracefully after "
-        "this many seconds of wall clock (the current sweep completes "
-        "and commits; the trek resumes where it stood)",
+        help="the exam clock: the per-level time limit in seconds "
+        "(default 128). The protocol's patience parameter - --time 32 "
+        "gives every exam level 32 seconds; the tier ladders in the "
+        "ledger report at the dyadic cuts",
     )
     return ap
 
@@ -515,7 +516,7 @@ def _run(args: argparse.Namespace) -> None:
                 tee_output.install()
 
         try:
-            R.main(on_progress=push_progress, time_ceiling_s=args.time)
+            R.main(on_progress=push_progress, level_time_s=args.time)
         finally:
             # the git tail ALWAYS runs (the envelope's ruling): the
             # ledger, the state, and the answers are committed and
