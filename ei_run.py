@@ -939,10 +939,12 @@ def main(on_progress: Any = None) -> None:
             lines.append("")
             lines.append("## the score-time frontier (practitioner reporting)")
             lines.append("")
-            lines.append("the best score at a patience level (the high-score level's time):")
+            lines.append("the best score at a patience level (the high-score level's time);")
+            lines.append("the ram column is the holder's MEASURED vulkan0 memory - the")
+            lines.append("price of that patience in device memory")
             lines.append("")
-            lines.append("| patience | best score | holder | at |")
-            lines.append("|---|---|---|---|")
+            lines.append("| patience | best score | holder | at | ram |")
+            lines.append("|---|---|---|---|---|")
             for cap in TIME_LADDER_S:
                 cands = [r for r in timed if r["high_score_time_s"] <= cap]
                 if not cands:
@@ -952,9 +954,11 @@ def main(on_progress: Any = None) -> None:
                     (r for r in cands if r["high_score"] == best),
                     key=lambda r: r["high_score_time_s"],
                 )
+                ram = h.get("ram_gib")
+                ram_s = f"{ram:.1f} GiB" if ram is not None else "-"
                 lines.append(
                     f"| <= {int(cap)}s | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s |"
+                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s | {ram_s} |"
                 )
         rammed = [r for r in rows if r.get("ram_gib") is not None]
         if rammed:
@@ -962,12 +966,16 @@ def main(on_progress: Any = None) -> None:
             lines.append("## the score-by-ram-budget table (practitioner reporting)")
             lines.append("")
             lines.append(
-                "the best score whose MEASURED vulkan0 ram (model + kv + compute) fits a budget:"
+                "the best score whose MEASURED vulkan0 ram (model + kv + compute) fits"
             )
+            lines.append(
+                "a budget; the patience column is the holder's time tier - how long"
+            )
+            lines.append("you wait per level at that memory size")
             lines.append("")
-            lines.append("| ram budget | best score | holder |")
-            lines.append("|---|---|---|")
-            for cap in (2, 4, 8, 16):
+            lines.append("| ram budget | best score | holder | patience |")
+            lines.append("|---|---|---|---|")
+            for cap in (1, 2, 4, 8, 16):
                 cands = [r for r in rammed if r["ram_gib"] <= cap]
                 if not cands:
                     continue
@@ -976,9 +984,14 @@ def main(on_progress: Any = None) -> None:
                     (r for r in cands if r["high_score"] == best),
                     key=lambda r: r["ram_gib"],
                 )
+                t_s = h.get("high_score_time_s")
+                tier = next(
+                    (f"t{int(c)}" for c in TIME_LADDER_S if t_s is not None and t_s <= c),
+                    "-",
+                )
                 lines.append(
                     f"| <= {cap} GiB | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} |"
+                    f"k={h['k_quant']} v={h['v_quant']} | {tier} |"
                 )
         lines.append("")
         lines.append(
