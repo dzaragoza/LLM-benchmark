@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ei_run.py - protocol ei: the epitome of simplicity.
+"""trek_run.py - protocol ei: the epitome of simplicity.
 
 Reuses the v9.5 machinery (the exam papers, the grader, the bells,
 the acquisition pipeline, the server) and disposes of the rules -
@@ -325,7 +325,7 @@ def disk_watchdog(
 
 # the ei's state file (module-level: full_benchmark's
 # --clean wipes it before main() runs)
-EI_STATE_FILE = "state/ei-state.json"
+TREK_STATE_FILE = "state/trek-state.json"
 
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
@@ -545,7 +545,7 @@ def run_pair(
                 # resume after the crash never re-runs it
                 state.setdefault("results", []).append(rec)
                 state["results"] = state["results"][-5000:]
-                _state_store.save_state(EI_STATE_FILE, state)
+                _state_store.save_state(TREK_STATE_FILE, state)
                 # THE FILLING DOT: this combo finished - the dot is
                 # its truth (and the count at every 7)
                 n_combo += 1
@@ -555,7 +555,7 @@ def run_pair(
         print()  # the sweep's line ends
         if n_resume:
             print(
-                f"[ei] sweep resumed: {n_resume} combos already done, "
+                f"[trek] sweep resumed: {n_resume} combos already done, "
                 f"{n_combo} run"
             )
     finally:
@@ -604,7 +604,7 @@ def _run_combo(
     exam_seed = entropy_get()
 
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
-    answers_dir = os.path.join("results", "ei", fam)
+    answers_dir = os.path.join("results", "trek", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, f"{kv_tag}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{kv_tag}.log")
@@ -813,15 +813,9 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     roster (f16 x bpw/16). The catalog lookup is cached: the ledger
     writes call this per record, a rebuild per record was the
     table-render timeout."""
-    global _MODELS_BY_ID
-    from bench.ei import _est_size_gib, catalog
+    from bench.trek import _est_size_gib_of as _trek_size
 
-    if _MODELS_BY_ID is None:
-        _MODELS_BY_ID = {mm["id"]: mm for mm in catalog()[0]}
-    m = _MODELS_BY_ID.get(r.get("fam"))
-    if m is None:
-        return None
-    return _est_size_gib(m["f16_gib"], r.get("rung"))
+    return _trek_size(r)
 
 
 def main(on_progress: Any = None) -> None:
@@ -843,7 +837,7 @@ def main(on_progress: Any = None) -> None:
 
     socket.getaddrinfo = _ipv4_first  # ty: ignore[invalid-assignment]
     models_dir = "models"
-    state_file = EI_STATE_FILE
+    state_file = TREK_STATE_FILE
     os.makedirs("state", exist_ok=True)
     port = int(os.environ.get("EI_PORT", "8210"))
 
@@ -893,14 +887,14 @@ def main(on_progress: Any = None) -> None:
         # the top-3 summary are REMOVED - at 1,500+ candidates the
         # table was too long to be useful and the summary's medians
         # duplicated what the crowns state directly.
-        lines = ["# ei.md - the ei ledger", ""]
+        lines = ["# trek.md - the trek ledger", ""]
 
         # THE TIME-TIER CROWNS (the objective: the best score at each
         # dyadic patience cut, 1..128s; 256s pre-declared for the day
         # the clock extends): the same model may hold several cuts
         # (quants change speed and capability) or different models
         # may hold them. The weakest tier names PoI's target.
-        from bench.ei import (
+        from bench.trek import (
             RAM_LADDER_GIB,
             TIME_LADDER_S,
             suspicion_check,
@@ -1016,86 +1010,83 @@ def main(on_progress: Any = None) -> None:
             f"_{len(rows)} candidates measured, {done_pairs:,} of {len(pool):,} "
             "pairs swept; each pair one acquisition, the seed recorded in state._"
         )
-        with open("md/ei.md", "w", encoding="utf-8") as fh:
+        with open("md/trek.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
 
     print(
-        f"[ei] pool: {total_pairs:,} (model, rung) pairs "
+        f"[trek] pool: {total_pairs:,} (model, rung) pairs "
         f"(each pick sweeps {n_kv} x {n_kv} = {n_kv * n_kv} kv combinations), "
         f"no size gate - llama-server decides at launch, ONE chance each"
     )
-    print(f"[ei] entropy: {_ENTROPY_DEV}")
-    print(f"[ei] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
+    print(f"[trek] entropy: {_ENTROPY_DEV}")
+    print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
     while len(done) < len(pool):
-        # THE PICK, v4: expected-improvement steers the pair choice
-        # (bench/ei.py - the monotone-logistic surrogate with PoI;
-        # below SEED_N swept pairs it IS uniform random, the same
-        # entropy draw as before, so the seed phase changes nothing).
-        # kv quants are NOT searched: the picked pair sweeps all 49
-        # (k, v) combinations in one acquisition, then the pair is
-        # never needed again. The done-key is the pair's pool index.
-        from bench import ei
+        # THE TREK STEP: bench/trek.py's deterministic walk - the
+        # frontier's best-estimated unmeasured cell under the
+        # declared, logged strategy. kv quants are NOT searched: the
+        # picked cell's pair sweeps all 49 (k, v) combinations in one
+        # acquisition, then the cell is never needed again. The
+        # done-key is the cell's grid/pool index.
+        from bench import trek
 
-        rec_pick = ei.next_pair(
-            state_file, seed_get=lambda: entropy_bits(16), n_pairs=len(pool)
-        )
+        rec_pick = trek.pick(state_file)
         if rec_pick is None:
             break
         pair_key = rec_pick["index"]
         fam = rec_pick["fam"]
         rung = rec_pick["rung"]
         key = f"{pair_key}"
-        phase = rec_pick.get("phase", "seed")
-        eps = rec_pick.get("epsilon")
-        if phase.startswith("poi"):
-            tag = (
-                f"eps={eps:.2f}" if eps is not None else "eps=0.00 (adaptive)"
-            ) if phase == "poi" else phase
-            tgt = rec_pick.get("target_tier")
-            tgt_s = f", target: {tgt} tier (score >= {rec_pick.get('target_score', '?') + 1})" if tgt else ""
-            print(
-                f"[ei] {tag}: p(score >= best+1) = {rec_pick['p']:.4f}, "
-                f"acquisition ~{rec_pick['cost_gib']} GiB{tgt_s}"
-            )
-        if key in done:
-            if phase == "seed-recovery":
-                # THE RECOVERY RE-ARM: the grid slot was replaced and
-                # the failed pair gets its chance again - the failed
-                # sweep's records stay (the failure evidence), the
-                # done-key leaves so the sweep re-runs at the new quant
-                done.discard(key)
-                _GC_DONE_SET.discard(key)
-                print(f"[ei] seed-recovery: re-arming {fam} {rung}")
-            else:
-                continue  # the pair already had its chance: re-draw
+        est = rec_pick.get("estimate")
+        sup = rec_pick.get("support", 0)
+        est_s = f"{est:.2f}" if est is not None else "blind"
         print(
-            f"[ei] #{n + 1} pair={key} "
+            f"[trek] step {n + 1}: {fam} {rung} "
+            f"(estimate {est_s}, support {sup})"
+        )
+        if key in done:
+            continue  # already measured (a resume's re-derivation guard)
+        print(
+            f"[trek] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
         )
         recs = run_pair(fam, rung, models_dir, state, port)
-        # THE PICK LEDGER: each pick's phase and outcome ride the
-        # state - the adaptive epsilon's raw material (the trailing
-        # rate at which PoI picks failed to beat the median)
+        # THE WALK LOG: each step's pick (with the strategy that made
+        # it, the estimate it acted on, and the realized score) rides
+        # the state - the replayable record of exactly what the
+        # walker did and why, and the checkpoint's raw material
         done_recs = [r for r in recs if r.get("result") == "done"]
         pick_score = (
-            max((r.get("high_score") or -1 for r in done_recs), default=None)
+            max((r.get("high_score") or -1 for r in done_recs), default=-1)
             if done_recs
-            else None
+            else -1
         )
-        state.setdefault("picks", []).append(
+        state.setdefault("walk", []).append(
             {
                 "index": pair_key,
                 "fam": fam,
                 "rung": rung,
-                "phase": phase,
-                "epsilon": eps,
-                "p": rec_pick.get("p"),
+                "estimate": est,
+                "support": sup,
+                "strategy": rec_pick.get("strategy"),
                 "score": pick_score,
                 "n_recs": len(recs),
             }
         )
-        state["picks"] = state["picks"][-2000:]  # bounded
+        state["walk"] = state["walk"][-4000:]  # bounded
+        # THE CHECKPOINT (every CHECKPOINT_N measured cells): the walk
+        # re-derives from the cache and the strategy is reviewed from
+        # the diagnostics - crown progression, estimate bias, lineage
+        # coverage. The strategy change is the author's ruling, logged;
+        # the walk then replays deterministically under it.
+        if len(state["walk"]) % trek.CHECKPOINT_N == 0:
+            rep = trek.checkpoint_report(state_file)
+            print(
+                f"[trek] CHECKPOINT {len(state['walk'])}: "
+                f"cells {rep['n_cells_measured']}, best {rep['best_score']}, "
+                f"estimate bias {rep.get('estimate_bias')}"
+            )
+            print(f"[trek]   lineage coverage: {rep['lineage_coverage']}")
         # THE RESUME-SAFE EXTEND: the resumed records are ALREADY in
         # state["results"] (run_pair persisted them per combo), so
         # only the records NOT yet in the state extend it - the
@@ -1137,7 +1128,7 @@ def main(on_progress: Any = None) -> None:
             if done_recs
             else recs[0].get("result", "?")
         )
-        print(f"[ei]   -> {summary}")
+        print(f"[trek]   -> {summary}")
         # INV: THE STUCK-RETRY GUARD (the imatrix lesson): the same
         # (fam, rung, result, detail) signature repeating more than
         # twice means a stuck retry loop, not independent evidence -
@@ -1175,8 +1166,8 @@ def main(on_progress: Any = None) -> None:
             try:
                 on_progress(n)
             except Exception as e:
-                print(f"[ei] progress push failed (ignored): {e}")
-    print(f"[ei] the pool is drained: {len(done)} pairs, one chance each - complete")
+                print(f"[trek] progress push failed (ignored): {e}")
+    print(f"[trek] the pool is drained: {len(done)} pairs, one chance each - complete")
 
 
 if __name__ == "__main__":

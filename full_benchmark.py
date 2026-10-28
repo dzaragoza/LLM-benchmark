@@ -2,7 +2,7 @@
 """full_benchmark.py -- the ei's envelope (the v9.5 exam
 walk is retired; the ei is the benchmark).
 
-One command: python full_benchmark.py --task ei. The pool is
+One command: python full_benchmark.py --task trek. The grid is
 v3: (model, model-quant) pairs - 64 models x 32 rungs = 2,048
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
@@ -164,7 +164,7 @@ def preflight_selfcheck() -> None:
     # --- the pool: the full v2 candidate census (the dry-run check,
     # folded in): every family x every rung x every kv pair, the
     # drawn-set coherent with the state file ---
-    import ei_run as R
+    import trek_run as R
 
     pool = R.the_pool()
     n_kv = len(R.KV_LADDER)
@@ -175,8 +175,8 @@ def preflight_selfcheck() -> None:
     fams = {f for f, _ in pool}
     assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
     assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
-    if os.path.isfile(R.EI_STATE_FILE):
-        with open(R.EI_STATE_FILE, encoding="utf-8") as fh:
+    if os.path.isfile(R.TREK_STATE_FILE):
+        with open(R.TREK_STATE_FILE, encoding="utf-8") as fh:
             st = json.load(fh)
         drawn = set(st.get("done", []))
         assert len(drawn) <= total, "the drawn-set exceeds the pool - corrupt state"
@@ -251,9 +251,9 @@ def git_tail(args: argparse.Namespace) -> None:
     paths = [args.state_file, args.results_file, "results.txt"]
     # the ledger is a first-class artifact: every commit carries
     # the latest regeneration (the progress pushes depend on it)
-    if os.path.isfile("md/ei.md"):
-        paths += ["md/ei.md"]
-    if os.path.isfile(EI_STATE := "state/ei-state.json"):
+    if os.path.isfile("md/trek.md"):
+        paths += ["md/trek.md"]
+    if os.path.isfile(EI_STATE := "state/trek-state.json"):
         paths += [EI_STATE]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split
@@ -366,7 +366,7 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
     # (the 119MB granite-3.1 lesson)
     import glob as _glob
 
-    for p in _glob.glob("results/ei/**/exam-server-*.log", recursive=True):
+    for p in _glob.glob("results/trek/**/exam-server-*.log", recursive=True):
         try:
             if os.path.getsize(p) > 20 * 2**20:
                 with open(p, encoding="utf-8", errors="replace") as fh:
@@ -417,8 +417,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="ei",
-        choices=["ei"],
+        default="trek",
+        choices=["trek"],
         help="the benchmark: the protocol ei (the v9.5 exam walk is retired)",
     )
     ap.add_argument(
@@ -480,19 +480,19 @@ def _run(args: argparse.Namespace) -> None:
     preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.task == "ei":
+    if args.task == "trek":
         # protocol ei: the epitome of simplicity - every
         # candidate of the 2048 pool (roster x LADDER = 11 bits of
         # real entropy per pick, ONE chance each), a fresh 8-bit
         # exam per candidate, a 128s timer PER LEVEL, results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
-        import ei_run as R
+        import trek_run as R
 
-        if args.clean and os.path.isfile(R.EI_STATE_FILE):
+        if args.clean and os.path.isfile(R.TREK_STATE_FILE):
             # simple: delete the state file - main() treats a
             # missing file as a fresh pool, every chance restored
-            os.remove(R.EI_STATE_FILE)
+            os.remove(R.TREK_STATE_FILE)
             stamp("ei: state deleted (--clean) - a fresh pool")
 
         def push_progress(n: int) -> None:
