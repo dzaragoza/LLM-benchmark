@@ -1098,6 +1098,38 @@ def main(on_progress: Any = None) -> None:
             else recs[0].get("result", "?")
         )
         print(f"[ei]   -> {summary}")
+        # INV: THE STUCK-RETRY GUARD (the imatrix lesson): the same
+        # (fam, rung, result, detail) signature repeating more than
+        # twice means a stuck retry loop, not independent evidence -
+        # the SameFileError flood produced 2,597 IDENTICAL failures
+        # across 53 pairs before anyone looked. Warning only: we
+        # decide whether it is our bug or our logic.
+        sig_counts: dict[tuple, int] = {}
+        for r in recs:
+            sig = (
+                r.get("fam"),
+                r.get("rung"),
+                r.get("result"),
+                (r.get("detail") or "")[:80],
+            )
+            sig_counts[sig] = sig_counts.get(sig, 0) + 1
+        prior = {
+            (
+                r.get("fam"),
+                r.get("rung"),
+                r.get("result"),
+                (r.get("detail") or "")[:80],
+            )
+            for r in state.get("results", [])[-2000:]
+        }
+        for sig, c in sig_counts.items():
+            if sig in prior and c > 2:
+                warn_contract(
+                    "inv", "driver.stuck_retry",
+                    False,
+                    f"{sig[0]} {sig[1]}: the failure '{sig[3]}' already fired "
+                    f"before and repeats {c}x - a stuck retry loop, not evidence",
+                )
         n += 1
         if on_progress is not None:
             try:
