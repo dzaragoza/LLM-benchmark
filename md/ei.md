@@ -2,7 +2,7 @@
 
 ## the top 3 dashboard
 
-- measured: 1504 done candidates, top 3 score levels (5 candidates of 1504, ties included)
+- measured: 1553 done candidates, top 3 score levels (5 candidates of 1553, ties included)
 - params median: **10.306 B**
 - model_quant mode: **Q6_K**
 - k_quant mode: **q8_0**
@@ -1524,5 +1524,54 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1502 | Falcon3-10B-Instruct | -1 | Q6_K | q5_0 | q8_0 | 9.94 | 32,768 | medium |
 | 1503 | Falcon3-10B-Instruct | -1 | Q6_K | q5_0 | q5_1 | 9.55 | 32,768 | slow |
 | 1504 | Falcon3-10B-Instruct | -1 | Q6_K | q5_1 | q5_0 | 9.55 | 32,768 | slow |
+| 1505 | Qwen3.5-9B | -1 | Q2_K | f16 | f16 | 11.64 | 262,144 | fast |
+| 1506 | Qwen3.5-9B | -1 | Q2_K | f16 | q8_0 | 9.77 | 262,144 | fast |
+| 1507 | Qwen3.5-9B | -1 | Q2_K | f16 | q4_0 | 8.77 | 262,144 | fast |
+| 1508 | Qwen3.5-9B | -1 | Q2_K | f16 | q4_1 | 8.89 | 262,144 | fast |
+| 1509 | Qwen3.5-9B | -1 | Q2_K | f16 | iq4_nl | 8.77 | 262,144 | fast |
+| 1510 | Qwen3.5-9B | -1 | Q2_K | f16 | q5_0 | 9.02 | 262,144 | fast |
+| 1511 | Qwen3.5-9B | -1 | Q2_K | f16 | q5_1 | 9.14 | 262,144 | fast |
+| 1512 | Qwen3.5-9B | -1 | Q2_K | q8_0 | f16 | 9.77 | 262,144 | fast |
+| 1513 | Qwen3.5-9B | -1 | Q2_K | q8_0 | q8_0 | 7.89 | 262,144 | fast |
+| 1514 | Qwen3.5-9B | -1 | Q2_K | q8_0 | q4_0 | 6.89 | 262,144 | fast |
+| 1515 | Qwen3.5-9B | -1 | Q2_K | q8_0 | q4_1 | 7.02 | 262,144 | fast |
+| 1516 | Qwen3.5-9B | -1 | Q2_K | q8_0 | iq4_nl | 6.89 | 262,144 | fast |
+| 1517 | Qwen3.5-9B | -1 | Q2_K | q8_0 | q5_0 | 7.14 | 262,144 | fast |
+| 1518 | Qwen3.5-9B | -1 | Q2_K | q8_0 | q5_1 | 7.27 | 262,144 | fast |
+| 1519 | Qwen3.5-9B | -1 | Q2_K | q4_0 | f16 | 8.77 | 262,144 | fast |
+| 1520 | Qwen3.5-9B | -1 | Q2_K | q4_0 | q8_0 | 6.89 | 262,144 | fast |
+| 1521 | Qwen3.5-9B | -1 | Q2_K | q4_0 | q4_0 | 5.89 | 262,144 | fast |
+| 1522 | Qwen3.5-9B | -1 | Q2_K | q4_0 | q4_1 | 6.02 | 262,144 | fast |
+| 1523 | Qwen3.5-9B | -1 | Q2_K | q4_0 | iq4_nl | 5.89 | 262,144 | fast |
+| 1524 | Qwen3.5-9B | -1 | Q2_K | q4_0 | q5_0 | 6.14 | 262,144 | fast |
+| 1525 | Qwen3.5-9B | -1 | Q2_K | q4_0 | q5_1 | 6.27 | 262,144 | fast |
+| 1526 | Qwen3.5-9B | -1 | Q2_K | q4_1 | f16 | 8.89 | 262,144 | fast |
+| 1527 | Qwen3.5-9B | -1 | Q2_K | q4_1 | q8_0 | 7.02 | 262,144 | fast |
+| 1528 | Qwen3.5-9B | -1 | Q2_K | q4_1 | q4_0 | 6.02 | 262,144 | fast |
+| 1529 | Qwen3.5-9B | -1 | Q2_K | q4_1 | q4_1 | 6.14 | 262,144 | fast |
+| 1530 | Qwen3.5-9B | -1 | Q2_K | q4_1 | iq4_nl | 6.02 | 262,144 | fast |
+| 1531 | Qwen3.5-9B | -1 | Q2_K | q4_1 | q5_0 | 6.27 | 262,144 | fast |
+| 1532 | Qwen3.5-9B | -1 | Q2_K | q4_1 | q5_1 | 6.39 | 262,144 | fast |
+| 1533 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | f16 | 8.77 | 262,144 | fast |
+| 1534 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | q8_0 | 6.89 | 262,144 | fast |
+| 1535 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | q4_0 | 5.89 | 262,144 | fast |
+| 1536 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | q4_1 | 6.02 | 262,144 | fast |
+| 1537 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | iq4_nl | 5.89 | 262,144 | fast |
+| 1538 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | q5_0 | 6.14 | 262,144 | fast |
+| 1539 | Qwen3.5-9B | -1 | Q2_K | iq4_nl | q5_1 | 6.27 | 262,144 | fast |
+| 1540 | Qwen3.5-9B | -1 | Q2_K | q5_0 | f16 | 9.02 | 262,144 | fast |
+| 1541 | Qwen3.5-9B | -1 | Q2_K | q5_0 | q8_0 | 7.14 | 262,144 | fast |
+| 1542 | Qwen3.5-9B | -1 | Q2_K | q5_0 | q4_0 | 6.14 | 262,144 | fast |
+| 1543 | Qwen3.5-9B | -1 | Q2_K | q5_0 | q4_1 | 6.27 | 262,144 | fast |
+| 1544 | Qwen3.5-9B | -1 | Q2_K | q5_0 | iq4_nl | 6.14 | 262,144 | fast |
+| 1545 | Qwen3.5-9B | -1 | Q2_K | q5_0 | q5_0 | 6.39 | 262,144 | fast |
+| 1546 | Qwen3.5-9B | -1 | Q2_K | q5_0 | q5_1 | 6.52 | 262,144 | fast |
+| 1547 | Qwen3.5-9B | -1 | Q2_K | q5_1 | f16 | 9.14 | 262,144 | fast |
+| 1548 | Qwen3.5-9B | -1 | Q2_K | q5_1 | q8_0 | 7.27 | 262,144 | fast |
+| 1549 | Qwen3.5-9B | -1 | Q2_K | q5_1 | q4_0 | 6.27 | 262,144 | fast |
+| 1550 | Qwen3.5-9B | -1 | Q2_K | q5_1 | q4_1 | 6.39 | 262,144 | fast |
+| 1551 | Qwen3.5-9B | -1 | Q2_K | q5_1 | iq4_nl | 6.27 | 262,144 | fast |
+| 1552 | Qwen3.5-9B | -1 | Q2_K | q5_1 | q5_0 | 6.52 | 262,144 | fast |
+| 1553 | Qwen3.5-9B | -1 | Q2_K | q5_1 | q5_1 | 6.64 | 262,144 | fast |
 
-_1504 candidates run of 100,352 (102 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1553 candidates run of 100,352 (103 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
