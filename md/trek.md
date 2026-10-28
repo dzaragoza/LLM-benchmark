@@ -33,4 +33,4 @@ you wait per level at that memory size
 | <= 8.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
 | <= 16.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
 
-_1519 candidates measured, 31 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_1568 candidates measured, 32 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
