@@ -27,10 +27,10 @@ you wait per level at that memory size
 
 | ram budget | best score | holder | patience |
 |---|---|---|---|
-| <= 1.0 GiB | 1 | gemma-3-1b-it IQ3_S k=q4_1 v=q4_0 | t1 |
+| <= 1.0 GiB | 1 | gemma-3-1b-it Q3_K_S k=q4_0 v=q5_1 | t1 |
 | <= 2.0 GiB | 2 | Qwen3.5-0.8B IQ3_XS k=iq4_nl v=q4_1 | t1 |
 | <= 4.0 GiB | 2 | Qwen3.5-0.8B IQ3_XS k=iq4_nl v=q4_1 | t1 |
 | <= 8.0 GiB | 2 | Qwen3.5-0.8B IQ3_XS k=iq4_nl v=q4_1 | t1 |
 | <= 16.0 GiB | 2 | Qwen3.5-0.8B IQ3_XS k=iq4_nl v=q4_1 | t1 |
 
-_5000 candidates measured, 139 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_5000 candidates measured, 140 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
