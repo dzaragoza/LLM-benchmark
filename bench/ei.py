@@ -313,6 +313,94 @@ def _pool_index() -> dict[tuple[str, str], int]:
     return idx
 
 
+
+
+# ------------------------------------------------- the three time tiers
+
+
+def tier_of(t_s: float | None) -> str | None:
+    """the candidate's tier by its own high-score level time: fast
+    <= 32s, medium <= 64s, slow <= 128s (the exam's level clock).
+    None: no level passed (score -1) - no tier (nothing was achieved
+    to be fast at), or the time datum is absent."""
+    if t_s is None:
+        return None
+    if t_s <= 32.0:
+        return "fast"
+    if t_s <= 64.0:
+        return "medium"
+    if t_s <= 128.0:
+        return "slow"
+    return "slow"  # over the clock never happens (the deadline caps at 128s)
+
+
+def tier_incumbents(state_file: str) -> dict[str, dict[str, Any]]:
+    """THE THREE INCUMBENTS (the author's ruling: the high score in
+    each time tier, fast/medium/slow): the best score achieved by a
+    candidate of that tier, per tier, with the holder's details. The
+    same model may hold several tiers (quants change both speed and
+    capability) or three different models may hold them."""
+    with open(state_file, encoding="utf-8") as fh:
+        st = json.load(fh)
+    inc: dict[str, dict[str, Any]] = {}
+    for r in st.get("results", []):
+        if r.get("result") != "done":
+            continue
+        t = tier_of(r.get("high_score_time_s"))
+        if t is None:
+            continue
+        s = int(r.get("high_score") or -1)
+        if s < 0:
+            continue
+        cur = inc.get(t)
+        if cur is None or s > cur["score"] or (s == cur["score"] and (r.get("high_score_time_s") or 1e9) < cur["time_s"]):
+            inc[t] = {
+                "score": s,
+                "time_s": float(r.get("high_score_time_s") or 1e9),
+                "fam": r.get("fam"),
+                "rung": r.get("rung"),
+                "k_quant": r.get("k_quant"),
+                "v_quant": r.get("v_quant"),
+            }
+    return inc
+
+
+def weakest_tier(inc: dict[str, dict[str, Any]]) -> str | None:
+    """THE ACQUISITION PRIORITY (the author's ruling: weakest first -
+    results fast): the tier furthest behind the global best is the
+    most valuable to improve. Ties broken toward the FASTER tier
+    (a fast discovery is worth more at equal gap)."""
+    if not inc:
+        return None
+    gbest = max(v["score"] for v in inc.values())
+    order = ["fast", "medium", "slow"]
+    # the gap BEHIND the global best; the weakest tier has the
+    # LARGEST gap (ties: the faster tier wins - a fast discovery is
+    # worth more at equal gap)
+    gaps = {t: gbest - inc[t]["score"] for t in inc}
+    return max(order, key=lambda t: (gaps.get(t, -1), -order.index(t)))
+
+
+def suspicion_check(inc: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """THE SUSPICION INVARIANT (the author's ruling, warning only):
+    the tier bests should be non-decreasing in tier time - the slow
+    champion should outscore the medium, the medium the fast (deep
+    scores need time; a total champion faster than the next score
+    would smell of exam-instance luck). A violation is reported, we
+    decide what to do if it happens - the check never blocks."""
+    order = ["fast", "medium", "slow"]
+    have = [t for t in order if t in inc]
+    violations = []
+    for a, b in zip(have, have[1:]):
+        if inc[a]["score"] > inc[b]["score"]:
+            violations.append(
+                f"{a} champion ({inc[a]['fam']} {inc[a]['rung']}, "
+                f"score {inc[a]['score']} at {inc[a]['time_s']:.0f}s) outscores the "
+                f"{b} champion (score {inc[b]['score']}) - possible "
+                "exam-instance luck, decide manually"
+            )
+    return {"violations": violations, "ok": not violations}
+
 # ---------------------------------------------------------- surrogate
 
 
@@ -545,11 +633,20 @@ def next_pair(
         return None
 
 
-    # the surrogate: fit on all tested, predict all
+    # THE TIER TARGET (the author's ruling: weakest tier first -
+    # results fast): the PoI target level is the weakest tier's
+    # incumbent + 1 (a full-point improvement where it is worth the
+    # most). The surrogate stays score-only; the tier names the goal.
+    inc = tier_incumbents(state_file)
+    wt = weakest_tier(inc)
+    y_best = max(best.values())
+    if wt is not None:
+        y_target_inc = inc[wt]["score"]
+    else:
+        y_target_inc = y_best
     X = feature_matrix()
     probs = surrogate_predict(X, X, best, tested)
-    y_best = max(best.values())
-    t_target = y_best + 1  # PoI: beat the incumbent by a full point
+    t_target = y_target_inc + 1  # PoI: beat the weakest tier's incumbent by a full point
     if t_target >= probs.shape[1]:
         # the target rides a phantom level: take the top threshold
         t_target = probs.shape[1] - 1
@@ -572,6 +669,7 @@ def next_pair(
             "p": float(p[idx]),
             "probs": [float(x) for x in levels],
             "phase": "poi-entropy",
+            "target_tier": wt,
             "cost_gib": _f16_gib_from_models_md(fam),
         }
 
@@ -606,6 +704,8 @@ def next_pair(
         "probs": [float(x) for x in levels],
         "phase": "poi",
         "epsilon": eps,
+        "target_tier": wt,
+        "target_score": y_target_inc,
         "cost_gib": _f16_gib_from_models_md(fam),
     }
 
@@ -628,7 +728,17 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
         "best_pairs": [
             _pair_of(i) for i, s in sorted(best.items(), key=lambda kv: -kv[1]) if s == max(best.values())
         ][:5],
+        # THE THREE TIERS (the author's ruling): the incumbent per
+        # time tier, the weakest tier, and the suspicion invariant -
+        # warning only, we decide what to do if it fires
+        "tiers": tier_incumbents(state_file),
+        "weakest_tier": None,
+        "suspicion": None,
     }
+    inc = out["tiers"]
+    if inc:
+        out["weakest_tier"] = weakest_tier(inc)
+        out["suspicion"] = suspicion_check(inc)
     if seed_pair(state_file, n_pairs) is not None:
         out["phase"] = "seed"
         out["p_better_remains"] = None

@@ -862,6 +862,35 @@ def main(on_progress: Any = None) -> None:
             f"- measured: {len(rows)} done candidates, top 3 score levels "
             f"({k} candidates of {len(rows)}, ties included)"
         )
+        # THE THREE TIME-TIER CROWNS (the author's ruling): the best
+        # score in each tier - fast <= 32s, medium <= 64s, slow <=
+        # 128s at the high-score level; the same model may hold
+        # several (quants change speed and capability) or three
+        # different models may hold them
+        from bench.ei import tier_incumbents, weakest_tier, suspicion_check
+
+        inc = tier_incumbents(state_file)
+        if inc:
+            lines.append("")
+            lines.append("## the three time-tier crowns")
+            lines.append("")
+            for t in ("fast", "medium", "slow"):
+                v = inc.get(t)
+                if v:
+                    lines.append(
+                        f"- {t} (<= {32 if t == 'fast' else 64 if t == 'medium' else 128}s): "
+                        f"**{v['fam']} {v['rung']} k={v['k_quant']} v={v['v_quant']}, "
+                        f"score {v['score']} @ {v['time_s']:.0f}s**"
+                    )
+            wt = weakest_tier(inc)
+            if wt:
+                lines.append(f"- the weakest tier: **{wt}** (the PoI target)")
+            sus = suspicion_check(inc)
+            if not sus["ok"]:
+                lines.append("")
+                lines.append("**WARNING - the suspicion invariant violated:**")
+                for v in sus["violations"]:
+                    lines.append(f"- {v}")
         if t_params:
             lines.append(f"- params median: **{_stats.median(t_params):g} B**")
         from collections import Counter as _C
@@ -951,9 +980,11 @@ def main(on_progress: Any = None) -> None:
             tag = (
                 f"eps={eps:.2f}" if eps is not None else "eps=0.00 (adaptive)"
             ) if phase == "poi" else phase
+            tgt = rec_pick.get("target_tier")
+            tgt_s = f", target: {tgt} tier (score >= {rec_pick.get('target_score', '?') + 1})" if tgt else ""
             print(
                 f"[ei] {tag}: p(score >= best+1) = {rec_pick['p']:.4f}, "
-                f"acquisition ~{rec_pick['cost_gib']} GiB"
+                f"acquisition ~{rec_pick['cost_gib']} GiB{tgt_s}"
             )
         if key in done:
             if phase == "seed-recovery":
