@@ -13,4 +13,4 @@ you wait per level at that memory size
 | <= 8.0 GiB | -1 | granite-4.0-h-350m Q1_0 k=q4_0 v=q4_0 | - |
 | <= 16.0 GiB | -1 | granite-4.0-h-350m Q1_0 k=q4_0 v=q4_0 | - |
 
-_196 candidates measured, 4 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_245 candidates measured, 5 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
