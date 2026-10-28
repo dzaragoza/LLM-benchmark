@@ -9,15 +9,15 @@ the ram column is the holder's memory TIER - the dyadic cut
 
 | patience | best score | holder | at | ram |
 |---|---|---|---|---|
-| <= 1s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 2s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 4s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 8s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 16s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 32s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 64s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 128s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
-| <= 256s | 1 | Qwen2.5-0.5B-Instruct IQ3_XS k=f16 v=f16 | 0s | g1 |
+| <= 1s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 2s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 4s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 8s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 16s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 32s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 64s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 128s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
+| <= 256s | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | 1s | g1 |
 
 ## the score-by-ram-budget table (practitioner reporting)
 
@@ -27,10 +27,10 @@ you wait per level at that memory size
 
 | ram budget | best score | holder | patience |
 |---|---|---|---|
-| <= 1.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
-| <= 2.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
-| <= 4.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
-| <= 8.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
-| <= 16.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
+| <= 1.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
+| <= 2.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
+| <= 4.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
+| <= 8.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
+| <= 16.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
 
-_1617 candidates measured, 33 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_1666 candidates measured, 34 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
