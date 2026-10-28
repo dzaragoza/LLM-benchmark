@@ -870,61 +870,33 @@ def main(on_progress: Any = None) -> None:
     _GC_DONE_SET.update(done)
 
     def write_ledger() -> None:
-        """md/ei.md: rank (highest score, tiebreak by time),
-        model, high score, quant @ high score, speed (fast <= 32s,
-        medium <= 64s, slow <= 128s - the candidate's whole run)."""
         rows = [r for r in state["results"] if r.get("result") == "done"]
         done_pairs = len(done)
-        rows.sort(
-            key=lambda r: (
-                -(r.get("high_score") or -1),
-                r.get("high_score_time_s") if r.get("high_score_time_s") is not None else 1e9,
-            )
-        )
 
-        # THE TOP-5% DASHBOARD (the author's four medians: params,
-        # quant, high-score level time, score) - computed FIRST and
-        # rendered at the TOP of the ledger (the author's ruling)
-        import re as _re
-        import statistics as _stats
-
-        fam_meta: dict[str, float] = {}
-        for ln in open("md/models.md", encoding="utf-8"):
-            m = _re.match(r"^\| ([^|]+) \| ([0-9.]+) \|", ln)
-            if m:
-                fam_meta[m.group(1).strip()] = float(m.group(2))
-        # THE TOP 3 (the author's ruling): the three highest SCORE
-        # LEVELS, ties included - every candidate whose high_score is
-        # one of the three highest distinct scores (score 3, 2, 1
-        # when the best is 3; all the tied candidates of each level)
-        scores_desc = sorted({r.get("high_score") or -1 for r in rows}, reverse=True)
-        top_scores = set(scores_desc[:3])
-        top = [r for r in rows if (r.get("high_score") or -1) in top_scores]
-        k = len(top)
-        t_params = [fam_meta[r["fam"]] for r in top if r["fam"] in fam_meta]
-        t_times = [r["high_score_time_s"] for r in top if r.get("high_score_time_s") is not None]
-        t_scores = [r.get("high_score") or -1 for r in top]
+        # THE LEDGER (the author's rulings, trimmed to what is read):
+        # the time-tier crowns (the objective), the two practitioner
+        # tables (reporting only), the footer. The ranking table and
+        # the top-3 summary are REMOVED - at 1,500+ candidates the
+        # table was too long to be useful and the summary's medians
+        # duplicated what the crowns state directly.
         lines = ["# ei.md - the ei ledger", ""]
-        lines.append("## the top 3 dashboard")
-        lines.append("")
-        lines.append(
-            f"- measured: {len(rows)} done candidates, top 3 score levels "
-            f"({k} candidates of {len(rows)}, ties included)"
+
+        # THE TIME-TIER CROWNS (the objective: the best score at each
+        # dyadic patience cut, 1..128s; 256s pre-declared for the day
+        # the clock extends): the same model may hold several cuts
+        # (quants change speed and capability) or different models
+        # may hold them. The weakest tier names PoI's target.
+        from bench.ei import (
+            TIME_LADDER_S,
+            suspicion_check,
+            tier_incumbents,
+            weakest_tier,
         )
-        # THE THREE TIME-TIER CROWNS (the author's ruling): the best
-        # score in each tier - fast <= 32s, medium <= 64s, slow <=
-        # 128s at the high-score level; the same model may hold
-        # several (quants change speed and capability) or three
-        # different models may hold them
-        from bench.ei import tier_incumbents, weakest_tier, suspicion_check
 
         inc = tier_incumbents(state_file)
         if inc:
+            lines.append("## the time-tier crowns")
             lines.append("")
-            lines.append("## the three time-tier crowns")
-            lines.append("")
-            from bench.ei import TIME_LADDER_S
-
             for cut in TIME_LADDER_S:
                 t = f"t{int(cut)}"
                 v = inc.get(t)
@@ -939,11 +911,9 @@ def main(on_progress: Any = None) -> None:
                 lines.append(f"- the weakest tier: **{wt}** (the PoI target)")
             # THE SUSPICION IS A POST-CONDITION, NOT AN INVARIANT
             # (the author's ruling): a tier inversion DURING
-            # execution is expected - the fast crown may transiently
-            # outscore slow simply because no slow candidate has
-            # been measured yet. The verdict only attaches when the
-            # pool is DRAINED (the experiment is finished); the
-            # ledger shows the live ordering, no warning mid-run
+            # execution is expected - a crown may simply not have a
+            # serious contender yet. The verdict only attaches when
+            # the pool is DRAINED (the experiment is finished).
             if len(done) >= len(pool):
                 sus = suspicion_check(inc)
                 if not sus["ok"]:
@@ -952,117 +922,68 @@ def main(on_progress: Any = None) -> None:
                     for v in sus["violations"]:
                         lines.append(f"- {v}")
                 else:
-                    lines.append("- the post-condition holds: the tier bests are ordered (fast <= medium <= slow)")
-
-            # THE EXTENDED REPORTING (the author's ruling: extra
-            # observations for the practitioners; the OPTIMIZATION is
-            # the original design - score at the three speed tiers -
-            # and none of this influences a single pick). Both tables
-            # are floors, not ceilings: the pool is not drained, the
-            # bests can only rise.
-            timed = [
-                r
-                for r in rows
-                if r.get("high_score_time_s") is not None and r.get("high_score") is not None
-            ]
-            if timed:
-                lines.append("")
-                lines.append("## the score-time frontier (practitioner reporting)")
-                lines.append("")
-                lines.append("the best score at a patience level (the high-score level's time):")
-                lines.append("")
-                lines.append("| patience | best score | holder | at |")
-                lines.append("|---|---|---|---|")
-                for cap in (8, 16, 32, 64, 128):
-                    cands = [r for r in timed if r["high_score_time_s"] <= cap]
-                    if not cands:
-                        continue
-                    best = max(r["high_score"] for r in cands)
-                    h = min(
-                        (r for r in cands if r["high_score"] == best),
-                        key=lambda r: r["high_score_time_s"],
-                    )
                     lines.append(
-                        f"| <= {cap}s | {best} | {h['fam']} {h['rung']} "
-                        f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s |"
+                        "- the post-condition holds: the tier bests are ordered up the ladder"
                     )
-            sized = [
-                r
-                for r in rows
-                if (r.get("size_gib") or _est_size_gib_of(r)) is not None
-            ]
-            if sized:
-                lines.append("")
-                lines.append("## the score-by-weights-budget table (practitioner reporting)")
-                lines.append("")
-                lines.append("the best score whose weights file fits a memory budget:")
-                lines.append("")
-                lines.append("| weights | best score | holder |")
-                lines.append("|---|---|---|")
-                for cap in (2, 4, 8, 16):
-                    cands = [r for r in sized if (s := (r.get("size_gib") or _est_size_gib_of(r))) <= cap]
-                    if not cands:
-                        continue
-                    best = max(r["high_score"] for r in cands)
-                    h = cands[[r["high_score"] for r in cands].index(best)]
-                    lines.append(
-                        f"| <= {cap} GiB | {best} | {h['fam']} {h['rung']} "
-                        f"k={h['k_quant']} v={h['v_quant']} |"
-                    )
-        if t_params:
-            lines.append(f"- params median: **{_stats.median(t_params):g} B**")
-        from collections import Counter as _C
 
-        for label, key in (
-            ("model_quant", "rung"),
-            ("k_quant", "k_quant"),
-            ("v_quant", "v_quant"),
-        ):
-            vals = [r.get(key) for r in top if r.get(key) is not None]
-            if vals:
-                mode = _C(vals).most_common(1)[0][0]
-                lines.append(f"- {label} mode: **{mode}**")
-        if t_times:
-            lines.append(f"- high-score level time median: **{_stats.median(t_times):g}s**")
-        if t_scores:
-            lines.append(f"- score median: **{_stats.median(t_scores):g}**")
-        t_ram = [r["ram_gib"] for r in top if r.get("ram_gib") is not None]
-        if t_ram:
-            lines.append(f"- vulkan0 ram median: **{_stats.median(t_ram):.2f} GiB**")
-        t_ctx = [r["ctx_settled"] for r in top if r.get("ctx_settled") is not None]
-        if t_ctx:
-            lines.append(f"- context median: **{_stats.median(t_ctx):,.0f}**")
-        lines.append("")
-        lines.append("_the machine sweet-spot band, live as the pool fills_")
-        lines.append("")
-        lines.append("Every candidate gets ONE chance (no replacement). Rank:")
-        lines.append("highest score, tiebreak by time. Speed: the candidate's")
-        lines.append("whole run - fast <= 32s, medium <= 64s, slow <= 128s.")
-        lines.append("")
-        lines.append(
-            "| rank | model | high score | quant @high | k | v | vulkan0 ram | ctx | speed |"
-        )
-        lines.append("|---|---|---|---|---|---|---|---|---|")
-        for i, r in enumerate(rows):
-            raw_t = r.get("high_score_time_s")
-            t = float(raw_t) if raw_t is not None else float(r.get("elapsed_s") or 0.0)
-            speed = next(
-                (f"t{int(c)}" for c in TIME_LADDER_S if t <= c), "t128"
-            )
-            ram = r.get("ram_gib")
-            ram_s = f"{ram:.2f}" if ram is not None else "-"
-            ctx = r.get("ctx_settled")
-            ctx_s = f"{ctx:,}" if ctx is not None else "-"
+        # THE EXTENDED REPORTING (the author's ruling: reporting only
+        # - the optimization is the crowns; nothing here influences a
+        # pick). Both tables are floors, not ceilings: the pool is
+        # not drained, the bests can only rise.
+        timed = [
+            r
+            for r in rows
+            if r.get("high_score_time_s") is not None and r.get("high_score") is not None
+        ]
+        if timed:
+            lines.append("")
+            lines.append("## the score-time frontier (practitioner reporting)")
+            lines.append("")
+            lines.append("the best score at a patience level (the high-score level's time):")
+            lines.append("")
+            lines.append("| patience | best score | holder | at |")
+            lines.append("|---|---|---|---|")
+            for cap in TIME_LADDER_S:
+                cands = [r for r in timed if r["high_score_time_s"] <= cap]
+                if not cands:
+                    continue
+                best = max(r["high_score"] for r in cands)
+                h = min(
+                    (r for r in cands if r["high_score"] == best),
+                    key=lambda r: r["high_score_time_s"],
+                )
+                lines.append(
+                    f"| <= {int(cap)}s | {best} | {h['fam']} {h['rung']} "
+                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s |"
+                )
+        rammed = [r for r in rows if r.get("ram_gib") is not None]
+        if rammed:
+            lines.append("")
+            lines.append("## the score-by-ram-budget table (practitioner reporting)")
+            lines.append("")
             lines.append(
-                f"| {i + 1} | {r['fam']} | {r.get('high_score', -1)} | {r['rung']} "
-                f"| {r.get('k_quant', 'f16')} | {r.get('v_quant', 'f16')} "
-                f"| {ram_s} | {ctx_s} | {speed} |"
+                "the best score whose MEASURED vulkan0 ram (model + kv + compute) fits a budget:"
             )
+            lines.append("")
+            lines.append("| ram budget | best score | holder |")
+            lines.append("|---|---|---|")
+            for cap in (2, 4, 8, 16):
+                cands = [r for r in rammed if r["ram_gib"] <= cap]
+                if not cands:
+                    continue
+                best = max(r["high_score"] for r in cands)
+                h = min(
+                    (r for r in cands if r["high_score"] == best),
+                    key=lambda r: r["ram_gib"],
+                )
+                lines.append(
+                    f"| <= {cap} GiB | {best} | {h['fam']} {h['rung']} "
+                    f"k={h['k_quant']} v={h['v_quant']} |"
+                )
         lines.append("")
         lines.append(
-            f"_{len(rows)} candidates run of {len(pool) * n_kv * n_kv:,} "
-            f"({done_pairs:,} of {len(pool):,} pairs swept); "
-            "each pair one acquisition, the seed recorded in state._"
+            f"_{len(rows)} candidates measured, {done_pairs:,} of {len(pool):,} "
+            "pairs swept; each pair one acquisition, the seed recorded in state._"
         )
         with open("md/ei.md", "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
