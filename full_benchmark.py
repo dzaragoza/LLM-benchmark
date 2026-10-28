@@ -424,8 +424,16 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="delete the ei state UP FRONT - a fresh pool, "
+        help="delete the trek state UP FRONT - a fresh pool, "
         "every chance restored; era changes only",
+    )
+    ap.add_argument(
+        "--time",
+        type=float,
+        default=None,
+        help="the sanity-check ceiling: stop the run gracefully after "
+        "this many seconds of wall clock (the current sweep completes "
+        "and commits; the trek resumes where it stood)",
     )
     return ap
 
@@ -507,7 +515,7 @@ def _run(args: argparse.Namespace) -> None:
                 tee_output.install()
 
         try:
-            R.main(on_progress=push_progress)
+            R.main(on_progress=push_progress, time_ceiling_s=args.time)
         finally:
             # the git tail ALWAYS runs (the envelope's ruling): the
             # ledger, the state, and the answers are committed and
