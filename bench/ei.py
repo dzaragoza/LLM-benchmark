@@ -79,6 +79,17 @@ from infra.hf_download import DEVICE_LIMIT_GIB
 # of the biggest models (gemma-3-27b Q4_1 at exactly 16.0 GiB, the
 # 8B class at F16) - the 9-16 GiB zone was a COVERAGE HOLE, not a
 # physics wall: nobody had tried big-model x high-bpw before.
+# THE DYADIC RAM LADDER (the reporting tiers): 1, 2, 4, 8, 16 GiB -
+# the patience ladder's mirror for memory. The candidate's ram tier
+# is the smallest cut its measured vulkan0 memory fits.
+RAM_LADDER_GIB = [
+    DEVICE_LIMIT_GIB / 16,
+    DEVICE_LIMIT_GIB / 8,
+    DEVICE_LIMIT_GIB / 4,
+    DEVICE_LIMIT_GIB / 2,
+    DEVICE_LIMIT_GIB,
+]
+
 SEED_BANDS_GIB = [
     DEVICE_LIMIT_GIB / 8,
     DEVICE_LIMIT_GIB / 4,

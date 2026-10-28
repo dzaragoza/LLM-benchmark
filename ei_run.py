@@ -887,6 +887,7 @@ def main(on_progress: Any = None) -> None:
         # (quants change speed and capability) or different models
         # may hold them. The weakest tier names PoI's target.
         from bench.ei import (
+            RAM_LADDER_GIB,
             TIME_LADDER_S,
             suspicion_check,
             tier_incumbents,
@@ -940,8 +941,8 @@ def main(on_progress: Any = None) -> None:
             lines.append("## the score-time frontier (practitioner reporting)")
             lines.append("")
             lines.append("the best score at a patience level (the high-score level's time);")
-            lines.append("the ram column is the holder's MEASURED vulkan0 memory - the")
-            lines.append("price of that patience in device memory")
+            lines.append("the ram column is the holder's memory TIER - the dyadic cut")
+            lines.append("(1/2/4/8/16 GiB) its measured vulkan0 ram fits")
             lines.append("")
             lines.append("| patience | best score | holder | at | ram |")
             lines.append("|---|---|---|---|---|")
@@ -955,10 +956,13 @@ def main(on_progress: Any = None) -> None:
                     key=lambda r: r["high_score_time_s"],
                 )
                 ram = h.get("ram_gib")
-                ram_s = f"{ram:.1f} GiB" if ram is not None else "-"
+                ram_tier = next(
+                    (f"g{c:g}" for c in RAM_LADDER_GIB if ram is not None and ram <= c),
+                    "-",
+                )
                 lines.append(
                     f"| <= {int(cap)}s | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s | {ram_s} |"
+                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s | {ram_tier} |"
                 )
         rammed = [r for r in rows if r.get("ram_gib") is not None]
         if rammed:
@@ -975,7 +979,7 @@ def main(on_progress: Any = None) -> None:
             lines.append("")
             lines.append("| ram budget | best score | holder | patience |")
             lines.append("|---|---|---|---|")
-            for cap in (1, 2, 4, 8, 16):
+            for cap in RAM_LADDER_GIB:
                 cands = [r for r in rammed if r["ram_gib"] <= cap]
                 if not cands:
                     continue
