@@ -511,6 +511,11 @@ def run_pair(
     # A resumed sweep continues the count from its true position.
     n_kv_ladder = len(KV_LADDER)
     try:
+        # THE LEADING 0 (the author's ruling): the count starts at 0
+        # so a resumed sweep's position is unambiguous - 0.......7 is
+        # a fresh sweep, 0......27.......35 is a resume that ran 8
+        # more (the pre-printed count marks where it picked up).
+        print("0", end="", flush=True)
         n_combo = 0
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
