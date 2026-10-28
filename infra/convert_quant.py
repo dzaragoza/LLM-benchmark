@@ -84,12 +84,20 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
                 "could not build the calibration corpus (build_imatrix_corpus.py failed)",
                 GUIDE[2],
             )
-    try:
-        os.link(IMATRIX_CORPUS, txt)
-    except OSError:
-        import shutil
+    # THE CALIB IS IDEMPOTENT: if txt exists (a hardlink of the
+    # corpus from a previous attempt, or a copy), reuse it - the
+    # content is identical, the inode does not matter. The retry
+    # path previously fell into shutil.copyfile's SameFileError
+    # (the existing calib IS a link of the corpus, same inode),
+    # build_crashing every subsequent IQ rung of the family forever
+    # (the 2,597-record flood in the state).
+    if not os.path.isfile(txt):
+        try:
+            os.link(IMATRIX_CORPUS, txt)
+        except OSError:
+            import shutil
 
-        shutil.copyfile(IMATRIX_CORPUS, txt)
+            shutil.copyfile(IMATRIX_CORPUS, txt)
     log = os.path.join(famdir, "imatrix.log")
     print(
         f"  [2] computing importance matrix from {os.path.basename(f16)} "
