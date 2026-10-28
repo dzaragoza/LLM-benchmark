@@ -44,4 +44,4 @@ you wait per level at that memory size
 | <= 8.0 GiB | 7 | Falcon3-10B-Instruct Q2_K k=q5_0 v=q8_0 | t64 |
 | <= 16.0 GiB | 14 | Falcon3-10B-Instruct Q6_K k=q4_1 v=q5_1 | t128 |
 
-_1310 candidates measured, 108 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_1261 candidates measured, 109 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
