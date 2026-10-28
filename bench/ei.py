@@ -924,27 +924,25 @@ def ablation_report(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
     thresholds = [t for t in thresholds if 0 < sum(ytr >= t) < len(ytr)]
     out: dict[str, Any] = {"n": len(tested), "thresholds": thresholds, "groups": {}}
 
+    tested_idx = np.array(tested)  # X's rows ARE pool indices
+
     def cv_logloss(drop: tuple[int, int] | None) -> float:
-        cols = (
-            np.ones(X.shape[1], dtype=bool)
-            if drop is None
-            else np.ones(X.shape[1], dtype=bool)
-        )
+        keep = np.ones(X.shape[1], dtype=bool)
         if drop is not None:
-            cols[drop[0]:drop[1]] = False
-        Xs = X[:, cols]
+            keep[drop[0]:drop[1]] = False
+        Xs = X[:, keep]
         total = 0.0
         for k in range(folds):
-            v = np.arange(k, len(tested), folds)
-            tr = np.array([i for i in range(len(tested)) if i not in set(v)])
+            v = np.arange(k, len(tested_idx), folds)
+            tr = np.array([i for i in range(len(tested_idx)) if i not in set(v)])
             ll = 0.0
             for t in thresholds:
                 yb = (ytr >= t).astype(float)
                 if yb[tr].sum() == 0 or yb[tr].sum() == len(tr):
                     p = yb[tr].mean() if len(tr) else 0.5
                 else:
-                    w = _fit_logistic(Xs[tested[tr]], yb[tr])
-                    p = 1.0 / (1.0 + np.exp(-(Xs[tested[v]] @ w)))
+                    w = _fit_logistic(Xs[tested_idx[tr]], yb[tr])
+                    p = 1.0 / (1.0 + np.exp(-(Xs[tested_idx[v]] @ w)))
                 p = np.clip(p, 1e-9, 1 - 1e-9)
                 ll += -float((yb[v] * np.log(p) + (1 - yb[v]) * np.log(1 - p)).sum())
             total += ll
