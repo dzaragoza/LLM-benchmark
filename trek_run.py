@@ -881,64 +881,21 @@ def main(on_progress: Any = None) -> None:
         rows = [r for r in state["results"] if r.get("result") == "done"]
         done_pairs = len(done)
 
-        # THE LEDGER (the author's rulings, trimmed to what is read):
-        # the time-tier crowns (the objective), the two practitioner
-        # tables (reporting only), the footer. The ranking table and
-        # the top-3 summary are REMOVED - at 1,500+ candidates the
-        # table was too long to be useful and the summary's medians
-        # duplicated what the crowns state directly.
+        # THE LEDGER (the author's rulings): the two practitioner
+        # tables - the score-time frontier and the score-by-ram
+        # budget - plus the footer. The time-tier crowns section is
+        # REMOVED per the author's ruling (the walker has no PoI
+        # target; the tables carry the practitioner information).
         lines = ["# trek.md - the trek ledger", ""]
 
-        # THE TIME-TIER CROWNS (the objective: the best score at each
-        # dyadic patience cut, 1..128s; 256s pre-declared for the day
-        # the clock extends): the same model may hold several cuts
-        # (quants change speed and capability) or different models
-        # may hold them. The weakest tier names PoI's target.
         from bench.trek import (
             RAM_LADDER_GIB,
             TIME_LADDER_S,
-            suspicion_check,
-            tier_incumbents,
-            weakest_tier,
         )
 
-        inc = tier_incumbents(state_file)
-        if inc:
-            lines.append("## the time-tier crowns")
-            lines.append("")
-            for cut in TIME_LADDER_S:
-                t = f"t{int(cut)}"
-                v = inc.get(t)
-                if v:
-                    lines.append(
-                        f"- {t} (<= {int(cut)}s): "
-                        f"**{v['fam']} {v['rung']} k={v['k_quant']} v={v['v_quant']}, "
-                        f"score {v['score']} @ {v['time_s']:.0f}s**"
-                    )
-            wt = weakest_tier(inc)
-            if wt:
-                lines.append(f"- the weakest tier: **{wt}** (the PoI target)")
-            # THE SUSPICION IS A POST-CONDITION, NOT AN INVARIANT
-            # (the author's ruling): a tier inversion DURING
-            # execution is expected - a crown may simply not have a
-            # serious contender yet. The verdict only attaches when
-            # the pool is DRAINED (the experiment is finished).
-            if len(done) >= len(pool):
-                sus = suspicion_check(inc)
-                if not sus["ok"]:
-                    lines.append("")
-                    lines.append("**SUSPICION (the finished experiment's post-condition):**")
-                    for v in sus["violations"]:
-                        lines.append(f"- {v}")
-                else:
-                    lines.append(
-                        "- the post-condition holds: the tier bests are ordered up the ladder"
-                    )
-
-        # THE EXTENDED REPORTING (the author's ruling: reporting only
-        # - the optimization is the crowns; nothing here influences a
-        # pick). Both tables are floors, not ceilings: the pool is
-        # not drained, the bests can only rise.
+        # THE PRACTITIONER REPORTING: both tables are floors, not
+        # ceilings - the grid is not fully measured, the bests can
+        # only rise.
         timed = [
             r
             for r in rows
