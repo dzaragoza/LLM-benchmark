@@ -527,7 +527,7 @@ def run_pair(
                 # resume after the crash never re-runs it
                 state.setdefault("results", []).append(rec)
                 state["results"] = state["results"][-5000:]
-                _state_store.save_state(state_file, state)
+                _state_store.save_state(EI_STATE_FILE, state)
                 n_combo += 1
                 print(".", end="", flush=True)
                 if (n_resume + n_combo) % n_kv_ladder == 0:
