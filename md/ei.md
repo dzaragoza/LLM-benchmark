@@ -1525,4 +1525,4 @@ whole run - fast <= 32s, medium <= 64s, slow <= 128s.
 | 1503 | Falcon3-10B-Instruct | -1 | Q6_K | q5_0 | q5_1 | 9.55 | 32,768 | slow |
 | 1504 | Falcon3-10B-Instruct | -1 | Q6_K | q5_1 | q5_0 | 9.55 | 32,768 | slow |
 
-_1504 candidates run of 100,352 (90 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
+_1504 candidates run of 100,352 (91 of 2,048 pairs swept); each pair one acquisition, the seed recorded in state._
