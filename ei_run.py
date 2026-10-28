@@ -917,11 +917,14 @@ def main(on_progress: Any = None) -> None:
             lines.append("")
             lines.append("## the three time-tier crowns")
             lines.append("")
-            for t in ("fast", "medium", "slow"):
+            from bench.ei import TIME_LADDER_S
+
+            for cut in TIME_LADDER_S:
+                t = f"t{int(cut)}"
                 v = inc.get(t)
                 if v:
                     lines.append(
-                        f"- {t} (<= {32 if t == 'fast' else 64 if t == 'medium' else 128}s): "
+                        f"- {t} (<= {int(cut)}s): "
                         f"**{v['fam']} {v['rung']} k={v['k_quant']} v={v['v_quant']}, "
                         f"score {v['score']} @ {v['time_s']:.0f}s**"
                     )
@@ -1037,7 +1040,9 @@ def main(on_progress: Any = None) -> None:
         for i, r in enumerate(rows):
             raw_t = r.get("high_score_time_s")
             t = float(raw_t) if raw_t is not None else float(r.get("elapsed_s") or 0.0)
-            speed = "fast" if t <= 32 else ("medium" if t <= 64 else "slow")
+            speed = next(
+                (f"t{int(c)}" for c in TIME_LADDER_S if t <= c), "t128"
+            )
             ram = r.get("ram_gib")
             ram_s = f"{ram:.2f}" if ram is not None else "-"
             ctx = r.get("ctx_settled")

@@ -74,7 +74,17 @@ from infra.hf_download import DEVICE_LIMIT_GIB
 # device budgets (the author's fairness: same quants is NOT fair -
 # the big models settle on the tiny quants that ruin the small
 # models; same file size is).
-SEED_BANDS_GIB = [DEVICE_LIMIT_GIB / 8, DEVICE_LIMIT_GIB / 4, DEVICE_LIMIT_GIB / 2]
+# THE DYADIC BAND LADDER (the author's gap-filler): 2, 4, 8, 16 GiB
+# - DEVICE/8, /4, /2, /1. The 16-GiB band probes the high-bpw rungs
+# of the biggest models (gemma-3-27b Q4_1 at exactly 16.0 GiB, the
+# 8B class at F16) - the 9-16 GiB zone was a COVERAGE HOLE, not a
+# physics wall: nobody had tried big-model x high-bpw before.
+SEED_BANDS_GIB = [
+    DEVICE_LIMIT_GIB / 8,
+    DEVICE_LIMIT_GIB / 4,
+    DEVICE_LIMIT_GIB / 2,
+    DEVICE_LIMIT_GIB,  # the dyadic completion: the 16-GiB band
+]
 
 
 def _est_size_gib(f16_gib: float | None, rung: str) -> float | None:
@@ -95,12 +105,17 @@ def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | N
     no feasible rung can fill."""
     from bench.roster import LADDER
 
-    # PRE: the bands are derived from the device budget, positive, sorted
+    # PRE: the bands are the dyadic ladder off the device budget -
+    # positive, sorted, each half the next
     warn_contract(
         "pre", "band_rungs.bands",
-        len(SEED_BANDS_GIB) == 3 and SEED_BANDS_GIB == sorted(SEED_BANDS_GIB)
-        and all(b > 0 for b in SEED_BANDS_GIB),
-        f"the bands are not 3 positive sorted values: {SEED_BANDS_GIB}",
+        SEED_BANDS_GIB == sorted(SEED_BANDS_GIB)
+        and all(b > 0 for b in SEED_BANDS_GIB)
+        and all(
+            abs(SEED_BANDS_GIB[i + 1] / SEED_BANDS_GIB[i] - 2.0) < 1e-9
+            for i in range(len(SEED_BANDS_GIB) - 1)
+        ),
+        f"the bands are not the dyadic ladder (each double the previous): {SEED_BANDS_GIB}",
     )
     out: list[str | None] = []
     for band in SEED_BANDS_GIB:
@@ -355,11 +370,21 @@ def _pool_index() -> dict[tuple[str, str], int]:
 # ------------------------------------------------- the three time tiers
 
 
+# THE DYADIC TIME LADDER (the author's ruling: optimize for the
+# time dyadic from 1s to 128s): the tier boundaries in seconds. A
+# candidate's tier is the smallest cut its high-score level time
+# fits. 256s is PRE-DECLARED in the ladder but no candidate can
+# land there while the level clock is 128s - it activates only if
+# the clock itself is ever extended (the 16-GiB band's candidates
+# would be the reason to).
+TIME_LADDER_S = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0]
+
+
 def tier_of(t_s: float | None) -> str | None:
-    """the candidate's tier by its own high-score level time: fast
-    <= 32s, medium <= 64s, slow <= 128s (the exam's level clock).
-    None: no level passed (score -1) - no tier (nothing was achieved
-    to be fast at), or the time datum is absent."""
+    """the candidate's tier by its own high-score level time: the
+    smallest dyadic cut (1, 2, 4, 8, 16, 32, 64, 128, 256s) the
+    time fits. None: no level passed (score -1) - no tier (nothing
+    was achieved to be fast at), or the time datum is absent."""
     warn_contract(
         "pre", "tier_of.positive",
         t_s is None or t_s > 0,
@@ -367,13 +392,10 @@ def tier_of(t_s: float | None) -> str | None:
     )
     if t_s is None:
         return None
-    if t_s <= 32.0:
-        return "fast"
-    if t_s <= 64.0:
-        return "medium"
-    if t_s <= 128.0:
-        return "slow"
-    return "slow"  # over the clock never happens (the deadline caps at 128s)
+    for cut in TIME_LADDER_S:
+        if t_s <= cut:
+            return f"t{int(cut)}"
+    return f"t{int(TIME_LADDER_S[-1])}"
 
 
 def tier_incumbents(state_file: str) -> dict[str, dict[str, Any]]:
@@ -422,7 +444,7 @@ def weakest_tier(inc: dict[str, dict[str, Any]]) -> str | None:
     if not inc:
         return None
     gbest = max(v["score"] for v in inc.values())
-    order = ["fast", "medium", "slow"]
+    order = [f"t{int(c)}" for c in TIME_LADDER_S]
     # the gap BEHIND the global best; the weakest tier has the
     # LARGEST gap (ties: the faster tier wins - a fast discovery is
     # worth more at equal gap)
@@ -440,7 +462,7 @@ def suspicion_check(inc: dict[str, dict[str, Any]]) -> dict[str, Any]:
     inversion mid-run is expected (a crown may simply not have a
     serious contender yet); the suspicion only arises at completion.
     A violation is reported, we decide what to do - never blocks."""
-    order = ["fast", "medium", "slow"]
+    order = [f"t{int(c)}" for c in TIME_LADDER_S]
     have = [t for t in order if t in inc]
     violations = []
     for a, b in zip(have, have[1:]):
