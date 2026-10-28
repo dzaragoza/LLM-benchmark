@@ -607,22 +607,48 @@ def surrogate_predict(
 
 
 def pair_state(state_file: str) -> dict[tuple[str, str], str]:
-    """(fam, rung) -> 'done' | 'failed' | None, from the records: a
-    pair is done when ANY of its kv combos ran, failed when its sweep
-    ended without a single done record (quantize_failed,
-    server_failed, ...)."""
+    """(fam, rung) -> 'done' | 'failed' | 'partial' | None. THE
+    COMPLETION TRUTH (the interrupted-sweep lesson): a pair is DONE
+    only when the driver marked it - its pool index is in the
+    state's done set, which happens when a SWEEP ENDED (all 49
+    combos attempted, verdicts fanned out). PARTIAL: records exist
+    (some combos ran) but the sweep never ended - an interrupt or
+    crash mid-sweep left the pair un-marked; the resume completes
+    it, so PARTIAL pairs are re-picked, not skipped. FAILED: the
+    sweep ended with zero done records (the quant-level verdict -
+    the recovery's raw material).
+
+    A kv failure is NOT a quant failure (the author's ruling):
+    'done' means at least one of the 49 ran; 'partial' means the
+    sweep is unfinished regardless of what its banked combos say."""
     out: dict[tuple[str, str], str] = {}
     with open(state_file, encoding="utf-8") as fh:
         st = json.load(fh)
+    # the driver's done-mark: only SWEEP ENDS land here. The pool
+    # index maps (fam, rung) -> index, so the done KEYS (indices)
+    # need the inverse: index -> (fam, rung)
+    pool_index = _pool_index()
+    index_to_pair = {v: k for k, v in pool_index.items()}
+    swept = {
+        index_to_pair[int(k)]
+        for k in st.get("done", [])
+        if k.isdigit() and int(k) in index_to_pair
+    }
+    has_records: set[tuple[str, str]] = set()
+    any_done: set[tuple[str, str]] = set()
     for r in st.get("results", []):
         fam, rung = r.get("fam"), r.get("rung")
         if not fam or not rung:
             continue
         key = (fam, rung)
+        has_records.add(key)
         if r.get("result") == "done":
-            out[key] = "done"
-        elif key not in out or out[key] is None:
-            out[key] = "failed"
+            any_done.add(key)
+    for key in has_records:
+        if key in swept:
+            out[key] = "done" if key in any_done else "failed"
+        else:
+            out[key] = "partial"
     return out
 
 
@@ -691,6 +717,9 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
                 continue
             if state == "failed":
                 continue  # excluded rung, the resolution already moved past it
+            # PARTIAL: records exist but the sweep never ended - the
+            # pick RETURNS to it, the resume completes the remaining
+            # combos (nothing skipped, nothing lost)
             phase = "seed" if q == q_clean else "seed-recovery"
             seen.add(q)
             return {
