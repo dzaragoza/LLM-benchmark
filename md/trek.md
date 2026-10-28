@@ -9,8 +9,10 @@ you wait per level at that memory size
 
 | ram budget | best score | holder | patience |
 |---|---|---|---|
-| <= 4.0 GiB | -1 | granite-4.0-h-350m Q1_0 k=q4_0 v=q4_0 | - |
-| <= 8.0 GiB | -1 | granite-4.0-h-350m Q1_0 k=q4_0 v=q4_0 | - |
-| <= 16.0 GiB | -1 | granite-4.0-h-350m Q1_0 k=q4_0 v=q4_0 | - |
+| <= 1.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
+| <= 2.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
+| <= 4.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
+| <= 8.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
+| <= 16.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
 
-_245 candidates measured, 5 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_294 candidates measured, 6 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
