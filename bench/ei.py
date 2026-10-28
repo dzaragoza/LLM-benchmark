@@ -652,6 +652,47 @@ def pair_state(state_file: str) -> dict[tuple[str, str], str]:
     return out
 
 
+def _cannot_fill(fam: str, states: dict[tuple[str, str], str]) -> bool:
+    """THE LINEAGE-FALLTHROUGH TEST (the author's ruling: the largest
+    that cannot fill its bands falls to the next-largest member).
+    True when the member's block is UNSERVABLE AND GAPPED: nothing
+    servable remains (every band resolution is measured or failed)
+    AND at least one band FAILED (the model could not fill it - the
+    honest gap). A member that measured ALL its bands (complete
+    block) is a served lineage, NOT a fallthrough; a member that
+    failed ALL its bands is dead - fallthrough; the mixed case
+    (gemma-3-27b: 1 band measured, 3 failed) is a model that cannot
+    fill its bands - fallthrough."""
+    models, _ = catalog()
+    m = {mm["id"]: mm for mm in models}.get(fam)
+    if m is None:
+        return True
+    # THE BAND'S FATE FOLLOWS THE RESOLVED RUNG (the recovery's view,
+    # not the clean pick): a band is FILLED when its recovery-resolved
+    # rung measured 'done' (the clean pick may have failed and the
+    # recovery filled the band with another rung); GAPPED when the
+    # resolution is None (every candidate failed - the band cannot be
+    # filled at all); SERVABLE when the resolved rung is unmeasured.
+    failed_rungs = {rung for (f, rung), s in states.items() if f == fam and s == "failed"}
+    rungs = band_rungs(m["f16_gib"], exclude=failed_rungs)
+    servable = False
+    any_gap = False
+    for band, q in zip(SEED_BANDS_GIB, rungs):
+        if q is None:
+            any_gap = True  # the band cannot be filled - a real gap
+            continue
+        state = states.get((fam, q))
+        if state is None:
+            servable = True  # the resolved rung is unmeasured - servable
+        # 'done' = the band filled; 'failed' cannot happen here
+        # (failed rungs were excluded from the resolution)
+    if servable:
+        return False  # the member can still measure a band
+    # nothing servable: every band filled (done) = served lineage;
+    # any gapped band = cannot fill - fall through to the next member
+    return any_gap
+
+
 def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
     """THE DETERMINISTIC SEED: every lineage's LARGEST model, measured
     at THE SAME THREE FILE-SIZE BANDS (2 / 4 / 8 GiB - the device
@@ -698,40 +739,71 @@ def seed_pair(state_file: str, n_pairs: int = 2048) -> dict[str, Any] | None:
             rung for (fam, rung), s in states.items()
             if fam == m["id"] and s == "failed"
         }
-        # THE CLOSEST-VALUE RESOLUTION, repeats allowed: the same
-        # rung may serve several bands - a repeated rung is
-        # measured ONCE (the dedupe), so a tiny model whose closest
-        # pick for every band is its own F16 seeds with one sweep
-        clean = band_rungs(m["f16_gib"])
-        rungs = band_rungs(m["f16_gib"], exclude=failed_rungs)
-        seen: set[str] = set()
-        for band, q_clean, q in zip(SEED_BANDS_GIB, clean, rungs):
-            if q is None or q in seen:
-                continue  # repeated rung: measured once, this band rides along
-            state = states.get((m["id"], q))
-            if state == "done":
-                seen.add(q)  # measured - and it covers its bands
-                continue
-            pi = pool_index.get((m["id"], q))
-            if pi is None:
-                continue
-            if state == "failed":
-                continue  # excluded rung, the resolution already moved past it
-            # PARTIAL: records exist but the sweep never ended - the
-            # pick RETURNS to it, the resume completes the remaining
-            # combos (nothing skipped, nothing lost)
-            phase = "seed" if q == q_clean else "seed-recovery"
-            seen.add(q)
-            return {
-                "index": pi,
-                "fam": m["id"],
-                "rung": q,
-                "band_gib": band,
-                "p": None,
-                "probs": None,
-                "phase": phase,
-                "cost_gib": _f16_gib_from_models_md(m["id"]),
+        # THE LINEAGE FALLBACK (the author's ruling): when the
+        # lineage's LARGEST model cannot fill its bands (every
+        # resolution failed or exhausted), the seed slot falls to
+        # the NEXT-LARGEST member - the lineage stays represented
+        # (the disqualification principle, one tier down: the 27B
+        # dead -> gemma-3-12b takes the bands; its Q8_0 at 12.1 GiB
+        # fills the 10-16 zone the largest could never reach)
+        members = sorted(by_fam[m["family"]], key=lambda mm: -mm["params_b"])
+        for member in members:
+            failed_rungs_m = {
+                rung for (fam, rung), s in states.items()
+                if fam == member["id"] and s == "failed"
             }
+            # THE CLOSEST-VALUE RESOLUTION, repeats allowed: the same
+            # rung may serve several bands - a repeated rung is
+            # measured ONCE (the dedupe), so a tiny model whose closest
+            # pick for every band is its own F16 seeds with one sweep
+            clean = band_rungs(member["f16_gib"])
+            rungs = band_rungs(member["f16_gib"], exclude=failed_rungs_m)
+            seen: set[str] = set()
+            done_any = False
+            for band, q_clean, q in zip(SEED_BANDS_GIB, clean, rungs):
+                if q is None or q in seen:
+                    continue  # repeated rung: measured once, this band rides along
+                state = states.get((member["id"], q))
+                if state == "done":
+                    seen.add(q)  # measured - and it covers its bands
+                    done_any = True
+                    continue
+                pi = pool_index.get((member["id"], q))
+                if pi is None:
+                    continue
+                if state == "failed":
+                    continue  # excluded rung, the resolution already moved past it
+                # PARTIAL: records exist but the sweep never ended -
+                # the pick RETURNS to it, the resume completes the
+                # remaining combos (nothing skipped, nothing lost)
+                phase = "seed" if q == q_clean else "seed-recovery"
+                seen.add(q)
+                return {
+                    "index": pi,
+                    "fam": member["id"],
+                    "rung": q,
+                    "band_gib": band,
+                    "p": None,
+                    "probs": None,
+                    "phase": phase,
+                    "cost_gib": _f16_gib_from_models_md(member["id"]),
+                }
+            # THE FALLTHROUGH RULE: the member SERVES the lineage when
+            # it can still measure a band (the return above), or when
+            # its block is COMPLETE (every band measured - the
+            # lineage's slot is filled). The next MEMBER takes over
+            # only when this one CANNOT FILL its bands: nothing
+            # servable AND at least one band failed (gemma-3-27b: 1
+            # band measured, 3 failed -> falls to gemma-3-12b; the
+            # 12b measures all 4 -> the block completes -> the
+            # lineage ends, NO cascade to the 9b).
+            if not _cannot_fill(member["id"], states):
+                break
+            # no band measured AND nothing servable: fall through to
+            # the next member; if THIS member still has servable
+            # bands, they were picked above (the return) - reaching
+            # here means exhausted
+        continue
     return None  # every lineage's block is complete
 
 
