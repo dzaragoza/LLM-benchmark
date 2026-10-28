@@ -1,6 +1,24 @@
 # trek.md - the trek ledger
 
 
+## the score-time frontier (practitioner reporting)
+
+the best score at a patience level (the high-score level's time);
+the ram column is the holder's memory TIER - the dyadic cut
+(1/2/4/8/16 GiB) its measured vulkan0 ram fits
+
+| patience | best score | holder | at | ram |
+|---|---|---|---|---|
+| <= 1s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 2s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 4s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 8s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 16s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 32s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 64s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 128s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+| <= 256s | 1 | SmolLM2-360M-Instruct IQ3_XXS k=f16 v=q5_1 | 1s | g1 |
+
 ## the score-by-ram-budget table (practitioner reporting)
 
 the best score whose MEASURED vulkan0 ram (model + kv + compute) fits
@@ -9,10 +27,10 @@ you wait per level at that memory size
 
 | ram budget | best score | holder | patience |
 |---|---|---|---|
-| <= 1.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
-| <= 2.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
-| <= 4.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
-| <= 8.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
-| <= 16.0 GiB | -1 | granite-4.0-350m TQ2_0 k=q4_0 v=q4_0 | - |
+| <= 1.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
+| <= 2.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
+| <= 4.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
+| <= 8.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
+| <= 16.0 GiB | 1 | SmolLM2-360M-Instruct IQ3_XXS k=iq4_nl v=q4_1 | t1 |
 
-_686 candidates measured, 14 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_735 candidates measured, 15 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
