@@ -511,12 +511,26 @@ def run_pair(
     # A resumed sweep continues the count from its true position.
     n_kv_ladder = len(KV_LADDER)
     try:
-        # THE LEADING 0 (the author's ruling): the count starts at 0
-        # so a resumed sweep's position is unambiguous - 0.......7 is
-        # a fresh sweep, 0......27.......35 is a resume that ran 8
-        # more (the pre-printed count marks where it picked up).
-        print("0", end="", flush=True)
+        # THE LEADING NUMBER (the author's refinement): the sweep
+        # starts by printing its position, always a multiple of 7 -
+        # 0 for a fresh sweep; for a resume, the NEXT milestone
+        # (the count rounded UP to the ladder's rhythm): a resume
+        # at 20 prints 21.......28 - the first number names the
+        # milestone the sweep is now working toward, every printed
+        # number divisible by 7, no 0-prefixed double marker.
+        import math
+
+        pos = (
+            0
+            if n_resume == 0
+            else int(math.ceil(n_resume / n_kv_ladder) * n_kv_ladder)
+        )
+        print(pos, end="", flush=True)
         n_combo = 0
+        # the marker rhythm: dots counted from the PRINTED position -
+        # the next marker prints when the sweep reaches pos + 7, so
+        # the leading number IS the milestone it names (no duplicate)
+        next_marker = pos
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
                 if (k_quant, v_quant) in done_combos:
@@ -541,8 +555,11 @@ def run_pair(
                 _state_store.save_state(EI_STATE_FILE, state)
                 n_combo += 1
                 print(".", end="", flush=True)
-                if (n_resume + n_combo) % n_kv_ladder == 0:
+                if n_resume + n_combo - pos >= n_kv_ladder and (
+                    (n_resume + n_combo) % n_kv_ladder == 0
+                ):
                     print(n_resume + n_combo, end="", flush=True)
+                    next_marker = n_resume + n_combo
         print()  # the sweep's line ends
         if n_resume:
             print(
