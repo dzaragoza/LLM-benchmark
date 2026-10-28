@@ -130912,3 +130912,35 @@ idempotent and will resume from this phase.
 ============================================================
 [ei]   -> build_failed
 [contract:inv:driver.stuck_retry] VIOLATED (1x): Ministral-3-8B-Instruct-2512 TQ2_0: the failure 'Ministral-3-8B-Instruct-2512 TQ2_0' already fired before and repeats 49x - a stuck retry loop, not evidence
+
+===== 2026-10-28T15:45:54 | full_benchmark.py =====
+[ei] #107 pair=1827 -> Ministral-3-8B-Instruct-2512 IQ2_XXS (sweeping 49 kv combinations)
+  [acquire] Ministral-3-8B-Instruct-2512 IQ2_XXS - (download/convert/quantize may take minutes)
+  [hub] listing files for mistralai/Ministral-3-8B-Instruct-2512 ...
+  [hub] 16 files listed
+  [2] quantizing Ministral-3-8B-Instruct-2512-f16.gguf -> IQ2_XXS (output hidden; shown on error)
+  [2] computing importance matrix from Ministral-3-8B-Instruct-2512-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/Ministral-3-8B-Instruct-2512/imatrix.log) ---
+radv/amdgpu: Not enough memory for command submission.
+0.04.668.107 E ggml_vulkan: device lost on Vulkan0
+0.04.745.568 E llama_model_load: error loading model: vk::Queue::submit: ErrorDeviceLost
+0.04.745.577 E llama_model_load_from_file_impl: failed to load model
+0.04.745.584 E cmn  common_init_: failed to load model 'models/Ministral-3-8B-Instruct-2512/Ministral-3-8B-Instruct-2512-f16.gguf'
+0.04.745.586 E main : failed to init
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/Ministral-3-8B-Instruct-2512/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[ei]   -> build_failed
+[contract:inv:driver.stuck_retry] VIOLATED (2x): Ministral-3-8B-Instruct-2512 IQ2_XXS: the failure 'Ministral-3-8B-Instruct-2512 IQ2_XXS' already fired before and repeats 49x - a stuck retry loop, not evidence
