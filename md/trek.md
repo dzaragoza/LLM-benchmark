@@ -33,4 +33,4 @@ you wait per level at that memory size
 | <= 8.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
 | <= 16.0 GiB | 3 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q5_0 | t1 |
 
-_2450 candidates measured, 50 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_2499 candidates measured, 51 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
