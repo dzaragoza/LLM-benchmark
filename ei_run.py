@@ -885,12 +885,22 @@ def main(on_progress: Any = None) -> None:
             wt = weakest_tier(inc)
             if wt:
                 lines.append(f"- the weakest tier: **{wt}** (the PoI target)")
-            sus = suspicion_check(inc)
-            if not sus["ok"]:
-                lines.append("")
-                lines.append("**WARNING - the suspicion invariant violated:**")
-                for v in sus["violations"]:
-                    lines.append(f"- {v}")
+            # THE SUSPICION IS A POST-CONDITION, NOT AN INVARIANT
+            # (the author's ruling): a tier inversion DURING
+            # execution is expected - the fast crown may transiently
+            # outscore slow simply because no slow candidate has
+            # been measured yet. The verdict only attaches when the
+            # pool is DRAINED (the experiment is finished); the
+            # ledger shows the live ordering, no warning mid-run
+            if len(done) >= len(pool):
+                sus = suspicion_check(inc)
+                if not sus["ok"]:
+                    lines.append("")
+                    lines.append("**SUSPICION (the finished experiment's post-condition):**")
+                    for v in sus["violations"]:
+                        lines.append(f"- {v}")
+                else:
+                    lines.append("- the post-condition holds: the tier bests are ordered (fast <= medium <= slow)")
         if t_params:
             lines.append(f"- params median: **{_stats.median(t_params):g} B**")
         from collections import Counter as _C

@@ -382,12 +382,15 @@ def weakest_tier(inc: dict[str, dict[str, Any]]) -> str | None:
 
 
 def suspicion_check(inc: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """THE SUSPICION INVARIANT (the author's ruling, warning only):
-    the tier bests should be non-decreasing in tier time - the slow
-    champion should outscore the medium, the medium the fast (deep
-    scores need time; a total champion faster than the next score
-    would smell of exam-instance luck). A violation is reported, we
-    decide what to do if it happens - the check never blocks."""
+    """THE POST-CONDITION (the author's ruling, warning only): when
+    the experiment is FINISHED, the tier bests should be
+    non-decreasing in tier time - the slow champion outscoring the
+    medium, the medium the fast (deep scores need time; a total
+    champion faster than the next score would smell of exam-instance
+    luck). NOT an invariant DURING execution: a transient tier
+    inversion mid-run is expected (a crown may simply not have a
+    serious contender yet); the suspicion only arises at completion.
+    A violation is reported, we decide what to do - never blocks."""
     order = ["fast", "medium", "slow"]
     have = [t for t in order if t in inc]
     violations = []
@@ -733,12 +736,13 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
         # warning only, we decide what to do if it fires
         "tiers": tier_incumbents(state_file),
         "weakest_tier": None,
-        "suspicion": None,
+        "suspicion": None,  # the post-condition's live status; FINAL only when the pool is drained
     }
     inc = out["tiers"]
     if inc:
         out["weakest_tier"] = weakest_tier(inc)
         out["suspicion"] = suspicion_check(inc)
+        out["suspicion"]["final"] = len(tested) >= n_pairs
     if seed_pair(state_file, n_pairs) is not None:
         out["phase"] = "seed"
         out["p_better_remains"] = None
