@@ -130794,3 +130794,48 @@ NameError: name 'state_file' is not defined
   [hub] listing files for mistralai/Mistral-Nemo-Instruct-2407 ...
   [hub] 18 files listed
   [1] Q8_0: estimated 24.2 GiB exceeds the device budget 16 GiB (the iGPU carve-out llama-server can use) - CANNOT RUN on this machine, skipping before download (addendum 35, tightened)
+
+===== 2026-10-28T15:01:08 | full_benchmark.py =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 444, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 510, in _run
+    R.main(on_progress=push_progress)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 1118, in main
+    recs = run_pair(fam, rung, models_dir, state, port)
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 453, in run_pair
+    return _fail_all(
+        _last_acquire_error.get("result", "acquire_failed"),
+        _last_acquire_error.get("detail", ""),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 443, in _fail_all
+    "size_gib": os.path.getsize(gguf) / (2**30) if os.path.isfile(gguf) else None,
+                                                   ~~~~~~~~~~~~~~^^^^^^
+  File "<frozen genericpath>", line 39, in isfile
+TypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType
+
+[2026-10-28T15:01:08] CRASH DETECTED - committing artifacts before exit
+
+===== CRASH 2026-10-28T15:01:08 =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 444, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 510, in _run
+    R.main(on_progress=push_progress)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 1118, in main
+    recs = run_pair(fam, rung, models_dir, state, port)
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 453, in run_pair
+    return _fail_all(
+        _last_acquire_error.get("result", "acquire_failed"),
+        _last_acquire_error.get("detail", ""),
+    )
+  File "/home/daniela/technical_reports/LLM-benchmark/ei_run.py", line 443, in _fail_all
+    "size_gib": os.path.getsize(gguf) / (2**30) if os.path.isfile(gguf) else None,
+                                                   ~~~~~~~~~~~~~~^^^^^^
+  File "<frozen genericpath>", line 39, in isfile
+TypeError: stat: path should be string, bytes, os.PathLike or integer, not NoneType
+
