@@ -316,6 +316,15 @@ def load_results(state_file: str) -> dict[int, int]:
         s = r.get("high_score")
         if s is None:
             continue
+        # PRE on the RAW record: the score is an int >= -1. The
+        # max() below CLAMPS anything below -1, masking corruption -
+        # the negative test caught exactly this - so the contract
+        # guards the input, not the output
+        warn_contract(
+            "pre", "load_results.record_score",
+            isinstance(s, (int, float)) and int(s) >= -1,
+            f"corrupt record: {r.get('fam')} {r.get('rung')} high_score={s}",
+        )
         best[pi] = max(best.get(pi, -1), int(s))
     # POST: every pair score is an int >= -1, in pool-index space
     warn_contract(
