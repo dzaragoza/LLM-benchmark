@@ -60,6 +60,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from bench.contracts import contract_health, warn_contract
 from bench.roster import LADDER, roster_from_models_md
 from infra.hf_download import DEVICE_LIMIT_GIB
 
@@ -94,6 +95,13 @@ def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | N
     no feasible rung can fill."""
     from bench.roster import LADDER
 
+    # PRE: the bands are derived from the device budget, positive, sorted
+    warn_contract(
+        "pre", "band_rungs.bands",
+        len(SEED_BANDS_GIB) == 3 and SEED_BANDS_GIB == sorted(SEED_BANDS_GIB)
+        and all(b > 0 for b in SEED_BANDS_GIB),
+        f"the bands are not 3 positive sorted values: {SEED_BANDS_GIB}",
+    )
     out: list[str | None] = []
     for band in SEED_BANDS_GIB:
         cands = [
@@ -108,6 +116,15 @@ def band_rungs(f16_gib: float | None, exclude: set[str] = set()) -> list[str | N
             continue
         cands.sort()
         out.append(cands[0][1])
+    # POST: every resolved rung is feasible (est size <= the device budget)
+    for band, q in zip(SEED_BANDS_GIB, out):
+        if q is not None:
+            size = _est_size_gib(f16_gib, q)
+            warn_contract(
+                "post", "band_rungs.feasible",
+                size is not None and size <= DEVICE_LIMIT_GIB,
+                f"{q} resolved for band {band:g} but est size {size} exceeds {DEVICE_LIMIT_GIB}",
+            )
     return out
 
 
@@ -300,6 +317,17 @@ def load_results(state_file: str) -> dict[int, int]:
         if s is None:
             continue
         best[pi] = max(best.get(pi, -1), int(s))
+    # POST: every pair score is an int >= -1, in pool-index space
+    warn_contract(
+        "post", "load_results.space",
+        all(0 <= pi < 2048 for pi in best),
+        f"pair index outside the pool: {min(best) if best else '-'}..{max(best) if best else '-'}",
+    )
+    warn_contract(
+        "post", "load_results.range",
+        all(s >= -1 for s in best.values()),
+        f"score below -1 in the results: {min(best.values()) if best else '-'}",
+    )
     return best
 
 
@@ -323,6 +351,11 @@ def tier_of(t_s: float | None) -> str | None:
     <= 32s, medium <= 64s, slow <= 128s (the exam's level clock).
     None: no level passed (score -1) - no tier (nothing was achieved
     to be fast at), or the time datum is absent."""
+    warn_contract(
+        "pre", "tier_of.positive",
+        t_s is None or t_s > 0,
+        f"non-positive level time: {t_s}",
+    )
     if t_s is None:
         return None
     if t_s <= 32.0:
@@ -362,6 +395,13 @@ def tier_incumbents(state_file: str) -> dict[str, dict[str, Any]]:
                 "k_quant": r.get("k_quant"),
                 "v_quant": r.get("v_quant"),
             }
+    # POST: every crown is a real achievement (score >= 0, time in its own tier)
+    for t, v in inc.items():
+        warn_contract("post", "tier_incumbents.score", v["score"] >= 0,
+                      f"{t} crown has score {v['score']}")
+        warn_contract("post", "tier_incumbents.time",
+                      tier_of(v["time_s"]) == t,
+                      f"{t} crown time {v['time_s']:.1f}s is not in its own tier")
     return inc
 
 
@@ -452,7 +492,14 @@ def level_probs(thresh_probs: np.ndarray) -> np.ndarray:
     eq = np.clip(eq, 0.0, None)
     s = eq.sum(axis=-1, keepdims=True)
     s[s == 0] = 1.0
-    return eq / s
+    out = eq / s
+    # POST: the level probabilities sum to 1 per combo
+    warn_contract(
+        "post", "level_probs.normalized",
+        bool(np.allclose(out.sum(axis=-1), 1.0)),
+        f"level probabilities do not sum to 1: min {out.sum(axis=-1).min():.6f} max {out.sum(axis=-1).max():.6f}",
+    )
+    return out
 
 
 def surrogate_predict(
@@ -743,6 +790,7 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
         out["weakest_tier"] = weakest_tier(inc)
         out["suspicion"] = suspicion_check(inc)
         out["suspicion"]["final"] = len(tested) >= n_pairs
+    out["contract_violations"] = contract_health()
     if seed_pair(state_file, n_pairs) is not None:
         out["phase"] = "seed"
         out["p_better_remains"] = None

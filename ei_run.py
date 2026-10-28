@@ -64,6 +64,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
+from bench.contracts import warn_contract, contract_health
 from bench import state_store as _state_store
 from bench.exam import (
     ask_exam,
@@ -420,6 +421,12 @@ def run_pair(
     needed again; the gc deals with the f16s and any leftover)."""
     from bench.exam import bell_window
 
+    # PRE: the pair exists in the pool (fam on the roster, rung on the LADDER)
+    warn_contract(
+        "pre", "run_pair.pair",
+        fam in {f for f, _ in roster_from_models_md()} and rung in LADDER,
+        f"the pair ({fam}, {rung}) is not in the pool",
+    )
     exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
 
@@ -538,6 +545,21 @@ def run_pair(
         # the f16s and any leftover.
         if rung != "F16" and os.path.isfile(gguf):
             os.remove(gguf)
+        # POST: the sweep produced one record per (k, v) combination -
+        # 49 of them, all on this pair (the resume counts the prior
+        # records in, so 49 holds even after a mid-sweep restart)
+        combos_seen = {(r.get("k_quant"), r.get("v_quant")) for r in records}
+        warn_contract(
+            "post", "run_pair.sweep_complete",
+            len(records) == len(KV_LADDER) ** 2
+            and len(combos_seen) == len(KV_LADDER) ** 2,
+            f"sweep produced {len(records)} records, {len(combos_seen)} distinct combos (expect {len(KV_LADDER)**2})",
+        )
+        warn_contract(
+            "post", "run_pair.on_pair",
+            all(r.get("fam") == fam and r.get("rung") == rung for r in records),
+            "records from another pair in this sweep's result",
+        )
         _ACTIVE_FAMILY[0] = ""
     return records
 
@@ -1049,6 +1071,18 @@ def main(on_progress: Any = None) -> None:
                 state["results"].append(r)
                 have.add(k)
         state["results"] = state["results"][-5000:]  # the state stays bounded
+        # INV: the done set only holds keys in the pool space, one
+        # entry per swept pair, before the pair is marked done
+        warn_contract(
+            "inv", "driver.done_space",
+            all(0 <= int(k) < len(pool) for k in done),
+            f"a done key outside the pool space: {max(int(k) for k in done)} >= {len(pool)}",
+        )
+        warn_contract(
+            "pre", "driver.pair_not_done",
+            int(key) not in {int(k) for k in done},
+            f"the picked pair {key} was already in the done set (double sweep!)",
+        )
         done.add(key)
         _GC_DONE_SET.add(key)
         state["done"] = sorted(done)
