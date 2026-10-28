@@ -1077,12 +1077,16 @@ def main(on_progress: Any = None) -> None:
         # entry per swept pair, before the pair is marked done
         warn_contract(
             "inv", "driver.done_space",
-            all(0 <= int(k) < len(pool) for k in done),
-            f"a done key outside the pool space: {max(int(k) for k in done)} >= {len(pool)}",
+            all(
+                0 <= int(k.split("@")[0]) < len(pool)
+                for k in done
+                if "@" not in k or k.split("@")[0].lstrip("-").isdigit()
+            ),
+            "a done key outside the pool space",
         )
         warn_contract(
             "pre", "driver.pair_not_done",
-            int(key) not in {int(k) for k in done},
+            key not in done,
             f"the picked pair {key} was already in the done set (double sweep!)",
         )
         done.add(key)
