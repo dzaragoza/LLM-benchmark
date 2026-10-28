@@ -176,6 +176,7 @@ def catalog() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "f16_gib": meta,
                 "window": _window_from_models_md(fam),
                 "arch": _arch_of(fam),
+                "thinking": _thinking_of(fam),
             }
         )
     quants = []
@@ -228,6 +229,21 @@ def _window_from_models_md(fam: str) -> int | None:
         return int(row[3].replace(",", ""))
     except (ValueError, IndexError):
         return None
+
+
+def _thinking_of(fam: str) -> str:
+    """the thinking-mode column: thinking / non-thinking / unknown -
+    reasoning models may handle the exam's chain-following
+    differently; cuts ACROSS lineages like the architecture flag."""
+    row = _md_row(fam)
+    if row is None or len(row) < 8:
+        return "unknown"
+    t = row[7].strip().lower()
+    if t.startswith("thinking"):
+        return "thinking"
+    if t.startswith("non"):
+        return "non-thinking"
+    return "unknown"
 
 
 def _arch_of(fam: str) -> str:
@@ -292,6 +308,7 @@ def feature_matrix() -> np.ndarray:
     models, quants = catalog()
     fams = sorted({m["family"] for m in models})
     archs = ["attention", "hybrid", "rwkv"]
+    thinks = ["thinking", "non-thinking", "unknown"]
     methods = ["f16", "k", "iq", "tq", "legacy"]
     log_p = np.log([m["params_b"] if m["params_b"] > 0 else 1e-3 for m in models])
     lp = (log_p - log_p.mean()) / (log_p.std() or 1.0)
@@ -303,9 +320,10 @@ def feature_matrix() -> np.ndarray:
     for mi, m in enumerate(models):
         fam_oh = [1.0 if m["family"] == f else 0.0 for f in fams]
         arch_oh = [1.0 if m["arch"] == a else 0.0 for a in archs]
+        th_oh = [1.0 if m["thinking"] == t else 0.0 for t in thinks]
         for qi, q in enumerate(quants):
             m_oh = [1.0 if q["method"] == meth else 0.0 for meth in methods]
-            rows.append(fam_oh + arch_oh + [lp[mi], lw[mi], b[qi], lp[mi] * b[qi]] + m_oh)
+            rows.append(fam_oh + arch_oh + th_oh + [lp[mi], lw[mi], b[qi], lp[mi] * b[qi]] + m_oh)
     X = np.array(rows, dtype=np.float64)
     return X
 
@@ -313,18 +331,46 @@ def feature_matrix() -> np.ndarray:
 # ---------------------------------------------------------- store
 
 
+def seed_plan() -> set[tuple[str, str]]:
+    """the seed's balanced block: (fam, rung) picks - the lineage
+    largest models x the dyadic bands, deduped. THE TRAINING
+    UNIVERSE: the random-era pairs are NOT part of it (the author's
+    ruling: fully excluded; their results stay in the records as a
+    zero-cost answer cache PoI may draw on)."""
+    models, _ = catalog()
+    by_fam: dict[str, list] = {}
+    for m in models:
+        by_fam.setdefault(m["family"], []).append(m)
+    largest = {f: max(ms, key=lambda m: m["params_b"]) for f, ms in by_fam.items()}
+    plan: set[tuple[str, str]] = set()
+    for m in largest.values():
+        seen: set[str] = set()
+        for q in band_rungs(m["f16_gib"]):
+            if q and q not in seen:
+                seen.add(q)
+                plan.add((m["id"], q))
+    return plan
+
+
 def load_results(state_file: str) -> dict[int, int]:
-    """pair index -> best score, from the ei state: every
-    fully-swept pair (49 records) contributes its max; partial sweeps
-    (crash leftovers) contribute their max too - a data point is a
-    data point."""
+    """pair index -> best score, from the ei state - THE TRAINING
+    SET: only the SEED BLOCK's pairs and the PoI PICKS (the picks
+    ledger). The random-era pairs are EXCLUDED from training (kept
+    in the records; if PoI asks for one, its sweep result joins the
+    training set from then on - it becomes a PoI pick)."""
     with open(state_file, encoding="utf-8") as fh:
         st = json.load(fh)
+    plan = seed_plan()
+    picks = {(p.get("fam"), p.get("rung")) for p in st.get("picks", [])}
+    pool_index = _pool_index()
+    train_pairs = plan | picks
     best: dict[int, int] = {}
     pool_index = _pool_index()
     for r in st.get("results", []):
         if r.get("result") != "done":
             continue
+        if (r.get("fam"), r.get("rung")) not in train_pairs:
+            continue  # the random era: cached, not trained on
         pi = pool_index.get((r["fam"], r["rung"]))
         if pi is None:
             continue
@@ -822,6 +868,7 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
         out["suspicion"] = suspicion_check(inc)
         out["suspicion"]["final"] = len(tested) >= n_pairs
     out["contract_violations"] = contract_health()
+    out["ablation"] = ablation_report(state_file, n_pairs)
     if seed_pair(state_file, n_pairs) is not None:
         out["phase"] = "seed"
         out["p_better_remains"] = None
@@ -840,6 +887,78 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
     out["p_better_remains"] = float(1.0 - np.exp(log_no))
     out["phase"] = "poi"
     out["calibration"] = _calibration(X, best, tested)
+    return out
+
+
+# THE FEATURE GROUPS (for the ablation): the column ranges of the
+# design matrix, by group - drop a group, refit, compare held-out
+# log-loss. The groups are the meaningful units (individual one-hots
+# carry no interpretable weight).
+FEATURE_GROUPS: dict[str, tuple[int, int]] = {
+    "lineage": (0, 14),
+    "arch": (14, 17),
+    "thinking": (17, 20),
+    "numeric": (20, 24),  # log-params, log-window, bpw, interaction
+    "method": (24, 29),
+}
+
+
+def ablation_report(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
+    """THE FEATURE ABLATION (the author's question: which features
+    earn their dimensions?). Fit the threshold ladder with each
+    feature group dropped, compare 5-fold held-out log-loss against
+    the full fit, per group: a group whose removal DOES NOT hurt is
+    a candidate to prune - d shrinks, the seed's effective sample
+    per coefficient grows. Costs seconds, not exams; run at seed
+    completion and periodically during PoI."""
+    best = load_results(state_file)
+    tested = sorted(best)
+    if len(tested) < 10:
+        return {"note": f"too few training pairs ({len(tested)}) - the ablation waits for the seed"}
+    X = feature_matrix()
+    ytr = np.array([best[i] for i in tested])
+    folds = 5
+    thresholds = sorted(set(ytr))
+    if thresholds[-1] == max(ytr):
+        thresholds = thresholds[:-1]  # the top level has no negatives at n small
+    thresholds = [t for t in thresholds if 0 < sum(ytr >= t) < len(ytr)]
+    out: dict[str, Any] = {"n": len(tested), "thresholds": thresholds, "groups": {}}
+
+    def cv_logloss(drop: tuple[int, int] | None) -> float:
+        cols = (
+            np.ones(X.shape[1], dtype=bool)
+            if drop is None
+            else np.ones(X.shape[1], dtype=bool)
+        )
+        if drop is not None:
+            cols[drop[0]:drop[1]] = False
+        Xs = X[:, cols]
+        total = 0.0
+        for k in range(folds):
+            v = np.arange(k, len(tested), folds)
+            tr = np.array([i for i in range(len(tested)) if i not in set(v)])
+            ll = 0.0
+            for t in thresholds:
+                yb = (ytr >= t).astype(float)
+                if yb[tr].sum() == 0 or yb[tr].sum() == len(tr):
+                    p = yb[tr].mean() if len(tr) else 0.5
+                else:
+                    w = _fit_logistic(Xs[tested[tr]], yb[tr])
+                    p = 1.0 / (1.0 + np.exp(-(Xs[tested[v]] @ w)))
+                p = np.clip(p, 1e-9, 1 - 1e-9)
+                ll += -float((yb[v] * np.log(p) + (1 - yb[v]) * np.log(1 - p)).sum())
+            total += ll
+        return total / folds
+
+    base = cv_logloss(None)
+    out["full_logloss"] = round(base, 3)
+    for g, rng in FEATURE_GROUPS.items():
+        ll = cv_logloss(rng)
+        out["groups"][g] = {
+            "logloss": round(ll, 3),
+            "delta": round(ll - base, 3),
+            "useful": ll > base + 0.02,  # removing it HURT: the group earns its dims
+        }
     return out
 
 
