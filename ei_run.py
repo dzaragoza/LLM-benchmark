@@ -511,21 +511,19 @@ def run_pair(
     # A resumed sweep continues the count from its true position.
     n_kv_ladder = len(KV_LADDER)
     try:
-        # THE WHOLE LINE UP FRONT (the author's final simplification):
-        # the sweep's full progress line prints once, before the
-        # first combo - the state's records know the position, so
-        # no incremental dots are needed. A fresh sweep prints
-        # 0.......7.......14.......21.......28.......35.......42.......49
-        # a resume prints the same line WITH ITS POSITION MARKED
-        # (X where the combos already done sit) - one line, no
-        # arithmetic, no console gymnastics.
-        whole = ""
-        for i in range(0, len(KV_LADDER) ** 2):
-            if i % n_kv_ladder == 0:
-                whole += str(i)
-            whole += "X" if i < n_resume else "."
-        print(whole, flush=True)
+        # THE FILLING DOTS (the author's ruling): the line starts
+        # at 0 and a dot prints as each kv combo FINISHES - the
+        # record landing in the state is the dot's truth. A resume
+        # prints its already-done combos' dots up front (so 0..
+        # reads instantly as 2 done), then fills the rest live; the
+        # count prints at every multiple of 7.
+        print("0", end="", flush=True)
         n_combo = 0
+        for _ in range(n_resume):
+            n_combo += 1
+            print(".", end="", flush=True)
+            if n_combo % n_kv_ladder == 0:
+                print(n_combo, end="", flush=True)
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
                 if (k_quant, v_quant) in done_combos:
@@ -548,7 +546,13 @@ def run_pair(
                 state.setdefault("results", []).append(rec)
                 state["results"] = state["results"][-5000:]
                 _state_store.save_state(EI_STATE_FILE, state)
+                # THE FILLING DOT: this combo finished - the dot is
+                # its truth (and the count at every 7)
                 n_combo += 1
+                print(".", end="", flush=True)
+                if n_combo % n_kv_ladder == 0:
+                    print(n_combo, end="", flush=True)
+        print()  # the sweep's line ends
         if n_resume:
             print(
                 f"[ei] sweep resumed: {n_resume} combos already done, "
