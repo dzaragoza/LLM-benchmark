@@ -511,26 +511,21 @@ def run_pair(
     # A resumed sweep continues the count from its true position.
     n_kv_ladder = len(KV_LADDER)
     try:
-        # THE LEADING NUMBER (the author's refinement): the sweep
-        # starts by printing its position, always a multiple of 7 -
-        # 0 for a fresh sweep; for a resume, the NEXT milestone
-        # (the count rounded UP to the ladder's rhythm): a resume
-        # at 20 prints 21.......28 - the first number names the
-        # milestone the sweep is now working toward, every printed
-        # number divisible by 7, no 0-prefixed double marker.
-        import math
-
-        pos = (
-            0
-            if n_resume == 0
-            else int(math.ceil(n_resume / n_kv_ladder) * n_kv_ladder)
-        )
-        print(pos, end="", flush=True)
+        # THE WHOLE LINE UP FRONT (the author's final simplification):
+        # the sweep's full progress line prints once, before the
+        # first combo - the state's records know the position, so
+        # no incremental dots are needed. A fresh sweep prints
+        # 0.......7.......14.......21.......28.......35.......42.......49
+        # a resume prints the same line WITH ITS POSITION MARKED
+        # (X where the combos already done sit) - one line, no
+        # arithmetic, no console gymnastics.
+        whole = ""
+        for i in range(0, len(KV_LADDER) ** 2):
+            if i % n_kv_ladder == 0:
+                whole += str(i)
+            whole += "X" if i < n_resume else "."
+        print(whole, flush=True)
         n_combo = 0
-        # the marker rhythm: dots counted from the PRINTED position -
-        # the next marker prints when the sweep reaches pos + 7, so
-        # the leading number IS the milestone it names (no duplicate)
-        next_marker = pos
         for k_quant in KV_LADDER:
             for v_quant in KV_LADDER:
                 if (k_quant, v_quant) in done_combos:
@@ -554,13 +549,6 @@ def run_pair(
                 state["results"] = state["results"][-5000:]
                 _state_store.save_state(EI_STATE_FILE, state)
                 n_combo += 1
-                print(".", end="", flush=True)
-                if n_resume + n_combo - pos >= n_kv_ladder and (
-                    (n_resume + n_combo) % n_kv_ladder == 0
-                ):
-                    print(n_resume + n_combo, end="", flush=True)
-                    next_marker = n_resume + n_combo
-        print()  # the sweep's line ends
         if n_resume:
             print(
                 f"[ei] sweep resumed: {n_resume} combos already done, "
