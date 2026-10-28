@@ -209,27 +209,103 @@ def cache_scores(state_file: str = TREK_STATE_FILE) -> dict[tuple[int, int], int
 # -------------------------------------------------------- the walker
 
 
+# THE EXAM CLOCK: the walk's own patience ladder. The first trek
+# runs at 1s per exam level; when it converges (the teleport rule),
+# the clock doubles and the walk restarts from the best spot. The
+# maximum clock is 128s - the protocol's patience ceiling.
+CLOCK_MIN_S = 1.0
+CLOCK_MAX_S = 128.0
+
+
+def _clocks() -> list[float]:
+    """the dyadic clock ladder: 1, 2, 4, ..., 128."""
+    out = []
+    c = CLOCK_MIN_S
+    while c <= CLOCK_MAX_S:
+        out.append(c)
+        c *= 2
+    return out
+
+
 def walk(
     state_file: str = TREK_STATE_FILE,
-    max_steps: int = 10_000,
+    max_steps: int = 100_000,
 ) -> dict[str, Any] | None:
-    """THE WALKER. Deterministic given the cache: replays the walk
-    from (0, 0) through the cached cells - free, no sweeps - and
-    returns the FIRST cell needing evaluation: the runner sweeps
-    it, the cache grows, the next call replays further.
+    """THE WALKER, TIME-DOUBLING (the author's specification):
 
-    Returns {..., 'reason': 'evaluate'} for the cell needing a
-    sweep, or None when the trek has ENDED (the walker teleported
-    to the same best location twice - a barren epoch: converged)."""
+    - the walk starts at (0, 0) with the exam clock at 1s per level.
+    - the walker's rules are the same as before: strict improvement
+      keeps the direction (and records the position as the best);
+      non-improvement draws a new direction; blocked at an edge,
+      keep drawing; after 95 movements, evaluate the landing cell
+      then TELEPORT to the best position, seed += 1, keep the high
+      score and best, new direction.
+    - CONVERGENCE: teleporting to a location it has already
+      teleported to AT THIS CLOCK. Then the CLOCK DOUBLES, the seed
+      += 1, and the walk RESTARTS from that spot - the previous
+      best is re-evaluated with double the time (its score may
+      rise: a 1s timeout may pass at 2s).
+    - the maximum clock is 128s: converging at 128s ends the trek
+      for good.
+
+    The cache is PER CLOCK: a cell measured at 1s does not count at
+    2s - the whole grid re-opens when the clock doubles. The walk
+    log (state['walk']) stamps every evaluation with its clock, and
+    the cache rebuild replays the log: the protocol's memory is the
+    log, the records keep score and time (no clock tag needed).
+
+    Deterministic given the cache: replays from (0,0) through
+    cached cells (free) and hands back the first cell needing
+    evaluation at the CURRENT clock. Returns {..., 'reason':
+    'evaluate', 'clock_s': ...} or None when the trek has ended."""
     grid = Grid()
-    scores = cache_scores(state_file)
-    rng = random.Random(1)  # the seed starts at 1; advances per epoch
-    row, col = 0, 0
+    st = json.load(open(state_file, encoding="utf-8"))
+    log: list[dict[str, Any]] = st.get("walk", [])
+
+    # THE CACHE REBUILD: replay the walk log per clock. Each log
+    # entry's (cell, clock) marks the cell measured at that clock;
+    # the CURRENT clock is the highest clock with any entry, or 1s.
+    measured: dict[float, set[tuple[int, int]]] = {}
+    scores: dict[float, dict[tuple[int, int], int]] = {}
+    for e in log:
+        c = float(e.get("clock_s", 1.0))
+        cell = (int(e["row"]), int(e["col"]))
+        measured.setdefault(c, set()).add(cell)
+        scores.setdefault(c, {})[cell] = int(e.get("score", -1))
+    current_clock = max(measured.keys()) if measured else CLOCK_MIN_S
+    # per-clock walk state: the convergence bookkeeping
+    # (teleport targets per clock) replays from the log's epochs
+    # NOTE: the full replay of directions/teleports per past clock
+    # is not needed - only the CURRENT clock's cache and the walk
+    # position matter; the position derives from the current
+    # clock's replay (below).
+
+    # replay the current clock's walk from its start: the walk at
+    # clock c starts at the BEST POSITION of clock c/2 (or (0,0)
+    # for the first clock). The log's entries at the current clock,
+    # in order, replay the draws deterministically.
+    rng = random.Random(_clocks().index(current_clock) + 1)  # seed = 1 at 1s, 2 at 2s...
+    # the starting position: the first entry of this clock's log
+    # (the restart spot), or (0,0) if none yet
+    this_clock_entries = [e for e in log if float(e.get("clock_s", 1.0)) == current_clock]
+    if this_clock_entries:
+        start = (int(this_clock_entries[0]["row"]), int(this_clock_entries[0]["col"]))
+    else:
+        start = (0, 0)
+
+    cur_scores = scores.get(current_clock, {})
+    row, col = start
     high = -1
-    best = (0, 0)
+    best = start
     moves = 0
-    epoch = 1
     teleport_targets: list[tuple[int, int]] = []
+    # the best/high replay: the high score at this clock starts from
+    # the clock's own evaluations (the log), the best from the same
+    for e in this_clock_entries:
+        s = int(e.get("score", -1))
+        if s > high:
+            high = s
+            best = (int(e["row"]), int(e["col"]))
 
     def draw() -> tuple[int, int]:
         return DIRECTIONS[rng.randrange(4)]
@@ -242,50 +318,56 @@ def walk(
             "fam": fam,
             "rung": rung,
             "pool_index": grid.pool_index(row, col),
+            "clock_s": current_clock,
             "high_score": high,
             "best": list(best),
-            "epoch": epoch,
-            "seed": epoch,          # seed = 1 + (epoch - 1)
+            "epoch": len(teleport_targets) + 1,
+            "seed": _clocks().index(current_clock) + 1 + len(teleport_targets),
             "movements": moves,
             "reason": reason,
         }
 
-    direction = draw()  # the initial direction: randomized at the start
+    direction = draw()
     while moves < max_steps:
-        # EVALUATE the current cell: the cache, or hand it back
-        if (row, col) not in scores:
+        if (row, col) not in cur_scores:
             return result()
-        score = scores[(row, col)]
-
-        # (a)/(b): improvement keeps the direction; non-improvement
-        # draws a new one. The high score and best position update
-        # on STRICT improvement only.
+        score = cur_scores[(row, col)]
         if score > high:
             high = score
             best = (row, col)
-            # keep the current direction
         else:
             direction = draw()
-
-        # THE EPOCH BOUNDARY: 95 movements - evaluate the landing
-        # cell first (done above), then teleport
         moves += 1
         if moves >= EPOCH_MOVEMENTS:
-            # TELEPORT: to the best position; the seed advances;
-            # the high score and best position are kept
             if best in teleport_targets:
-                return None  # the same target twice: the trek ends
+                # CONVERGED at this clock: the clock doubles (or the
+                # trek ends at the max clock)
+                if current_clock >= CLOCK_MAX_S:
+                    return None
+                next_clock = current_clock * 2
+                # the next trek restarts from the best spot, at the
+                # doubled clock - the runner sweeps it fresh (the
+                # cache has no entries at that clock yet)
+                return {
+                    "row": best[0],
+                    "col": best[1],
+                    "fam": grid.cell(best[0], best[1])[0],
+                    "rung": grid.cell(best[0], best[1])[1],
+                    "pool_index": grid.pool_index(best[0], best[1]),
+                    "clock_s": next_clock,
+                    "high_score": -1,
+                    "best": list(best),
+                    "epoch": 1,
+                    "seed": _clocks().index(next_clock) + 1,
+                    "movements": 0,
+                    "reason": "evaluate",
+                }
             teleport_targets.append(best)
             row, col = best
-            epoch += 1
-            rng = random.Random(epoch)  # seed += 1
+            rng = random.Random(_clocks().index(current_clock) + 1 + len(teleport_targets))
             direction = draw()
             moves = 0
             continue
-
-        # STEP in the current direction; blocked at an edge: keep
-        # drawing until the direction is open (each draw consumes
-        # the stream)
         while True:
             nr, nc = row + direction[0], col + direction[1]
             if grid.inside(nr, nc):

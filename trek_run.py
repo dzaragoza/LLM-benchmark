@@ -818,13 +818,10 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     return _trek_size(r)
 
 
-def main(
-    on_progress: Any = None,
-    level_time_s: float | None = None,
-) -> None:
-    """The trek's run loop. level_time_s: THE EXAM CLOCK - the
-    per-level time limit (--time), the protocol's patience
-    definition. None: the default LEVEL_TIMEOUT_S (128s)."""
+def main(on_progress: Any = None) -> None:
+    """The trek's run loop. The exam clock is the WALK's own: it
+    starts at 1s per level and doubles when a trek converges (the
+    teleport rule), up to 128s - see bench/trek.py's walk."""
     # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
     # first with no fallback - a black-holed IPv6 route (curl works,
     # the library hangs, zero packets - the author's T14s case) is
@@ -853,8 +850,14 @@ def main(
             state = json.load(fh)
     # the state's results list IS the ledger's memory; run_pair
     # appends per combo and may rebind the list on trim, so every
-    # consumer re-reads state["results"] instead of caching a handle
-    results: list[dict[str, Any]] = state["results"]
+    # consumer re-reads state["results"] instead of caching a handle.
+    # A fresh state may lack the keys - created here (the KeyError
+    # crash on a fresh trek state).
+    results: list[dict[str, Any]] = state.setdefault("results", [])
+    state.setdefault("done", [])
+    state.setdefault("walk", [])
+    # the done keys are PER CLOCK ("index@clock"); the legacy keys
+    # (bare indices, from the single-clock era) stay valid
 
     pool = the_pool()
     _GC_POOL.clear()
@@ -983,12 +986,6 @@ def main(
     )
     print(f"[trek] entropy: {_ENTROPY_DEV}")
     print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
-    # THE EXAM CLOCK (--time): the per-level limit, overridable per
-    # run - the practitioner's patience parameter
-    global LEVEL_TIMEOUT_S
-    if level_time_s is not None:
-        LEVEL_TIMEOUT_S = float(level_time_s)
-        print(f"[trek] the exam clock: {LEVEL_TIMEOUT_S:g}s per level (--time)")
     n = len(done)
     while len(done) < len(pool):
         # THE TREK STEP: bench/trek.py's deterministic walker - it
@@ -1001,21 +998,31 @@ def main(
 
         rec_pick = trek.walk(state_file)
         if rec_pick is None:
-            print("[trek] the trek has ENDED: a barren epoch - the walker converged")
+            print("[trek] the trek has ENDED: converged at the 128s clock")
             break
         pair_key = rec_pick["pool_index"]
         fam = rec_pick["fam"]
         rung = rec_pick["rung"]
-        key = f"{pair_key}"
+        clock = rec_pick.get("clock_s", 1.0)
+        # THE PER-CLOCK DONE-KEY: a cell measured at 1s re-opens at
+        # 2s (the higher clock may score differently) - the key
+        # carries the clock so the same cell can complete multiple
+        # sweeps, one per clock
+        key = f"{pair_key}@{clock:g}"
+        # THE EXAM CLOCK FOLLOWS THE WALK: the sweep runs at the
+        # walker's current clock (the LEVEL_TIMEOUT_S the per-level
+        # deadline reads)
+        global LEVEL_TIMEOUT_S
+        LEVEL_TIMEOUT_S = float(clock)
         est = rec_pick.get("high_score")
         ep = rec_pick.get("epoch")
         mv = rec_pick.get("movements")
         print(
-            f"[trek] epoch {ep}, movement {mv}: evaluating {fam} {rung} "
-            f"(high score {est}, best at {rec_pick.get('best')})"
+            f"[trek] clock {clock:g}s, epoch {ep}, movement {mv}: "
+            f"evaluating {fam} {rung} (high {est}, best at {rec_pick.get('best')})"
         )
         if key in done:
-            continue  # already measured (a resume's replay guard)
+            continue  # already measured at THIS clock (a resume's replay guard)
         print(
             f"[trek] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
@@ -1033,9 +1040,12 @@ def main(
         )
         state.setdefault("walk", []).append(
             {
+                "row": rec_pick.get("row"),
+                "col": rec_pick.get("col"),
                 "index": pair_key,
                 "fam": fam,
                 "rung": rung,
+                "clock_s": rec_pick.get("clock_s", 1.0),
                 "epoch": rec_pick.get("epoch"),
                 "seed": rec_pick.get("seed"),
                 "movements": rec_pick.get("movements"),
