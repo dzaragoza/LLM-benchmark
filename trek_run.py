@@ -1046,6 +1046,8 @@ def main(on_progress: Any = None) -> None:
                 "fam": fam,
                 "rung": rung,
                 "clock_s": rec_pick.get("clock_s", 1.0),
+                "draws": rec_pick.get("draws", 0),
+                "direction": rec_pick.get("direction"),
                 "epoch": rec_pick.get("epoch"),
                 "seed": rec_pick.get("seed"),
                 "movements": rec_pick.get("movements"),

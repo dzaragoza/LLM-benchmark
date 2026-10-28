@@ -299,15 +299,43 @@ def walk(
     best = start
     moves = 0
     teleport_targets: list[tuple[int, int]] = []
-    # the best/high replay: the high score at this clock starts from
-    # the clock's own evaluations (the log), the best from the same
-    for e in this_clock_entries:
+    # THE STREAM-EXACT REPLAY (the resume bug the cache audit
+    # caught): the original walk consumed direction draws between
+    # logged evaluations - movements over cached cells draw too,
+    # and the improvement branch KEEPS a direction drawn earlier.
+    # The draw count alone cannot recover that kept direction, so
+    # the log records each evaluation's DIRECTION (the walker's
+    # full state: position, clock, draws, movements, direction) and
+    # the replay restores it exactly instead of re-drawing.
+    draws_logged = 0
+    direction_logged = None
+    # the replay's high/best: ALL entries EXCEPT the last - the
+    # loop re-evaluates the last logged cell freshly (its score
+    # must not be double-counted, or the improvement rule misfires
+    # and the kept direction gets discarded)
+    for e in this_clock_entries[:-1]:
         s = int(e.get("score", -1))
         if s > high:
             high = s
             best = (int(e["row"]), int(e["col"]))
+    if this_clock_entries:
+        d = this_clock_entries[-1].get("draws")
+        if d is not None:
+            draws_logged = int(d)
+        dr = this_clock_entries[-1].get("direction")
+        if dr is not None:
+            direction_logged = (int(dr[0]), int(dr[1]))
+    if this_clock_entries:
+        last = this_clock_entries[-1]
+        row, col = int(last["row"]), int(last["col"])
+        moves = int(last.get("movements", 0))
+    for _ in range(draws_logged):
+        rng.randrange(4)
+
+    draw_count = [draws_logged]
 
     def draw() -> tuple[int, int]:
+        draw_count[0] += 1
         return DIRECTIONS[rng.randrange(4)]
 
     def result(reason: str = "evaluate") -> dict[str, Any]:
@@ -324,10 +352,15 @@ def walk(
             "epoch": len(teleport_targets) + 1,
             "seed": _clocks().index(current_clock) + 1 + len(teleport_targets),
             "movements": moves,
+            "draws": draw_count[0],
+            "direction": list(direction if direction_logged is None else direction_logged),
             "reason": reason,
         }
 
-    direction = draw()
+    if direction_logged is not None:
+        direction = direction_logged  # restore the kept direction
+    else:
+        direction = draw()
     while moves < max_steps:
         if (row, col) not in cur_scores:
             return result()
@@ -360,6 +393,8 @@ def walk(
                     "epoch": 1,
                     "seed": _clocks().index(next_clock) + 1,
                     "movements": 0,
+                    "draws": 0,
+                    "direction": list(draw()),
                     "reason": "evaluate",
                 }
             teleport_targets.append(best)
