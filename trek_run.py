@@ -1112,6 +1112,10 @@ def main(on_progress: Any = None) -> None:
         # decide whether it is our bug or our logic.
         sig_counts: dict[tuple, int] = {}
         for r in recs:
+            if r.get("result") == "done":
+                continue  # a done record is a SCORE, not a failure -
+                # at the 1s clock every candidate scores -1 and 49
+                # identical scores are NOT a stuck retry loop
             sig = (
                 r.get("fam"),
                 r.get("rung"),
