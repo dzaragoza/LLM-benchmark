@@ -440,7 +440,13 @@ def run_pair(
                 "seed": exam_seed,
                 "result": result,
                 "detail": detail,
-                "size_gib": os.path.getsize(gguf) / (2**30) if os.path.isfile(gguf) else None,
+                # the measured size when a file exists; None when the
+                # acquire failed before producing one (gguf is None)
+                "size_gib": (
+                    round(os.path.getsize(gguf) / (2**30), 3)
+                    if gguf and os.path.isfile(gguf)
+                    else None
+                ),
             }
             for k_quant in KV_LADDER
             for v_quant in KV_LADDER
