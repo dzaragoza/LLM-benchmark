@@ -363,18 +363,36 @@ def walk(
             "seed": _clocks().index(current_clock) + 1 + len(teleport_targets),
             "movements": moves,
             "draws": draw_count[0],
-            "direction": list(direction if direction_logged is None else direction_logged),
+            "direction": list(direction),
             "reason": reason,
         }
 
+    # THE REPLAY'S INITIAL DIRECTION: the last logged entry's
+    # direction (the one in effect at the last evaluation). For a
+    # fresh clock (no entries), the first draw.
     if direction_logged is not None:
-        direction = direction_logged  # restore the kept direction
+        direction = direction_logged
     else:
         direction = draw()
     while moves < max_steps:
         if (row, col) not in cur_scores:
-            return result()
+            # THE LOGGED DIRECTION IS THE CURRENT ONE - the direction
+            # in effect at this evaluation (after any redraws and
+            # blocked-edge funnels), the one the walker would step in
+            # on improvement. NOT the restored direction_logged (the
+            # stale-by-one-draw bug: the log said [down] while the
+            # steps went right - the corner's blocked-edge loop had
+            # redrawn three times and the current direction was
+            # right, but result() preferred the stale restored one).
+            res = result()
+            res["direction"] = list(direction)
+            return res
         score = cur_scores[(row, col)]
+        # THE IMPROVEMENT RULE (the author's spec): strict
+        # improvement keeps the current direction and records the
+        # position as the best; non-improvement draws a new
+        # direction. The step follows in both cases; the walker
+        # keeps moving until it lands on an unmeasured cell.
         if score > high:
             high = score
             best = (row, col)
