@@ -1022,30 +1022,31 @@ def main(on_progress: Any = None) -> None:
     print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
     n = len(done)
     while len(done) < len(pool):
-        # THE TREK STEP: bench/trek.py's deterministic walk - the
-        # frontier's best-estimated unmeasured cell under the
-        # declared, logged strategy. kv quants are NOT searched: the
-        # picked cell's pair sweeps all 49 (k, v) combinations in one
-        # acquisition, then the cell is never needed again. The
-        # done-key is the cell's grid/pool index.
+        # THE TREK STEP: bench/trek.py's deterministic walker - it
+        # replays the walk from (0, 0) through the cached cells
+        # (free) and hands back the FIRST cell needing evaluation.
+        # kv quants are NOT searched: the picked cell's pair sweeps
+        # all 49 (k, v) combinations in one acquisition. The
+        # done-key is the cell's pool index.
         from bench import trek
 
-        rec_pick = trek.pick(state_file)
+        rec_pick = trek.walk(state_file)
         if rec_pick is None:
+            print("[trek] the trek has ENDED: a barren epoch - the walker converged")
             break
-        pair_key = rec_pick["index"]
+        pair_key = rec_pick["pool_index"]
         fam = rec_pick["fam"]
         rung = rec_pick["rung"]
         key = f"{pair_key}"
-        est = rec_pick.get("estimate")
-        sup = rec_pick.get("support", 0)
-        est_s = f"{est:.2f}" if est is not None else "blind"
+        est = rec_pick.get("high_score")
+        ep = rec_pick.get("epoch")
+        mv = rec_pick.get("movements")
         print(
-            f"[trek] step {n + 1}: {fam} {rung} "
-            f"(estimate {est_s}, support {sup})"
+            f"[trek] epoch {ep}, movement {mv}: evaluating {fam} {rung} "
+            f"(high score {est}, best at {rec_pick.get('best')})"
         )
         if key in done:
-            continue  # already measured (a resume's re-derivation guard)
+            continue  # already measured (a resume's replay guard)
         print(
             f"[trek] #{n + 1} pair={key} "
             f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
@@ -1066,27 +1067,16 @@ def main(on_progress: Any = None) -> None:
                 "index": pair_key,
                 "fam": fam,
                 "rung": rung,
-                "estimate": est,
-                "support": sup,
-                "strategy": rec_pick.get("strategy"),
+                "epoch": rec_pick.get("epoch"),
+                "seed": rec_pick.get("seed"),
+                "movements": rec_pick.get("movements"),
+                "high_score_before": rec_pick.get("high_score"),
+                "best_before": rec_pick.get("best"),
                 "score": pick_score,
                 "n_recs": len(recs),
             }
         )
         state["walk"] = state["walk"][-4000:]  # bounded
-        # THE CHECKPOINT (every CHECKPOINT_N measured cells): the walk
-        # re-derives from the cache and the strategy is reviewed from
-        # the diagnostics - crown progression, estimate bias, lineage
-        # coverage. The strategy change is the author's ruling, logged;
-        # the walk then replays deterministically under it.
-        if len(state["walk"]) % trek.CHECKPOINT_N == 0:
-            rep = trek.checkpoint_report(state_file)
-            print(
-                f"[trek] CHECKPOINT {len(state['walk'])}: "
-                f"cells {rep['n_cells_measured']}, best {rep['best_score']}, "
-                f"estimate bias {rep.get('estimate_bias')}"
-            )
-            print(f"[trek]   lineage coverage: {rep['lineage_coverage']}")
         # THE RESUME-SAFE EXTEND: the resumed records are ALREADY in
         # state["results"] (run_pair persisted them per combo), so
         # only the records NOT yet in the state extend it - the
