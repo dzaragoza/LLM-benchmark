@@ -62,6 +62,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
 from bench.exam import (
@@ -432,6 +433,7 @@ def run_pair(
                 "seed": exam_seed,
                 "result": result,
                 "detail": detail,
+                "size_gib": os.path.getsize(gguf) / (2**30) if os.path.isfile(gguf) else None,
             }
             for k_quant in KV_LADDER
             for v_quant in KV_LADDER
@@ -449,6 +451,28 @@ def run_pair(
     # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from the model, so the
     # window is exactly n_ctx_train, one parameter less to worry
+    # THE POST-QUANTIZATION SIZE CHECK (the author's ruling): the
+    # file is on disk now - MEASURE it. The estimate chose the band
+    # and gated the download; the measured size is the truth that
+    # gates the LAUNCH: a file over the device budget cannot run
+    # (the GPU can never hold it), so the sweep fans out the honest
+    # too_large_measured verdict without paying 49 doomed launches;
+    # the recovery then re-resolves the band. The measured size
+    # also rides every record - the ledger's size column becomes
+    # the measured truth, not the estimate.
+    size_gib = round(os.path.getsize(gguf) / (2**30), 3)
+    print(f"  [2] {rung}: measured {size_gib:.2f} GiB on disk")
+    if size_gib > hf_download.DEVICE_LIMIT_GIB:
+        print(
+            f"  [2] {rung}: measured {size_gib:.2f} GiB exceeds the "
+            f"device budget {hf_download.DEVICE_LIMIT_GIB:.0f} GiB - CANNOT RUN, "
+            "skipping the launch (the measured gate)"
+        )
+        return _fail_all(
+            "too_large_measured",
+            f"measured {size_gib:.2f} GiB > {hf_download.DEVICE_LIMIT_GIB:.0f} GiB device budget",
+        )
+
     ctx = bell_window(state, fam, models_dir) or 262144
 
     # THE SWEEP RESUME (the author's ruling): the state's results ARE
