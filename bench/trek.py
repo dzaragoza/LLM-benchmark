@@ -259,7 +259,17 @@ def walk(
     evaluation at the CURRENT clock. Returns {..., 'reason':
     'evaluate', 'clock_s': ...} or None when the trek has ended."""
     grid = Grid()
-    st = json.load(open(state_file, encoding="utf-8"))
+    # A FRESH START (no state file - a first run or after --clean):
+    # the trek begins at (0,0) at the 1s clock; the state is created
+    # (the runner saves it on the first sweep's completion)
+    if not os.path.isfile(state_file):
+        os.makedirs(os.path.dirname(state_file) or ".", exist_ok=True)
+        st: dict[str, Any] = {"done": [], "results": [], "walk": []}
+        with open(state_file, "w", encoding="utf-8") as fh:
+            json.dump(st, fh, indent=1)
+    else:
+        with open(state_file, encoding="utf-8") as fh:
+            st = json.load(fh)
     log: list[dict[str, Any]] = st.get("walk", [])
 
     # THE CACHE REBUILD: replay the walk log per clock. Each log
