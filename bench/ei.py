@@ -176,7 +176,6 @@ def catalog() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "f16_gib": meta,
                 "window": _window_from_models_md(fam),
                 "arch": _arch_of(fam),
-                "thinking": _thinking_of(fam),
             }
         )
     quants = []
@@ -229,21 +228,6 @@ def _window_from_models_md(fam: str) -> int | None:
         return int(row[3].replace(",", ""))
     except (ValueError, IndexError):
         return None
-
-
-def _thinking_of(fam: str) -> str:
-    """the thinking-mode column: thinking / non-thinking / unknown -
-    reasoning models may handle the exam's chain-following
-    differently; cuts ACROSS lineages like the architecture flag."""
-    row = _md_row(fam)
-    if row is None or len(row) < 8:
-        return "unknown"
-    t = row[7].strip().lower()
-    if t.startswith("thinking"):
-        return "thinking"
-    if t.startswith("non"):
-        return "non-thinking"
-    return "unknown"
 
 
 def _arch_of(fam: str) -> str:
@@ -308,7 +292,6 @@ def feature_matrix() -> np.ndarray:
     models, quants = catalog()
     fams = sorted({m["family"] for m in models})
     archs = ["attention", "hybrid", "rwkv"]
-    thinks = ["thinking", "non-thinking", "unknown"]
     methods = ["f16", "k", "iq", "tq", "legacy"]
     log_p = np.log([m["params_b"] if m["params_b"] > 0 else 1e-3 for m in models])
     lp = (log_p - log_p.mean()) / (log_p.std() or 1.0)
@@ -320,10 +303,9 @@ def feature_matrix() -> np.ndarray:
     for mi, m in enumerate(models):
         fam_oh = [1.0 if m["family"] == f else 0.0 for f in fams]
         arch_oh = [1.0 if m["arch"] == a else 0.0 for a in archs]
-        th_oh = [1.0 if m["thinking"] == t else 0.0 for t in thinks]
         for qi, q in enumerate(quants):
             m_oh = [1.0 if q["method"] == meth else 0.0 for meth in methods]
-            rows.append(fam_oh + arch_oh + th_oh + [lp[mi], lw[mi], b[qi], lp[mi] * b[qi]] + m_oh)
+            rows.append(fam_oh + arch_oh + [lp[mi], lw[mi], b[qi], lp[mi] * b[qi]] + m_oh)
     X = np.array(rows, dtype=np.float64)
     return X
 
@@ -897,9 +879,8 @@ def status(state_file: str, n_pairs: int = 2048) -> dict[str, Any]:
 FEATURE_GROUPS: dict[str, tuple[int, int]] = {
     "lineage": (0, 14),
     "arch": (14, 17),
-    "thinking": (17, 20),
-    "numeric": (20, 24),  # log-params, log-window, bpw, interaction
-    "method": (24, 29),
+    "numeric": (17, 21),  # log-params, log-window, bpw, interaction
+    "method": (21, 26),
 }
 
 
