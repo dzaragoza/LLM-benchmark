@@ -783,6 +783,27 @@ def _run_combo(
 # by pair
 
 
+_MODELS_BY_ID: dict[str, dict[str, Any]] | None = None
+
+
+def _est_size_gib_of(r: dict[str, Any]) -> float | None:
+    """the candidate's weights size for the extended reporting's
+    budget table: the MEASURED size_gib where the record carries it
+    (the post-quantization truth), else the estimate from the
+    roster (f16 x bpw/16). The catalog lookup is cached: the ledger
+    writes call this per record, a rebuild per record was the
+    table-render timeout."""
+    global _MODELS_BY_ID
+    from bench.ei import _est_size_gib, catalog
+
+    if _MODELS_BY_ID is None:
+        _MODELS_BY_ID = {mm["id"]: mm for mm in catalog()[0]}
+    m = _MODELS_BY_ID.get(r.get("fam"))
+    if m is None:
+        return None
+    return _est_size_gib(m["f16_gib"], r.get("rung"))
+
+
 def main(on_progress: Any = None) -> None:
     # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
     # first with no fallback - a black-holed IPv6 route (curl works,
@@ -923,6 +944,62 @@ def main(on_progress: Any = None) -> None:
                         lines.append(f"- {v}")
                 else:
                     lines.append("- the post-condition holds: the tier bests are ordered (fast <= medium <= slow)")
+
+            # THE EXTENDED REPORTING (the author's ruling: extra
+            # observations for the practitioners; the OPTIMIZATION is
+            # the original design - score at the three speed tiers -
+            # and none of this influences a single pick). Both tables
+            # are floors, not ceilings: the pool is not drained, the
+            # bests can only rise.
+            timed = [
+                r
+                for r in rows
+                if r.get("high_score_time_s") is not None and r.get("high_score") is not None
+            ]
+            if timed:
+                lines.append("")
+                lines.append("## the score-time frontier (practitioner reporting)")
+                lines.append("")
+                lines.append("the best score at a patience level (the high-score level's time):")
+                lines.append("")
+                lines.append("| patience | best score | holder | at |")
+                lines.append("|---|---|---|---|")
+                for cap in (8, 16, 32, 64, 128):
+                    cands = [r for r in timed if r["high_score_time_s"] <= cap]
+                    if not cands:
+                        continue
+                    best = max(r["high_score"] for r in cands)
+                    h = min(
+                        (r for r in cands if r["high_score"] == best),
+                        key=lambda r: r["high_score_time_s"],
+                    )
+                    lines.append(
+                        f"| <= {cap}s | {best} | {h['fam']} {h['rung']} "
+                        f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s |"
+                    )
+            sized = [
+                r
+                for r in rows
+                if (r.get("size_gib") or _est_size_gib_of(r)) is not None
+            ]
+            if sized:
+                lines.append("")
+                lines.append("## the score-by-weights-budget table (practitioner reporting)")
+                lines.append("")
+                lines.append("the best score whose weights file fits a memory budget:")
+                lines.append("")
+                lines.append("| weights | best score | holder |")
+                lines.append("|---|---|---|")
+                for cap in (2, 4, 8, 16):
+                    cands = [r for r in sized if (s := (r.get("size_gib") or _est_size_gib_of(r))) <= cap]
+                    if not cands:
+                        continue
+                    best = max(r["high_score"] for r in cands)
+                    h = cands[[r["high_score"] for r in cands].index(best)]
+                    lines.append(
+                        f"| <= {cap} GiB | {best} | {h['fam']} {h['rung']} "
+                        f"k={h['k_quant']} v={h['v_quant']} |"
+                    )
         if t_params:
             lines.append(f"- params median: **{_stats.median(t_params):g} B**")
         from collections import Counter as _C
