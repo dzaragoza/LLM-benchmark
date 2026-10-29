@@ -732,10 +732,13 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
 
 
 def main(on_progress: Any = None, walker_seed: int = 1) -> None:
-    """The trek v2 run loop: the walker walks the grid at the current
-    budget, the runner does the exam work; the histories accumulate;
-    a converged budget doubles (the ladder 1..128s); the trek ends
-    at 128s convergence. One walker seed for everything."""
+    """The trek v3 phase-A run loop: the walker acts on every cell it
+    stands on (a new cell -> t=1; the top result a timeout -> t*2;
+    the top result a fail -> nothing), draws a direction after each
+    action, 95 movements per life, the teleport home at exhaustion -
+    a repeated home ENDS the walk, a new walker spawns, and the trek
+    ends when a spawn finds no improvement anywhere. The histories
+    accumulate; the budget rides the action, never a global ladder."""
     import socket
 
     _orig_getaddrinfo = socket.getaddrinfo
@@ -750,44 +753,46 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     models_dir = "models"
     port = int(os.environ.get("TREK_PORT", "8210"))
 
-    print(f"[trek] v2: walkers over exam histories; the walker seed {walker_seed}")
+    print(f"[trek] v3 phase a: the walker acts on every cell; the seed {walker_seed}")
     print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
 
     st = trek.load_state()
 
-    # the budget ladder: start where the state left off (or 1s)
-    budget = st.get("last_budget", trek.CLOCK_LADDER[0])
-    budget_idx = trek.CLOCK_LADDER.index(budget)
-    while budget_idx < len(trek.CLOCK_LADDER):
-        budget = trek.CLOCK_LADDER[budget_idx]
-        st["last_budget"] = budget
-        trek.save_state(st)
-        write_ledger(st)
-        print(f"[trek] the {budget:g}s walker")
-
-        n = 0
-        while True:
-            pick = trek.walk(st, walker_seed, budget_s=budget)
-            if pick is None:
-                break
-            if pick["reason"] == "converged":
-                print(
-                    f"[trek] the {budget:g}s walker CONVERGED "
-                    f"(best {pick['fam']} {pick['rung']}, high {pick['high']})"
-                )
-                break
-            fam, rung = pick["fam"], pick["rung"]
+    n = 0
+    while True:
+        pick = trek.walk(st, walker_seed)
+        if pick is None:
+            break
+        if pick["reason"] == "ended":
             print(
-                f"[trek] {budget:g}s, epoch {pick['epoch']}, movement {pick['movements']}: "
-                f"{fam} {rung} (high {pick['high']}, best at {pick['best']})"
+                f"[trek] life {pick['life']} ENDED: no improvement "
+                f"(best {pick['fam']} {pick['rung']}, high {pick['high']}) - "
+                f"a new walker spawns"
             )
-            run_pair(fam, rung, models_dir, st, port, budget)
-            write_ledger(st)  # the ledger re-derives from the histories
-            n += 1
-            if on_progress is not None:
-                try:
-                    on_progress(n)
-                except Exception:
-                    pass
-        budget_idx += 1
-    print("[trek] the trek has ENDED: converged at the 128s budget")
+            # the spawn's high-score target repeated: end this walk,
+            # the new life spawns on the next walk() call
+            ws = st.setdefault("walk", {})
+            ws["life"] = ws.get("life", 1) + 1
+            ws["position"] = [-1, -1]  # the spawn
+            ws["movements"] = 0
+            ws["high"] = -1
+            ws["spawn_targets"] = []
+            trek.save_state(st)
+            continue
+        fam, rung = pick["fam"], pick["rung"]
+        print(
+            f"[trek] life {pick['life']}, movement {pick['movements']}: "
+            f"{fam} {rung} - {pick['action']} at t={pick['budget']:g}s "
+            f"(high {pick['high']}, best at {pick['best']})"
+        )
+        run_pair(fam, rung, models_dir, st, port, pick["budget"])
+        # the walk state advances: the runner's exam is done, the
+        # walker's next call re-derives the action at this cell
+        write_ledger(st)  # the ledger re-derives from the histories
+        n += 1
+        if on_progress is not None:
+            try:
+                on_progress(n)
+            except Exception:
+                pass
+    print("[trek] the trek has ENDED: no improvement found by any spawn")

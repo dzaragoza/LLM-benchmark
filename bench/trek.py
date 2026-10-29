@@ -415,181 +415,246 @@ def pair_state_under(
 # ------------------------------------------------------------- the walker
 
 
+def cell_action(
+    st: dict[str, Any],
+    fam: str,
+    rung: str,
+    kv_ladder: list[str],
+) -> tuple[str, float]:
+    """THE CELL'S ACTION under phase A (the author's v3 spec): given
+    the pair's 49 candidate histories, what does the walker do here?
+    Returns (action, budget):
+    - ('exam', 1.0): a NEW cell (no histories) - the first exam at t=1
+    - ('exam', t*2): the cell's top result is a timeout at t - re-run
+      at the doubled budget (max 128s; at 128 it is settled)
+    - ('none', 0): the cell's top result is a fail (wrong answer /
+      out of paper / launch failure) - do nothing
+    - ('none', 0): the cell is fully settled (the top timeout is at
+      128, or the best score cannot improve) - do nothing
+    The 'top result' is the best candidate's frontier: the highest
+    score any candidate reaches, and what stops it."""
+    best_score = -1
+    best_stop = "fail"  # the worst case: nothing ran
+    best_budget = 1.0
+    any_hist = False
+    for k in kv_ladder:
+        for v in kv_ladder:
+            h = history_of(st, fam, rung, k, v)
+            if not h:
+                continue
+            any_hist = True
+            # the candidate's frontier under its own history
+            score = 0
+            while True:
+                rec = h.get(score)
+                if rec is None:
+                    # the candidate's exam is unfinished: a re-run
+                    # would continue it - this counts as a timeout
+                    # at the last recorded budget (or 1 if fresh)
+                    return ("exam", max(1.0, _last_budget_of(h)))
+                if rec.get("status") == "pass":
+                    score += 1
+                    continue
+                if rec.get("status") == "timeout":
+                    t = rec.get("timeout_s", 1.0)
+                    if score > best_score or (score == best_score and t > best_budget):
+                        if score >= best_score:
+                            best_score = score
+                            best_budget = t
+                            best_stop = "timeout"
+                    break
+                # wrong answer / out of paper / error: settled fail
+                break
+            if score - 1 > best_score:
+                best_score = score - 1
+    if not any_hist:
+        return ("exam", 1.0)
+    if best_stop == "timeout":
+        if best_budget >= 128.0:
+            return ("none", 0)  # the max budget already evaluated
+        return ("exam", min(best_budget * 2, 128.0))
+    return ("none", 0)
+
+
+def _last_budget_of(h: dict[int, Any]) -> float:
+    """the newest timeout budget in a history (for the unfinished-
+    exam case): the re-run continues at that budget."""
+    budgets = [
+        rec.get("timeout_s", 1.0)
+        for rec in h.values()
+        if isinstance(rec, dict) and rec.get("status") == "timeout"
+    ]
+    return max(budgets) if budgets else 1.0
+
+
 def walk(
     st: dict[str, Any],
-    walker_seed: int,
-    budget_s: float | None = None,
+    walker_seed: int = 1,
     kv_ladder: list[str] | None = None,
     max_steps: int = 1_000_000,
 ) -> dict[str, Any] | None:
-    """THE WALKER at a budget. Deterministic: (the exam histories,
-    the walker seed, the budget) -> the next cell needing work.
+    """THE V3 PHASE-A WALKER (the author's spec): the walker acts on
+    EVERY cell it stands on - never passes through.
 
-    The walker state derives from the histories every call: the
-    measured set (any candidate history exists = the cell is on the
-    map), the scores under the budget, the needs-work flags. The
-    walk re-derives from its epoch start each call (the v1 lesson:
-    cached steps cost movements; the replay is exact).
+    THE WALK: the walker spawns at a random grid position (drawn
+    from the fixed seed-1 stream), sets its high score to -1, and
+    evaluates each cell it stands on:
+    - a new cell: the exam at t=1
+    - the cell's top result a timeout: the exam at timeout x 2
+      (max 128s; at max, do nothing)
+    - the cell's top result a fail: do nothing
+    After the action, the walker draws a random direction and steps
+    (95 movements per life; a blocked edge redraws). If the action's
+    result improved the high score, the high-score location updates
+    to the current cell.
 
-    The walk's bookkeeping is MOVEMENTS ONLY: 95 per epoch, every
-    step costs one, the epoch ends with a teleport to the best cell,
-    a repeated teleport target doubles the budget (handled by the
-    caller iterating the ladder) or ends at 128s.
+    When the 95 movements are exhausted, the walker teleports to the
+    high-score cell and explores again. If it teleports to a cell
+    ALREADY marked with the high score (no improvement found in the
+    life), the walk ENDS: a new walker spawns at a random position
+    and starts a new life. The trek ends when a spawned walker's
+    high-score-teleport target repeats - no improvement anywhere.
 
-    Returns {'row','col','fam','rung','budget_s','high','best',
-    'epoch','movements','score','needs_work','reason'} where reason
-    is 'evaluate' (the cell needs exam work under this budget) or
-    'converged' (the walk finished: every reachable cell is settled
-    under this budget)."""
+    THE REPLAY is exact from the persisted walk state: the spawn,
+    the position, the movements used, the high score and its cell,
+    and the teleports-so-far determine everything (the draws are a
+    pure function of the seed and the draw count - actions never
+    influence the path, so the replay never diverges).
+
+    Returns {'row','col','fam','rung','action','budget','high',
+    'best','life','movements','draws','spawn','reason'} - reason
+    'evaluate' (the cell needs the action), 'teleport' (the walker
+    returns to its best), 'ended' (the walk finished: the spawn's
+    high-score target repeated - the trek is done)."""
     grid = Grid()
     if kv_ladder is None:
         kv_ladder = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
 
-    # the current budget: given, or derived from the state's last
-    # walk record
-    if budget_s is None:
-        budget_s = st.get("last_budget", CLOCK_LADDER[0])
+    ws = st.setdefault("walk", {})
+    rng = random.Random(f"trek-v3-{walker_seed}-{ws.get('draws', 0)}")
 
-    # THE WALK'S START: (-1,-1) for a fresh walk - the first pick
-    # draws both coordinates; otherwise the recorded walk position
-    rng = random.Random(f"trek-walker-{walker_seed}-{CLOCK_LADDER.index(budget_s)}")
-
-    # the cells' states under this budget
-    cell_score: dict[tuple[int, int], int] = {}
-    cell_work: dict[tuple[int, int], bool] = {}
-    measured: set[tuple[int, int]] = set()
-    for row in range(grid.n_rows):
-        for col in range(grid.n_cols):
-            fam, rung = grid.cell(row, col)
-            s, work = pair_state_under(st, fam, rung, kv_ladder, budget_s)
-            if s > -2:
-                measured.add((row, col))
-                cell_score[(row, col)] = s
-                cell_work[(row, col)] = work
-
-    # the walk bookkeeping: replay from the state's walk record
-    walk_rec = st.setdefault("walks", {}).setdefault(f"{budget_s:g}", {})
-    epoch = walk_rec.get("epoch", 1)
-    position = tuple(walk_rec.get("position", [-1, -1]))
-    moves = walk_rec.get("movements", 0)
-    high = walk_rec.get("high", -1)
-    best = tuple(walk_rec.get("best", position))
-    targets = [tuple(t) for t in walk_rec.get("targets", [])]
-
-    if position == (-1, -1):
-        # THE FRESH START (the v2 ruling): ONLY the first walker (the
-        # 1s budget) may start at (-1,-1) - it draws both coordinates
-        # and starts at that random cell. Any other budget starting
-        # at (-1,-1) is a contract violation (the walker state was
-        # not carried across the budget doubling).
-        warn_contract(
-            "pre",
-            "walk.start_budget",
-            budget_s == CLOCK_LADDER[0],
-            f"only the {CLOCK_LADDER[0]:g}s walker may start at (-1,-1); "
-            f"the {budget_s:g}s walker must inherit a grid position",
-        )
-        position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
-        best = position
-
-    def save() -> None:
-        walk_rec["epoch"] = epoch
-        walk_rec["position"] = list(position)
-        walk_rec["movements"] = moves
-        walk_rec["high"] = high
-        walk_rec["best"] = list(best)
-        walk_rec["targets"] = [list(t) for t in targets]
+    # THE WALK STATE (persisted; the replay's complete truth)
+    life = ws.get("life", 1)
+    position = tuple(ws.get("position", [-1, -1]))
+    movements = ws.get("movements", 0)
+    high = ws.get("high", -1)
+    best = tuple(ws.get("best", position))
+    draws_used = ws.get("draws", 0)
+    spawn_high_targets = [tuple(t) for t in ws.get("spawn_targets", [])]
+    # PRE (phase a): the spawn at (-1,-1) is LEGAL for every life -
+    # each new walker spawns at a random position (the v3 ruling) -
+    # but the HIGH SCORE must reset with it: a spawned life never
+    # inherits the previous life's high
+    warn_contract(
+        "pre",
+        "walk.spawn_resets_high",
+        not (position == (-1, -1) and high != -1 and movements > 0),
+        f"the spawn at (-1,-1) must reset the high score (found high {high})",
+    )
 
     def draw() -> tuple[int, int]:
+        nonlocal draws_used
+        draws_used += 1
+        ws["draws"] = draws_used
         return DIRECTIONS[rng.randrange(4)]
 
-    # POST: the position is inside the grid - and a non-first budget
-    # NEVER sees (-1,-1) (its walk state carries over from the
-    # previous budget's convergence)
-    warn_contract(
-        "post", "walk.start_inside",
-        grid.inside(position[0], position[1]),
-        f"the walk position {position} is outside the grid",
-    )
-    warn_contract(
-        "inv",
-        "walk.no_offgrid_restart",
-        not (budget_s != CLOCK_LADDER[0] and tuple(position) == (-1, -1)),
-        f"the {budget_s:g}s walker restarted at (-1,-1) - only the "
-        f"{CLOCK_LADDER[0]:g}s walker may draw its start",
-    )
+    def save() -> None:
+        ws["life"] = life
+        ws["position"] = list(position)
+        ws["movements"] = movements
+        ws["high"] = high
+        ws["best"] = list(best)
+        ws["draws"] = draws_used
+        ws["spawn_targets"] = [list(t) for t in spawn_high_targets]
 
-    direction = draw()
-    total = 0
+    if position == (-1, -1):
+        # THE SPAWN: a random grid position; the high score starts -1
+        position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
+        high = -1
+        best = position
+        movements = 0
+        save()
+
     row, col = position
+    total = 0
     while total < max_steps:
-        if (row, col) not in measured:
-            # an unmeasured cell: the walk's frontier under this budget
-            fam, rung = grid.cell(row, col)
+        fam, rung = grid.cell(row, col)
+        action, budget = cell_action(st, fam, rung, kv_ladder)
+        if action == "exam":
+            # the cell needs exam work: hand it back to the runner
             save()
             return {
                 "row": row, "col": col, "fam": fam, "rung": rung,
-                "budget_s": budget_s, "high": high, "best": list(best),
-                "epoch": epoch, "movements": moves,
-                "score": -2, "needs_work": True, "reason": "evaluate",
+                "action": action, "budget": budget,
+                "high": high, "best": list(best),
+                "life": life, "movements": movements, "draws": draws_used,
+                "reason": "evaluate",
             }
-        score = cell_score[(row, col)]
-        if cell_work[(row, col)]:
-            # measured but needing re-runs under this budget
-            fam, rung = grid.cell(row, col)
-            save()
-            return {
-                "row": row, "col": col, "fam": fam, "rung": rung,
-                "budget_s": budget_s, "high": high, "best": list(best),
-                "epoch": epoch, "movements": moves,
-                "score": score, "needs_work": True, "reason": "evaluate",
-            }
-        # a settled cell: the walk's rule applies
-        if score > high:
-            high = score
+        # NO ACTION NEEDED: apply the cell's result to the high score
+        # (the cell's best score from its histories) and move on
+        cell_score = _cell_best_score(st, fam, rung, kv_ladder, budget)
+        if cell_score > high:
+            high = cell_score
             best = (row, col)
-        else:
-            direction = draw()
-        moves += 1
+        movements += 1
         total += 1
-        if moves >= EPOCH_MOVEMENTS:
-            # the epoch ends: teleport to the best
-            if best in targets:
-                # CONVERGED at this budget
+        if movements >= EPOCH_MOVEMENTS:
+            # THE LIFE ENDS: teleport to the high-score cell
+            if best in spawn_high_targets:
+                # no improvement in this life: the spawn's walk ENDS
                 save()
-                # THE BUDGET CARRY-OVER: the next budget's walker
-                # restarts at this walk's best position - the walk
-                # state carries across the doubling, never (-1,-1)
-                # (the start_budget contract enforces exactly this)
-                next_idx = CLOCK_LADDER.index(budget_s) + 1
-                if next_idx < len(CLOCK_LADDER):
-                    nb = CLOCK_LADDER[next_idx]
-                    st.setdefault("walks", {})[f"{nb:g}"] = {
-                        "epoch": 1,
-                        "position": list(best),
-                        "movements": 0,
-                        "high": -1,
-                        "best": list(best),
-                        "targets": [],
-                    }
                 return {
                     "row": best[0], "col": best[1],
                     "fam": grid.cell(best[0], best[1])[0],
                     "rung": grid.cell(best[0], best[1])[1],
-                    "budget_s": budget_s, "high": high, "best": list(best),
-                    "epoch": epoch, "movements": moves,
-                    "score": cell_score.get(best, -1), "needs_work": False,
-                    "reason": "converged",
+                    "action": "none", "budget": 0,
+                    "high": high, "best": list(best),
+                    "life": life, "movements": movements, "draws": draws_used,
+                    "reason": "ended",
                 }
-            targets.append(best)
+            spawn_high_targets.append(best)
             row, col = best
-            moves = 0
+            movements = 0
+            save()
             continue
-        # STEP (blocked: redraw until open)
+        # DRAW A DIRECTION AND STEP (blocked: redraw)
+        direction = draw()
         while True:
             nr, nc = row + direction[0], col + direction[1]
             if grid.inside(nr, nc):
                 break
             direction = draw()
         row, col = nr, nc
+        position = (row, col)
+        save()
     return None
+
+
+def _cell_best_score(
+    st: dict[str, Any],
+    fam: str,
+    rung: str,
+    kv_ladder: list[str],
+    budget: float,
+) -> int:
+    """the cell's best settled score: the highest level any candidate
+    passes, reading the histories at whatever budget they were
+    taken (the walker's high score tracks the best-known result)."""
+    best = -1
+    for k in kv_ladder:
+        for v in kv_ladder:
+            h = history_of(st, fam, rung, k, v)
+            if not h:
+                continue
+            score = 0
+            while True:
+                rec = h.get(score)
+                if rec is None:
+                    break
+                if rec.get("status") == "pass":
+                    score += 1
+                    continue
+                break
+            if score - 1 > best:
+                best = score - 1
+    return best
