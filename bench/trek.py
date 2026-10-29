@@ -165,7 +165,7 @@ def load_state(state_file: str = TREK_STATE_FILE) -> dict[str, Any]:
         return json.load(fh)
 
 
-def save_state(state_file: str, st: dict[str, Any]) -> None:
+def save_state(st: dict[str, Any], state_file: str = TREK_STATE_FILE) -> None:
     os.makedirs(os.path.dirname(state_file) or ".", exist_ok=True)
     with open(state_file, "w", encoding="utf-8") as fh:
         json.dump(st, fh, indent=1)
