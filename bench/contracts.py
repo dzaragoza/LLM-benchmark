@@ -23,7 +23,6 @@ rail and the status can report the session's contract health.
 from __future__ import annotations
 
 import sys
-from typing import Any
 
 # the session's violation count, by tag
 CONTRACT_VIOLATIONS: dict[str, int] = {}

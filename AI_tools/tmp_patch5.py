@@ -1,4 +1,4 @@
-OLD = '''    # the PAPER is the model's own training window: -c is NOT set -
+OLD = """    # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from model, so the
     # window is exactly n_ctx_train, one parameter less to worry
     ctx = bell_window(state, fam, models_dir) or 262144
@@ -28,9 +28,9 @@ OLD = '''    # the PAPER is the model's own training window: -c is NOT set -
                 if n_combo % n_kv_ladder == 0:
                     print(n_combo, end="", flush=True)
         print()  # the sweep's line ends
-    finally:'''
+    finally:"""
 
-NEW = '''    # the PAPER is the model's own training window: -c is NOT set -
+NEW = """    # the PAPER is the model's own training window: -c is NOT set -
     # llama-server defaults ctx to 0 = load from model, so the
     # window is exactly n_ctx_train, one parameter less to worry
     ctx = bell_window(state, fam, models_dir) or 262144
@@ -92,4 +92,4 @@ NEW = '''    # the PAPER is the model's own training window: -c is NOT set -
         print()  # the sweep's line ends
         if n_resume:
             print(f"[ei] sweep resumed: {n_resume} combos already done, {n_combo} run")
-    finally:'''
+    finally:"""

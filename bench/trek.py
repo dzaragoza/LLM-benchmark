@@ -94,13 +94,38 @@ def _rungs_by_bpw() -> list[str]:
 def _bpw(rung: str) -> float:
     """bits per weight per rung."""
     BPW = {
-        "F16": 16.0, "Q8_0": 8.5, "Q6_K": 6.56, "Q5_K_M": 5.69, "Q5_K_S": 5.54,
-        "Q5_1": 5.63, "Q5_0": 5.54, "Q4_K_M": 4.85, "Q4_K_S": 4.58, "Q4_1": 5.0,
-        "Q4_0": 4.55, "IQ4_NL": 4.5, "IQ4_XS": 4.25, "Q3_K_L": 3.91, "Q3_K_M": 3.91,
-        "Q3_K_S": 3.5, "IQ3_M": 3.66, "IQ3_S": 3.44, "IQ3_XS": 3.3, "IQ3_XXS": 3.06,
-        "Q2_K": 3.35, "Q2_K_S": 3.0, "IQ2_M": 2.7, "IQ2_S": 2.5, "IQ2_XS": 2.31,
-        "IQ2_XXS": 2.06, "Q2_0": 3.35, "Q1_0": 1.68, "IQ1_M": 1.75, "IQ1_S": 1.56,
-        "TQ1_0": 1.5, "TQ2_0": 2.0,
+        "F16": 16.0,
+        "Q8_0": 8.5,
+        "Q6_K": 6.56,
+        "Q5_K_M": 5.69,
+        "Q5_K_S": 5.54,
+        "Q5_1": 5.63,
+        "Q5_0": 5.54,
+        "Q4_K_M": 4.85,
+        "Q4_K_S": 4.58,
+        "Q4_1": 5.0,
+        "Q4_0": 4.55,
+        "IQ4_NL": 4.5,
+        "IQ4_XS": 4.25,
+        "Q3_K_L": 3.91,
+        "Q3_K_M": 3.91,
+        "Q3_K_S": 3.5,
+        "IQ3_M": 3.66,
+        "IQ3_S": 3.44,
+        "IQ3_XS": 3.3,
+        "IQ3_XXS": 3.06,
+        "Q2_K": 3.35,
+        "Q2_K_S": 3.0,
+        "IQ2_M": 2.7,
+        "IQ2_S": 2.5,
+        "IQ2_XS": 2.31,
+        "IQ2_XXS": 2.06,
+        "Q2_0": 3.35,
+        "Q1_0": 1.68,
+        "IQ1_M": 1.75,
+        "IQ1_S": 1.56,
+        "TQ1_0": 1.5,
+        "TQ2_0": 2.0,
     }
     return BPW.get(rung, 8.0)
 
@@ -270,10 +295,19 @@ def walk(
     if not log:
         fam, rung = grid.cell(0, 0)
         return {
-            "row": 0, "col": 0, "fam": fam, "rung": rung,
-            "pool_index": grid.pool_index(0, 0), "clock_s": CLOCK_MIN_S,
-            "high_score": -1, "best": [0, 0], "epoch": 1,
-            "seed": 1, "movements": 0, "draws": 0, "direction": [1, 0],
+            "row": 0,
+            "col": 0,
+            "fam": fam,
+            "rung": rung,
+            "pool_index": grid.pool_index(0, 0),
+            "clock_s": CLOCK_MIN_S,
+            "high_score": -1,
+            "best": [0, 0],
+            "epoch": 1,
+            "seed": 1,
+            "movements": 0,
+            "draws": 0,
+            "direction": [1, 0],
             "reason": "evaluate",
         }
 
@@ -330,7 +364,7 @@ def walk(
         moves = 0
         draws = 0
 
-        def draw() -> tuple[int, int]:
+        def draw(rng: random.Random = rng) -> tuple[int, int]:
             nonlocal draws
             draws += 1
             return DIRECTIONS[rng.randrange(4)]
@@ -340,13 +374,18 @@ def walk(
             if (row, col) not in measured:
                 fam, rung = grid.cell(row, col)
                 return {
-                    "row": row, "col": col, "fam": fam, "rung": rung,
+                    "row": row,
+                    "col": col,
+                    "fam": fam,
+                    "rung": rung,
                     "pool_index": grid.pool_index(row, col),
                     "clock_s": current_clock,
-                    "high_score": high, "best": list(best),
+                    "high_score": high,
+                    "best": list(best),
                     "epoch": epoch,
                     "seed": clock_idx + 1 + epoch,
-                    "movements": moves, "draws": draws,
+                    "movements": moves,
+                    "draws": draws,
                     "direction": list(direction),
                     "reason": "evaluate",
                 }
@@ -366,9 +405,7 @@ def walk(
                 # THE EPOCH ENDS: teleport to the best position
                 if best in targets:
                     # converged at this clock
-                    return _advance_clock(
-                        grid, state_file, current_clock, best, measured, log
-                    )
+                    return _advance_clock(grid, state_file, current_clock, best, measured, log)
                 targets.append(best)
                 epoch += 1
                 epoch_starts[epoch] = best
@@ -399,13 +436,19 @@ def _advance_clock(
     next_clock = current_clock * 2
     fam, rung = grid.cell(best[0], best[1])
     return {
-        "row": best[0], "col": best[1], "fam": fam, "rung": rung,
+        "row": best[0],
+        "col": best[1],
+        "fam": fam,
+        "rung": rung,
         "pool_index": grid.pool_index(best[0], best[1]),
         "clock_s": next_clock,
-        "high_score": -1, "best": list(best),
+        "high_score": -1,
+        "best": list(best),
         "epoch": 1,
         "seed": _clocks().index(next_clock) + 1,
-        "movements": 0, "draws": 0, "direction": [1, 0],
+        "movements": 0,
+        "draws": 0,
+        "direction": [1, 0],
         "reason": "evaluate",
     }
 
@@ -440,8 +483,10 @@ def tier_incumbents(state_file: str = TREK_STATE_FILE) -> dict[str, dict[str, An
         if s < 0:
             continue
         cur = inc.get(t)
-        if cur is None or s > cur["score"] or (
-            s == cur["score"] and (r.get("high_score_time_s") or 1e9) < cur["time_s"]
+        if (
+            cur is None
+            or s > cur["score"]
+            or (s == cur["score"] and (r.get("high_score_time_s") or 1e9) < cur["time_s"])
         ):
             inc[t] = {
                 "score": s,
@@ -460,7 +505,7 @@ def suspicion_check(inc: dict[str, dict[str, Any]]) -> dict[str, Any]:
     order = [f"t{int(c)}" for c in TIME_LADDER_S]
     have = [t for t in order if t in inc]
     violations = []
-    for a, b in zip(have, have[1:]):
+    for a, b in zip(have, have[1:], strict=False):
         if inc[a]["score"] > inc[b]["score"]:
             violations.append(
                 f"{a} champion outscores the {b} champion - possible "

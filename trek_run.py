@@ -64,8 +64,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
-from bench.contracts import warn_contract, contract_health
 from bench import state_store as _state_store
+from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
     build_chain,
@@ -423,7 +423,8 @@ def run_pair(
 
     # PRE: the pair exists in the pool (fam on the roster, rung on the LADDER)
     warn_contract(
-        "pre", "run_pair.pair",
+        "pre",
+        "run_pair.pair",
         fam in {f for f, _ in roster_from_models_md()} and rung in LADDER,
         f"the pair ({fam}, {rung}) is not in the pool",
     )
@@ -497,9 +498,7 @@ def run_pair(
     # combo, on disk), but the RECORD is the resume's truth: it
     # carries the verdict, not just the prose.
     prior_records = [
-        r
-        for r in state.get("results", [])
-        if r.get("fam") == fam and r.get("rung") == rung
+        r for r in state.get("results", []) if r.get("fam") == fam and r.get("rung") == rung
     ]
     done_combos = {(r.get("k_quant"), r.get("v_quant")) for r in prior_records}
     records: list[dict[str, Any]] = list(prior_records)
@@ -554,10 +553,7 @@ def run_pair(
                     print(n_combo, end="", flush=True)
         print()  # the sweep's line ends
         if n_resume:
-            print(
-                f"[trek] sweep resumed: {n_resume} combos already done, "
-                f"{n_combo} run"
-            )
+            print(f"[trek] sweep resumed: {n_resume} combos already done, {n_combo} run")
     finally:
         # THE FILE RULE: a fully swept quant is deleted - no kv
         # combination of it remains, it will never be needed again.
@@ -570,13 +566,15 @@ def run_pair(
         # records in, so 49 holds even after a mid-sweep restart)
         combos_seen = {(r.get("k_quant"), r.get("v_quant")) for r in records}
         warn_contract(
-            "post", "run_pair.sweep_complete",
-            len(records) == len(KV_LADDER) ** 2
-            and len(combos_seen) == len(KV_LADDER) ** 2,
-            f"sweep produced {len(records)} records, {len(combos_seen)} distinct combos (expect {len(KV_LADDER)**2})",
+            "post",
+            "run_pair.sweep_complete",
+            len(records) == len(KV_LADDER) ** 2 and len(combos_seen) == len(KV_LADDER) ** 2,
+            f"sweep produced {len(records)} records, "
+            f"{len(combos_seen)} distinct combos (expect {len(KV_LADDER) ** 2})",
         )
         warn_contract(
-            "post", "run_pair.on_pair",
+            "post",
+            "run_pair.on_pair",
             all(r.get("fam") == fam and r.get("rung") == rung for r in records),
             "records from another pair in this sweep's result",
         )
@@ -853,7 +851,7 @@ def main(on_progress: Any = None) -> None:
     # consumer re-reads state["results"] instead of caching a handle.
     # A fresh state may lack the keys - created here (the KeyError
     # crash on a fresh trek state).
-    results: list[dict[str, Any]] = state.setdefault("results", [])
+    state.setdefault("results", [])
     state.setdefault("done", [])
     state.setdefault("walk", [])
     # the done keys are PER CLOCK ("index@clock"); the legacy keys
@@ -934,21 +932,18 @@ def main(on_progress: Any = None) -> None:
                     (f"g{c:g}" for c in RAM_LADDER_GIB if ram is not None and ram <= c),
                     "-",
                 )
+                t_disp = f"{h['high_score_time_s']:.0f}"
                 lines.append(
                     f"| <= {int(cap)}s | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} | {h['high_score_time_s']:.0f}s | {ram_tier} |"
+                    f"k={h['k_quant']} v={h['v_quant']} | {t_disp}s | {ram_tier} |"
                 )
         rammed = [r for r in rows if r.get("ram_gib") is not None]
         if rammed:
             lines.append("")
             lines.append("## the score-by-ram-budget table (practitioner reporting)")
             lines.append("")
-            lines.append(
-                "the best score whose MEASURED vulkan0 ram (model + kv + compute) fits"
-            )
-            lines.append(
-                "a budget; the patience column is the holder's time tier - how long"
-            )
+            lines.append("the best score whose MEASURED vulkan0 ram (model + kv + compute) fits")
+            lines.append("a budget; the patience column is the holder's time tier - how long")
             lines.append("you wait per level at that memory size")
             lines.append("")
             lines.append("| ram budget | best score | holder | patience |")
@@ -1024,8 +1019,7 @@ def main(on_progress: Any = None) -> None:
         if key in done:
             continue  # already measured at THIS clock (a resume's replay guard)
         print(
-            f"[trek] #{n + 1} pair={key} "
-            f"-> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
+            f"[trek] #{n + 1} pair={key} -> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
         )
         recs = run_pair(fam, rung, models_dir, state, port)
         # THE WALK LOG: each step's pick (with the strategy that made
@@ -1034,9 +1028,7 @@ def main(on_progress: Any = None) -> None:
         # walker did and why, and the checkpoint's raw material
         done_recs = [r for r in recs if r.get("result") == "done"]
         pick_score = (
-            max((r.get("high_score") or -1 for r in done_recs), default=-1)
-            if done_recs
-            else -1
+            max((r.get("high_score") or -1 for r in done_recs), default=-1) if done_recs else -1
         )
         state.setdefault("walk", []).append(
             {
@@ -1076,7 +1068,8 @@ def main(on_progress: Any = None) -> None:
         # INV: the done set only holds keys in the pool space, one
         # entry per swept pair, before the pair is marked done
         warn_contract(
-            "inv", "driver.done_space",
+            "inv",
+            "driver.done_space",
             all(
                 0 <= int(k.split("@")[0]) < len(pool)
                 for k in done
@@ -1085,7 +1078,8 @@ def main(on_progress: Any = None) -> None:
             "a done key outside the pool space",
         )
         warn_contract(
-            "pre", "driver.pair_not_done",
+            "pre",
+            "driver.pair_not_done",
             key not in done,
             f"the picked pair {key} was already in the done set (double sweep!)",
         )
@@ -1135,7 +1129,8 @@ def main(on_progress: Any = None) -> None:
         for sig, c in sig_counts.items():
             if sig in prior and c > 2:
                 warn_contract(
-                    "inv", "driver.stuck_retry",
+                    "inv",
+                    "driver.stuck_retry",
                     False,
                     f"{sig[0]} {sig[1]}: the failure '{sig[3]}' already fired "
                     f"before and repeats {c}x - a stuck retry loop, not evidence",
