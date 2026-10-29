@@ -25,20 +25,20 @@ git pull --rebase --autostash; or exit 1
 #        still carries the 49 false _launch markers from the corrupt
 #        file - the failure was the pipeline's, not the candidates') ---
 echo "==> removing the false _launch markers (the corrupt-file incident)"
-python3 -c '
+python3 - <<'EOF'
 import sys
-sys.path.insert(0, ".")
+sys.path.insert(0, '.')
 from bench import trek
 st = trek.load_state()
 removed = 0
-for key in list(st["candidates"]):
-    h = st["candidates"][key]
-    if key.startswith("Qwen2.5-1.5B-Instruct|IQ3_XXS|") and set(h.keys()) == {"_launch"}:
-        del st["candidates"][key]
+for key in list(st['candidates']):
+    h = st['candidates'][key]
+    if key.startswith('Qwen2.5-1.5B-Instruct|IQ3_XXS|') and set(h.keys()) == {'_launch'}:
+        del st['candidates'][key]
         removed += 1
 print(f"removed {removed} false _launch markers")
 trek.save_state(st)
-'
+EOF
 
 # --- 4. delete the corrupt quant file (the gate will re-quantize on
 #        the next visit; the acquire's magic check would catch it too,
@@ -53,5 +53,4 @@ git add -A
 and git commit -m "re-apply: the corrupt-file incident's false markers (post-rebase recovery)"
 and git push origin main
 
-echo "==> done. verify:"
-echo "    git log --oneline -3"
+echo "==> done. verify with: git log --oneline -3; and python3 -c \"import sys; sys.path.insert(0,'.'); from bench import trek; print(len(trek.load_state()['candidates']), 'candidates, no bare _launch markers')\""
