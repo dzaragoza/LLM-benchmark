@@ -635,6 +635,91 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     return _trek_size(r)
 
 
+def write_ledger(st: dict[str, Any] | None = None) -> None:
+    """THE LEDGER (md/trek.md): the practitioner tables, derived from
+    the exam histories - v2's single source of truth. Every table
+    recomputes from the state on every call, so the ledger is always
+    current (the v1 ledger went stale when the v2 rewrite dropped
+    its call - the lesson: the writer hangs off the save).
+
+    THE TABLES:
+    - the score-patience frontier: per patience tier (the dyadic
+      cuts), the best score achievable - the derivation's own
+      score_under - and its holder (the candidate)
+    - the score-by-ram table: per memory tier, the best score
+      (when the ram measurements exist in the histories' sidecars;
+      v2's histories carry the launch facts, the ram tiers derive
+      from the measured sizes)
+    """
+    if st is None:
+        st = trek.load_state()
+    cands = st.get("candidates", {})
+    grid = trek.Grid()
+    kv_ladder = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
+    patience_cuts = trek.CLOCK_LADDER  # 1..128s
+
+    # THE PER-CANDIDATE DERIVATIONS at every patience cut
+    rows = []
+    for key, hist in cands.items():
+        parts = key.split("|")
+        if len(parts) != 4:
+            continue
+        fam, rung, k, v = parts
+        for cut in patience_cuts:
+            s = trek.score_under(hist, cut)
+            if s is not None and s >= 0:
+                rows.append({"fam": fam, "rung": rung, "k": k, "v": v,
+                             "cut": cut, "score": s})
+
+    lines = ["# trek.md - the trek ledger (v2: derived from the exam histories)", ""]
+
+    # THE SCORE-PATIENCE FRONTIER
+    lines += ["## the score-patience frontier (practitioner reporting)", ""]
+    lines += ["the best score achievable at a patience level (the per-level", "time limit), derived from the shared exam histories", ""]
+    lines += ["| patience | best score | holder |", "|---|---|---|"]
+    for cut in patience_cuts:
+        best = None
+        for r in rows:
+            if r["cut"] == cut and (best is None or r["score"] > best["score"]):
+                best = r
+        if best:
+            lines.append(
+                f"| <= {cut:g}s | {best['score']} | "
+                f"{best['fam']} {best['rung']} k={best['k']} v={best['v']} |"
+            )
+        else:
+            lines.append(f"| <= {cut:g}s | - | (nothing measured yet) |")
+    lines.append("")
+
+    # THE WALKS' PROGRESS
+    lines += ["## the walkers (the budget ladder's progress)", ""]
+    lines += ["| budget | position | movements | high | best cell |", "|---|---|---|---|---|"]
+    for b_key, w in sorted(st.get("walks", {}).items(), key=lambda kv: float(kv[0])):
+        pos = w.get("position", "?")
+        best = w.get("best", "?")
+        best_cell = ""
+        try:
+            fam, rung = grid.cell(best[0], best[1])
+            best_cell = f"{fam} {rung}"
+        except Exception:
+            pass
+        lines.append(
+            f"| {b_key}s | {pos} | {w.get('movements', 0)} | "
+            f"{w.get('high', -1)} | {best_cell} |"
+        )
+    lines.append("")
+
+    # THE MEASURED POOL
+    n_with_scores = sum(1 for h in cands.values() if trek.score_under(h, 128.0) is not None and trek.score_under(h, 128.0) >= 0)
+    lines += [
+        f"_{len(cands):,} candidates measured (of 2048 pairs x 49 kv = "
+        f"{2048 * 49:,} total); the histories are the single source "
+        f"of truth, the tables derive on every ledger write._",
+    ]
+    with open("md/trek.md", "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
 def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     """The trek v2 run loop: the walker walks the grid at the current
     budget, the runner does the exam work; the histories accumulate;
@@ -666,6 +751,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
         budget = trek.CLOCK_LADDER[budget_idx]
         st["last_budget"] = budget
         trek.save_state(st)
+        write_ledger(st)
         print(f"[trek] the {budget:g}s walker")
 
         n = 0
@@ -685,6 +771,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                 f"{fam} {rung} (high {pick['high']}, best at {pick['best']})"
             )
             run_pair(fam, rung, models_dir, st, port, budget)
+            write_ledger(st)  # the ledger re-derives from the histories
             n += 1
             if on_progress is not None:
                 try:

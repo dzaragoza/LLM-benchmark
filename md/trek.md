@@ -1,36 +1,28 @@
-# trek.md - the trek ledger
+# trek.md - the trek ledger (v2: derived from the exam histories)
 
+## the score-patience frontier (practitioner reporting)
 
-## the score-time frontier (practitioner reporting)
+the best score achievable at a patience level (the per-level
+time limit), derived from the shared exam histories
 
-the best score at a patience level (the high-score level's time);
-the ram column is the holder's memory TIER - the dyadic cut
-(1/2/4/8/16 GiB) its measured vulkan0 ram fits
+| patience | best score | holder |
+|---|---|---|
+| <= 1s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 2s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 4s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 8s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 16s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 32s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 64s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
+| <= 128s | 2 | Llama-3.2-1B-Instruct IQ3_XXS k=q5_1 v=q5_0 |
 
-| patience | best score | holder | at | ram |
+## the walkers (the budget ladder's progress)
+
+| budget | position | movements | high | best cell |
 |---|---|---|---|---|
-| <= 1s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 2s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 4s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 8s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 16s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 32s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 64s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 128s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
-| <= 256s | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | 1s | g2 |
+| 1s | [9, 13] | 95 | 1 | gemma-3-1b-it Q2_K |
+| 2s | [7, 13] | 95 | 1 | gemma-3-1b-it Q2_K |
+| 4s | [7, 13] | 95 | 2 | Llama-3.2-1B-Instruct IQ3_XXS |
+| 8s | [9, 10] | 6 | 2 | Llama-3.2-1B-Instruct IQ3_XXS |
 
-## the score-by-ram-budget table (practitioner reporting)
-
-the best score whose MEASURED vulkan0 ram (model + kv + compute) fits
-a budget; the patience column is the holder's time tier - how long
-you wait per level at that memory size
-
-| ram budget | best score | holder | patience |
-|---|---|---|---|
-| <= 1.0 GiB | 2 | Qwen2.5-0.5B-Instruct Q2_K k=q8_0 v=q4_1 | t1 |
-| <= 2.0 GiB | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | t1 |
-| <= 4.0 GiB | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | t1 |
-| <= 8.0 GiB | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | t1 |
-| <= 16.0 GiB | 4 | Qwen3.5-0.8B Q4_0 k=q5_0 v=q5_0 | t1 |
-
-_4951 candidates measured, 289 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_2,156 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
