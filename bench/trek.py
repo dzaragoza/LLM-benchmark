@@ -156,13 +156,34 @@ class Grid:
 # ------------------------------------------------------- the exam history store
 
 
+def _int_keys(history: dict[str, Any]) -> dict[int, Any]:
+    """JSON turns int level keys into strings on the round-trip -
+    normalize them back (the derivations look up int levels; a
+    string-keyed history reads as empty and every candidate would
+    re-run from level 0)."""
+    out: dict[int, Any] = {}
+    for k, v in history.items():
+        if isinstance(k, str) and k.lstrip("-").isdigit():
+            out[int(k)] = v
+        elif isinstance(k, int):
+            out[k] = v
+        else:
+            out[k] = v  # the non-level keys (_launch) pass through
+    return out
+
+
 def load_state(state_file: str = TREK_STATE_FILE) -> dict[str, Any]:
     """the v2 state: {'candidates': {candidate_key: history}, ...}.
-    The candidate key: 'fam|rung|k|v'. The history: {level: record}."""
+    The candidate key: 'fam|rung|k|v'. The history: {level: record}
+    - with the level keys normalized back to ints (JSON stringifies
+    them on save; the derivations expect ints)."""
     if not os.path.isfile(state_file):
         return {"candidates": {}}
     with open(state_file, encoding="utf-8") as fh:
-        return json.load(fh)
+        st = json.load(fh)
+    cands = st.get("candidates", {})
+    st["candidates"] = {key: _int_keys(h) for key, h in cands.items()}
+    return st
 
 
 def save_state(st: dict[str, Any], state_file: str = TREK_STATE_FILE) -> None:
