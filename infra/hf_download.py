@@ -360,6 +360,19 @@ def local_rung(famdir: str, rung: str) -> str | None:
     f = find_rung_file(os.listdir(famdir), rung)
     return os.path.join(famdir, f) if f else None
 
+def is_valid_gguf(path: str) -> bool:
+    """THE MAGIC CHECK: a real GGUF starts with the 'GGUF' magic.
+    A partially-written file (an interrupted quantization - the
+    SIGINT-mid-quantize incident: 0.16 GiB of a 0.58 GiB IQ3_XXS,
+    'invalid magic characters' on every launch) fails this check
+    and the acquire path deletes + re-quantizes it instead of
+    trusting the file's existence."""
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(4) == b"GGUF"
+    except OSError:
+        return False
+
 
 # =========================================================== phase 1
 

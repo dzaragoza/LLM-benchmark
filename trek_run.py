@@ -330,7 +330,18 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
     famdir = os.path.join(models_dir, fam)
     existing = hf_download.local_rung(famdir, rung)
     if existing and os.path.isfile(existing):
-        return existing
+        # THE CORRUPT-FILE GATE (the SIGINT-mid-quantize incident): a
+        # partial file left by an interrupted quantization looks ready
+        # to the size check but dies on every launch ('invalid magic
+        # characters'). Verify the GGUF magic; a corrupt file is
+        # deleted and re-quantized, never trusted.
+        if hf_download.is_valid_gguf(existing):
+            return existing
+        print(
+            f"  [acquire] {rung}: the existing file is CORRUPT (no GGUF "
+            f"magic - an interrupted quantization) - deleting and requantizing"
+        )
+        os.remove(existing)
     repo = dict(_rost.roster_from_models_md()).get(fam)
     if not repo:
         _last_acquire_error.update(result="no_repo", detail=fam)
