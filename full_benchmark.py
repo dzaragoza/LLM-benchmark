@@ -427,6 +427,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="delete the trek state UP FRONT - a fresh pool, "
         "every chance restored; era changes only",
     )
+    ap.add_argument(
+        "--seed",
+        type=int,
+        default=1,
+        help="the walker seed: ONE seed for the whole run, all the "
+        "walkers (the v2 ruling). The same seed reproduces the same "
+        "walk exactly; different seeds explore the same landscape "
+        "by different paths (the exam histories are shared - the "
+        "exams are candidate-deterministic)",
+    )
     return ap
 
 
@@ -507,7 +517,7 @@ def _run(args: argparse.Namespace) -> None:
                 tee_output.install()
 
         try:
-            R.main(on_progress=push_progress)
+            R.main(on_progress=push_progress, walker_seed=args.seed)
         finally:
             # the git tail ALWAYS runs (the envelope's ruling): the
             # ledger, the state, and the answers are committed and

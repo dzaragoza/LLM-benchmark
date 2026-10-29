@@ -1,53 +1,17 @@
 #!/usr/bin/env python3
-"""trek_run.py - protocol ei: the epitome of simplicity.
+"""trek_run.py - protocol trek v2: walkers over exam histories.
 
-Reuses the v9.5 machinery (the exam papers, the grader, the bells,
-the acquisition pipeline, the server) and disposes of the rules -
-it is only interested in RESULTS.
+The STATE is the exam-history store (bench/trek.py): per candidate
+(model, model_quant, k, v), a level-by-level record - pass times
+and timeout budgets. The walker derives its scores from the
+histories under its budget; the runner CONTINUES each candidate's
+exam from its frontier level when the walker requests work. The
+kv sweep amortization stays: the picked pair's quant file is
+acquired once, all 49 candidates examined under the current budget.
 
-  the pool    the candidate PAIR is (model, model-quant) - 64
-              models x 32 rungs = 2,048 pairs. A pair's pick
-              evaluates ALL 49 (k, v) cache-quant combinations
-              (7 x 7) in one acquisition: no constant quant
-              re-calculation, the file is acquired once
-  the pick    16 bits of REAL entropy (/dev/hwrng if present,
-              else /dev/random - the kernel's harvested pool,
-              never a pseudorandom generator): 11 bits the model
-              index, 5 bits the model rung. ONE CHANCE per PAIR,
-              no replacement: a pick that lands on an already-run
-              pair is re-drawn with fresh entropy; the pool
-              drains to zero and the protocol is complete. A
-              fresh 8-bit exam seed serves EVERY candidate of the
-              sweep, recorded for reproducibility
-  the kv      per pair, EVERY combination of KV_LADDER x
-              KV_LADDER (f16, q8_0, q4_0, q4_1, iq4_nl, q5_0,
-              q5_1) takes the exam - 49 candidates per pick; the
-              server gets --cache-type-k and --cache-type-v, f16
-              means no flag (the default). A quant file that has
-              been fully swept can be safely deleted: no kv
-              combination of it remains, it will never be needed
-              again. The gc deals with the f16s and any leftover
-  the exam    8 bits of entropy = one of 256 possible exams; the
-              SAME exam seed serves every level of the candidate
-  the run     the candidate takes level 0, 1, 2, ... under one
-              TOTAL timeout of 128 seconds for the whole run:
-                pass  -> the next exam level
-                fail or timeout -> the run is over; the fail
-                reason and the high score (the highest passed
-                level) are recorded
-  the files   an F16 candidate is kept on disk; a quant candidate
-              is deleted after its run
-  the gc      a disk watchdog: when free space on /home falls to
-              16 GiB or below, the OLDEST f16 on disk is removed
-              repeatedly (1s cadence) until free space exceeds
-              16 GiB again - never the active candidate's f16.
-              Linux has no native low-disk event (inotify watches
-              files, not free space), so the watchdog polls
-              statvfs once per second - microseconds of CPU,
-              effectively event-driven
-
-No quant ladders, no walk rules, no proctor: a candidate, an exam,
-a clock, a result.
+The walker seed: ONE for the whole run (default 1), all walkers;
+the exam seeds are candidate-deterministic (the same candidate =
+the same exam instance, so re-runs continue the same exam).
 """
 
 from __future__ import annotations
@@ -65,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
+from bench import trek
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
@@ -411,175 +376,94 @@ def run_pair(
     models_dir: str,
     state: dict[str, Any],
     port: int,
-    entropy_get=lambda: entropy_bits(8),
-) -> list[dict[str, Any]]:
-    """One (model, model-quant) pair, ONE acquisition, the FULL 49-
-    combination (k, v) cache-quant sweep. Every combination takes
-    its own exam under its own 8-bit seed. Returns one record per
-    combination; the pair's quant file is deleted at the end (every
-    kv combination of it has been exhausted - it will never be
-    needed again; the gc deals with the f16s and any leftover)."""
+    budget_s: float,
+) -> None:
+    """One (model, model-quant) pair under the walker's budget: ONE
+    acquisition, then the 49 candidates' exam CONTINUATIONS - each
+    candidate whose history needs work under this budget resumes
+    its exam from its frontier level; settled candidates cost
+    nothing (the derivation reads the history). The pair's quant
+    file is deleted at the end (the gc owns the f16s)."""
     from bench.exam import bell_window
 
-    # PRE: the pair exists in the pool (fam on the roster, rung on the LADDER)
     warn_contract(
         "pre",
         "run_pair.pair",
         fam in {f for f, _ in roster_from_models_md()} and rung in LADDER,
         f"the pair ({fam}, {rung}) is not in the pool",
     )
-    exam_seed = entropy_get()
     _ACTIVE_FAMILY[0] = fam
+    candidates = state.setdefault("candidates", {})
 
-    def _fail_all(result: str, detail: str = "") -> list[dict[str, Any]]:
-        return [
-            {
-                "fam": fam,
-                "rung": rung,
-                "k_quant": k_quant,
-                "v_quant": v_quant,
-                "seed": exam_seed,
-                "result": result,
-                "detail": detail,
-                # the measured size when a file exists; None when the
-                # acquire failed before producing one (gguf is None)
-                "size_gib": (
-                    round(os.path.getsize(gguf) / (2**30), 3)
-                    if gguf and os.path.isfile(gguf)
-                    else None
-                ),
-            }
-            for k_quant in KV_LADDER
-            for v_quant in KV_LADDER
-        ]
+    def save() -> None:
+        _state_store.save_state(TREK_STATE_FILE, state)
 
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
-        # the acquire path printed the specific failure; the records
-        # carry the distinct cause, not the generic unbuildable
-        return _fail_all(
-            _last_acquire_error.get("result", "acquire_failed"),
-            _last_acquire_error.get("detail", ""),
-        )
+        # the acquire failed: mark the launch failure on all 49
+        # candidates (the walker sees a failed cell - settled,
+        # scoreless, not worth re-acquiring under any budget)
+        for k in KV_LADDER:
+            for v in KV_LADDER:
+                key = trek.cand_key(fam, rung, k, v)
+                if key not in candidates:
+                    candidates[key] = {
+                        "_launch": {
+                            "status": "failed",
+                            "detail": _last_acquire_error.get("detail", "")[:100],
+                        }
+                    }
+        save()
+        _ACTIVE_FAMILY[0] = ""
+        return
 
-    # the PAPER is the model's own training window: -c is NOT set -
-    # llama-server defaults ctx to 0 = load from the model, so the
-    # window is exactly n_ctx_train, one parameter less to worry
-    # THE POST-QUANTIZATION SIZE CHECK (the author's ruling): the
-    # file is on disk now - MEASURE it. The estimate chose the band
-    # and gated the download; the measured size is the truth that
-    # gates the LAUNCH: a file over the device budget cannot run
-    # (the GPU can never hold it), so the sweep fans out the honest
-    # too_large_measured verdict without paying 49 doomed launches;
-    # the recovery then re-resolves the band. The measured size
-    # also rides every record - the ledger's size column becomes
-    # the measured truth, not the estimate.
     size_gib = round(os.path.getsize(gguf) / (2**30), 3)
     print(f"  [2] {rung}: measured {size_gib:.2f} GiB on disk")
     if size_gib > hf_download.DEVICE_LIMIT_GIB:
-        print(
-            f"  [2] {rung}: measured {size_gib:.2f} GiB exceeds the "
-            f"device budget {hf_download.DEVICE_LIMIT_GIB:.0f} GiB - CANNOT RUN, "
-            "skipping the launch (the measured gate)"
-        )
-        return _fail_all(
-            "too_large_measured",
-            f"measured {size_gib:.2f} GiB > {hf_download.DEVICE_LIMIT_GIB:.0f} GiB device budget",
-        )
+        for k in KV_LADDER:
+            for v in KV_LADDER:
+                key = trek.cand_key(fam, rung, k, v)
+                if key not in candidates:
+                    candidates[key] = {"_launch": {"status": "failed", "detail": "too large"}}
+        save()
+        if rung != "F16" and os.path.isfile(gguf):
+            os.remove(gguf)
+        _ACTIVE_FAMILY[0] = ""
+        return
 
     ctx = bell_window(state, fam, models_dir) or 262144
 
-    # THE SWEEP RESUME (the author's ruling): the state's results ARE
-    # the kv-combo memory - every completed combo's record is in the
-    # state the moment it lands (saved per combo below), so a stop
-    # mid-sweep re-picks the pair and SKIPS the combos whose records
-    # already exist; the sweep resumes at the next untested (k, v)
-    # instead of starting from 0. The answer files stay too (per
-    # combo, on disk), but the RECORD is the resume's truth: it
-    # carries the verdict, not just the prose.
-    prior_records = [
-        r for r in state.get("results", []) if r.get("fam") == fam and r.get("rung") == rung
-    ]
-    done_combos = {(r.get("k_quant"), r.get("v_quant")) for r in prior_records}
-    records: list[dict[str, Any]] = list(prior_records)
-    n_resume = len(done_combos)
+    # THE WORK LIST: the candidates needing exam work under this
+    # budget (the derivation's needs_rerun)
+    work = []
+    for k in KV_LADDER:
+        for v in KV_LADDER:
+            key = trek.cand_key(fam, rung, k, v)
+            hist = candidates.get(key, {})
+            if trek.needs_rerun(hist, budget_s):
+                work.append((k, v, key, hist))
+    n_settled = len(KV_LADDER) ** 2 - len(work)
+    print(f"[trek] {len(work)} candidates need work under {budget_s:g}s "
+          f"({n_settled} settled from history)")
 
-    # THE KV PROGRESS (the author's ruling): a dot per combination,
-    # the count at every multiple of 7 - the 49-combo sweep reads
-    # as ......7......14......21 ......49, live in the console.
-    # A resumed sweep continues the count from its true position.
-    n_kv_ladder = len(KV_LADDER)
+    print("0", end="", flush=True)
+    n = 0
+    n_ladder = len(KV_LADDER)
     try:
-        # THE FILLING DOTS (the author's ruling): the line starts
-        # at 0 and a dot prints as each kv combo FINISHES - the
-        # record landing in the state is the dot's truth. A resume
-        # prints its already-done combos' dots up front (so 0..
-        # reads instantly as 2 done), then fills the rest live; the
-        # count prints at every multiple of 7.
-        print("0", end="", flush=True)
-        n_combo = 0
-        for _ in range(n_resume):
-            n_combo += 1
+        for k, v, key, hist in work:
+            _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, budget_s, hist)
+            candidates[key] = hist
+            save()
+            n += 1
             print(".", end="", flush=True)
-            if n_combo % n_kv_ladder == 0:
-                print(n_combo, end="", flush=True)
-        for k_quant in KV_LADDER:
-            for v_quant in KV_LADDER:
-                if (k_quant, v_quant) in done_combos:
-                    continue  # already measured: the resume skips it
-                rec = _run_combo(
-                    fam,
-                    rung,
-                    k_quant,
-                    v_quant,
-                    gguf,
-                    ctx,
-                    models_dir,
-                    port,
-                    entropy_get,
-                )
-                records.append(rec)
-                # THE PER-COMBO PERSISTENCE: the record lands in the
-                # state NOW - a crash after this combo keeps it, the
-                # resume after the crash never re-runs it
-                state.setdefault("results", []).append(rec)
-                state["results"] = state["results"][-5000:]
-                _state_store.save_state(TREK_STATE_FILE, state)
-                # THE FILLING DOT: this combo finished - the dot is
-                # its truth (and the count at every 7)
-                n_combo += 1
-                print(".", end="", flush=True)
-                if n_combo % n_kv_ladder == 0:
-                    print(n_combo, end="", flush=True)
-        print()  # the sweep's line ends
-        if n_resume:
-            print(f"[trek] sweep resumed: {n_resume} combos already done, {n_combo} run")
+            if n % n_ladder == 0:
+                print(n, end="", flush=True)
+        print()
     finally:
-        # THE FILE RULE: a fully swept quant is deleted - no kv
-        # combination of it remains, it will never be needed again.
-        # The f16 stays (the quantization source); the gc deals with
-        # the f16s and any leftover.
         if rung != "F16" and os.path.isfile(gguf):
             os.remove(gguf)
-        # POST: the sweep produced one record per (k, v) combination -
-        # 49 of them, all on this pair (the resume counts the prior
-        # records in, so 49 holds even after a mid-sweep restart)
-        combos_seen = {(r.get("k_quant"), r.get("v_quant")) for r in records}
-        warn_contract(
-            "post",
-            "run_pair.sweep_complete",
-            len(records) == len(KV_LADDER) ** 2 and len(combos_seen) == len(KV_LADDER) ** 2,
-            f"sweep produced {len(records)} records, "
-            f"{len(combos_seen)} distinct combos (expect {len(KV_LADDER) ** 2})",
-        )
-        warn_contract(
-            "post",
-            "run_pair.on_pair",
-            all(r.get("fam") == fam and r.get("rung") == rung for r in records),
-            "records from another pair in this sweep's result",
-        )
         _ACTIVE_FAMILY[0] = ""
-    return records
+    return
 
 
 def _run_combo(
@@ -591,113 +475,76 @@ def _run_combo(
     ctx: int,
     models_dir: str,
     port: int,
-    entropy_get: Any,
-) -> dict[str, Any]:
-    """One (k, v) combination of the pair's sweep: one exam, a
-    clock, a result. The exam seed (8 bits) serves EVERY level of
-    this candidate. The total run timeout is 128s: pass advances a
-    level, fail or timeout ends the run and records the reason and
-    the high score."""
-    t_start = time.monotonic()
-    exam_seed = entropy_get()
-
+    budget_s: float,
+    history: dict[int, Any],
+) -> dict[int, Any]:
+    """One candidate's exam CONTINUATION under the walker's budget.
+    The candidate's history is the record: the exam resumes at the
+    frontier level (the first unmeasured level, or the level whose
+    timeout was under a smaller budget); passes and timeouts update
+    the history in place. The candidate-deterministic exam seed
+    means the exam instance is the SAME as any previous run - the
+    continuation is faithful."""
+    exam_seed = trek.exam_seed_of(fam, rung, k_quant, v_quant)
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
     answers_dir = os.path.join("results", "trek", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, f"{kv_tag}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{kv_tag}.log")
 
-    # the cache quants are the candidate's own: --cache-type-k/v,
-    # f16 = the default cache (no flag)
     kv_args: list[str] = []
     if k_quant != "f16":
         kv_args += ["--cache-type-k", k_quant]
     if v_quant != "f16":
         kv_args += ["--cache-type-v", v_quant]
-    # FULL GPU OFFLOAD, always: --n-gpu-layers 999 forces every
-    # layer onto the iGPU - the CPU is useless for this experiment.
-    # With ctx 0 (load from model) llama-server then auto-shrinks
-    # the context until model + KV + compute fit the device; a
-    # candidate that cannot fit even shrunk fails at launch (the
-    # honest verdict: this machine cannot run it on the GPU)
     proc, healthy = llama_server.start_server(
         gguf,
         port=port,
         extra_args=[
-            "--n-gpu-layers",
-            "999",
-            "--parallel",
-            "1",
-            "--reasoning",
-            "off",
-            "--reasoning-budget",
-            "0",
-        ]
-        + kv_args,
+            "--n-gpu-layers", "999",
+            "--parallel", "1",
+            "--reasoning", "off",
+            "--reasoning-budget", "0",
+        ] + kv_args,
         log_path=log_path,
     )
-    high_score = -1
-    high_score_time: float | None = None
-    fail_reason = ""
-    attempts: list[dict[str, Any]] = []
     try:
         if not healthy or not llama_server.wait_healthy(port, proc=proc):
-            # THE DIAGNOSIS rides the record (the phi-2 lesson: a
-            # quantized KV cache needs head_dim divisible by 32 -
-            # 'K cache type q4_0 with block size 32 does not divide
-            # n_embd_head_k=80' - an architecture verdict, not a
-            # device-fit one; the ledger must tell them apart)
             diag = ""
             try:
                 with open(log_path, errors="replace") as fh:
                     errs = [
-                        ln.strip()
-                        for ln in fh
+                        ln.strip() for ln in fh
                         if (" E " in ln or "device lost" in ln.lower())
-                        and any(
-                            w in ln.lower()
-                            for w in ("failed", "error", "does not divide", "device lost")
-                        )
+                        and any(w in ln.lower() for w in ("failed", "error", "does not divide", "device lost"))
                     ]
                 diag = errs[-1][-200:] if errs else ""
             except OSError:
                 pass
-            return {
-                "fam": fam,
-                "rung": rung,
-                "k_quant": k_quant,
-                "v_quant": v_quant,
-                "seed": exam_seed,
-                "result": "server_failed",
-                "detail": diag,
-            }
-        # THE RAM + SETTLED-CONTEXT DATUMS: llama-server's own
-        # numbers. ctx 0 (load from model) lets the server AUTO-SHRINK
-        # the context until model + KV + compute fit the device; the
-        # SETTLED context is the last n_ctx printed, after any
-        # resize. The LAST memory breakdown block is the settled
-        # state (the first is the pre-shrink wish - the device-lost
-        # lesson: first-block numbers can exceed the device). The
-        # VULKAN0 row alone - the device the candidate runs on.
-        ram_gib: float | None = None
-        ctx_settled: int | None = None
-        kv_gib: float | None = None
-        with open(log_path, errors="replace") as fh:
-            for ln in fh:
-                m = re.search(r"llama_context: n_ctx\s*=\s*(\d+)", ln)
-                if m:
-                    ctx_settled = int(m.group(1))
-        mem = llama_server.memory_breakdown_gib(log_path)
-        if mem is not None:
-            vk = (mem.get("devices") or {}).get("Vulkan0")
-            if vk is not None:
-                ram_gib = round(vk["model_gib"] + vk["context_gib"] + vk["compute_gib"], 3)
-                kv_gib = round(vk["context_gib"], 3)
+            history.setdefault("_launch", {"status": "failed", "detail": diag})
+            return history
+
+        # THE FRONTIER: the first level needing work under this budget
         level = 0
         while True:
-            # the PER-LEVEL timer: starts when the question is sent
+            rec = history.get(level)
+            if rec is None:
+                break  # unmeasured: the exam continues here
+            if rec.get("status") == "pass":
+                if rec.get("time_s", 1e9) <= budget_s:
+                    level += 1
+                    continue
+                return history  # passed slower than the budget: settled
+            if rec.get("status") == "timeout":
+                if rec.get("timeout_s", 1e9) < budget_s:
+                    break  # the smaller-budget timeout: re-run here
+                return history  # settled at this budget
+            return history  # wrong answer etc: settled
+
+        # THE EXAM CONTINUATION from the frontier level
+        while True:
             level_t0 = time.monotonic()
-            deadline = level_t0 + LEVEL_TIMEOUT_S
+            deadline = level_t0 + budget_s
             insts = {
                 "chain": build_chain(exam_seed, level),
                 "elevator": build_elevator(exam_seed, level),
@@ -705,6 +552,7 @@ def _run_combo(
             messages: list[dict[str, str]] = []
             remaining = ctx
             level_pass = True
+            fail_reason = ""
             for part, prompter in (
                 ("chain", chain_prompt),
                 ("elevator", elevator_prompt),
@@ -722,10 +570,7 @@ def _run_combo(
                     break
                 try:
                     answer, tokens, finish = ask_exam(
-                        port,
-                        messages,
-                        remaining,
-                        deadline=deadline,
+                        port, messages, remaining, deadline=deadline,
                     )
                 except Exception as e:
                     answer, tokens, finish = "", 0, f"error: {e}"
@@ -736,6 +581,7 @@ def _run_combo(
                     "k_quant": k_quant,
                     "v_quant": v_quant,
                     "seed": exam_seed,
+                    "budget_s": budget_s,
                     "level": level,
                     "part": part,
                     "ok": ok,
@@ -743,7 +589,6 @@ def _run_combo(
                     "answer_tokens": tokens,
                     "answer": (answer or "")[-2000:],
                 }
-                attempts.append(attempt)
                 with open(answers_path, "a", encoding="utf-8") as fh:
                     fh.write(json.dumps(attempt, ensure_ascii=True) + "\n")
                 if not ok:
@@ -761,47 +606,20 @@ def _run_combo(
                 remaining -= tokens
             level_time = round(time.monotonic() - level_t0, 1)
             if not level_pass:
+                if fail_reason == "timeout":
+                    history[level] = {"status": "timeout", "timeout_s": budget_s}
+                elif fail_reason == "wrong answer":
+                    history[level] = {"status": "wrong answer"}
+                elif fail_reason == "out of paper":
+                    history[level] = {"status": "out of paper"}
+                else:
+                    history[level] = {"status": "error", "detail": fail_reason[:100]}
                 break
-            # the SPEED datum is at the HIGH-SCORE exam (the author's
-            # clarification): the time of the level the candidate
-            # PASSED that set its high score - not the failing level
-            high_score_time = level_time
-            high_score = level
+            history[level] = {"status": "pass", "time_s": level_time}
             level += 1
     finally:
         llama_server.stop_server(proc, port)
-
-    return {
-        "fam": fam,
-        "rung": rung,
-        "k_quant": k_quant,
-        "v_quant": v_quant,
-        "seed": exam_seed,
-        "result": "done",
-        "high_score": high_score,
-        "fail_reason": fail_reason,
-        "ram_gib": ram_gib,
-        "ctx_settled": ctx_settled,
-        "kv_gib": kv_gib,
-        "attempts": len(attempts),
-        # the SPEED datum: the LAST level's time (the deciding level's
-        # own timer), not the whole run - per the author's clarification
-        "high_score_time_s": high_score_time,  # None: no level passed
-        "elapsed_s": round(time.monotonic() - t_start, 1),
-    }
-
-
-# --- the controller --------------------------------------------------------
-
-
-# the watchability cadence (the exam's per-family push ruling,
-# ei-shaped): commit + push after EVERY pair - the full
-# 49-combination (k, v) sweep of the model-quant lands in the
-# ledger as one unit, a multi-hour run is readable remotely pair
-# by pair
-
-
-_MODELS_BY_ID: dict[str, dict[str, Any]] | None = None
+    return history
 
 
 def _est_size_gib_of(r: dict[str, Any]) -> float | None:
@@ -816,16 +634,11 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     return _trek_size(r)
 
 
-def main(on_progress: Any = None) -> None:
-    """The trek's run loop. The exam clock is the WALK's own: it
-    starts at 1s per level and doubles when a trek converges (the
-    teleport rule), up to 128s - see bench/trek.py's walk."""
-    # IPv4-FIRST (the dead-IPv6 fix): Python's connect tries IPv6
-    # first with no fallback - a black-holed IPv6 route (curl works,
-    # the library hangs, zero packets - the author's T14s case) is
-    # an infinite silent hang. Prefer AF_INET in getaddrinfo: every
-    # hub/library connection resolves IPv4 only, until the machine's
-    # IPv6 is fixed at the router level.
+def main(on_progress: Any = None, walker_seed: int = 1) -> None:
+    """The trek v2 run loop: the walker walks the grid at the current
+    budget, the runner does the exam work; the histories accumulate;
+    a converged budget doubles (the ladder 1..128s); the trek ends
+    at 128s convergence. One walker seed for everything."""
     import socket
 
     _orig_getaddrinfo = socket.getaddrinfo
@@ -838,311 +651,44 @@ def main(on_progress: Any = None) -> None:
 
     socket.getaddrinfo = _ipv4_first  # ty: ignore[invalid-assignment]
     models_dir = "models"
-    state_file = TREK_STATE_FILE
-    os.makedirs("state", exist_ok=True)
-    port = int(os.environ.get("EI_PORT", "8210"))
+    port = int(os.environ.get("TREK_PORT", "8210"))
 
-    state: dict[str, Any] = {}
-    if os.path.isfile(state_file):
-        with open(state_file, encoding="utf-8") as fh:
-            state = json.load(fh)
-    # the state's results list IS the ledger's memory; run_pair
-    # appends per combo and may rebind the list on trim, so every
-    # consumer re-reads state["results"] instead of caching a handle.
-    # A fresh state may lack the keys - created here (the KeyError
-    # crash on a fresh trek state).
-    state.setdefault("results", [])
-    state.setdefault("done", [])
-    state.setdefault("walk", [])
-    # the done keys are PER CLOCK ("index@clock"); the legacy keys
-    # (bare indices, from the single-clock era) stay valid
-
-    pool = the_pool()
-    _GC_POOL.clear()
-    _GC_POOL.extend(pool)
-    assert len(pool) == 2048, len(pool)
-    n_kv = len(KV_LADDER)
-    total_pairs = len(pool)
-
-    stop = threading.Event()
-    gc_log: list[str] = []
-    watchdog = threading.Thread(
-        target=disk_watchdog,
-        args=(models_dir, None, stop, gc_log),
-        daemon=True,
-    )
-    watchdog.start()
-
-    # no SIGINT handler here: the full_benchmark envelope owns it
-    # (its handler runs the git tail); the loop saves the state after
-    # EVERY pick, so the on-disk state is always current when the
-    # envelope's handler fires and commits it
-
-    # one chance per candidate: the done-set persists in the state
-    done: set[str] = set(state.get("done", []))
-    state["done"] = sorted(done)
-    _GC_DONE_SET.clear()
-    _GC_DONE_SET.update(done)
-
-    def write_ledger() -> None:
-        rows = [r for r in state["results"] if r.get("result") == "done"]
-        done_pairs = len(done)
-
-        # THE LEDGER (the author's rulings): the two practitioner
-        # tables - the score-time frontier and the score-by-ram
-        # budget - plus the footer. The time-tier crowns section is
-        # REMOVED per the author's ruling (the walker has no PoI
-        # target; the tables carry the practitioner information).
-        lines = ["# trek.md - the trek ledger", ""]
-
-        from bench.trek import (
-            RAM_LADDER_GIB,
-            TIME_LADDER_S,
-        )
-
-        # THE PRACTITIONER REPORTING: both tables are floors, not
-        # ceilings - the grid is not fully measured, the bests can
-        # only rise.
-        timed = [
-            r
-            for r in rows
-            if r.get("high_score_time_s") is not None and r.get("high_score") is not None
-        ]
-        if timed:
-            lines.append("")
-            lines.append("## the score-time frontier (practitioner reporting)")
-            lines.append("")
-            lines.append("the best score at a patience level (the high-score level's time);")
-            lines.append("the ram column is the holder's memory TIER - the dyadic cut")
-            lines.append("(1/2/4/8/16 GiB) its measured vulkan0 ram fits")
-            lines.append("")
-            lines.append("| patience | best score | holder | at | ram |")
-            lines.append("|---|---|---|---|---|")
-            for cap in TIME_LADDER_S:
-                cands = [r for r in timed if r["high_score_time_s"] <= cap]
-                if not cands:
-                    continue
-                best = max(r["high_score"] for r in cands)
-                h = min(
-                    (r for r in cands if r["high_score"] == best),
-                    key=lambda r: r["high_score_time_s"],
-                )
-                ram = h.get("ram_gib")
-                ram_tier = next(
-                    (f"g{c:g}" for c in RAM_LADDER_GIB if ram is not None and ram <= c),
-                    "-",
-                )
-                t_disp = f"{h['high_score_time_s']:.0f}"
-                lines.append(
-                    f"| <= {int(cap)}s | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} | {t_disp}s | {ram_tier} |"
-                )
-        rammed = [r for r in rows if r.get("ram_gib") is not None]
-        if rammed:
-            lines.append("")
-            lines.append("## the score-by-ram-budget table (practitioner reporting)")
-            lines.append("")
-            lines.append("the best score whose MEASURED vulkan0 ram (model + kv + compute) fits")
-            lines.append("a budget; the patience column is the holder's time tier - how long")
-            lines.append("you wait per level at that memory size")
-            lines.append("")
-            lines.append("| ram budget | best score | holder | patience |")
-            lines.append("|---|---|---|---|")
-            for cap in RAM_LADDER_GIB:
-                cands = [r for r in rammed if r["ram_gib"] <= cap]
-                if not cands:
-                    continue
-                best = max(r["high_score"] for r in cands)
-                h = min(
-                    (r for r in cands if r["high_score"] == best),
-                    key=lambda r: r["ram_gib"],
-                )
-                t_s = h.get("high_score_time_s")
-                tier = next(
-                    (f"t{int(c)}" for c in TIME_LADDER_S if t_s is not None and t_s <= c),
-                    "-",
-                )
-                lines.append(
-                    f"| <= {cap} GiB | {best} | {h['fam']} {h['rung']} "
-                    f"k={h['k_quant']} v={h['v_quant']} | {tier} |"
-                )
-        lines.append("")
-        lines.append(
-            f"_{len(rows)} candidates measured, {done_pairs:,} of {len(pool):,} "
-            "pairs swept; each pair one acquisition, the seed recorded in state._"
-        )
-        with open("md/trek.md", "w", encoding="utf-8") as fh:
-            fh.write("\n".join(lines) + "\n")
-
-    print(
-        f"[trek] pool: {total_pairs:,} (model, rung) pairs "
-        f"(each pick sweeps {n_kv} x {n_kv} = {n_kv * n_kv} kv combinations), "
-        f"no size gate - llama-server decides at launch, ONE chance each"
-    )
-    print(f"[trek] entropy: {_ENTROPY_DEV}")
+    print(f"[trek] v2: walkers over exam histories; the walker seed {walker_seed}")
     print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
-    n = len(done)
-    while len(done) < len(pool):
-        # THE TREK STEP: bench/trek.py's deterministic walker - it
-        # replays the walk from (0, 0) through the cached cells
-        # (free) and hands back the FIRST cell needing evaluation.
-        # kv quants are NOT searched: the picked cell's pair sweeps
-        # all 49 (k, v) combinations in one acquisition. The
-        # done-key is the cell's pool index.
-        from bench import trek
 
-        rec_pick = trek.walk(state_file)
-        if rec_pick is None:
-            print("[trek] the trek has ENDED: converged at the 128s clock")
-            break
-        pair_key = rec_pick["pool_index"]
-        fam = rec_pick["fam"]
-        rung = rec_pick["rung"]
-        clock = rec_pick.get("clock_s", 1.0)
-        # THE PER-CLOCK DONE-KEY: a cell measured at 1s re-opens at
-        # 2s (the higher clock may score differently) - the key
-        # carries the clock so the same cell can complete multiple
-        # sweeps, one per clock
-        key = f"{pair_key}@{clock:g}"
-        # THE EXAM CLOCK FOLLOWS THE WALK: the sweep runs at the
-        # walker's current clock (the LEVEL_TIMEOUT_S the per-level
-        # deadline reads)
-        global LEVEL_TIMEOUT_S
-        LEVEL_TIMEOUT_S = float(clock)
-        est = rec_pick.get("high_score")
-        ep = rec_pick.get("epoch")
-        mv = rec_pick.get("movements")
-        print(
-            f"[trek] clock {clock:g}s, epoch {ep}, movement {mv}: "
-            f"evaluating {fam} {rung} (high {est}, best at {rec_pick.get('best')})"
-        )
-        if key in done:
-            continue  # already measured at THIS clock (a resume's replay guard)
-        print(
-            f"[trek] #{n + 1} pair={key} -> {fam} {rung} (sweeping {n_kv * n_kv} kv combinations)"
-        )
-        recs = run_pair(fam, rung, models_dir, state, port)
-        # THE WALK LOG: each step's pick (with the strategy that made
-        # it, the estimate it acted on, and the realized score) rides
-        # the state - the replayable record of exactly what the
-        # walker did and why, and the checkpoint's raw material
-        done_recs = [r for r in recs if r.get("result") == "done"]
-        pick_score = (
-            max((r.get("high_score") or -1 for r in done_recs), default=-1) if done_recs else -1
-        )
-        state.setdefault("walk", []).append(
-            {
-                "row": rec_pick.get("row"),
-                "col": rec_pick.get("col"),
-                "index": pair_key,
-                "fam": fam,
-                "rung": rung,
-                "clock_s": rec_pick.get("clock_s", 1.0),
-                "draws": rec_pick.get("draws", 0),
-                "direction": rec_pick.get("direction"),
-                "epoch": rec_pick.get("epoch"),
-                "seed": rec_pick.get("seed"),
-                "movements": rec_pick.get("movements"),
-                "high_score_before": rec_pick.get("high_score"),
-                "best_before": rec_pick.get("best"),
-                "score": pick_score,
-                "n_recs": len(recs),
-            }
-        )
-        state["walk"] = state["walk"][-4000:]  # bounded
-        # THE RESUME-SAFE EXTEND: the resumed records are ALREADY in
-        # state["results"] (run_pair persisted them per combo), so
-        # only the records NOT yet in the state extend it - the
-        # fresh-sweep path (recs == all new) appends all, the
-        # resumed path appends only what actually ran
-        have = {
-            (r.get("fam"), r.get("rung"), r.get("k_quant"), r.get("v_quant"), r.get("seed"))
-            for r in state["results"]
-        }
-        for r in recs:
-            k = (r.get("fam"), r.get("rung"), r.get("k_quant"), r.get("v_quant"), r.get("seed"))
-            if k not in have:
-                state["results"].append(r)
-                have.add(k)
-        state["results"] = state["results"][-5000:]  # the state stays bounded
-        # INV: the done set only holds keys in the pool space, one
-        # entry per swept pair, before the pair is marked done
-        warn_contract(
-            "inv",
-            "driver.done_space",
-            all(
-                0 <= int(k.split("@")[0]) < len(pool)
-                for k in done
-                if "@" not in k or k.split("@")[0].lstrip("-").isdigit()
-            ),
-            "a done key outside the pool space",
-        )
-        warn_contract(
-            "pre",
-            "driver.pair_not_done",
-            key not in done,
-            f"the picked pair {key} was already in the done set (double sweep!)",
-        )
-        done.add(key)
-        _GC_DONE_SET.add(key)
-        state["done"] = sorted(done)
-        _state_store.save_state(state_file, state)
-        write_ledger()
-        while gc_log:
-            print(gc_log.pop(0))
-        done_recs = [r for r in recs if r.get("result") == "done"]
-        best = max((r.get("high_score") or -1 for r in done_recs), default=None)
-        summary = (
-            f"{len(done_recs)}/{len(recs)} done, best high_score={best}"
-            if done_recs
-            else recs[0].get("result", "?")
-        )
-        print(f"[trek]   -> {summary}")
-        # INV: THE STUCK-RETRY GUARD (the imatrix lesson): the same
-        # (fam, rung, result, detail) signature repeating more than
-        # twice means a stuck retry loop, not independent evidence -
-        # the SameFileError flood produced 2,597 IDENTICAL failures
-        # across 53 pairs before anyone looked. Warning only: we
-        # decide whether it is our bug or our logic.
-        sig_counts: dict[tuple, int] = {}
-        for r in recs:
-            if r.get("result") == "done":
-                continue  # a done record is a SCORE, not a failure -
-                # at the 1s clock every candidate scores -1 and 49
-                # identical scores are NOT a stuck retry loop
-            sig = (
-                r.get("fam"),
-                r.get("rung"),
-                r.get("result"),
-                (r.get("detail") or "")[:80],
-            )
-            sig_counts[sig] = sig_counts.get(sig, 0) + 1
-        prior = {
-            (
-                r.get("fam"),
-                r.get("rung"),
-                r.get("result"),
-                (r.get("detail") or "")[:80],
-            )
-            for r in state.get("results", [])[-2000:]
-        }
-        for sig, c in sig_counts.items():
-            if sig in prior and c > 2:
-                warn_contract(
-                    "inv",
-                    "driver.stuck_retry",
-                    False,
-                    f"{sig[0]} {sig[1]}: the failure '{sig[3]}' already fired "
-                    f"before and repeats {c}x - a stuck retry loop, not evidence",
+    st = trek.load_state()
+
+    # the budget ladder: start where the state left off (or 1s)
+    budget = st.get("last_budget", trek.CLOCK_LADDER[0])
+    budget_idx = trek.CLOCK_LADDER.index(budget)
+    while budget_idx < len(trek.CLOCK_LADDER):
+        budget = trek.CLOCK_LADDER[budget_idx]
+        st["last_budget"] = budget
+        trek.save_state(st)
+        print(f"[trek] the {budget:g}s walker")
+
+        n = 0
+        while True:
+            pick = trek.walk(st, walker_seed, budget_s=budget)
+            if pick is None:
+                break
+            if pick["reason"] == "converged":
+                print(
+                    f"[trek] the {budget:g}s walker CONVERGED "
+                    f"(best {pick['fam']} {pick['rung']}, high {pick['high']})"
                 )
-        n += 1
-        if on_progress is not None:
-            try:
-                on_progress(n)
-            except Exception as e:
-                print(f"[trek] progress push failed (ignored): {e}")
-    print(f"[trek] the pool is drained: {len(done)} pairs, one chance each - complete")
-
-
-if __name__ == "__main__":
-    main()
+                break
+            fam, rung = pick["fam"], pick["rung"]
+            print(
+                f"[trek] {budget:g}s, epoch {pick['epoch']}, movement {pick['movements']}: "
+                f"{fam} {rung} (high {pick['high']}, best at {pick['best']})"
+            )
+            run_pair(fam, rung, models_dir, st, port, budget)
+            n += 1
+            if on_progress is not None:
+                try:
+                    on_progress(n)
+                except Exception:
+                    pass
+        budget_idx += 1
+    print("[trek] the trek has ENDED: converged at the 128s budget")
