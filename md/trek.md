@@ -23,6 +23,6 @@ time limit), derived from the shared exam histories
 | 1s | [9, 13] | 95 | 1 | gemma-3-1b-it Q2_K |
 | 2s | [7, 13] | 95 | 1 | gemma-3-1b-it Q2_K |
 | 4s | [7, 13] | 95 | 2 | Llama-3.2-1B-Instruct IQ3_XXS |
-| 8s | [9, 10] | 32 | 2 | Llama-3.2-1B-Instruct IQ3_XXS |
+| 8s | [9, 10] | 50 | 2 | Llama-3.2-1B-Instruct IQ3_XXS |
 
-_2,609 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
+_2,658 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
