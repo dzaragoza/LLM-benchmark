@@ -245,6 +245,37 @@ def _check_markdown(src: str, out: str, path: str) -> None:
         )
 
 
+def _check_replacement_seam(out: str, path: str) -> None:
+    """The seam gate (the session-41 incident): a replace whose old
+    text was written against a pre-format structure can, via the
+    whitespace-flexible rescue, splice its new text across a line
+    boundary - gluing a return/raise onto the following line's
+    content ('return _advance_clock(...)        # PRE: ...') - a
+    result that PARSES (the ast gate stays silent) but derails the
+    block structure. The signature: a balanced-paren line whose
+    return/raise/break/continue statement is followed by 4+ interior
+    spaces and a comment marker or a statement keyword - two
+    statements where one should be. Refuses with the merged lines;
+    the fix is a fresh anchor after re-reading the region."""
+    if _file_type(path) != "python":
+        return
+    merged = []
+    for ln in out.split("\n"):
+        m = re.search(
+            r"\b(return|raise|break|continue)\b.*\S\s{4,}(?:#|def |class |if |for |while |with |assert )",
+            ln,
+        )
+        if m and ln.count("(") == ln.count(")"):
+            merged.append(ln)
+    if merged:
+        raise CodeEditError(
+            f"{path}: the replacement SEAM is broken - a statement is "
+            f"glued to the following line (a stale anchor after a format "
+            f"pass; re-read the region and re-aim):\n"
+            + "\n".join(merged[:3])
+        )
+
+
 def _check_python_syntax(src: str, out: str, path: str) -> None:
     """The ast gate (session 37, addendum 16): for .py targets, if the
     source parsed and the edit's result does not, the edit is refused
@@ -1001,6 +1032,7 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     out, regions = _apply(src, blocks)
     _check_delimiters(src, out, path, regions)
     _check_python_syntax(src, out, path)
+    _check_replacement_seam(out, path)
     # verify every post-condition against the IN-MEMORY result BEFORE
     # touching disk (session 35, addendum 4: these checks used to run
     # after the write, so a failed verify left the file MODIFIED and
