@@ -417,6 +417,21 @@ def walk(
             if best in targets:
                 # CONVERGED at this budget
                 save()
+                # THE BUDGET CARRY-OVER: the next budget's walker
+                # restarts at this walk's best position - the walk
+                # state carries across the doubling, never (-1,-1)
+                # (the start_budget contract enforces exactly this)
+                next_idx = CLOCK_LADDER.index(budget_s) + 1
+                if next_idx < len(CLOCK_LADDER):
+                    nb = CLOCK_LADDER[next_idx]
+                    st.setdefault("walks", {})[f"{nb:g}"] = {
+                        "epoch": 1,
+                        "position": list(best),
+                        "movements": 0,
+                        "high": -1,
+                        "best": list(best),
+                        "targets": [],
+                    }
                 return {
                     "row": best[0], "col": best[1],
                     "fam": grid.cell(best[0], best[1])[0],
