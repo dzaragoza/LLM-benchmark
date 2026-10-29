@@ -305,6 +305,14 @@ def git_tail(args: argparse.Namespace) -> None:
     if not existing:
         stamp("nothing to commit - no artifacts found")
         return
+    if git_ops.in_rebase():
+        stamp(
+            "NOT committing: a rebase is in progress (unresolved "
+            "conflicts) - resolve it by hand (git status, fix, git add, "
+            "git rebase --continue) and restart; committing onto the "
+            "detached HEAD makes recovery harder"
+        )
+        return
     rc, err = git_ops.add(existing)
     if rc != 0:
         stamp(f"git add failed: {err.strip()}")

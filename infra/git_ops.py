@@ -13,6 +13,7 @@ machine.
 
 from __future__ import annotations
 
+import os
 import subprocess
 
 
@@ -26,11 +27,32 @@ def inside_work_tree() -> bool:
     return r.returncode == 0 and r.stdout.strip() == "true"
 
 
+def in_rebase() -> bool:
+    """True when a rebase is in progress (an unresolved conflict from a
+    previous pull). The 15:53 incident: the auto-commit pulled while a
+    conflicted rebase was open, committed to the detached HEAD twice,
+    and left the machine's git unusable (every later pull/push failed
+    with 'You are not currently on a branch'). The envelope checks this
+    BEFORE committing: a rebase in progress needs the operator's
+    resolution, never another commit on top of it."""
+    return os.path.isdir(os.path.join(".git", "rebase-merge")) or os.path.isdir(
+        os.path.join(".git", "rebase-apply")
+    )
+
+
 def pull_rebase(autostash: bool = True) -> tuple[int, str, str]:
     """git pull --rebase (autostash optional). Returns (rc, stdout, stderr).
 
     Session 43, R-20: the no_verify bypass is REMOVED - the hooks are
     never omitted; a pull that trips a hook is fixed, not skipped."""
+    if in_rebase():
+        return (
+            128,
+            "",
+            "a rebase is already in progress (unresolved conflicts) - "
+            "resolve it by hand: git status, fix the conflicts, git add, "
+            "git rebase --continue; never commit onto the detached HEAD",
+        )
     args = ["git", "pull", "--rebase"]
     if autostash:
         args.append("--autostash")
