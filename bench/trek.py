@@ -283,11 +283,15 @@ def _validate_state(st: dict[str, Any], where: str) -> None:
     """the schema gate: refuse corrupt state - on SAVE (never write
     it) and on LOAD (never serve it). The int-key normalization
     runs FIRST (load_state), so the in-memory form always has int
-    levels and the schema's oneOf branches check the records."""
-    try:
-        import jsonschema
-    except ImportError:  # the schema is best-effort without the lib
-        return
+    levels and the schema's oneOf branches check the records.
+
+    THE SCHEMA IS MANDATORY (the author's ruling): no skip path.
+    jsonschema is a hard requirement - a missing library is a
+    crash, not a degraded mode (the same ruling as the converter
+    dependencies: a wrong result silently produced is worse than
+    a loud failure)."""
+    import jsonschema
+
     try:
         jsonschema.validate(st, STATE_SCHEMA)
     except jsonschema.ValidationError as e:
