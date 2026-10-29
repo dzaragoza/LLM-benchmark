@@ -229,39 +229,33 @@ def _clocks() -> list[float]:
 
 def walk(
     state_file: str = TREK_STATE_FILE,
-    max_steps: int = 100_000,
+    max_steps: int = 1_000_000,
 ) -> dict[str, Any] | None:
-    """THE WALKER, TIME-DOUBLING (the author's specification):
+    """THE WALKER, TIME-DOUBLING (the author's specification), with
+    EVERY MOVEMENT COSTING THE SAME - cached or measured (the
+    author's ruling): an epoch's 95 movements count every step the
+    walker takes, so the walk is a pure function of the log - the
+    replay re-derives the ENTIRE current epoch from its start, and
+    a restart anywhere leaves the walk identical.
 
-    - the walk starts at (0, 0) with the exam clock at 1s per level.
-    - the walker's rules are the same as before: strict improvement
-      keeps the direction (and records the position as the best);
-      non-improvement draws a new direction; blocked at an edge,
-      keep drawing; after 95 movements, evaluate the landing cell
-      then TELEPORT to the best position, seed += 1, keep the high
-      score and best, new direction.
-    - CONVERGENCE: teleporting to a location it has already
-      teleported to AT THIS CLOCK. Then the CLOCK DOUBLES, the seed
-      += 1, and the walk RESTARTS from that spot - the previous
-      best is re-evaluated with double the time (its score may
-      rise: a 1s timeout may pass at 2s).
-    - the maximum clock is 128s: converging at 128s ends the trek
-      for good.
+    THE REPLAY'S EXACTNESS rests on one property: a cached cell can
+    never improve the high score - its score was already absorbed
+    when the cell was swept (high is monotone), so re-crossing it
+    applies the same non-improvement rule and consumes the same
+    draw. The path from an epoch's start is therefore identical
+    given the measured set, regardless of when the runner swept
+    which cell or restarted the process.
 
-    The cache is PER CLOCK: a cell measured at 1s does not count at
-    2s - the whole grid re-opens when the clock doubles. The walk
-    log (state['walk']) stamps every evaluation with its clock, and
-    the cache rebuild replays the log: the protocol's memory is the
-    log, the records keep score and time (no clock tag needed).
+    THE LOG is the protocol's memory: every swept cell at this
+    clock (its score), the epoch numbers, and each epoch's start
+    position (best_before of its first entry - the teleport
+    target). No restore fields are needed; draws/direction in the
+    entries are informational.
 
-    Deterministic given the cache: replays from (0,0) through
-    cached cells (free) and hands back the first cell needing
-    evaluation at the CURRENT clock. Returns {..., 'reason':
-    'evaluate', 'clock_s': ...} or None when the trek has ended."""
+    Returns the first unmeasured cell at the current clock (the
+    runner sweeps it), or the doubled-clock restart cell on
+    convergence, or None when the trek ends (converged at 128s)."""
     grid = Grid()
-    # A FRESH START (no state file - a first run or after --clean):
-    # the trek begins at (0,0) at the 1s clock; the state is created
-    # (the runner saves it on the first sweep's completion)
     if not os.path.isfile(state_file):
         os.makedirs(os.path.dirname(state_file) or ".", exist_ok=True)
         st: dict[str, Any] = {"done": [], "results": [], "walk": []}
@@ -272,217 +266,148 @@ def walk(
             st = json.load(fh)
     log: list[dict[str, Any]] = st.get("walk", [])
 
-    # THE CACHE REBUILD: replay the walk log per clock. Each log
-    # entry's (cell, clock) marks the cell measured at that clock;
-    # the CURRENT clock is the highest clock with any entry, or 1s.
-    measured: dict[float, set[tuple[int, int]]] = {}
-    scores: dict[float, dict[tuple[int, int], int]] = {}
-    for e in log:
-        c = float(e.get("clock_s", 1.0))
-        cell = (int(e["row"]), int(e["col"]))
-        measured.setdefault(c, set()).add(cell)
-        scores.setdefault(c, {})[cell] = int(e.get("score", -1))
-    current_clock = max(measured.keys()) if measured else CLOCK_MIN_S
-    # per-clock walk state: the convergence bookkeeping
-    # (teleport targets per clock) replays from the log's epochs
-    # NOTE: the full replay of directions/teleports per past clock
-    # is not needed - only the CURRENT clock's cache and the walk
-    # position matter; the position derives from the current
-    # clock's replay (below).
-
-    # replay the current clock's walk from its start: the walk at
-    # clock c starts at the BEST POSITION of clock c/2 (or (0,0)
-    # for the first clock). The log's entries at the current clock,
-    # in order, replay the draws deterministically.
-    rng = random.Random(_clocks().index(current_clock) + 1)  # seed = 1 at 1s, 2 at 2s...
-    # the starting position: the first entry of this clock's log
-    # (the restart spot), or (0,0) if none yet
-    this_clock_entries = [e for e in log if float(e.get("clock_s", 1.0)) == current_clock]
-    if this_clock_entries:
-        start = (int(this_clock_entries[0]["row"]), int(this_clock_entries[0]["col"]))
-    else:
-        start = (0, 0)
-
-    cur_scores = scores.get(current_clock, {})
-    row, col = start
-    high = -1
-    best = start
-    moves = 0
-    teleport_targets: list[tuple[int, int]] = []
-    # THE TELEPORT HISTORY (the convergence bug the author caught:
-    # the walk teleported to (4,13) epoch after epoch without
-    # doubling - the targets list started EMPTY on every walk()
-    # call, so the repeat-target check never saw previous epochs'
-    # targets across restarts; the doubling only fired when the
-    # whole convergence happened inside one call). The history
-    # reconstructs from the log: every entry with epoch > 1 marks
-    # a completed teleport, and its best_before is the position
-    # that epoch teleported TO (the walker restarts AT the target).
-    # Each distinct epoch number contributes its target once.
-    seen_epochs: set[int] = set()
-    for e in this_clock_entries:
-        ep = int(e.get("epoch", 1))
-        if ep > 1 and ep not in seen_epochs:
-            t = e.get("best_before")
-            if t is not None:
-                teleport_targets.append(tuple(t))
-                seen_epochs.add(ep)
-    # THE UP-FRONT CONVERGENCE CHECK: a repeated target in the log
-    # means the original walk ALREADY converged at this clock - the
-    # clock doubles (or the trek ends at max) immediately, without
-    # re-walking to the boundary. The history reconstruction makes
-    # this check restart-safe: the repeat is visible from the log.
-    if len(set(teleport_targets)) < len(teleport_targets):
-        # a target repeated: converged
-        if current_clock >= CLOCK_MAX_S:
-            return None
-        next_clock = current_clock * 2
-        best_cell = grid.cell(best[0], best[1]) if this_clock_entries else ("", "")
+    # THE FRESH START: no log - the trek begins at (0,0) at the 1s clock
+    if not log:
+        fam, rung = grid.cell(0, 0)
         return {
-            "row": best[0],
-            "col": best[1],
-            "fam": best_cell[0],
-            "rung": best_cell[1],
-            "pool_index": grid.pool_index(best[0], best[1]),
-            "clock_s": next_clock,
-            "high_score": -1,
-            "best": list(best),
-            "epoch": 1,
-            "seed": _clocks().index(next_clock) + 1,
-            "movements": 0,
-            "draws": 0,
-            "direction": [1, 0],
+            "row": 0, "col": 0, "fam": fam, "rung": rung,
+            "pool_index": grid.pool_index(0, 0), "clock_s": CLOCK_MIN_S,
+            "high_score": -1, "best": [0, 0], "epoch": 1,
+            "seed": 1, "movements": 0, "draws": 0, "direction": [1, 0],
             "reason": "evaluate",
         }
-    # THE STREAM-EXACT REPLAY (the resume bug the cache audit
-    # caught): the original walk consumed direction draws between
-    # logged evaluations - movements over cached cells draw too,
-    # and the improvement branch KEEPS a direction drawn earlier.
-    # The draw count alone cannot recover that kept direction, so
-    # the log records each evaluation's DIRECTION (the walker's
-    # full state: position, clock, draws, movements, direction) and
-    # the replay restores it exactly instead of re-drawing.
-    draws_logged = 0
-    direction_logged = None
-    # the replay's high/best: ALL entries EXCEPT the last - the
-    # loop re-evaluates the last logged cell freshly (its score
-    # must not be double-counted, or the improvement rule misfires
-    # and the kept direction gets discarded)
-    for e in this_clock_entries[:-1]:
+
+    # THE CURRENT CLOCK and its entries (chronological)
+    current_clock = max(float(e.get("clock_s", 1.0)) for e in log)
+    entries = [e for e in log if float(e.get("clock_s", 1.0)) == current_clock]
+    clock_idx = _clocks().index(current_clock)  # 0-based; seed = clock_idx + epoch
+
+    # THE MEASURED SET at this clock: (row, col) -> score
+    measured: dict[tuple[int, int], int] = {}
+    for e in entries:
+        measured[(int(e["row"]), int(e["col"]))] = int(e.get("score", -1))
+
+    # THE HIGH/BEST: replay the entries chronologically - a swept
+    # cell's score applies the strict-improvement rule exactly as
+    # the original walk did (cached cells never improve high, so
+    # the entries are the complete record)
+    high = -1
+    best = (0, 0)
+    for e in entries:
         s = int(e.get("score", -1))
         if s > high:
             high = s
             best = (int(e["row"]), int(e["col"]))
-    if this_clock_entries:
-        d = this_clock_entries[-1].get("draws")
-        if d is not None:
-            draws_logged = int(d)
-        dr = this_clock_entries[-1].get("direction")
-        if dr is not None:
-            direction_logged = (int(dr[0]), int(dr[1]))
-    if this_clock_entries:
-        last = this_clock_entries[-1]
-        row, col = int(last["row"]), int(last["col"])
-        moves = int(last.get("movements", 0))
-    for _ in range(draws_logged):
-        rng.randrange(4)
 
-    draw_count = [draws_logged]
+    # THE EPOCH STARTS: epoch 1 starts at the clock's restart spot
+    # (entries[0].best_before); epoch k > 1 starts where epoch k-1
+    # teleported TO (also its first entry's best_before)
+    epoch_starts: dict[int, tuple[int, int]] = {}
+    for e in entries:
+        ep = int(e.get("epoch", 1))
+        if ep not in epoch_starts:
+            t = e.get("best_before")
+            epoch_starts[ep] = (int(t[0]), int(t[1])) if t else (0, 0)
+    max_epoch = max(epoch_starts)
 
-    def draw() -> tuple[int, int]:
-        draw_count[0] += 1
-        return DIRECTIONS[rng.randrange(4)]
+    # THE TELEPORT TARGETS: epoch k's start (k >= 2) IS the target
+    # of the k-1 -> k teleport. A repeated target = converged.
+    targets = [epoch_starts[k] for k in sorted(epoch_starts) if k >= 2]
+    if len(set(targets)) < len(targets):
+        # converged already (a repeated teleport target in the log)
+        return _advance_clock(grid, state_file, current_clock, best, measured, log)
 
-    def result(reason: str = "evaluate") -> dict[str, Any]:
-        fam, rung = grid.cell(row, col)
-        return {
-            "row": row,
-            "col": col,
-            "fam": fam,
-            "rung": rung,
-            "pool_index": grid.pool_index(row, col),
-            "clock_s": current_clock,
-            "high_score": high,
-            "best": list(best),
-            "epoch": len(teleport_targets) + 1,
-            "seed": _clocks().index(current_clock) + 1 + len(teleport_targets),
-            "movements": moves,
-            "draws": draw_count[0],
-            "direction": list(direction),
-            "reason": reason,
-        }
+    # THE CLOCK REPLAY: walk the current epoch from its start - and
+    # through subsequent epochs if the replay crosses boundaries -
+    # until an unmeasured cell (return it) or convergence (advance
+    # the clock) or the trek's end (None)
+    epoch = max_epoch
+    total = 0
+    while total < max_steps:
+        start = epoch_starts.get(epoch, best)
+        rng = random.Random(clock_idx + 1 + epoch)
+        row, col = start
+        moves = 0
+        draws = 0
 
-    # THE REPLAY'S INITIAL DIRECTION: the last logged entry's
-    # direction (the one in effect at the last evaluation). For a
-    # fresh clock (no entries), the first draw.
-    if direction_logged is not None:
-        direction = direction_logged
-    else:
+        def draw() -> tuple[int, int]:
+            nonlocal draws
+            draws += 1
+            return DIRECTIONS[rng.randrange(4)]
+
         direction = draw()
-    while moves < max_steps:
-        if (row, col) not in cur_scores:
-            # THE LOGGED DIRECTION IS THE CURRENT ONE - the direction
-            # in effect at this evaluation (after any redraws and
-            # blocked-edge funnels), the one the walker would step in
-            # on improvement. NOT the restored direction_logged (the
-            # stale-by-one-draw bug: the log said [down] while the
-            # steps went right - the corner's blocked-edge loop had
-            # redrawn three times and the current direction was
-            # right, but result() preferred the stale restored one).
-            res = result()
-            res["direction"] = list(direction)
-            return res
-        score = cur_scores[(row, col)]
-        # THE IMPROVEMENT RULE (the author's spec): strict
-        # improvement keeps the current direction and records the
-        # position as the best; non-improvement draws a new
-        # direction. The step follows in both cases; the walker
-        # keeps moving until it lands on an unmeasured cell.
-        if score > high:
-            high = score
-            best = (row, col)
-        else:
-            direction = draw()
-        moves += 1
-        if moves >= EPOCH_MOVEMENTS:
-            if best in teleport_targets:
-                # CONVERGED at this clock: the clock doubles (or the
-                # trek ends at the max clock)
-                if current_clock >= CLOCK_MAX_S:
-                    return None
-                next_clock = current_clock * 2
-                # the next trek restarts from the best spot, at the
-                # doubled clock - the runner sweeps it fresh (the
-                # cache has no entries at that clock yet)
+        while moves < EPOCH_MOVEMENTS:
+            if (row, col) not in measured:
+                fam, rung = grid.cell(row, col)
                 return {
-                    "row": best[0],
-                    "col": best[1],
-                    "fam": grid.cell(best[0], best[1])[0],
-                    "rung": grid.cell(best[0], best[1])[1],
-                    "pool_index": grid.pool_index(best[0], best[1]),
-                    "clock_s": next_clock,
-                    "high_score": -1,
-                    "best": list(best),
-                    "epoch": 1,
-                    "seed": _clocks().index(next_clock) + 1,
-                    "movements": 0,
-                    "draws": 0,
-                    "direction": list(draw()),
+                    "row": row, "col": col, "fam": fam, "rung": rung,
+                    "pool_index": grid.pool_index(row, col),
+                    "clock_s": current_clock,
+                    "high_score": high, "best": list(best),
+                    "epoch": epoch,
+                    "seed": clock_idx + 1 + epoch,
+                    "movements": moves, "draws": draws,
+                    "direction": list(direction),
                     "reason": "evaluate",
                 }
-            teleport_targets.append(best)
-            row, col = best
-            rng = random.Random(_clocks().index(current_clock) + 1 + len(teleport_targets))
-            direction = draw()
-            moves = 0
-            continue
-        while True:
-            nr, nc = row + direction[0], col + direction[1]
-            if grid.inside(nr, nc):
-                break
-            direction = draw()
-        row, col = nr, nc
+            score = measured[(row, col)]
+            # THE RULE: strict improvement keeps the direction and
+            # records the position; non-improvement draws a new one.
+            # A cached cell never improves high (proven), so the
+            # replay's draws match the original's exactly.
+            if score > high:
+                high = score
+                best = (row, col)
+            else:
+                direction = draw()
+            moves += 1
+            total += 1
+            if moves >= EPOCH_MOVEMENTS:
+                # THE EPOCH ENDS: teleport to the best position
+                if best in targets:
+                    # converged at this clock
+                    return _advance_clock(
+                        grid, state_file, current_clock, best, measured, log
+                    )
+                targets.append(best)
+                epoch += 1
+                epoch_starts[epoch] = best
+                break  # the next epoch starts at the target
+            # STEP (blocked at an edge: keep drawing until open)
+            while True:
+                nr, nc = row + direction[0], col + direction[1]
+                if grid.inside(nr, nc):
+                    break
+                direction = draw()
+            row, col = nr, nc
     return None
+
+
+def _advance_clock(
+    grid: Grid,
+    state_file: str,
+    current_clock: float,
+    best: tuple[int, int],
+    measured: dict[tuple[int, int], int],
+    log: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """CONVERGENCE: the clock doubles and the walk restarts from the
+    best spot (re-evaluated at the doubled time); at the max clock
+    the trek ENDS."""
+    if current_clock >= CLOCK_MAX_S:
+        return None
+    next_clock = current_clock * 2
+    fam, rung = grid.cell(best[0], best[1])
+    return {
+        "row": best[0], "col": best[1], "fam": fam, "rung": rung,
+        "pool_index": grid.pool_index(best[0], best[1]),
+        "clock_s": next_clock,
+        "high_score": -1, "best": list(best),
+        "epoch": 1,
+        "seed": _clocks().index(next_clock) + 1,
+        "movements": 0, "draws": 0, "direction": [1, 0],
+        "reason": "evaluate",
+    }
 
 
 # ------------------------------------------------------ the reporting
