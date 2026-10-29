@@ -485,7 +485,8 @@ def _run_combo(
     the history in place. The candidate-deterministic exam seed
     means the exam instance is the SAME as any previous run - the
     continuation is faithful."""
-    exam_seed = trek.exam_seed_of(fam, rung, k_quant, v_quant)
+    exam_seed = trek.EXAM_SEED  # the repetition counter: always 1 (one exam per candidate)
+    instance_key = trek.exam_instance_key(fam, rung, k_quant, v_quant)
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
     answers_dir = os.path.join("results", "trek", fam)
     os.makedirs(answers_dir, exist_ok=True)
@@ -546,8 +547,8 @@ def _run_combo(
             level_t0 = time.monotonic()
             deadline = level_t0 + budget_s
             insts = {
-                "chain": build_chain(exam_seed, level),
-                "elevator": build_elevator(exam_seed, level),
+                "chain": build_chain(instance_key, level),
+                "elevator": build_elevator(instance_key, level),
             }
             messages: list[dict[str, str]] = []
             remaining = ctx

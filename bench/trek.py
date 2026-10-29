@@ -70,11 +70,21 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # THE CANDIDATE-DETERMINISTIC EXAM SEED: the same candidate always
 # gets the same exam instance (the same levels, the same papers) -
 # the histories are reproducible and shared across walkers/seeds
-def exam_seed_of(fam: str, rung: str, k_quant: str, v_quant: str) -> int:
-    """a fixed 8-bit derivation per candidate - stable across runs,
-    seeds, and walkers (the v2 ruling: the exam instance depends
-    only on the candidate, so a re-run under a bigger budget
-    continues the SAME exam)."""
+# THE EXAM SEED (the author's correction): the exam seed counts
+# exam REPETITIONS - we run each exam ONCE, so the seed is ALWAYS 1.
+# The exam INSTANCE is still candidate-deterministic: the papers
+# derive from the candidate's own key (below), so the same candidate
+# always gets the same exam, and a re-run under a bigger budget
+# continues the same exam faithfully.
+EXAM_SEED = 1
+
+
+def exam_instance_key(fam: str, rung: str, k_quant: str, v_quant: str) -> int:
+    """the candidate's exam-instance key: a fixed 8-bit derivation
+    of the candidate's identity - the papers (the chain and elevator
+    instances per level) derive from this key, so every run of the
+    same candidate presents the SAME exam regardless of the walker
+    seed, the budget, or the run."""
     h = 0
     for s in (fam, rung, k_quant, v_quant):
         for ch in s:
@@ -327,7 +337,18 @@ def walk(
     targets = [tuple(t) for t in walk_rec.get("targets", [])]
 
     if position == (-1, -1):
-        # THE FRESH START (the v2 ruling): draw both coordinates
+        # THE FRESH START (the v2 ruling): ONLY the first walker (the
+        # 1s budget) may start at (-1,-1) - it draws both coordinates
+        # and starts at that random cell. Any other budget starting
+        # at (-1,-1) is a contract violation (the walker state was
+        # not carried across the budget doubling).
+        warn_contract(
+            "pre",
+            "walk.start_budget",
+            budget_s == CLOCK_LADDER[0],
+            f"only the {CLOCK_LADDER[0]:g}s walker may start at (-1,-1); "
+            f"the {budget_s:g}s walker must inherit a grid position",
+        )
         position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
         best = position
 
@@ -342,11 +363,20 @@ def walk(
     def draw() -> tuple[int, int]:
         return DIRECTIONS[rng.randrange(4)]
 
-    # POST: the position is inside the grid (the -1,-1 case drew it)
+    # POST: the position is inside the grid - and a non-first budget
+    # NEVER sees (-1,-1) (its walk state carries over from the
+    # previous budget's convergence)
     warn_contract(
         "post", "walk.start_inside",
         grid.inside(position[0], position[1]),
         f"the walk position {position} is outside the grid",
+    )
+    warn_contract(
+        "inv",
+        "walk.no_offgrid_restart",
+        not (budget_s != CLOCK_LADDER[0] and tuple(position) == (-1, -1)),
+        f"the {budget_s:g}s walker restarted at (-1,-1) - only the "
+        f"{CLOCK_LADDER[0]:g}s walker may draw its start",
     )
 
     direction = draw()
