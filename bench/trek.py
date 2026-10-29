@@ -309,6 +309,51 @@ def walk(
     best = start
     moves = 0
     teleport_targets: list[tuple[int, int]] = []
+    # THE TELEPORT HISTORY (the convergence bug the author caught:
+    # the walk teleported to (4,13) epoch after epoch without
+    # doubling - the targets list started EMPTY on every walk()
+    # call, so the repeat-target check never saw previous epochs'
+    # targets across restarts; the doubling only fired when the
+    # whole convergence happened inside one call). The history
+    # reconstructs from the log: every entry with epoch > 1 marks
+    # a completed teleport, and its best_before is the position
+    # that epoch teleported TO (the walker restarts AT the target).
+    # Each distinct epoch number contributes its target once.
+    seen_epochs: set[int] = set()
+    for e in this_clock_entries:
+        ep = int(e.get("epoch", 1))
+        if ep > 1 and ep not in seen_epochs:
+            t = e.get("best_before")
+            if t is not None:
+                teleport_targets.append(tuple(t))
+                seen_epochs.add(ep)
+    # THE UP-FRONT CONVERGENCE CHECK: a repeated target in the log
+    # means the original walk ALREADY converged at this clock - the
+    # clock doubles (or the trek ends at max) immediately, without
+    # re-walking to the boundary. The history reconstruction makes
+    # this check restart-safe: the repeat is visible from the log.
+    if len(set(teleport_targets)) < len(teleport_targets):
+        # a target repeated: converged
+        if current_clock >= CLOCK_MAX_S:
+            return None
+        next_clock = current_clock * 2
+        best_cell = grid.cell(best[0], best[1]) if this_clock_entries else ("", "")
+        return {
+            "row": best[0],
+            "col": best[1],
+            "fam": best_cell[0],
+            "rung": best_cell[1],
+            "pool_index": grid.pool_index(best[0], best[1]),
+            "clock_s": next_clock,
+            "high_score": -1,
+            "best": list(best),
+            "epoch": 1,
+            "seed": _clocks().index(next_clock) + 1,
+            "movements": 0,
+            "draws": 0,
+            "direction": [1, 0],
+            "reason": "evaluate",
+        }
     # THE STREAM-EXACT REPLAY (the resume bug the cache audit
     # caught): the original walk consumed direction draws between
     # logged evaluations - movements over cached cells draw too,
