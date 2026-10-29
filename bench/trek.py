@@ -52,6 +52,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from bench.contracts import warn_contract
 from bench.roster import LADDER, roster_from_models_md
 
 # ------------------------------------------------------------- constants
@@ -152,6 +153,24 @@ class Grid:
         for row in range(self.n_rows):
             for col in range(self.n_cols):
                 self._idx_to_cell[self.pool_index(row, col)] = (row, col)
+        # POST: the grid is the full bijection - 64 rows, 32 cols,
+        # every cell maps to a distinct pool index and back
+        warn_contract(
+            "post", "grid.dimensions",
+            self.n_rows == 64 and self.n_cols == 32,
+            f"the grid is {self.n_rows}x{self.n_cols}, expected 64x32",
+        )
+        warn_contract(
+            "post", "grid.bijection",
+            len(self._pos) == self.n_rows * self.n_cols
+            and len(self._idx_to_cell) == self.n_rows * self.n_cols
+            and all(
+                self._idx_to_cell[self._pos[self.cell(r, c)]] == (r, c)
+                for r in range(self.n_rows)
+                for c in range(self.n_cols)
+            ),
+            "the (row,col) <-> pool-index maps are not mutually inverse",
+        )
 
     def cell(self, row: int, col: int) -> tuple[str, str]:
         return (self.models[row], self.rungs[col])
@@ -228,6 +247,12 @@ def cache_scores(state_file: str = TREK_STATE_FILE) -> dict[tuple[int, int], int
         cell = grid.row_col_of(idx)
         if cell is not None and cell not in out:
             out[cell] = -1  # the sweep ended, nothing ran: the floor
+    # POST: every score is >= -1 (the floor)
+    warn_contract(
+        "post", "cache_scores.floor",
+        all(s >= -1 for s in out.values()),
+        f"a cached score below the floor: {min(out.values()) if out else '-'}",
+    )
     return out
 
 
@@ -291,6 +316,8 @@ def walk(
             st = json.load(fh)
     log: list[dict[str, Any]] = st.get("walk", [])
 
+    # PRE: the grid is complete (the bijection contract guarantees
+    # the cell mapping is total - the walk can never leave the grid)
     # THE FRESH START: no log - the trek begins at (0,0) at the 1s clock
     if not log:
         fam, rung = grid.cell(0, 0)
@@ -313,6 +340,15 @@ def walk(
 
     # THE CURRENT CLOCK and its entries (chronological)
     current_clock = max(float(e.get("clock_s", 1.0)) for e in log)
+    # PRE: the clock is on the dyadic ladder - BEFORE the index
+    # derivation (the guard must precede the guarded operation; the
+    # negative test crashed at .index() before the late check fired)
+    warn_contract(
+        "pre",
+        "walk.clock_on_ladder",
+        current_clock in _clocks(),
+        f"the current clock {current_clock} is not on the dyadic ladder",
+    )
     entries = [e for e in log if float(e.get("clock_s", 1.0)) == current_clock]
     clock_idx = _clocks().index(current_clock)  # 0-based; seed = clock_idx + epoch
 
@@ -373,6 +409,18 @@ def walk(
         while moves < EPOCH_MOVEMENTS:
             if (row, col) not in measured:
                 fam, rung = grid.cell(row, col)
+                # POST: the returned cell is INSIDE the grid and
+                # UNMEASURED at this clock (the runner sweeps it)
+                warn_contract(
+                    "post", "walk.cell_inside",
+                    grid.inside(row, col),
+                    f"the pick ({row},{col}) is outside the grid",
+                )
+                warn_contract(
+                    "post", "walk.cell_unmeasured",
+                    (row, col) not in measured,
+                    f"the pick ({row},{col}) is already measured at this clock",
+                )
                 return {
                     "row": row,
                     "col": col,
@@ -399,6 +447,13 @@ def walk(
                 best = (row, col)
             else:
                 direction = draw()
+            # INV: the epoch budget - every step (cached or measured)
+            # costs one movement; the epoch ends at exactly 95
+            warn_contract(
+                "inv", "walk.epoch_budget",
+                moves <= EPOCH_MOVEMENTS,
+                f"movement count {moves} exceeded the epoch budget",
+            )
             moves += 1
             total += 1
             if moves >= EPOCH_MOVEMENTS:
@@ -431,9 +486,21 @@ def _advance_clock(
     """CONVERGENCE: the clock doubles and the walk restarts from the
     best spot (re-evaluated at the doubled time); at the max clock
     the trek ENDS."""
+    # PRE: the clock is below max (the trek continues)
+    warn_contract(
+        "pre", "advance.below_max",
+        current_clock <= CLOCK_MAX_S,
+        f"advancing past the max clock: {current_clock}",
+    )
     if current_clock >= CLOCK_MAX_S:
         return None
     next_clock = current_clock * 2
+    # POST: the next clock is exactly double and on the ladder
+    warn_contract(
+        "post", "advance.doubled",
+        next_clock == current_clock * 2 and next_clock in _clocks(),
+        f"the next clock {next_clock} is not the double of {current_clock} on the ladder",
+    )
     fam, rung = grid.cell(best[0], best[1])
     return {
         "row": best[0],
@@ -496,6 +563,13 @@ def tier_incumbents(state_file: str = TREK_STATE_FILE) -> dict[str, dict[str, An
                 "k_quant": r.get("k_quant"),
                 "v_quant": r.get("v_quant"),
             }
+    # POST: each crown's time sits in its own tier
+    for t, v in inc.items():
+        warn_contract(
+            "post", "tier_incumbents.own_tier",
+            tier_of(v["time_s"]) == t,
+            f"the {t} crown's time {v['time_s']} is not in its tier",
+        )
     return inc
 
 
