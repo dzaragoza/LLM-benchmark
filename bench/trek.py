@@ -183,10 +183,125 @@ def load_state(state_file: str = TREK_STATE_FILE) -> dict[str, Any]:
         st = json.load(fh)
     cands = st.get("candidates", {})
     st["candidates"] = {key: _int_keys(h) for key, h in cands.items()}
+    _validate_state(st, "load")
     return st
 
 
+# THE STATE SCHEMA (the author's ruling, option 1: JSON stays, the
+# schema is the fix - the int-key bug was a schema failure, not a
+# format failure): the executable declaration of what the state IS.
+# save_state validates against it and REFUSES to write a violation
+# (the crash-rail philosophy: corrupt data never lands on disk);
+# load_state validates after the int-key normalization and refuses
+# to serve corrupt state. The schema doubles as the report's data
+# dictionary: this is what a candidate's exam history is.
+STATE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["candidates"],
+    "properties": {
+        "candidates": {
+            "type": "object",
+            # the key: 'fam|rung|k|v'
+            "additionalProperties": {
+                "type": "object",
+                # the history: level -> record. The level keys are
+                # ints in memory; JSON stringifies on disk (the
+                # loader normalizes back - the schema accepts both)
+                "additionalProperties": {
+                    "oneOf": [
+                        {  # a passed level: the time is required
+                            "type": "object",
+                            "required": ["status", "time_s"],
+                            "properties": {
+                                "status": {"const": "pass"},
+                                "time_s": {"type": "number", "minimum": 0},
+                            },
+                            "additionalProperties": False,
+                        },
+                        {  # a timeout: the budget is required
+                            "type": "object",
+                            "required": ["status", "timeout_s"],
+                            "properties": {
+                                "status": {"const": "timeout"},
+                                "timeout_s": {"type": "number", "exclusiveMinimum": 0},
+                            },
+                            "additionalProperties": False,
+                        },
+                        {  # a settled failure
+                            "type": "object",
+                            "required": ["status"],
+                            "properties": {
+                                "status": {
+                                    "enum": ["wrong answer", "out of paper", "error"]
+                                },
+                                "detail": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        },
+                        {  # the launch-failure marker (not a level)
+                            "type": "object",
+                            "required": ["status"],
+                            "properties": {
+                                "status": {"const": "failed"},
+                                "detail": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        },
+                    ]
+                },
+            },
+        },
+        "last_budget": {"type": "number"},
+        "walks": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "epoch": {"type": "integer", "minimum": 1},
+                    "position": {
+                        "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                    },
+                    "movements": {"type": "integer", "minimum": 0},
+                    "high": {"type": "integer"},
+                    "best": {
+                        "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+
+
+def _validate_state(st: dict[str, Any], where: str) -> None:
+    """the schema gate: refuse corrupt state - on SAVE (never write
+    it) and on LOAD (never serve it). The int-key normalization
+    runs FIRST (load_state), so the in-memory form always has int
+    levels and the schema's oneOf branches check the records."""
+    try:
+        import jsonschema
+    except ImportError:  # the schema is best-effort without the lib
+        return
+    try:
+        jsonschema.validate(st, STATE_SCHEMA)
+    except jsonschema.ValidationError as e:
+        raise ValueError(
+            f"the trek state fails its schema ({where}): "
+            f"{e.message} at {list(e.absolute_path)}"
+        ) from e
+
+
 def save_state(st: dict[str, Any], state_file: str = TREK_STATE_FILE) -> None:
+    """Save the state, SCHEMA-VALIDATED: a violation refuses to
+    write (corrupt data never lands on disk - the crash-rail
+    philosophy applied to the state itself)."""
+    _validate_state(st, "save")
     os.makedirs(os.path.dirname(state_file) or ".", exist_ok=True)
     with open(state_file, "w", encoding="utf-8") as fh:
         json.dump(st, fh, indent=1)
