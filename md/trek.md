@@ -28,9 +28,9 @@ you wait per level at that memory size
 | ram budget | best score | holder | patience |
 |---|---|---|---|
 | <= 1.0 GiB | 0 | MiniCPM-1B-sft IQ2_XS k=q4_1 v=q5_1 | t1 |
-| <= 2.0 GiB | 1 | SmolLM2-1.7B-Instruct IQ3_M k=q4_1 v=q5_1 | t1 |
+| <= 2.0 GiB | 1 | SmolLM2-1.7B-Instruct IQ2_M k=q5_0 v=q8_0 | t1 |
 | <= 4.0 GiB | 2 | Qwen3-1.7B IQ2_M k=q5_0 v=q4_0 | t1 |
 | <= 8.0 GiB | 2 | Qwen3-1.7B IQ2_M k=q5_0 v=q4_0 | t1 |
 | <= 16.0 GiB | 2 | Qwen3-1.7B IQ2_M k=q5_0 v=q4_0 | t1 |
 
-_5000 candidates measured, 177 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_5000 candidates measured, 178 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
