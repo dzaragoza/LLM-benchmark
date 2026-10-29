@@ -9,15 +9,15 @@ the ram column is the holder's memory TIER - the dyadic cut
 
 | patience | best score | holder | at | ram |
 |---|---|---|---|---|
-| <= 1s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 2s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 4s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 8s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 16s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 32s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 64s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 128s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
-| <= 256s | 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=q8_0 | 0s | g1 |
+| <= 1s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 2s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 4s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 8s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 16s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 32s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 64s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 128s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
+| <= 256s | 2 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=f16 | 0s | g1 |
 
 ## the score-by-ram-budget table (practitioner reporting)
 
@@ -33,4 +33,4 @@ you wait per level at that memory size
 | <= 8.0 GiB | 2 | Qwen2.5-0.5B-Instruct Q2_K k=q8_0 v=q4_1 | t1 |
 | <= 16.0 GiB | 2 | Qwen2.5-0.5B-Instruct Q2_K k=q8_0 v=q4_1 | t1 |
 
-_5000 candidates measured, 260 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
+_5000 candidates measured, 261 of 2,048 pairs swept; each pair one acquisition, the seed recorded in state._
