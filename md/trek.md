@@ -14,10 +14,10 @@ the tier's champion
 | <= 2s | - | (nothing measured yet) | - |
 | <= 4s | - | (nothing measured yet) | - |
 | <= 8s | - | (nothing measured yet) | - |
-| <= 16s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
-| <= 32s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=iq4_nl | - |
-| <= 64s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | - |
-| <= 128s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | - |
+| <= 16s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | 11.24 |
+| <= 32s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=iq4_nl | 13.48 |
+| <= 64s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | 13.48 |
+| <= 128s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | 13.48 |
 
 ## the walker (the current life)
 
@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_931 candidates measured (of 960 pairs x 7 x 7 kv = 47,040 total, 2.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_931 candidates measured (984 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.0%); the histories are the single source of truth, the tables derive on every ledger write._

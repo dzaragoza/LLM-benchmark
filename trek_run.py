@@ -728,11 +728,20 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     # log's memory breakdown; a candidate never measured at a
     # launch shows "-")
     def vram_of(fam: str, rung: str, k: str, v: str) -> str:
-        log = os.path.join("results", "trek", fam, f"exam-server-{rung}-k{k}v{v}.log")
+        """the tier holder's vulkan0 FOOTPRINT: model + kv(context) +
+        compute - what the candidate actually occupies (the device
+        'self' total includes the pre-allocated context buffer and
+        overstates the footprint)."""
+        log = os.path.join("results", "trek", fam, f"exam-server-{rung}-k{k}-v{v}.log")
         bd = llama_server.memory_breakdown_gib(log)
         if bd and bd.get("devices"):
-            dev = next(iter(bd["devices"].values()))
-            return f"{dev.get('self_gib', 0):.2f}"
+            dev = bd["devices"].get("Vulkan0") or next(iter(bd["devices"].values()))
+            fp = (
+                dev.get("model_gib", 0)
+                + dev.get("context_gib", 0)
+                + dev.get("compute_gib", 0)
+            )
+            return f"{fp:.2f}"
         return "-"
 
     lines += ["## the score-patience frontier (practitioner reporting)", ""]
@@ -831,11 +840,21 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     n_pairs = grid.n_rows * grid.n_cols
     total_cands = n_pairs * len(kv_ladder) ** 2
     pct = 100.0 * len(cands) / total_cands if total_cands else 0.0
+    # the measurements: every exam level ever recorded (a re-run at a
+    # bigger budget IS new evidence - the count that moves while the
+    # walk deepens the visited cells before widening)
+    n_levels = sum(
+        1
+        for h in cands.values()
+        for kk in h
+        if isinstance(kk, int) or (isinstance(kk, str) and kk.lstrip("-").isdigit())
+    )
     lines += [
-        f"_{len(cands):,} candidates measured (of {n_pairs:,} pairs x "
-        f"{len(kv_ladder)} x {len(kv_ladder)} kv = {total_cands:,} total, "
-        f"{pct:.1f}%); the histories are the single source of truth, "
-        "the tables derive on every ledger write._",
+        f"_{len(cands):,} candidates measured ({n_levels:,} exam levels "
+        f"recorded; a re-run at a bigger budget is new evidence) of "
+        f"{n_pairs:,} pairs x {len(kv_ladder)} x {len(kv_ladder)} kv = "
+        f"{total_cands:,} total, {pct:.1f}%); the histories are the single "
+        "source of truth, the tables derive on every ledger write._",
     ]
     with open("md/trek.md", "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
