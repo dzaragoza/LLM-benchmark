@@ -575,18 +575,37 @@ def cell_action(
     rung: str,
     kv_ladder: list[str],
 ) -> tuple[str, float]:
-    """THE CELL'S ACTION under phase A (the author's v3 spec): given
-    the pair's 49 candidate histories, what does the walker do here?
-    Returns (action, budget):
-    - ('exam', 1.0): a NEW cell (no histories) - the first exam at t=1
-    - ('exam', t*2): the cell's top result is a timeout at t - re-run
-      at the doubled budget (max 128s; at 128 it is settled)
-    - ('none', 0): the cell's top result is a fail (wrong answer /
-      out of paper / launch failure) - do nothing
-    - ('none', 0): the cell is fully settled (the top timeout is at
-      128, or the best score cannot improve) - do nothing
+    """THE CELL'S ACTION under the two-phase v3 (the author's
+    prospect/dig ruling). Returns (action, budget):
+    - ('dig', 128.0): THE DIG - the cell has ANY score > -1 (some
+      candidate answered) and still has work at t=128: the walker
+      switches immediately to the maximum time and works ALL the
+      kv combos at 128, closing the cell in one visit. As soon as
+      a candidate shows it can answer, the cell gets the maximum
+      chance to show its ceiling.
+    - ('exam', 1.0): THE PROSPECT on a NEW cell (no histories) -
+      the first exam at t=1
+    - ('exam', t*2): THE PROSPECT's escalation - the cell's top
+      result is a timeout at t (no score yet) - re-run at the
+      doubled budget, exactly as before
+    - ('none', 0): no score ever found and the cell is settled
+      (every candidate closed, or the top timeout at 128, or a
+      fail) - do nothing; the dig never started
     The 'top result' is the best candidate's frontier: the highest
     score any candidate reaches, and what stops it."""
+    # THE DIG TRIGGER (the author's phase 2): any score > -1 anywhere
+    # in the cell + any work left at the max budget -> dig at 128,
+    # closing the cell in one visit
+    best = _cell_best_score(st, fam, rung, kv_ladder, 0)
+    if best > -1:
+        any_work_at_128 = any(
+            needs_rerun(history_of(st, fam, rung, k, v), 128.0)
+            for k in kv_ladder
+            for v in kv_ladder
+        )
+        if any_work_at_128:
+            return ("dig", 128.0)
+        return ("none", 0)  # scored and fully settled at 128: done
     # THE SCORE CONVENTION (the off-by-one fix): score = the highest
     # level PASSED = the pass count - 1. A wrong answer AT level k
     # books score k-1, never k. (Found in audit: the old code booked
@@ -814,7 +833,7 @@ def walk(
         # leftover candidates resume. A COMPLETED sweep honors the
         # marker: one action per visit, no escalation loop.
         unfinished = cell_sweep_unfinished(st, fam, rung, kv_ladder)
-        if action == "exam" and ((row, col) != dispatched or unfinished):
+        if action in ("exam", "dig") and ((row, col) != dispatched or unfinished):
             # INV: THE RECORD ADVANCES ACROSS CALLS - this pick moves,
             # or advances the epoch, or respawns, or RESUMES unfinished
             # work (the legitimate repeat); anything else is a frozen
