@@ -14,10 +14,10 @@ the tier's champion
 | <= 2s | - | (nothing measured yet) | - |
 | <= 4s | - | (nothing measured yet) | - |
 | <= 8s | - | (nothing measured yet) | - |
-| <= 16s | - | (nothing measured yet) | - |
-| <= 32s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
-| <= 64s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
-| <= 128s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
+| <= 16s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
+| <= 32s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
+| <= 64s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
+| <= 128s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
 
 ## the walker (the current life)
 
@@ -36,13 +36,13 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | -1 | 941 | 0 | no (floor champion) |
-| t2 | -1 | 949 | 0.718 | no (floor champion) |
-| t4 | -1 | 952 | 1.44 | no (floor champion) |
-| t8 | -1 | 956 | 2.16 | no (floor champion) |
-| t16 | -1 | 958 | 2.88 | no (floor champion) |
-| t32 | 0 | 958 | 0.00544 | yes |
-| t64 | 0 | 960 | 0.00892 | yes |
-| t128 | 0 | 960 | 0.0129 | no |
+| t2 | -1 | 949 | 7.61 | no (floor champion) |
+| t4 | -1 | 952 | 15.2 | no (floor champion) |
+| t8 | -1 | 956 | 22.7 | no (floor champion) |
+| t16 | 1 | 957 | 0.0647 | no |
+| t32 | 1 | 958 | 0.117 | no |
+| t64 | 1 | 960 | 0.181 | no |
+| t128 | 1 | 960 | 0.257 | no |
 
 quorum: unmet; not blocked
 
