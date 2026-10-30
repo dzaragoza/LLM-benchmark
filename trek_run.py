@@ -790,11 +790,12 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     # pairs x 49 kv candidates)
     n_pairs = grid.n_rows * grid.n_cols
     total_cands = n_pairs * len(kv_ladder) ** 2
+    pct = 100.0 * len(cands) / total_cands if total_cands else 0.0
     lines += [
         f"_{len(cands):,} candidates measured (of {n_pairs:,} pairs x "
-        f"{len(kv_ladder)} x {len(kv_ladder)} kv = {total_cands:,} total); "
-        "the histories are the single source of truth, the tables "
-        "derive on every ledger write._",
+        f"{len(kv_ladder)} x {len(kv_ladder)} kv = {total_cands:,} total, "
+        f"{pct:.1f}%); the histories are the single source of truth, "
+        "the tables derive on every ledger write._",
     ]
     with open("md/trek.md", "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")

@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_931 candidates measured (of 960 pairs x 7 x 7 kv = 47,040 total); the histories are the single source of truth, the tables derive on every ledger write._
+_931 candidates measured (of 960 pairs x 7 x 7 kv = 47,040 total, 2.0%); the histories are the single source of truth, the tables derive on every ledger write._
