@@ -682,12 +682,32 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
                 rows.append({"fam": fam, "rung": rung, "k": k, "v": v,
                              "cut": cut, "score": s})
 
-    lines = ["# trek.md - the trek ledger (v2: derived from the exam histories)", ""]
+    lines = ["# trek.md - the trek ledger (v3: derived from the exam histories)", ""]
 
-    # THE SCORE-PATIENCE FRONTIER
+    # THE SCORE-PATIENCE FRONTIER: per tier the best score, its
+    # holder, and the holder's VRAM (the vulkan0 memory the
+    # candidate's own server launch used - parsed from the launch
+    # log's memory breakdown; a candidate never measured at a
+    # launch shows "-")
+    def vram_of(fam: str, rung: str, k: str, v: str) -> str:
+        log = os.path.join("results", "trek", fam, f"exam-server-{rung}-k{k}v{v}.log")
+        bd = llama_server.memory_breakdown_gib(log)
+        if bd and bd.get("devices"):
+            dev = next(iter(bd["devices"].values()))
+            return f"{dev.get('self_gib', 0):.2f}"
+        return "-"
+
     lines += ["## the score-patience frontier (practitioner reporting)", ""]
-    lines += ["the best score achievable at a patience level (the per-level", "time limit), derived from the shared exam histories", ""]
-    lines += ["| patience | best score | holder |", "|---|---|---|"]
+    lines += [
+        "the best score achievable at a patience level (the per-level",
+        "time limit), derived from the shared exam histories; the vram",
+        "column is the tier's holder's vulkan0 memory (model + kv +",
+        "compute, the candidate's own launch) - what you need to run",
+        "the tier's champion",
+        "",
+        "| patience | best score | holder | vram (GiB) |",
+        "|---|---|---|---|",
+    ]
     for cut in patience_cuts:
         best = None
         for r in rows:
@@ -696,36 +716,59 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         if best:
             lines.append(
                 f"| <= {cut:g}s | {best['score']} | "
-                f"{best['fam']} {best['rung']} k={best['k']} v={best['v']} |"
+                f"{best['fam']} {best['rung']} k={best['k']} v={best['v']} | "
+                f"{vram_of(best['fam'], best['rung'], best['k'], best['v'])} |"
             )
         else:
-            lines.append(f"| <= {cut:g}s | - | (nothing measured yet) |")
+            lines.append(f"| <= {cut:g}s | - | (nothing measured yet) | - |")
     lines.append("")
 
-    # THE WALKS' PROGRESS
-    lines += ["## the walkers (the budget ladder's progress)", ""]
-    lines += ["| budget | position | movements | high | best cell |", "|---|---|---|---|---|"]
-    for b_key, w in sorted(st.get("walks", {}).items(), key=lambda kv: float(kv[0])):
-        pos = w.get("position", "?")
-        best = w.get("best", "?")
-        best_cell = ""
-        try:
-            fam, rung = grid.cell(best[0], best[1])
-            best_cell = f"{fam} {rung}"
-        except Exception:
-            pass
-        lines.append(
-            f"| {b_key}s | {pos} | {w.get('movements', 0)} | "
-            f"{w.get('high', -1)} | {best_cell} |"
-        )
-    lines.append("")
-
-    # THE MEASURED POOL
-    n_with_scores = sum(1 for h in cands.values() if trek.score_under(h, 128.0) is not None and trek.score_under(h, 128.0) >= 0)
+    # THE STOP CONDITION'S PROGRESS (the radio): per tier the union
+    # bound's sum, the champion, and the certification state
+    lines += ["## the radio (the stop condition's progress)", ""]
+    radio_rec = st.get("radio", {})
+    tiers_rec = radio_rec.get("tiers", {})
     lines += [
-        f"_{len(cands):,} candidates measured (of 2048 pairs x 49 kv = "
-        f"{2048 * 49:,} total); the histories are the single source "
-        f"of truth, the tables derive on every ledger write._",
+        "the per-tier certification: the live cells' summed probability",
+        "of beating the tier's champion (the union bound); a tier is",
+        "certified when the sum < 0.01 AND the quorum (>= 2 cells",
+        "pooled) AND a real champion (not the floor); the * marks the",
+        "eager tier (tier 1 - its certification rests on the",
+        "support-cap assumption); '-' = not modelable (a pool empty:",
+        "keep searching)",
+        "",
+        "| tier | champion | live cells | sum p | certified |",
+        "|---|---|---|---|---|",
+    ]
+    for t in radio.TIER_LADDER:
+        rec = tiers_rec.get(str(t), {})
+        sp = rec.get("sum_p")
+        cert = "yes" if rec.get("certified") else "no"
+        if rec.get("floor_champion"):
+            cert += " (floor champion)"
+        if t == 1 and rec.get("certified"):
+            cert += " *"
+        lines.append(
+            f"| t{t} | {rec.get('champion', '-')} | {rec.get('live_units', '-')} | "
+            f"{'-' if sp is None else f'{sp:.3g}'} | {cert} |"
+        )
+    if radio_rec:
+        lines += [
+            "",
+            f"quorum: {'met' if radio_rec.get('quorum', False) else 'unmet'}; "
+            f"{'blocked (an unfinished exam)' if radio_rec.get('blocked') else 'not blocked'}",
+        ]
+    lines.append("")
+
+    # THE MEASURED POOL (the corrected count: the safe grid's 64 x 15
+    # pairs x 49 kv candidates)
+    n_pairs = grid.n_rows * grid.n_cols
+    total_cands = n_pairs * len(kv_ladder) ** 2
+    lines += [
+        f"_{len(cands):,} candidates measured (of {n_pairs:,} pairs x "
+        f"{len(kv_ladder)} x {len(kv_ladder)} kv = {total_cands:,} total); "
+        "the histories are the single source of truth, the tables "
+        "derive on every ledger write._",
     ]
     with open("md/trek.md", "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")

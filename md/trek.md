@@ -1,24 +1,45 @@
-# trek.md - the trek ledger (v2: derived from the exam histories)
+# trek.md - the trek ledger (v3: derived from the exam histories)
 
 ## the score-patience frontier (practitioner reporting)
 
 the best score achievable at a patience level (the per-level
-time limit), derived from the shared exam histories
+time limit), derived from the shared exam histories; the vram
+column is the tier's holder's vulkan0 memory (model + kv +
+compute, the candidate's own launch) - what you need to run
+the tier's champion
 
-| patience | best score | holder |
-|---|---|---|
-| <= 1s | - | (nothing measured yet) |
-| <= 2s | - | (nothing measured yet) |
-| <= 4s | - | (nothing measured yet) |
-| <= 8s | - | (nothing measured yet) |
-| <= 16s | - | (nothing measured yet) |
-| <= 32s | - | (nothing measured yet) |
-| <= 64s | - | (nothing measured yet) |
-| <= 128s | - | (nothing measured yet) |
+| patience | best score | holder | vram (GiB) |
+|---|---|---|---|
+| <= 1s | - | (nothing measured yet) | - |
+| <= 2s | - | (nothing measured yet) | - |
+| <= 4s | - | (nothing measured yet) | - |
+| <= 8s | - | (nothing measured yet) | - |
+| <= 16s | - | (nothing measured yet) | - |
+| <= 32s | - | (nothing measured yet) | - |
+| <= 64s | - | (nothing measured yet) | - |
+| <= 128s | - | (nothing measured yet) | - |
 
-## the walkers (the budget ladder's progress)
+## the radio (the stop condition's progress)
 
-| budget | position | movements | high | best cell |
+the per-tier certification: the live cells' summed probability
+of beating the tier's champion (the union bound); a tier is
+certified when the sum < 0.01 AND the quorum (>= 2 cells
+pooled) AND a real champion (not the floor); the * marks the
+eager tier (tier 1 - its certification rests on the
+support-cap assumption); '-' = not modelable (a pool empty:
+keep searching)
+
+| tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
+| t1 | -1 | 941 | 0 | no (floor champion) |
+| t2 | -1 | 950 | 0 | no (floor champion) |
+| t4 | -1 | 953 | 0 | no (floor champion) |
+| t8 | -1 | 957 | 0 | no (floor champion) |
+| t16 | -1 | 959 | 0 | no (floor champion) |
+| t32 | -1 | 960 | 0 | no (floor champion) |
+| t64 | -1 | 960 | 0 | no (floor champion) |
+| t128 | -1 | 960 | 0 | no (floor champion) |
 
-_931 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
+quorum: unmet; not blocked
+
+_931 candidates measured (of 960 pairs x 7 x 7 kv = 47,040 total); the histories are the single source of truth, the tables derive on every ledger write._
