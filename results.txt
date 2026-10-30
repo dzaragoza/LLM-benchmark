@@ -136255,3 +136255,71 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
+
+===== 2026-10-30T01:31:57 | full_benchmark.py --clean =====
+[trek] life 1, movement 5: Qwen3-8B IQ2_XS - exam at t=1s (high -1, best at [55, 5])
+  [acquire] Qwen3-8B IQ2_XS - (download/convert/quantize may take minutes)
+  [hub] listing files for Qwen/Qwen3-8B ...
+  [hub] 15 files listed
+  [2] quantizing Qwen3-8B-f16.gguf -> IQ2_XS (output hidden; shown on error)
+  [2] computing importance matrix from Qwen3-8B-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/Qwen3-8B/imatrix.log) ---
+0.00.352.994 W load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.09.126.325 I cmn          init: llama threadpool init, n_threads = 8
+0.09.126.363 I 
+0.09.126.455 I system_info: n_threads = 8 (n_threads_batch = 8) / 16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.09.126.461 I compute_imatrix: tokenizing the input ..
+0.09.196.598 I compute_imatrix: tokenization took 70.129 ms
+0.09.196.631 I compute_imatrix: computing over 119 chunks, n_ctx=512, batch_size=2048, n_seq=4
+radv/amdgpu: Not enough memory for command submission.
+0.10.679.819 E ggml_vulkan: device lost on Vulkan0
+[New LWP 1216680]
+[New LWP 1216679]
+[New LWP 1216678]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.opensuse.org/>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+0x00007feb49aa79d2 in __syscall_cancel_arch () from /lib64/libc.so.6
+#0  0x00007feb49aa79d2 in __syscall_cancel_arch () from /lib64/libc.so.6
+#1  0x00007feb49a9ab98 in __internal_syscall_cancel () from /lib64/libc.so.6
+#2  0x00007feb49a9abf1 in __syscall_cancel () from /lib64/libc.so.6
+#3  0x00007feb49b0c7db in wait4 () from /lib64/libc.so.6
+#4  0x00007feb4ad9521b in ggml_print_backtrace () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#5  0x00007feb4adaaadf in ggml_uncaught_exception() () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#6  0x00007feb49ec9adc in ?? () from /lib64/libstdc++.so.6
+#7  0x00007feb49eb6d19 in std::terminate() () from /lib64/libstdc++.so.6
+#8  0x00007feb49eb6d32 in ?? () from /lib64/libstdc++.so.6
+#9  0x00007feb41824dad in vk_queue_handle_unsynchronized::submit(vk::ArrayProxy<vk::SubmitInfo const>, vk::Fence) [clone .cold] () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#10 0x00007feb4186f890 in ggml_vk_submit(std::shared_ptr<vk_context_struct>&, vk::Fence) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#11 0x00007feb418707fc in ggml_vk_synchronize(ggml_backend_vk_context*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#12 0x00007feb41871d84 in ggml_backend_vk_synchronize(ggml_backend*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-vulkan.so
+#13 0x00007feb4adb4068 in ggml_backend_sched_copy_input(ggml_backend_sched*, ggml_backend_sched_split*, ggml_tensor*) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#14 0x00007feb4adb41f5 in ggml_backend_sched_graph_compute_async () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libggml-base.so.0
+#15 0x00007feb4a424a0b in llama_context::graph_compute(ggml_cgraph*, bool) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#16 0x00007feb4a427315 in llama_context::process_ubatch(llama_ubatch const&, llm_graph_type, llama_memory_context_i*, ggml_status&) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#17 0x00007feb4a430cd4 in llama_context::decode(llama_batch_ext const&) () from /home/daniela/technical_reports/LLM-benchmark/llama-b11669/libllama.so.0
+#18 0x0000562bf2bff25c in main ()
+[Inferior 1 (process 1216676) detached]
+terminate called after throwing an instance of 'vk::DeviceLostError'
+  what():  vk::Queue::submit: ErrorDeviceLost
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/Qwen3-8B/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
