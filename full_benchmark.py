@@ -170,12 +170,17 @@ def preflight_selfcheck() -> None:
     pool = R.the_pool()
     n_kv = len(R.KV_LADDER)
     total = len(pool) * n_kv * n_kv
-    assert len(pool) == 2048, f"the model pool must be 2048 pairs, got {len(pool)}"
+    assert len(pool) == 64 * len(LADDER), (
+        f"the model pool must be 64 x {len(LADDER)} = {64 * len(LADDER)} pairs, "
+        f"got {len(pool)} (the safe ladder reshaped the pool - update me when the truth changes)"
+    )
     assert n_kv == 7, f"the KV ladder must be 7 quants, got {n_kv}"
     assert R.PICK_BITS == 16, "the pick must be 16 bits in v3"
     fams = {f for f, _ in pool}
     assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
-    assert len(LADDER) == 32 and LADDER[-1] == "F16", "the LADDER must be 32 rungs"
+    assert len(LADDER) == 15 and LADDER[-1] == "F16", (
+        "the LADDER must be 15 rungs (the safe ladder - update me when the truth changes)"
+    )
     if os.path.isfile(R.TREK_STATE_FILE):
         with open(R.TREK_STATE_FILE, encoding="utf-8") as fh:
             st = json.load(fh)
