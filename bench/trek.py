@@ -227,7 +227,9 @@ STATE_SCHEMA: dict[str, Any] = {
                             },
                             "additionalProperties": False,
                         },
-                        {  # a settled failure
+                        {  # a settled failure (the closing budget rides
+                           # the record - the radio's attempted-bracket
+                           # evidence needs it)
                             "type": "object",
                             "required": ["status"],
                             "properties": {
@@ -235,6 +237,7 @@ STATE_SCHEMA: dict[str, Any] = {
                                     "enum": ["wrong answer", "out of paper", "error"]
                                 },
                                 "detail": {"type": "string"},
+                                "budget_s": {"type": "number", "exclusiveMinimum": 0},
                             },
                             "additionalProperties": False,
                         },
@@ -433,9 +436,11 @@ def cell_action(
       128, or the best score cannot improve) - do nothing
     The 'top result' is the best candidate's frontier: the highest
     score any candidate reaches, and what stops it."""
-    best_score = -1
-    best_stop = "fail"  # the worst case: nothing ran
-    best_budget = 1.0
+    # THE SCORE CONVENTION (the off-by-one fix): score = the highest
+    # level PASSED = the pass count - 1. A wrong answer AT level k
+    # books score k-1, never k. (Found in audit: the old code booked
+    # the failing level as the score in the timeout branch.)
+    open_caps: list[float] = []
     any_hist = False
     for k in kv_ladder:
         for v in kv_ladder:
@@ -443,37 +448,31 @@ def cell_action(
             if not h:
                 continue
             any_hist = True
-            # the candidate's frontier under its own history
-            score = 0
-            while True:
-                rec = h.get(score)
-                if rec is None:
-                    # the candidate's exam is unfinished: a re-run
-                    # would continue it - this counts as a timeout
-                    # at the last recorded budget (or 1 if fresh)
-                    return ("exam", max(1.0, _last_budget_of(h)))
-                if rec.get("status") == "pass":
-                    score += 1
-                    continue
-                if rec.get("status") == "timeout":
-                    t = rec.get("timeout_s", 1.0)
-                    if score > best_score or (score == best_score and t > best_budget):
-                        if score >= best_score:
-                            best_score = score
-                            best_budget = t
-                            best_stop = "timeout"
-                    break
-                # wrong answer / out of paper / error: settled fail
-                break
-            if score - 1 > best_score:
-                best_score = score - 1
+            # the frontier: the first non-pass level
+            level = 0
+            rec = h.get(level)
+            while rec is not None and rec.get("status") == "pass":
+                level += 1
+                rec = h.get(level)
+            if rec is None:
+                # unfinished (an interrupted exam): continue it at its
+                # last recorded budget
+                return ("exam", max(1.0, _last_budget_of(h)))
+            if rec.get("status") == "timeout":
+                open_caps.append(float(rec.get("timeout_s", 1.0)))
+            # wrong answer / out of paper / error: closed - nothing here
     if not any_hist:
-        return ("exam", 1.0)
-    if best_stop == "timeout":
-        if best_budget >= 128.0:
+        return ("exam", 1.0)  # a new cell: the first exam at t=1
+    if open_caps:
+        # THE ONE TIMEOUT SETTING (the author's rule): the cell's live
+        # candidates re-run at cap x 2 (max 128; at max, do nothing).
+        # The most-due (smallest) cap drives - a desynced cell catches
+        # up over visits, one doubling per action.
+        cap = min(open_caps)
+        if cap >= 128.0:
             return ("none", 0)  # the max budget already evaluated
-        return ("exam", min(best_budget * 2, 128.0))
-    return ("none", 0)
+        return ("exam", min(cap * 2, 128.0))
+    return ("none", 0)  # every probed candidate closed: the top result a fail
 
 
 def _last_budget_of(h: dict[int, Any]) -> float:
@@ -576,12 +575,17 @@ def walk(
         save()
 
     row, col = position
+    dispatched = tuple(ws.get("dispatched", position))
     total = 0
     while total < max_steps:
         fam, rung = grid.cell(row, col)
         action, budget = cell_action(st, fam, rung, kv_ladder)
-        if action == "exam":
-            # the cell needs exam work: hand it back to the runner
+        if action == "exam" and (row, col) != dispatched:
+            # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
+            # needs exam work and was not yet dispatched THIS visit -
+            # hand it to the runner; the phase-B radio then fires (the
+            # author's #5), and the NEXT walk() steps away from here
+            ws["dispatched"] = [row, col]
             save()
             return {
                 "row": row, "col": col, "fam": fam, "rung": rung,
@@ -590,8 +594,10 @@ def walk(
                 "life": life, "movements": movements, "draws": draws_used,
                 "reason": "evaluate",
             }
-        # NO ACTION NEEDED: apply the cell's result to the high score
-        # (the cell's best score from its histories) and move on
+        # NO ACTION NEEDED (or the action was already dispatched this
+        # visit - one action per cell): apply the cell's best settled
+        # score to the high score and move on
+        ws["dispatched"] = [-1, -1]
         cell_score = _cell_best_score(st, fam, rung, kv_ladder, budget)
         if cell_score > high:
             high = cell_score

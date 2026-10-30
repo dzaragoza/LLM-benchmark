@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench import trek
+from bench import radio, trek
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
@@ -621,11 +621,11 @@ def _run_combo(
                 if fail_reason == "timeout":
                     history[level] = {"status": "timeout", "timeout_s": budget_s}
                 elif fail_reason == "wrong answer":
-                    history[level] = {"status": "wrong answer"}
+                    history[level] = {"status": "wrong answer", "budget_s": budget_s}
                 elif fail_reason == "out of paper":
-                    history[level] = {"status": "out of paper"}
+                    history[level] = {"status": "out of paper", "budget_s": budget_s}
                 else:
-                    history[level] = {"status": "error", "detail": fail_reason[:100]}
+                    history[level] = {"status": "error", "detail": fail_reason[:100], "budget_s": budget_s}
                 break
             history[level] = {"status": "pass", "time_s": level_time}
             level += 1
@@ -786,10 +786,23 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             f"(high {pick['high']}, best at {pick['best']})"
         )
         run_pair(fam, rung, models_dir, st, port, pick["budget"])
-        # the walk state advances: the runner's exam is done, the
-        # walker's next call re-derives the action at this cell
+        # PHASE B (the author's #5): the radio fires after the sweep,
+        # when the cell's action is done. It says continue (the walk
+        # is untouched) or STOP (all 8 tiers certified - the trek is
+        # over: the champion cannot be beaten anywhere, at any tier).
+        radio_res = radio.certify(st, KV_LADDER)
+        st["radio"] = {
+            "tiers": radio_res["tiers"],
+            "all_certified": radio_res["all_certified"],
+            "blocked": radio_res["blocked"],
+        }
+        print(radio.summary(radio_res))
+        trek.save_state(st)
         write_ledger(st)  # the ledger re-derives from the histories
         n += 1
+        if radio_res["all_certified"]:
+            print("[trek] THE RADIO: all 8 tiers certified - the search ENDS")
+            break
         if on_progress is not None:
             try:
                 on_progress(n)
