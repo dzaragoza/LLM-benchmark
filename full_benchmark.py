@@ -187,6 +187,7 @@ def preflight_selfcheck() -> None:
     print(f"[preflight] the disk headroom: {free:.1f} GiB free")
 
     import bench.exam as E
+    import bench.trek as T
     from bench.roster import LADDER, roster_from_models_md
 
     # --- the grader: the flexible subsequence ---
@@ -210,6 +211,18 @@ def preflight_selfcheck() -> None:
 
     # --- the paper: the unknown-family branch ---
     assert E.bell_window({}, "no-such-family-xyz", "models") is None
+
+    # --- THE WALK CANARY (the author's ruling: cheap): the seed-1
+    # --- walk's first 20 picks on the canonical mock landscape -
+    # --- regenerated and compared against the frozen sequence. Any
+    # --- walk semantics change is a diff: the walk is the protocol's
+    # --- determinism carrier, and its behavior is pinned here.
+    canary_now = T.walk_canary_sequence()
+    assert canary_now == T.WALK_CANARY, (
+        f"the walk canary diverged - the walk semantics changed "
+        f"(regenerate WALK_CANARY if the change is intended):\n"
+        f"  was: {T.WALK_CANARY[:4]}...\n  now: {canary_now[:4]}..."
+    )
 
     # --- the roster ladder the pool is drawn from (the safe ladder:
     # --- 15 classic K-quant rungs, F16 last - the imatrix rungs cut) ---

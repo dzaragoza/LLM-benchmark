@@ -86,6 +86,56 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # THE CANDIDATE-DETERMINISTIC EXAM SEED: the same candidate always
 # gets the same exam instance (the same levels, the same papers) -
 # the histories are reproducible and shared across walkers/seeds
+# THE WALK CANARY (the author's ruling: cheap): the seed-1 walk's
+# first 20 picks on the canonical mock landscape (every candidate of
+# every picked cell times out at the picked budget - the pure-walk
+# shape). The preflight regenerates this and compares: any walk
+# semantics change (the spawn, the dispatch, the budget escalation,
+# the one-action rule, the movement accounting) shows as a sequence
+# diff - the pin bug, the spawn off-by-one, and the dispatch-default
+# bug would ALL have been canary diffs. Stored as [row, col,
+# movements, budget] tuples.
+WALK_CANARY: list[list] = [
+    [55, 1, 0, 1.0], [55, 2, 1, 1.0], [56, 2, 2, 1.0], [57, 2, 3, 1.0],
+    [56, 2, 4, 2.0], [55, 2, 5, 2.0], [55, 3, 6, 1.0], [54, 3, 7, 1.0],
+    [53, 3, 8, 1.0], [54, 3, 9, 2.0], [54, 4, 10, 1.0], [54, 5, 11, 1.0],
+    [55, 5, 12, 1.0], [55, 4, 13, 1.0], [54, 4, 14, 2.0], [55, 4, 15, 2.0],
+    [54, 4, 16, 4.0], [54, 3, 17, 4.0], [53, 3, 18, 2.0], [53, 4, 19, 1.0],
+]
+
+
+def walk_canary_sequence() -> list[list]:
+    """Regenerate the canary: the seed-1 walk's first 20 picks on the
+    canonical mock landscape (deterministic - the same code gives the
+    same sequence). Compared against WALK_CANARY by the preflight."""
+    grid = Grid()
+    kv7 = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
+    st: dict[str, Any] = {"candidates": {}, "walk": {}}
+    seq: list[list] = []
+    for _ in range(20):
+        p = walk(st, 1)
+        if p is None:
+            break
+        if p["reason"] == "ended":
+            ws = st.setdefault("walk", {})
+            ws["life"] = ws.get("life", 1) + 1
+            ws["position"] = [-1, -1]
+            ws["movements"] = 0
+            ws["high"] = -1
+            ws["spawn_targets"] = []
+            ws["dispatched"] = [-1, -1]
+            continue
+        f, r = grid.cell(p["row"], p["col"])
+        for k in kv7:
+            for v in kv7:
+                st["candidates"].setdefault(cand_key(f, r, k, v), {})[0] = {
+                    "status": "timeout",
+                    "timeout_s": p["budget"],
+                }
+        seq.append([p["row"], p["col"], p["movements"], p["budget"]])
+    return seq
+
+
 # THE EXAM SEED (the author's correction): the exam seed counts
 # exam REPETITIONS - we run each exam ONCE, so the seed is ALWAYS 1.
 # The exam INSTANCE is still candidate-deterministic: the papers
@@ -700,7 +750,33 @@ def walk(
 
     epoch_budget = epoch_movements(grid)
 
+    # THE TRANSITION CONTRACTS' BASELINE: the record as of this
+    # walk() call's ENTRY - the advance is measured ACROSS calls
+    # (per pick), never between the in-call saves (the spawn's save
+    # and the dispatch's save legitimately repeat values within one
+    # call - the first-call false positive, caught in verification).
+    entry_record = {
+        "life": ws.get("life"),
+        "movements": ws.get("movements"),
+        "position": list(ws["position"]) if "position" in ws else None,
+        "high": ws.get("high"),
+    }
+
     def save() -> None:
+        # INV: movements within the epoch budget, never negative
+        warn_contract(
+            "inv", "walk.movements_in_budget",
+            0 <= movements <= epoch_budget,
+            f"movements {movements} outside [0, {epoch_budget}]",
+        )
+        # INV: the high score never decreases within a life
+        if life == entry_record.get("life") and entry_record.get("high") is not None:
+            warn_contract(
+                "inv", "walk.high_monotone",
+                high >= entry_record["high"],
+                f"the high score decreased within a life "
+                f"({entry_record['high']} -> {high})",
+            )
         ws["life"] = life
         ws["position"] = list(position)
         ws["movements"] = movements
@@ -739,6 +815,24 @@ def walk(
         # marker: one action per visit, no escalation loop.
         unfinished = cell_sweep_unfinished(st, fam, rung, kv_ladder)
         if action == "exam" and ((row, col) != dispatched or unfinished):
+            # INV: THE RECORD ADVANCES ACROSS CALLS - this pick moves,
+            # or advances the epoch, or respawns, or RESUMES unfinished
+            # work (the legitimate repeat); anything else is a frozen
+            # walk - the pin bug's signature (the same cell, the same
+            # movement, dispatched again with no resume to do).
+            entry_pos = entry_record.get("position")
+            same_cell_as_entry = entry_pos == [row, col]
+            nothing_advanced = (
+                movements == entry_record.get("movements")
+                and life == entry_record.get("life")
+            )
+            warn_contract(
+                "inv", "walk.record_advances",
+                not (same_cell_as_entry and nothing_advanced and not unfinished),
+                "the walk record did not advance - a frozen walk "
+                "(the same cell re-dispatched at the same movement, "
+                "no unfinished work: the pin bug's signature)",
+            )
             # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
             # needs exam work and was not yet dispatched THIS visit -
             # hand it to the runner; the phase-B radio then fires (the
