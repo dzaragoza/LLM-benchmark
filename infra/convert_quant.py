@@ -60,6 +60,19 @@ IMATRIX_RUNGS = {
 IMATRIX_CORPUS = "./data/imatrix-corpus.txt"
 
 
+def _device_lost(log: str) -> bool:
+    """the vulkan device-lost signature in a tool's log (the RADV
+    OOM path: 'Not enough memory for command submission' ->
+    'device lost on Vulkan0'). Used by the imatrix retry - a
+    transient driver failure deserves one retry, a persistent tool
+    failure does not."""
+    try:
+        with open(log, errors="replace") as fh:
+            return "device lost" in fh.read()
+    except OSError:
+        return False
+
+
 def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
     """Build the family's importance matrix once (from the f16, with the
     repo corpus as calibration text) and return its path. llama-imatrix
@@ -103,13 +116,25 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
         f"  [2] computing importance matrix from {os.path.basename(f16)} "
         "(output hidden; shown on error)"
     )
-    rc = run_quiet(
-        [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl"],
-        log,
-        2,
-        "imatrix",
-        "llama-imatrix run",
-    )
+    # THE GENTLE IMATRIX (the vulkan guard): the default submission
+    # (batch 2048 x 4 seqs) trips RADV's 'Not enough memory for
+    # command submission' -> device lost -> the machine can crash.
+    # A quarter of the batch (512) keeps the command buffers small -
+    # the imatrix quality is a per-tensor statistic, insensitive to
+    # the batch shape.
+    def imatrix_cmd() -> list[str]:
+        return [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl",
+                "--batch-size", "512"]
+
+    rc = run_quiet(imatrix_cmd(), log, 2, "imatrix", "llama-imatrix run")
+    if rc != 0 and _device_lost(log):
+        # THE DEVICE-LOST RETRY: a transient driver OOM (the common
+        # case on the iGPU) - one gentle retry after the device
+        # settles; a persistent failure fails as before
+        print("  [2] imatrix: device lost (a transient driver OOM) - retrying once")
+        if os.path.isfile(out):
+            os.remove(out)  # a partial imatrix is never trusted
+        rc = run_quiet(imatrix_cmd(), log, 2, "imatrix", "llama-imatrix run (retry)")
     if rc != 0 or not os.path.isfile(out):
         fail(2, "imatrix", f"llama-imatrix failed (full log: {log})", GUIDE[2])
     return out
