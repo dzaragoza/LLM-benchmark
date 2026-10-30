@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 42 of 78 in the epoch; high -1, best at Qwen3-8B Q3_K_S
+life 1: movement 43 of 78 in the epoch; high -1, best at Qwen3-8B Q3_K_S
 
 ## the radio (the stop condition's progress)
 
@@ -39,8 +39,8 @@ keep searching)
 | t2 | -1 | 950 | 0 | no (floor champion) |
 | t4 | -1 | 953 | 0 | no (floor champion) |
 | t8 | -1 | 957 | 0 | no (floor champion) |
-| t16 | -1 | 959 | 0 | no (floor champion) |
-| t32 | -1 | 960 | 0 | no (floor champion) |
+| t16 | -1 | 958 | 0 | no (floor champion) |
+| t32 | -1 | 959 | 0 | no (floor champion) |
 | t64 | -1 | 960 | 0 | no (floor champion) |
 | t128 | -1 | 960 | 0 | no (floor champion) |
 
