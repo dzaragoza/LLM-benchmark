@@ -898,7 +898,6 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             ws["position"] = [-1, -1]  # the spawn
             ws["movements"] = 0
             ws["high"] = -1
-            ws["spawn_targets"] = []
             trek.save_state(st)
             continue
         fam, rung = pick["fam"], pick["rung"]

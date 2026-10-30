@@ -122,7 +122,6 @@ def walk_canary_sequence() -> list[list]:
             ws["position"] = [-1, -1]
             ws["movements"] = 0
             ws["high"] = -1
-            ws["spawn_targets"] = []
             ws["dispatched"] = [-1, -1]
             continue
         f, r = grid.cell(p["row"], p["col"])
@@ -749,7 +748,13 @@ def walk(
     high = ws.get("high", -1)
     best = tuple(ws.get("best", position))
     draws_used = ws.get("draws", 0)
-    spawn_high_targets = [tuple(t) for t in ws.get("spawn_targets", [])]
+    # THE EPOCH START (the death rule's baseline): the cell where
+    # the current epoch began - the spawn cell or the last teleport
+    # target. Persisted (a resume mid-epoch must know it); replaces
+    # the retired spawn_targets list.
+    epoch_start: tuple[int, int] | None = (
+        tuple(ws["epoch_start"]) if "epoch_start" in ws else None
+    )
     # PRE (phase a): the spawn at (-1,-1) is LEGAL for every life -
     # each new walker spawns at a random position (the v3 ruling) -
     # but the HIGH SCORE must reset with it: a spawned life never
@@ -779,6 +784,7 @@ def walk(
         "movements": ws.get("movements"),
         "position": list(ws["position"]) if "position" in ws else None,
         "high": ws.get("high"),
+        "best": list(ws["best"]) if "best" in ws else None,
     }
 
     def save() -> None:
@@ -802,7 +808,8 @@ def walk(
         ws["high"] = high
         ws["best"] = list(best)
         ws["draws"] = draws_used
-        ws["spawn_targets"] = [list(t) for t in spawn_high_targets]
+        if epoch_start is not None:
+            ws["epoch_start"] = list(epoch_start)
 
     if position == (-1, -1):
         # THE SPAWN IS A TELEPORT, NOT A MOVEMENT (the author's
@@ -814,6 +821,7 @@ def walk(
         high = -1
         best = position
         movements = 0  # the teleport: free
+        epoch_start = position
         save()
 
     row, col = position
@@ -893,14 +901,22 @@ def walk(
                 "walk.exact_movements",
                 movements == epoch_budget,
                 f"the epoch ended at {movements} movements, expected exactly {epoch_budget}",
-            )
-            # THE LIFE ENDS: teleport to the high-score cell
-            if best in spawn_high_targets:
-                # no improvement in this life: the spawn's walk ENDS
+            )            # THE DEATH RULE (the author's corrected spec): the
+            # walker dies when the teleport returns to the cell the
+            # EPOCH STARTED FROM - the epoch found nothing better
+            # than its own start. The epoch's start is the entry
+            # record's best (the walk record's best at call entry =
+            # where this epoch began); the strict-improvement update
+            # makes the target chain monotone, so the accumulated
+            # spawn-targets list of the old rule was redundant
+            # machinery (a repeated target anywhere implies this
+            # local condition fires at the same epoch or earlier).
+            if best == epoch_start:
+                # the teleport goes home to the epoch's start: the
+                # life ENDS - a new walker spawns at random
                 save()
                 return {
-                    "row": best[0],
-                    "col": best[1],
+                    "row": best[0], "col": best[1],
                     "fam": grid.cell(best[0], best[1])[0],
                     "rung": grid.cell(best[0], best[1])[1],
                     "action": "none",
@@ -912,9 +928,10 @@ def walk(
                     "draws": draws_used,
                     "reason": "ended",
                 }
-            spawn_high_targets.append(best)
             row, col = best
+            position = (row, col)
             movements = 0
+            epoch_start = (row, col)
             save()
             continue
         # DRAW A DIRECTION AND STEP (blocked: redraw)
