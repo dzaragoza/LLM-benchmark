@@ -15,9 +15,9 @@ the tier's champion
 | <= 4s | - | (nothing measured yet) | - |
 | <= 8s | - | (nothing measured yet) | - |
 | <= 16s | - | (nothing measured yet) | - |
-| <= 32s | - | (nothing measured yet) | - |
-| <= 64s | - | (nothing measured yet) | - |
-| <= 128s | - | (nothing measured yet) | - |
+| <= 32s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
+| <= 64s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
+| <= 128s | 0 | Qwen3-8B Q2_K k=q4_1 v=q5_0 | - |
 
 ## the walker (the current life)
 
@@ -36,13 +36,13 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | -1 | 941 | 0 | no (floor champion) |
-| t2 | -1 | 950 | 0 | no (floor champion) |
-| t4 | -1 | 953 | 0 | no (floor champion) |
-| t8 | -1 | 957 | 0 | no (floor champion) |
-| t16 | -1 | 958 | 0 | no (floor champion) |
-| t32 | -1 | 959 | 0 | no (floor champion) |
-| t64 | -1 | 960 | 0 | no (floor champion) |
-| t128 | -1 | 960 | 0 | no (floor champion) |
+| t2 | -1 | 950 | 0.809 | no (floor champion) |
+| t4 | -1 | 953 | 1.62 | no (floor champion) |
+| t8 | -1 | 957 | 2.43 | no (floor champion) |
+| t16 | -1 | 958 | 3.25 | no (floor champion) |
+| t32 | 0 | 958 | 0.00689 | yes |
+| t64 | 0 | 960 | 0.0112 | no |
+| t128 | 0 | 960 | 0.0162 | no |
 
 quorum: unmet; not blocked
 
