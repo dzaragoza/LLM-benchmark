@@ -36,13 +36,13 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | -1 | 941 | 0 | no (floor champion) |
-| t2 | -1 | 949 | 21.4 | no (floor champion) |
-| t4 | -1 | 952 | 42.4 | no (floor champion) |
-| t8 | -1 | 956 | 63 | no (floor champion) |
-| t16 | 1 | 957 | 11.7 | no |
-| t32 | 3 | 957 | 0.55 | no |
-| t64 | 3 | 960 | 0.855 | no |
-| t128 | 3 | 960 | 1.22 | no |
+| t2 | -1 | 949 | 29.5 | no (floor champion) |
+| t4 | -1 | 952 | 58.2 | no (floor champion) |
+| t8 | -1 | 956 | 86.2 | no (floor champion) |
+| t16 | 1 | 957 | 27.4 | no |
+| t32 | 3 | 957 | 1.91 | no |
+| t64 | 3 | 959 | 2.86 | no |
+| t128 | 3 | 960 | 4.04 | no |
 
 quorum: unmet; not blocked
 
