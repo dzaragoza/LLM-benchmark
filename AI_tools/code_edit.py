@@ -245,27 +245,157 @@ def _check_markdown(src: str, out: str, path: str) -> None:
         )
 
 
+def _selftest() -> int:
+    """code_edit's own gate suite (python3 AI_tools/code_edit.py
+    --selftest): the incident cases from the tool's history, run
+    against the LIVE gates - a gate change verifies here, never by
+    a hand-rolled harness. Returns the failure count (0 = clean)."""
+    import tempfile
+
+    fails = 0
+
+    def check(label: str, ok: bool) -> None:
+        nonlocal fails
+        print(f"[{'OK' if ok else 'FAIL'}] {label}")
+        if not ok:
+            fails += 1
+
+    def try_edit(content: str, blocks: list, want: str) -> bool:
+        tmp = tempfile.mktemp(suffix=".py")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        got = "accepted"
+        try:
+            edit(tmp, blocks)
+        except CodeEditError:
+            got = "refused"
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        return got == want
+
+    # THE SEAM GATE: the session-41 incident
+    check(
+        "seam: the real glued seam refused",
+        try_edit(
+            "def f(x):\n    if x:\n        return helper(x)\n    # c\n    y = 2\n    return y\n",
+            [("replace", "return helper(x)\n    # c",
+              "return helper(x)        # c")],
+            "refused",
+        ),
+    )
+    # THE SELF-MATCH: prose describing a seam is not a violation
+    check(
+        "seam: prose describing a seam accepted",
+        try_edit(
+            '"""a return immediately followed by an interior space run\n'
+            'and a comment marker - documentation, not a violation."""\n'
+            "def g(x):\n    return x  # fine\n",
+            [("replace", "return x  # fine", "return x + 1  # fine")],
+            "accepted",
+        ),
+    )
+    # THE LEGAL INLINE COMMENT
+    check(
+        "seam: the legal inline comment accepted",
+        try_edit(
+            "def k(x):\n    return x  # fine\n",
+            [("replace", "return x  # fine", "return x + 3  # fine")],
+            "accepted",
+        ),
+    )
+    # THE AST GATE: an edit breaking the syntax refused
+    check(
+        "ast: a syntax-breaking edit refused",
+        try_edit(
+            "def a(x):\n    return x\n",
+            [("replace", "return x", "return x '")],
+            "refused",
+        ),
+    )
+    # THE UNIQUENESS: a duplicate target refused
+    check(
+        "uniqueness: a duplicate target refused",
+        try_edit(
+            "def b(x):\n    return x\n\n\ndef c(x):\n    return x\n",
+            [("replace", "return x", "return x + 1")],
+            "refused",
+        ),
+    )
+    # THE WRITE ROUND-TRIP: a legal edit lands and reads back
+    tmp = tempfile.mktemp(suffix=".py")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write("def d(x):\n    return 41\n")
+    edit(tmp, [("replace", "return 41", "return 42")])
+    with open(tmp, encoding="utf-8") as fh:
+        check("write: the edit lands and reads back", "return 42" in fh.read())
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    return fails
+
+
+def _code_line_numbers(src: str) -> set[int]:
+    """The physical line numbers that carry real CODE - computed by
+    tokenize: a line is CODE iff at least one token STARTS on it that
+    is neither a string literal, nor a comment, nor pure whitespace
+    bookkeeping (NL/NEWLINE/INDENT/DEDENT/ENCODING). Everything else
+    is PROSE: a docstring's interior, a comment, a blank line.
+
+    The self-match lesson (the raw-scan flaw): a gate that scans raw
+    text flags its own documentation DESCRIBING the violation, and
+    false-positives legal multi-line constructs; tokenize draws the
+    line between prose and code, and only code can violate. A glued
+    seam always carries code tokens (the return/raise statement
+    itself), so the gate loses nothing by skipping prose."""
+    import io
+    import tokenize as _tk
+
+    code: set[int] = set()
+    try:
+        for tok in _tk.generate_tokens(io.StringIO(src).readline):
+            if tok.type in (
+                _tk.STRING,
+                _tk.COMMENT,
+                _tk.NL,
+                _tk.NEWLINE,
+                _tk.INDENT,
+                _tk.DEDENT,
+                _tk.ENCODING,
+            ):
+                continue
+            code.add(tok.start[0])
+    except _tk.TokenError:
+        # untokenizable (the ast gate catches real breakage); treat
+        # every line as code - the raw scan, never a silent skip
+        return set(range(1, src.count("\n") + 2))
+    return code
+
+
 def _check_replacement_seam(out: str, path: str) -> None:
     """The seam gate (the session-41 incident): a replace whose old
     text was written against a pre-format structure can, via the
     whitespace-flexible rescue, splice its new text across a line
     boundary - gluing a return/raise onto the following line's
-    content - e.g. a return immediately followed by an interior
-    space run and a comment marker - a result that PARSES (the ast
-    gate stays silent) but derails the
-    block structure. The signature: a balanced-paren line whose
+    content (a return immediately followed by an interior space run
+    and a comment marker or statement keyword) - a result that
+    PARSES (the ast gate stays silent) but derails the block
+    structure. The signature: a balanced-paren line whose
     return/raise/break/continue statement is followed by 4+ interior
     spaces and a comment marker or a statement keyword - two
-    statements where one should be. Refuses with the merged lines;
-    the fix is a fresh anchor after re-reading the region."""
+    statements where one should be. The scan is CODE-ONLY (the
+    self-match fix: prose cannot violate); refuses with the merged
+    lines; the fix is a fresh anchor after re-reading the region."""
     if _file_type(path) != "python":
         return
-    merged = []
     _SEAM_PAT = (
         r"\b(return|raise|break|continue)\b"
         r".*\S\s{4,}(?:#|def |class |if |for |while |with |assert )"
     )
-    for ln in out.split("\n"):
+    code_lines = _code_line_numbers(out)
+    merged = []
+    for ln_no, ln in enumerate(out.split("\n"), start=1):
+        if ln_no not in code_lines:
+            continue  # prose (a string interior, a comment): never a seam
         m = re.search(_SEAM_PAT, ln)
         if m and ln.count("(") == ln.count(")"):
             merged.append(ln)
@@ -1327,6 +1457,12 @@ def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+
+    if len(_sys.argv) > 1 and _sys.argv[1] == "--selftest":
+        _rc = _selftest()
+        print("\n" + ("ALL GATE TESTS PASS" if _rc == 0 else f"{_rc} FAILURES"))
+        raise SystemExit(1 if _rc else 0)
     import argparse
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
