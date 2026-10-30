@@ -136355,3 +136355,37 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
+
+===== 2026-10-30T01:32:56 | full_benchmark.py --clean =====
+[trek] life 1, movement 7: granite-3.3-8b-instruct IQ2_S - exam at t=1s (high -1, best at [55, 5])
+  [acquire] granite-3.3-8b-instruct IQ2_S - (download/convert/quantize may take minutes)
+  [hub] listing files for ibm-granite/granite-3.3-8b-instruct ...
+  [hub] 15 files listed
+  [1] downloading safetensors from ibm-granite/granite-3.3-8b-instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] converting safetensors -> f16 (pinned converter; output hidden; shown on error)
+  [2] safetensors-source deleted (the f16 is the quant source from here)
+  [2] quantizing granite-3.3-8b-instruct-f16.gguf -> IQ2_S (output hidden; shown on error)
+  [2] computing importance matrix from granite-3.3-8b-instruct-f16.gguf (output hidden; shown on error)
+
+--- output of the failed llama-imatrix run (full log: models/granite-3.3-8b-instruct/imatrix.log) ---
+radv/amdgpu: Not enough memory for command submission.
+0.04.899.905 E ggml_vulkan: device lost on Vulkan0
+0.04.952.535 E llama_model_load: error loading model: vk::Queue::submit: ErrorDeviceLost
+0.04.952.544 E llama_model_load_from_file_impl: failed to load model
+0.04.952.550 E cmn  common_init_: failed to load model 'models/granite-3.3-8b-instruct/granite-3.3-8b-instruct-f16.gguf'
+0.04.952.552 E main : failed to init
+
+--- end of tool output ---
+
+============================================================
+PHASE 2 FAILED at imatrix: llama-imatrix failed (full log: models/granite-3.3-8b-instruct/imatrix.log)
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
