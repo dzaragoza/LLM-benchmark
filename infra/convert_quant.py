@@ -116,6 +116,7 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
         f"  [2] computing importance matrix from {os.path.basename(f16)} "
         "(output hidden; shown on error)"
     )
+
     # THE GENTLE IMATRIX (the vulkan guard): the default submission
     # (batch 2048 x 4 seqs) trips RADV's 'Not enough memory for
     # command submission' -> device lost -> the machine can crash.
@@ -123,8 +124,7 @@ def ensure_imatrix(fam: str, famdir: str, f16: str) -> str | None:
     # the imatrix quality is a per-tensor statistic, insensitive to
     # the batch shape.
     def imatrix_cmd() -> list[str]:
-        return [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl",
-                "--batch-size", "512"]
+        return [IMATRIX_BIN, "-m", f16, "-f", txt, "-o", out, "--no-ppl", "--batch-size", "512"]
 
     rc = run_quiet(imatrix_cmd(), log, 2, "imatrix", "llama-imatrix run")
     if rc != 0 and _device_lost(log):

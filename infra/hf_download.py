@@ -360,6 +360,7 @@ def local_rung(famdir: str, rung: str) -> str | None:
     f = find_rung_file(os.listdir(famdir), rung)
     return os.path.join(famdir, f) if f else None
 
+
 def is_valid_gguf(path: str) -> bool:
     """THE MAGIC CHECK: a real GGUF starts with the 'GGUF' magic.
     A partially-written file (an interrupted quantization - the

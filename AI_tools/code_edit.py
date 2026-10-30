@@ -250,8 +250,9 @@ def _check_replacement_seam(out: str, path: str) -> None:
     text was written against a pre-format structure can, via the
     whitespace-flexible rescue, splice its new text across a line
     boundary - gluing a return/raise onto the following line's
-    content ('return _advance_clock(...)        # PRE: ...') - a
-    result that PARSES (the ast gate stays silent) but derails the
+    content - e.g. a return immediately followed by an interior
+    space run and a comment marker - a result that PARSES (the ast
+    gate stays silent) but derails the
     block structure. The signature: a balanced-paren line whose
     return/raise/break/continue statement is followed by 4+ interior
     spaces and a comment marker or a statement keyword - two
@@ -260,19 +261,19 @@ def _check_replacement_seam(out: str, path: str) -> None:
     if _file_type(path) != "python":
         return
     merged = []
+    _SEAM_PAT = (
+        r"\b(return|raise|break|continue)\b"
+        r".*\S\s{4,}(?:#|def |class |if |for |while |with |assert )"
+    )
     for ln in out.split("\n"):
-        m = re.search(
-            r"\b(return|raise|break|continue)\b.*\S\s{4,}(?:#|def |class |if |for |while |with |assert )",
-            ln,
-        )
+        m = re.search(_SEAM_PAT, ln)
         if m and ln.count("(") == ln.count(")"):
             merged.append(ln)
     if merged:
         raise CodeEditError(
             f"{path}: the replacement SEAM is broken - a statement is "
             f"glued to the following line (a stale anchor after a format "
-            f"pass; re-read the region and re-aim):\n"
-            + "\n".join(merged[:3])
+            f"pass; re-read the region and re-aim):\n" + "\n".join(merged[:3])
         )
 
 

@@ -25,8 +25,6 @@ raise, so a partial session's contract health is inspectable.
 
 from __future__ import annotations
 
-import sys
-
 # the session's violation count, by tag
 CONTRACT_VIOLATIONS: dict[str, int] = {}
 

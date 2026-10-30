@@ -71,10 +71,20 @@ def _curve(h: dict[int, Any]) -> tuple[str, float, int, list[float], float]:
             times.append(float(rec.get("time_s", 0.0)))
             continue
         if status == "timeout":
-            return ("open", float(rec.get("timeout_s", 1.0)), len(times) - 1, times,
-                    float(rec.get("timeout_s", 1.0)))
-        return ("closed", float(rec.get("budget_s", 1.0)), len(times) - 1, times,
-                float(rec.get("budget_s", 1.0)))
+            return (
+                "open",
+                float(rec.get("timeout_s", 1.0)),
+                len(times) - 1,
+                times,
+                float(rec.get("timeout_s", 1.0)),
+            )
+        return (
+            "closed",
+            float(rec.get("budget_s", 1.0)),
+            len(times) - 1,
+            times,
+            float(rec.get("budget_s", 1.0)),
+        )
 
 
 def _tier_score(times: list[float], t: int) -> int:
@@ -114,7 +124,9 @@ class _Tail:
         self.suf = suf
         # ACCEPTANCE 1: every convolution row sums to 1
         warn_contract(
-            "inv", "radio.row_sums_1", abs(suf[0] - 1.0) < 1e-9,
+            "inv",
+            "radio.row_sums_1",
+            abs(suf[0] - 1.0) < 1e-9,
             f"the convolution row sums to {suf[0]!r}, not 1",
         )
 
@@ -204,7 +216,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
 
     # the precomputed rows: D_rows[d] = the distribution of the sum of
     # d D-draws; U_rows[d] = g from G + d D-draws. d = 0 needs no pool.
-    D_tails: list[_Tail | None] = [ _Tail({0: 1.0}) ]
+    D_tails: list[_Tail | None] = [_Tail({0: 1.0})]
     if D_dist is not None:
         row = {0: 1.0}
         for _ in range(MAX_D):
@@ -241,7 +253,8 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                 groups[("unknown", -1, int(round(math.log2(t))))] += 1
         # EDGE: a live unit's known score cannot exceed the champion
         warn_contract(
-            "inv", "radio.score_le_champion",
+            "inv",
+            "radio.score_le_champion",
             all(s <= C[t] for (_kind, s, _d) in groups),
             f"a live unit's known score exceeds the champion C[{t}]={C[t]}",
         )
@@ -276,9 +289,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
         # tiers certified at C = -1). A tier certifies only when its
         # champion is a REAL measured score - at least one level
         # passed somewhere at that tier.
-        certified = (
-            modelable and quorum and C[t] >= 0 and total < CERTIFY_EPS
-        )
+        certified = modelable and quorum and C[t] >= 0 and total < CERTIFY_EPS
         tiers[str(t)] = {
             "champion": C[t],
             "live_units": sum(groups.values()),

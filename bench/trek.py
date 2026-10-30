@@ -65,16 +65,17 @@ TREK_STATE_FILE = "state/trek-state.json"
 _EPOCH_MOVEMENTS: int | None = None
 
 
-def epoch_movements(grid: "Grid") -> int:
+def epoch_movements(grid: Grid) -> int:
     """the walker's movement budget per epoch: n_rows + n_cols - 1,
     derived from the grid's dimensions (the author's encoding)."""
     return grid.n_rows + grid.n_cols - 1
 
 
-def epoch_evaluations(grid: "Grid") -> int:
+def epoch_evaluations(grid: Grid) -> int:
     """the evaluations per epoch (the spawn cell + the steps):
     n_rows + n_cols - derived from the grid's dimensions."""
     return grid.n_rows + grid.n_cols
+
 
 # the four directions: (row_step, col_step) - no diagonals
 DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -119,7 +120,11 @@ def _param_of(fam: str) -> float:
         with open(path, encoding="utf-8") as fh:
             for ln in fh:
                 cells = [c.strip() for c in ln.strip().strip("|").split("|")]
-                if len(cells) >= 5 and cells[0] == fam and cells[1] not in ("params", "", "unknown"):
+                if (
+                    len(cells) >= 5
+                    and cells[0] == fam
+                    and cells[1] not in ("params", "", "unknown")
+                ):
                     try:
                         return float(cells[1])
                     except ValueError:
@@ -138,13 +143,38 @@ def _models_sorted() -> list[str]:
 
 def _bpw(rung: str) -> float:
     BPW = {
-        "F16": 16.0, "Q8_0": 8.5, "Q6_K": 6.56, "Q5_K_M": 5.69, "Q5_K_S": 5.54,
-        "Q5_1": 5.63, "Q5_0": 5.54, "Q4_K_M": 4.85, "Q4_K_S": 4.58, "Q4_1": 5.0,
-        "Q4_0": 4.55, "IQ4_NL": 4.5, "IQ4_XS": 4.25, "Q3_K_L": 3.91, "Q3_K_M": 3.91,
-        "Q3_K_S": 3.5, "IQ3_M": 3.66, "IQ3_S": 3.44, "IQ3_XS": 3.3, "IQ3_XXS": 3.06,
-        "Q2_K": 3.35, "Q2_K_S": 3.0, "IQ2_M": 2.7, "IQ2_S": 2.5, "IQ2_XS": 2.31,
-        "IQ2_XXS": 2.06, "Q2_0": 3.35, "Q1_0": 1.68, "IQ1_M": 1.75, "IQ1_S": 1.56,
-        "TQ1_0": 1.5, "TQ2_0": 2.0,
+        "F16": 16.0,
+        "Q8_0": 8.5,
+        "Q6_K": 6.56,
+        "Q5_K_M": 5.69,
+        "Q5_K_S": 5.54,
+        "Q5_1": 5.63,
+        "Q5_0": 5.54,
+        "Q4_K_M": 4.85,
+        "Q4_K_S": 4.58,
+        "Q4_1": 5.0,
+        "Q4_0": 4.55,
+        "IQ4_NL": 4.5,
+        "IQ4_XS": 4.25,
+        "Q3_K_L": 3.91,
+        "Q3_K_M": 3.91,
+        "Q3_K_S": 3.5,
+        "IQ3_M": 3.66,
+        "IQ3_S": 3.44,
+        "IQ3_XS": 3.3,
+        "IQ3_XXS": 3.06,
+        "Q2_K": 3.35,
+        "Q2_K_S": 3.0,
+        "IQ2_M": 2.7,
+        "IQ2_S": 2.5,
+        "IQ2_XS": 2.31,
+        "IQ2_XXS": 2.06,
+        "Q2_0": 3.35,
+        "Q1_0": 1.68,
+        "IQ1_M": 1.75,
+        "IQ1_S": 1.56,
+        "TQ1_0": 1.5,
+        "TQ2_0": 2.0,
     }
     return BPW.get(rung, 8.0)
 
@@ -172,7 +202,8 @@ class Grid:
             for col in range(self.n_cols):
                 self._idx_to_cell[self.pool_index(row, col)] = (row, col)
         warn_contract(
-            "post", "grid.dimensions",
+            "post",
+            "grid.dimensions",
             self.n_rows == 64 and self.n_cols == len(LADDER),
             f"the grid is {self.n_rows}x{self.n_cols}, expected 64x{len(LADDER)}",
         )
@@ -181,14 +212,16 @@ class Grid:
         # epoch ends at exactly n_rows + n_cols - 1 movements with
         # n_rows + n_cols evaluations behind it
         warn_contract(
-            "inv", "grid.epoch_derives",
+            "inv",
+            "grid.epoch_derives",
             epoch_movements(self) == self.n_rows + self.n_cols - 1
             and epoch_evaluations(self) == self.n_rows + self.n_cols,
             f"the epoch budgets do not derive from the grid "
             f"({epoch_movements(self)} movements, {epoch_evaluations(self)} evaluations)",
         )
         warn_contract(
-            "post", "grid.models_param_sorted",
+            "post",
+            "grid.models_param_sorted",
             all(
                 _param_of(self.models[i]) <= _param_of(self.models[i + 1])
                 for i in range(len(self.models) - 1)
@@ -216,7 +249,9 @@ def _int_keys(history: dict[str, Any]) -> dict[int, Any]:
     """JSON turns int level keys into strings on the round-trip -
     normalize them back (the derivations look up int levels; a
     string-keyed history reads as empty and every candidate would
-    re-run from level 0)."""
+    re-run from level 0). The non-level keys (_launch) pass through
+    as-is - the level-typed map is a convention for the level keys,
+    and the passthrough keeps the marker visible."""
     out: dict[int, Any] = {}
     for k, v in history.items():
         if isinstance(k, str) and k.lstrip("-").isdigit():
@@ -224,7 +259,11 @@ def _int_keys(history: dict[str, Any]) -> dict[int, Any]:
         elif isinstance(k, int):
             out[k] = v
         else:
-            out[k] = v  # the non-level keys (_launch) pass through
+            # the non-level key (_launch): passes through; the map's
+            # declared int-key convention is for the LEVELS, and the
+            # lookups go through .get(level) with int levels only
+            marker: dict[Any, Any] = out
+            marker[k] = v
     return out
 
 
@@ -284,14 +323,12 @@ STATE_SCHEMA: dict[str, Any] = {
                             "additionalProperties": False,
                         },
                         {  # a settled failure (the closing budget rides
-                           # the record - the radio's attempted-bracket
-                           # evidence needs it)
+                            # the record - the radio's attempted-bracket
+                            # evidence needs it)
                             "type": "object",
                             "required": ["status"],
                             "properties": {
-                                "status": {
-                                    "enum": ["wrong answer", "out of paper", "error"]
-                                },
+                                "status": {"enum": ["wrong answer", "out of paper", "error"]},
                                 "detail": {"type": "string"},
                                 "budget_s": {"type": "number", "exclusiveMinimum": 0},
                             },
@@ -318,17 +355,26 @@ STATE_SCHEMA: dict[str, Any] = {
                 "properties": {
                     "epoch": {"type": "integer", "minimum": 1},
                     "position": {
-                        "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 2,
+                        "maxItems": 2,
                     },
                     "movements": {"type": "integer", "minimum": 0},
                     "high": {"type": "integer"},
                     "best": {
-                        "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 2,
+                        "maxItems": 2,
                     },
                     "targets": {
                         "type": "array",
                         "items": {
-                            "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "minItems": 2,
+                            "maxItems": 2,
                         },
                     },
                 },
@@ -355,8 +401,7 @@ def _validate_state(st: dict[str, Any], where: str) -> None:
         jsonschema.validate(st, STATE_SCHEMA)
     except jsonschema.ValidationError as e:
         raise ValueError(
-            f"the trek state fails its schema ({where}): "
-            f"{e.message} at {list(e.absolute_path)}"
+            f"the trek state fails its schema ({where}): {e.message} at {list(e.absolute_path)}"
         ) from e
 
 
@@ -701,10 +746,17 @@ def walk(
             ws["dispatched"] = [row, col]
             save()
             return {
-                "row": row, "col": col, "fam": fam, "rung": rung,
-                "action": action, "budget": budget,
-                "high": high, "best": list(best),
-                "life": life, "movements": movements, "draws": draws_used,
+                "row": row,
+                "col": col,
+                "fam": fam,
+                "rung": rung,
+                "action": action,
+                "budget": budget,
+                "high": high,
+                "best": list(best),
+                "life": life,
+                "movements": movements,
+                "draws": draws_used,
                 "reason": "evaluate",
             }
         # NO ACTION NEEDED (or the action was already dispatched this
@@ -724,7 +776,8 @@ def walk(
             # the derived budget of movements (n_rows + n_cols - 1);
             # over-shooting means the boundary check was skipped
             warn_contract(
-                "inv", "walk.exact_movements",
+                "inv",
+                "walk.exact_movements",
                 movements == epoch_budget,
                 f"the epoch ended at {movements} movements, expected exactly {epoch_budget}",
             )
@@ -733,12 +786,17 @@ def walk(
                 # no improvement in this life: the spawn's walk ENDS
                 save()
                 return {
-                    "row": best[0], "col": best[1],
+                    "row": best[0],
+                    "col": best[1],
                     "fam": grid.cell(best[0], best[1])[0],
                     "rung": grid.cell(best[0], best[1])[1],
-                    "action": "none", "budget": 0,
-                    "high": high, "best": list(best),
-                    "life": life, "movements": movements, "draws": draws_used,
+                    "action": "none",
+                    "budget": 0,
+                    "high": high,
+                    "best": list(best),
+                    "life": life,
+                    "movements": movements,
+                    "draws": draws_used,
                     "reason": "ended",
                 }
             spawn_high_targets.append(best)

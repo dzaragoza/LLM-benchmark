@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import threading
 import time
@@ -28,8 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
-from bench import state_store as _state_store
 from bench import radio, trek
+from bench import state_store as _state_store
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
@@ -454,8 +453,10 @@ def run_pair(
             if trek.needs_rerun(hist, budget_s):
                 work.append((k, v, key, hist))
     n_settled = len(KV_LADDER) ** 2 - len(work)
-    print(f"[trek] {len(work)} candidates need work under {budget_s:g}s "
-          f"({n_settled} settled from history)")
+    print(
+        f"[trek] {len(work)} candidates need work under {budget_s:g}s "
+        f"({n_settled} settled from history)"
+    )
 
     print("0", end="", flush=True)
     n = 0
@@ -494,8 +495,8 @@ def _run_combo(
     models_dir: str,
     port: int,
     budget_s: float,
-    history: dict[int, Any],
-) -> dict[int, Any]:
+    history: dict[Any, Any],
+) -> dict[Any, Any]:
     """One candidate's exam CONTINUATION under the walker's budget.
     The candidate's history is the record: the exam resumes at the
     frontier level (the first unmeasured level, or the level whose
@@ -520,11 +521,16 @@ def _run_combo(
         gguf,
         port=port,
         extra_args=[
-            "--n-gpu-layers", "999",
-            "--parallel", "1",
-            "--reasoning", "off",
-            "--reasoning-budget", "0",
-        ] + kv_args,
+            "--n-gpu-layers",
+            "999",
+            "--parallel",
+            "1",
+            "--reasoning",
+            "off",
+            "--reasoning-budget",
+            "0",
+        ]
+        + kv_args,
         log_path=log_path,
     )
     try:
@@ -533,14 +539,18 @@ def _run_combo(
             try:
                 with open(log_path, errors="replace") as fh:
                     errs = [
-                        ln.strip() for ln in fh
+                        ln.strip()
+                        for ln in fh
                         if (" E " in ln or "device lost" in ln.lower())
-                        and any(w in ln.lower() for w in ("failed", "error", "does not divide", "device lost"))
+                        and any(
+                            w in ln.lower()
+                            for w in ("failed", "error", "does not divide", "device lost")
+                        )
                     ]
                 diag = errs[-1][-200:] if errs else ""
             except OSError:
                 pass
-            history.setdefault("_launch", {"status": "failed", "detail": diag})
+            history["_launch"] = {"status": "failed", "detail": diag}
             return history
 
         # THE FRONTIER: the first level needing work under this budget
@@ -589,7 +599,10 @@ def _run_combo(
                     break
                 try:
                     answer, tokens, finish = ask_exam(
-                        port, messages, remaining, deadline=deadline,
+                        port,
+                        messages,
+                        remaining,
+                        deadline=deadline,
                     )
                 except Exception as e:
                     answer, tokens, finish = "", 0, f"error: {e}"
@@ -632,7 +645,11 @@ def _run_combo(
                 elif fail_reason == "out of paper":
                     history[level] = {"status": "out of paper", "budget_s": budget_s}
                 else:
-                    history[level] = {"status": "error", "detail": fail_reason[:100], "budget_s": budget_s}
+                    history[level] = {
+                        "status": "error",
+                        "detail": fail_reason[:100],
+                        "budget_s": budget_s,
+                    }
                 break
             history[level] = {"status": "pass", "time_s": level_time}
             level += 1
@@ -648,9 +665,15 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     roster (f16 x bpw/16). The catalog lookup is cached: the ledger
     writes call this per record, a rebuild per record was the
     table-render timeout."""
-    from bench.trek import _est_size_gib_of as _trek_size
+    # the local derivation (bench.trek._est_size_gib_of was the v1
+    # helper, retired with the v2 state rework; the local one is the
+    # ledger's own)
+    from bench.trek import _bpw
 
-    return _trek_size(r)
+    f16 = _f16_gib_from_models_md(r.get("fam", ""))
+    if f16 is None:
+        return None
+    return round(f16 * _bpw(r.get("rung", "")) / 16.0, 3)
 
 
 def write_ledger(st: dict[str, Any] | None = None) -> None:
@@ -677,7 +700,7 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     patience_cuts = trek.CLOCK_LADDER  # 1..128s
 
     # THE PER-CANDIDATE DERIVATIONS at every patience cut
-    rows = []
+    rows: list[dict[str, Any]] = []
     for key, hist in cands.items():
         parts = key.split("|")
         if len(parts) != 4:
@@ -686,8 +709,16 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         for cut in patience_cuts:
             s = trek.score_under(hist, cut)
             if s is not None and s >= 0:
-                rows.append({"fam": fam, "rung": rung, "k": k, "v": v,
-                             "cut": cut, "score": s})
+                rows.append(
+                    {
+                        "fam": str(fam),
+                        "rung": str(rung),
+                        "k": str(k),
+                        "v": str(v),
+                        "cut": float(cut),
+                        "score": int(s),
+                    }
+                )
 
     lines = ["# trek.md - the trek ledger (v3: derived from the exam histories)", ""]
 
@@ -719,6 +750,7 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         best = None
         for r in rows:
             if r["cut"] == cut and (best is None or r["score"] > best["score"]):
+                # ty: the row's fields are typed at append (str/float/int)
                 best = r
         if best:
             lines.append(
@@ -747,12 +779,13 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     except Exception:
         pass
     epoch_budget = trek.epoch_movements(grid)
-    status = "at the spawn (the teleport drawn)" if pos == [-1, -1] else (
-        f"movement {movs} of {epoch_budget} in the epoch"
+    status = (
+        "at the spawn (the teleport drawn)"
+        if pos == [-1, -1]
+        else (f"movement {movs} of {epoch_budget} in the epoch")
     )
     lines += [
-        f"life {life}: {status}; high {high}, best at "
-        f"{best_cell or best}",
+        f"life {life}: {status}; high {high}, best at {best_cell or best}",
         "",
     ]
 
