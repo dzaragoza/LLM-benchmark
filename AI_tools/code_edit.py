@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """code_edit.py - deterministic single-file code edits for the agent
 (session 34, addendum 20).
 
@@ -77,9 +76,8 @@ import ast
 import json
 import os
 import re
+import sys
 import tempfile
-from collections.abc import Sequence
-from typing import Any
 
 __all__ = [
     "CodeEditError",
@@ -112,152 +110,6 @@ def _contract(kind: str, name: str, ok: bool, detail: str = "") -> None:
     if not ok:
         raise ContractViolationError(
             f"[contract:{kind}:{name}] VIOLATED: {detail or 'condition failed'}"
-        )
-
-
-def _as_lines(text: str | Sequence[str]) -> list[str]:
-    """new_lines may be a string (one line, newline optional) or a
-    list/sequence of lines; returns bare lines (no newline)."""
-    if isinstance(text, str):
-        if not text:
-            return []
-        if not text.strip():
-            return [text.rstrip("\n")]
-        return text.rstrip("\n").split("\n")
-    return [str(x).rstrip("\n") for x in text]
-
-
-def _lines_of(buf: str) -> tuple[list[str], bool]:
-    """Split into lines; trailing is True when the file ends with a
-    newline (the join must restore it)."""
-    trailing = buf.endswith("\n")
-    lines = buf.split("\n")
-    if trailing:
-        lines = lines[:-1]
-    return lines, trailing
-
-
-def _join(lines: list[str], trailing: bool) -> str:
-    return "\n".join(lines) + ("\n" if trailing else "")
-
-
-def _check_range(first: object, last: object, n: int, i: int) -> tuple[int, int]:
-    if not isinstance(first, int) or not isinstance(last, int):
-        raise CodeEditError(f"block {i}: line range must be two ints - got {first!r}, {last!r}")
-    if first < 1 or last < first or last > n:
-        raise CodeEditError(
-            f"block {i}: line range [{first}, {last}] out of bounds (file has {n} lines)"
-        )
-    return first, last
-
-
-def _replace_nth(buf: str, old: str, new: str, k: int) -> str:
-    """Replace the k-th (1-based) occurrence of old with new."""
-    parts = buf.split(old)
-    return old.join(parts[:k]) + new + old.join(parts[k:])
-
-
-def _regex_once(buf: str, pattern: str, i: int, flags: int = 0) -> tuple[str, str]:
-    matches = list(re.finditer(pattern, buf, flags))
-    if len(matches) != 1:
-        raise CodeEditError(
-            f"block {i}: replace_regex pattern matched {len(matches)} "
-            "times - must match exactly once"
-        )
-    return pattern, buf
-
-
-def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
-    """Locate the region strictly BETWEEN two unique anchors (anchors
-    themselves are kept). start must occur exactly once; end must
-    occur exactly once AFTER start."""
-    n = buf.count(start)
-    if n == 0:
-        raise CodeEditError(f"block {i}: replace_region start anchor not found:\n{start[:200]}")
-    if n > 1:
-        raise CodeEditError(f"block {i}: replace_region start anchor found {n} times - add context")
-    a = buf.index(start) + len(start)
-    tail = buf[a:]
-    m = tail.count(end)
-    if m == 0:
-        raise CodeEditError(
-            f"block {i}: replace_region end anchor not found after start:\n{end[:200]}"
-        )
-    if m > 1:
-        raise CodeEditError(
-            f"block {i}: replace_region end anchor found {m} times after start - add context"
-        )
-    return a, a + tail.index(end)
-
-
-def _file_type(path: str) -> str:
-    """The check rules differ per file type (session 35, addendum 4):
-    prose files legally contain unbalanced quotes and brackets."""
-    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
-    if ext in ("md", "markdown", "rst", "txt", "log"):
-        return "prose"
-    if ext == "py":
-        return "python"
-    if ext in ("html", "htm", "js", "mjs", "css"):
-        return "markup"
-    if ext == "json":
-        return "json"
-    return "code"
-
-
-SEPARATOR_LIKE = re.compile(r"^\|[-\s|]+\|$")
-
-
-def _fix_markdown(out: str, path: str) -> str:
-    """The md auto-fixer (session 35, addendum 17, author ruling: the
-    editor FIXES the mechanical rules instead of failing): a blank
-    line before a table header (MD058) and after a table body
-    (MD058), and the single trailing newline (MD047), are inserted
-    automatically. These are exactly the rules whose fix is unique
-    and unambiguous; the judgement rules (MD056 ragged tables, MD055
-    row pipes, fence balance) have no safe automatic fix and stay
-    lint failures."""
-    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
-        return out
-    lines = out.split("\n")
-    fixed: list[str] = []
-    for line in lines:
-        row = line.startswith("|")
-        prev = fixed[-1] if fixed else ""
-        prev_blank = prev.strip() == ""
-        prev_table = prev.startswith("|")
-        if row and not prev_blank and not prev_table:
-            fixed.append("")
-        if not row and prev_table and not prev_blank and line.strip() != "":
-            fixed.append("")
-        prev2 = fixed[-2] if len(fixed) >= 2 else ""
-        if row and fixed and fixed[-1].strip() == "" and SEPARATOR_LIKE.match(prev2):
-            fixed.pop()
-        fixed.append(line)
-    out = "\n".join(fixed)
-    if out:
-        out = out.rstrip("\n") + "\n"
-    return out
-
-
-def _check_markdown(src: str, out: str, path: str) -> None:
-    """The md-linter gate (session 35, addendum 16, revised 17): the
-    mechanical rules (MD058 blank lines around tables, MD047 trailing
-    newline) are AUTO-FIXED by _fix_markdown; what remains is the
-    judgement class - a markdown edit must not INTRODUCE a violation
-    with no safe automatic fix (MD056 ragged tables, MD055 row
-    pipes, fence balance). Only NEW problems fail the edit;
-    pre-existing violations stay flagged for pre-commit."""
-    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
-        return
-    import md_check
-
-    before = {p.split(": ", 1)[-1] for p in md_check.check_text(path, src)}
-    new = [q for q in md_check.check_text(path, out) if q.split(": ", 1)[-1] not in before]
-    if new:
-        raise CodeEditError(
-            f"{path}: the edit introduces markdown-lint violations "
-            "(md_check rules, session 35 addendum 17):\n  " + "\n  ".join(new)
         )
 
 
@@ -347,7 +199,261 @@ def _selftest() -> int:
         check("write: the edit lands and reads back", "return 42" in fh.read())
     if os.path.exists(tmp):
         os.remove(tmp)
+
+    # THE STRUCTURED-FILE RULE: a raw edit on .json/.csv is refused;
+    # the repair exception allows it
+    tmp_json = tempfile.mktemp(suffix=".json")
+    with open(tmp_json, "w", encoding="utf-8") as fh:
+        fh.write('{"a": 1}')
+    got = "accepted"
+    try:
+        edit(tmp_json, [("replace", '"a": 1', '"a": 2')])
+    except CodeEditError:
+        got = "refused"
+    check("structured: a raw json edit refused", got == "refused")
+    if os.path.exists(tmp_json):
+        os.remove(tmp_json)
+    tmp_json2 = tempfile.mktemp(suffix=".json")
+    with open(tmp_json2, "w", encoding="utf-8") as fh:
+        fh.write('{"a": 1}')
+    got = "refused"
+    try:
+        edit(tmp_json2, [("replace", '"a": 1', '"a": 2')], repair=True)
+        got = "accepted"
+    except CodeEditError:
+        pass
+    check("structured: the repair exception accepts", got == "accepted")
+    if os.path.exists(tmp_json2):
+        os.remove(tmp_json2)
+    # edit_json is the sanctioned json path
+    tmp_json3 = tempfile.mktemp(suffix=".json")
+    with open(tmp_json3, "w", encoding="utf-8") as fh:
+        fh.write('{"a": 1}')
+    edit_json(tmp_json3, [("set", "a", 2)])
+    with open(tmp_json3, encoding="utf-8") as fh:
+        ok = json.load(fh) == {"a": 2}
+    check("structured: edit_json is the sanctioned path", ok)
+    if os.path.exists(tmp_json3):
+        os.remove(tmp_json3)
+    # csv refused raw
+    tmp_csv = tempfile.mktemp(suffix=".csv")
+    with open(tmp_csv, "w", encoding="utf-8") as fh:
+        fh.write("a,b\n1,2\n")
+    got = "accepted"
+    try:
+        edit(tmp_csv, [("replace", "1,2", "1,3")])
+    except CodeEditError:
+        got = "refused"
+    check("structured: a raw csv edit refused", got == "refused")
+    if os.path.exists(tmp_csv):
+        os.remove(tmp_csv)
     return fails
+
+
+# ======================================================================
+# SECTION 1: GENERAL FILE OPERATIONS
+# the file-type dispatch, the atomic write, the top-level entry
+# points (every file type flows through here; the type-specific
+# gates live in their sections)
+# ======================================================================
+
+
+def _file_type(path: str) -> str:
+    """The check rules differ per file type (session 35, addendum 4):
+    prose files legally contain unbalanced quotes and brackets."""
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in ("md", "markdown", "rst", "txt", "log"):
+        return "prose"
+    if ext == "py":
+        return "python"
+    if ext in ("html", "htm", "js", "mjs", "css"):
+        return "markup"
+    if ext == "json":
+        return "json"
+    return "code"
+
+
+def _atomic_write_sync(path: str, content: str) -> None:
+    """Write to a temp file in the same directory, fsync it, os.replace
+    over the target, then fsync the DIRECTORY entry - the rename is
+    what makes it crash-atomic; the dir fsync is what makes the rename
+    itself durable."""
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".code_edit_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        dir_fd = os.open(d, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def write(path: str, content: str, repair: bool = False) -> None:
+    """Create or overwrite a file with the same atomic, synced write
+    as edit(); the ONLY path for new files (an edit on a missing file
+    is still an error - write is deliberate). Markdown content runs
+    through the auto-fixer (session 35, addendum 17). THE STRUCTURED-
+    FILE RULE applies (see edit): json/csv only with repair=True."""
+    _structured_file_guard(path, repair)
+    content = _fix_markdown(content, path)
+    _atomic_write_sync(path, content)
+    with open(path, encoding="utf-8") as f:
+        if f.read() != content:
+            raise CodeEditError(f"{path}: disk content diverged after write - re-check")
+
+
+def safe_append(path: str, addition: str) -> str:
+    """Append text to a file as one verified transaction (session 36,
+    addendum 21: born from the day's heredoc-escaping incidents - the
+    escaped-newline corruption of test files and the triple-repair
+    chain it took). Three guarantees the naive `cat >>` heredoc cannot
+    make:
+    1. IDEMPOTENT: if the addition's first line already exists in the
+       target (the exact append already landed), the file is left
+       untouched and reported as such - a retried command can never
+       double-append.
+    2. NON-CORRUPTING: no shell is involved, so no escaping layer can
+       eat the content; the bytes written are exactly the bytes given.
+    3. ATOMIC: the write goes through _atomic_write_sync (temp file +
+       fsync + os.replace) - a crash mid-append cannot leave a torn
+       file. For .py targets the result is compiled (ast.parse)
+       BEFORE the write - a syntactically broken addition is refused
+       with the file untouched.
+    4. MARKDOWN-CHECKED (session 37, addendum 13): for .md targets
+       the assembled result runs the md auto-fixer and the
+       no-new-violations lint gate BEFORE the write - an append can
+       no longer introduce a table/fence break that the editor
+       itself would have refused.
+    Returns a report string: 'appended N line(s) to <path>' or
+    'idempotent skip: addition already present in <path>'.
+    """
+    existing = open(path, encoding="utf-8").read()
+    first_lines = [ln for ln in addition.split("\n") if ln.strip()]
+    if first_lines and first_lines[0].strip() in existing:
+        return f"idempotent skip: addition already present in {path}"
+    out = existing
+    if out and not out.endswith("\n"):
+        out += "\n"
+    out += addition
+    if _file_type(path) == "python":
+        ast.parse(out)
+    # session 37, addendum 13: an append to a markdown file runs the
+    # SAME pipeline as edit() - the auto-fixer normalizes the
+    # mechanical whitespace (blank lines around any table the
+    # addition introduces, the single trailing newline) and the
+    # no-new-violations lint gate refuses a judgement-class break
+    # (ragged table, broken pipes, unclosed fence) BEFORE the write,
+    # file untouched. The notebook appends (the session's `cat >>
+    # heredoc` pattern) can no longer smuggle a lint break in.
+    if _file_type(path) == "prose" and path.endswith((".md", ".markdown")):
+        out = _fix_markdown(out, path)
+        _check_markdown(existing, out, path)
+    _atomic_write_sync(path, out)
+    n = addition.count("\n") + (1 if addition and not addition.endswith("\n") else 0)
+    return f"appended {n} line(s) to {path}"
+
+
+def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
+    """Apply one edit() per file as ONE cross-file transaction: every
+    file's blocks are verified FIRST; a failure anywhere touches
+    NOTHING (the whole set rolls back to git - no half-edited sets).
+    edits: [(path, blocks), ...] - paths must be unique."""
+    seen: set[str] = set()
+    specs = []
+    for path, blocks in edits:
+        if path in seen:
+            raise CodeEditError(f"edit_many: duplicate path {path}")
+        seen.add(path)
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        _verify_blocks(src, blocks)
+        out, regions = _apply(src, blocks)
+        _check_delimiters(src, out, path, regions)
+        _check_python_syntax(src, out, path)
+        _verify_result(out, blocks, path)
+        out = _fix_markdown(out, path)
+        _check_markdown(src, out, path)
+        specs.append((path, src, out))
+    for path, _src, out in specs:
+        _atomic_write_sync(path, out)
+        with open(path, encoding="utf-8") as f:
+            if f.read() != out:
+                raise CodeEditError(
+                    f"{path}: disk content diverged after write - the file may be corrupt; re-check"
+                )
+
+
+def check(path: str, blocks: Sequence[tuple]) -> str:
+    """Pre-flight a block set WITHOUT writing (session 35, addendum 6):
+    runs every check edit() would run (verify, delimiters, result) and
+    returns the preview diff. A failing check raises CodeEditError with
+    the exact block and reason. Use this to validate blocks before
+    committing to the write."""
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    blocks = [_normalize_block(tuple(b)) for b in blocks]
+    _verify_blocks(src, blocks)
+    out, regions = _apply(src, blocks)
+    _check_delimiters(src, out, path, regions)
+    _check_python_syntax(src, out, path)
+    _verify_result(out, blocks, path)
+    out = _fix_markdown(out, path)
+    _check_markdown(src, out, path)
+    import difflib
+
+    return "".join(
+        difflib.unified_diff(
+            src.splitlines(keepends=True),
+            out.splitlines(keepends=True),
+            fromfile=path,
+            tofile=path + " (edited)",
+        )
+    )
+
+
+def preview(path: str, blocks: Sequence[tuple]) -> str:
+    """The unified diff edit() would produce - verifies every block,
+    writes NOTHING. For eyeballing a change before committing to it."""
+    import difflib
+
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    _verify_blocks(src, blocks)
+    out, regions = _apply(src, blocks)
+    _check_delimiters(src, out, path, regions)
+    _check_python_syntax(src, out, path)
+    _verify_result(out, blocks, path)
+    out = _fix_markdown(out, path)
+    _check_markdown(src, out, path)
+    return "".join(
+        difflib.unified_diff(
+            src.splitlines(keepends=True),
+            out.splitlines(keepends=True),
+            fromfile=path,
+            tofile=path + " (edited)",
+        )
+    )
+
+
+def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:
+    """Alias kept for callers that think in patch blocks."""
+    edit(path, blocks)
+
+
+# ======================================================================
+# SECTION 2: PYTHON FILES
+# the ast gate, the seam gate (the masked scan), the delimiter
+# checks: the structural guarantees a .py edit must preserve
+# ======================================================================
 
 
 def _masked_line(src: str) -> dict[int, str]:
@@ -450,7 +556,6 @@ def _check_replacement_seam(out: str, path: str) -> None:
             f"glued to the following line (a stale anchor after a format "
             f"pass; re-read the region and re-aim):\n" + "\n".join(merged[:3])
         )
-
 
 
 def _check_python_syntax(src: str, out: str, path: str) -> None:
@@ -672,6 +777,295 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
     _ = changed_lines  # kept for clarity; per-line comparison handled above
 
 
+# ======================================================================
+# SECTION 3: MD FILES
+# the markdown auto-fixer, the table checker, the table sorter:
+# prose files legally contain unbalanced quotes and brackets; the
+# md gates know the difference
+# ======================================================================
+
+
+SEPARATOR_LIKE = re.compile(r"^\|[-\s|]+\|$")
+
+
+def _fix_markdown(out: str, path: str) -> str:
+    """The md auto-fixer (session 35, addendum 17, author ruling: the
+    editor FIXES the mechanical rules instead of failing): a blank
+    line before a table header (MD058) and after a table body
+    (MD058), and the single trailing newline (MD047), are inserted
+    automatically. These are exactly the rules whose fix is unique
+    and unambiguous; the judgement rules (MD056 ragged tables, MD055
+    row pipes, fence balance) have no safe automatic fix and stay
+    lint failures."""
+    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
+        return out
+    lines = out.split("\n")
+    fixed: list[str] = []
+    for line in lines:
+        row = line.startswith("|")
+        prev = fixed[-1] if fixed else ""
+        prev_blank = prev.strip() == ""
+        prev_table = prev.startswith("|")
+        if row and not prev_blank and not prev_table:
+            fixed.append("")
+        if not row and prev_table and not prev_blank and line.strip() != "":
+            fixed.append("")
+        prev2 = fixed[-2] if len(fixed) >= 2 else ""
+        if row and fixed and fixed[-1].strip() == "" and SEPARATOR_LIKE.match(prev2):
+            fixed.pop()
+        fixed.append(line)
+    out = "\n".join(fixed)
+    if out:
+        out = out.rstrip("\n") + "\n"
+    return out
+
+
+def _check_markdown(src: str, out: str, path: str) -> None:
+    """The md-linter gate (session 35, addendum 16, revised 17): the
+    mechanical rules (MD058 blank lines around tables, MD047 trailing
+    newline) are AUTO-FIXED by _fix_markdown; what remains is the
+    judgement class - a markdown edit must not INTRODUCE a violation
+    with no safe automatic fix (MD056 ragged tables, MD055 row
+    pipes, fence balance). Only NEW problems fail the edit;
+    pre-existing violations stay flagged for pre-commit."""
+    if _file_type(path) != "prose" or not path.endswith((".md", ".markdown")):
+        return
+    import md_check
+
+    before = {p.split(": ", 1)[-1] for p in md_check.check_text(path, src)}
+    new = [q for q in md_check.check_text(path, out) if q.split(": ", 1)[-1] not in before]
+    if new:
+        raise CodeEditError(
+            f"{path}: the edit introduces markdown-lint violations "
+            "(md_check rules, session 35 addendum 17):\n  " + "\n  ".join(new)
+        )
+
+
+def _sort_table(buf: str, key_col: int, numeric: bool, reverse: bool, i: int) -> str:
+    """The markdown table sort (the roster incident). Finds THE table
+    (a header row + a separator row), verifies the key column in
+    every row, stable-sorts the DATA rows by it - the header and
+    separator stay in place, prose around the table is untouched.
+    numeric=True sorts by float(value) (a non-numeric key is a hard
+    error - a silent string sort of a numbers column is the bug
+    class this block exists to prevent); numeric=False by raw text.
+    Exactly one table must be present."""
+    lines = buf.split("\n")
+    tables = []
+    t = 0
+    while t < len(lines) - 1:
+        if (
+            lines[t].startswith("|")
+            and lines[t + 1].startswith("|")
+            and set(lines[t + 1].replace("|", "").replace(" ", "")) <= {"-"}
+            and lines[t + 1].count("-") >= 2
+        ):
+            start = t
+            t += 2
+            while t < len(lines) and lines[t].startswith("|"):
+                t += 1
+            tables.append((start, t))
+        else:
+            t += 1
+    if len(tables) != 1:
+        raise CodeEditError(
+            f"block {i}: sort_table found {len(tables)} tables - exactly one "
+            "must be present (sort each table in its own edit call)"
+        )
+    start, end = tables[0]
+    header, sep, data = lines[start], lines[start + 1], lines[start + 2 : end]
+
+    def cells(ln: str) -> list[str]:
+        return [c.strip() for c in ln.strip().strip("|").split("|")]
+
+    nhead = len(cells(header))
+    if not (1 <= key_col <= nhead):
+        raise CodeEditError(
+            f"block {i}: sort_table key column {key_col} out of range "
+            f"(the header has {nhead} columns)"
+        )
+
+    def key(ln: str):
+        parts = cells(ln)
+        if len(parts) != nhead:
+            raise CodeEditError(
+                f"block {i}: sort_table row has {len(parts)} cells, the "
+                f"header has {nhead} - ragged rows are refused, never "
+                "silently mis-sorted"
+            )
+        v = parts[key_col - 1]  # 1-based column spec -> 0-based cell
+        if numeric:
+            try:
+                return float(v.replace(",", ""))
+            except ValueError as e:
+                raise CodeEditError(
+                    f"block {i}: sort_table numeric key {v!r} does not "
+                    "parse as a number - fix the cell or sort as text"
+                ) from e
+        return v
+
+    data_sorted = sorted(data, key=key, reverse=reverse)
+    out = lines[:start] + [header, sep] + data_sorted + lines[end:]
+    if buf.endswith("\n") and not out[-1] == "":
+        # the join above drops the blank line that followed the table
+        # when the file ends there - restore the trailing newline
+        out = out + [""]
+    return "\n".join(out)
+
+
+# ======================================================================
+# SECTION 4: GENERAL TEXT
+# the line utilities, the block language (replace/insert/delete/
+# region/lines/indent...), the verify/apply machinery: the editing
+# core every file type shares
+# ======================================================================
+
+
+def _as_lines(text: str | Sequence[str]) -> list[str]:
+    """new_lines may be a string (one line, newline optional) or a
+    list/sequence of lines; returns bare lines (no newline)."""
+    if isinstance(text, str):
+        if not text:
+            return []
+        if not text.strip():
+            return [text.rstrip("\n")]
+        return text.rstrip("\n").split("\n")
+    return [str(x).rstrip("\n") for x in text]
+
+
+def _lines_of(buf: str) -> tuple[list[str], bool]:
+    """Split into lines; trailing is True when the file ends with a
+    newline (the join must restore it)."""
+    trailing = buf.endswith("\n")
+    lines = buf.split("\n")
+    if trailing:
+        lines = lines[:-1]
+    return lines, trailing
+
+
+def _join(lines: list[str], trailing: bool) -> str:
+    return "\n".join(lines) + ("\n" if trailing else "")
+
+
+def _check_range(first: object, last: object, n: int, i: int) -> tuple[int, int]:
+    if not isinstance(first, int) or not isinstance(last, int):
+        raise CodeEditError(f"block {i}: line range must be two ints - got {first!r}, {last!r}")
+    if first < 1 or last < first or last > n:
+        raise CodeEditError(
+            f"block {i}: line range [{first}, {last}] out of bounds (file has {n} lines)"
+        )
+    return first, last
+
+
+def _replace_nth(buf: str, old: str, new: str, k: int) -> str:
+    """Replace the k-th (1-based) occurrence of old with new."""
+    parts = buf.split(old)
+    return old.join(parts[:k]) + new + old.join(parts[k:])
+
+
+def _regex_once(buf: str, pattern: str, i: int, flags: int = 0) -> tuple[str, str]:
+    matches = list(re.finditer(pattern, buf, flags))
+    if len(matches) != 1:
+        raise CodeEditError(
+            f"block {i}: replace_regex pattern matched {len(matches)} "
+            "times - must match exactly once"
+        )
+    return pattern, buf
+
+
+def _region_of(buf: str, start: str, end: str, i: int) -> tuple[int, int]:
+    """Locate the region strictly BETWEEN two unique anchors (anchors
+    themselves are kept). start must occur exactly once; end must
+    occur exactly once AFTER start."""
+    n = buf.count(start)
+    if n == 0:
+        raise CodeEditError(f"block {i}: replace_region start anchor not found:\n{start[:200]}")
+    if n > 1:
+        raise CodeEditError(f"block {i}: replace_region start anchor found {n} times - add context")
+    a = buf.index(start) + len(start)
+    tail = buf[a:]
+    m = tail.count(end)
+    if m == 0:
+        raise CodeEditError(
+            f"block {i}: replace_region end anchor not found after start:\n{end[:200]}"
+        )
+    if m > 1:
+        raise CodeEditError(
+            f"block {i}: replace_region end anchor found {m} times after start - add context"
+        )
+    return a, a + tail.index(end)
+
+
+def _sep(anchor: str, new: str, after: bool) -> str:
+    """The separator an insert needs (session 35, addendum 9 - register
+    entry 6): when the join point sits between two non-newline
+    characters the texts would fuse into one broken line, so a newline
+    is forced. An explicit blank line in `new` is preserved as-is."""
+    edge_a = anchor[-1] if anchor else "\n"
+    edge_b = new[0] if new else "\n"
+    if after and edge_a != "\n" and edge_b != "\n":
+        return "\n" + new
+    if not after and edge_b != "\n" and edge_a != "\n":
+        return new + "\n"
+    return new
+
+
+def _find_replace_target(buf: str, target: str, i: int) -> tuple[str, str]:
+    """Locate the replace target (session 40, addendum 6): exact
+    match first; on a miss, a whitespace-flexible fallback - the
+    target's whitespace runs matched as \\s+ - rescues edits written
+    against differently-indented or reformatted text, but ONLY when
+    the flexible pattern matches exactly one place (ambiguity is a
+    refusal, never a guess). Returns (old_actual, new) where
+    old_actual is the FILE's own text (what buf.replace must use);
+    on failure raises with the target and the file's own text so the
+    caller can re-aim instead of guessing."""
+    n = buf.count(target)
+    if n == 1:
+        return target, target
+    if n > 1:
+        raise CodeEditError(
+            f"block {i}: replace target found {n} times - add context to make it unique"
+        )
+    flex = re.escape(target)
+    flex = re.sub(r"(?:\\\s|\\\n|\\ )+", r"\\s+", flex)
+    matches = list(re.finditer(flex, buf))
+    if len(matches) == 1:
+        return matches[0].group(0), target
+    if len(matches) > 1:
+        raise CodeEditError(
+            f"block {i}: replace target not found exactly; a whitespace-flexible "
+            f"pass found {len(matches)} candidate places - add context to make it unique"
+        )
+    # addendum 149: quote-style-flexible rescue - the format hook (and
+    # any formatter) legally rewrites ' to " across the file, so an
+    # old_str written against the pre-format style stops matching
+    # exactly while the CODE is unchanged. Try the quote-swapped
+    # target both ways; uniqueness required, same as the whitespace
+    # rescue. The file's own text is returned, so the apply is exact.
+    swapped = (
+        target.replace(chr(39), chr(34)) if chr(39) in target else target.replace(chr(34), chr(39))
+    )
+    if swapped != target:
+        n_sw = buf.count(swapped)
+        if n_sw == 1:
+            return swapped, target
+        if n_sw > 1:
+            raise CodeEditError(
+                f"block {i}: replace target found {n_sw} times after the "
+                f"quote-style swap - add context to make it unique"
+            )
+    target_lines = target.splitlines()
+    first_target_line = target_lines[0] if target_lines else target
+    needle = first_target_line.strip()
+    hits = [ln for ln in buf.split("\n") if needle and needle in ln]
+    ctx = "\n".join(hits[:3]) if hits else buf[:200]
+    raise CodeEditError(
+        f"block {i}: replace target not found. First target line:\n"
+        f"--- wanted ---\n{first_target_line[:200]}\n--- file's near lines ---\n{ctx}\n--- end ---"
+    )
+
+
 _KINDS = (
     "replace",
     "replace_all",
@@ -858,148 +1252,6 @@ def _verify_blocks(src: str, blocks: Sequence[tuple]) -> None:
             raise CodeEditError(f"block {i}: unknown kind {kind!r}")
 
 
-def _sort_table(buf: str, key_col: int, numeric: bool, reverse: bool, i: int) -> str:
-    """The markdown table sort (the roster incident). Finds THE table
-    (a header row + a separator row), verifies the key column in
-    every row, stable-sorts the DATA rows by it - the header and
-    separator stay in place, prose around the table is untouched.
-    numeric=True sorts by float(value) (a non-numeric key is a hard
-    error - a silent string sort of a numbers column is the bug
-    class this block exists to prevent); numeric=False by raw text.
-    Exactly one table must be present."""
-    lines = buf.split("\n")
-    tables = []
-    t = 0
-    while t < len(lines) - 1:
-        if (
-            lines[t].startswith("|")
-            and lines[t + 1].startswith("|")
-            and set(lines[t + 1].replace("|", "").replace(" ", "")) <= {"-"}
-            and lines[t + 1].count("-") >= 2
-        ):
-            start = t
-            t += 2
-            while t < len(lines) and lines[t].startswith("|"):
-                t += 1
-            tables.append((start, t))
-        else:
-            t += 1
-    if len(tables) != 1:
-        raise CodeEditError(
-            f"block {i}: sort_table found {len(tables)} tables - exactly one "
-            "must be present (sort each table in its own edit call)"
-        )
-    start, end = tables[0]
-    header, sep, data = lines[start], lines[start + 1], lines[start + 2 : end]
-
-    def cells(ln: str) -> list[str]:
-        return [c.strip() for c in ln.strip().strip("|").split("|")]
-
-    nhead = len(cells(header))
-    if not (1 <= key_col <= nhead):
-        raise CodeEditError(
-            f"block {i}: sort_table key column {key_col} out of range "
-            f"(the header has {nhead} columns)"
-        )
-
-    def key(ln: str):
-        parts = cells(ln)
-        if len(parts) != nhead:
-            raise CodeEditError(
-                f"block {i}: sort_table row has {len(parts)} cells, the "
-                f"header has {nhead} - ragged rows are refused, never "
-                "silently mis-sorted"
-            )
-        v = parts[key_col - 1]  # 1-based column spec -> 0-based cell
-        if numeric:
-            try:
-                return float(v.replace(",", ""))
-            except ValueError as e:
-                raise CodeEditError(
-                    f"block {i}: sort_table numeric key {v!r} does not "
-                    "parse as a number - fix the cell or sort as text"
-                ) from e
-        return v
-
-    data_sorted = sorted(data, key=key, reverse=reverse)
-    out = lines[:start] + [header, sep] + data_sorted + lines[end:]
-    if buf.endswith("\n") and not out[-1] == "":
-        # the join above drops the blank line that followed the table
-        # when the file ends there - restore the trailing newline
-        out = out + [""]
-    return "\n".join(out)
-
-
-def _sep(anchor: str, new: str, after: bool) -> str:
-    """The separator an insert needs (session 35, addendum 9 - register
-    entry 6): when the join point sits between two non-newline
-    characters the texts would fuse into one broken line, so a newline
-    is forced. An explicit blank line in `new` is preserved as-is."""
-    edge_a = anchor[-1] if anchor else "\n"
-    edge_b = new[0] if new else "\n"
-    if after and edge_a != "\n" and edge_b != "\n":
-        return "\n" + new
-    if not after and edge_b != "\n" and edge_a != "\n":
-        return new + "\n"
-    return new
-
-
-def _find_replace_target(buf: str, target: str, i: int) -> tuple[str, str]:
-    """Locate the replace target (session 40, addendum 6): exact
-    match first; on a miss, a whitespace-flexible fallback - the
-    target's whitespace runs matched as \\s+ - rescues edits written
-    against differently-indented or reformatted text, but ONLY when
-    the flexible pattern matches exactly one place (ambiguity is a
-    refusal, never a guess). Returns (old_actual, new) where
-    old_actual is the FILE's own text (what buf.replace must use);
-    on failure raises with the target and the file's own text so the
-    caller can re-aim instead of guessing."""
-    n = buf.count(target)
-    if n == 1:
-        return target, target
-    if n > 1:
-        raise CodeEditError(
-            f"block {i}: replace target found {n} times - add context to make it unique"
-        )
-    flex = re.escape(target)
-    flex = re.sub(r"(?:\\\s|\\\n|\\ )+", r"\\s+", flex)
-    matches = list(re.finditer(flex, buf))
-    if len(matches) == 1:
-        return matches[0].group(0), target
-    if len(matches) > 1:
-        raise CodeEditError(
-            f"block {i}: replace target not found exactly; a whitespace-flexible "
-            f"pass found {len(matches)} candidate places - add context to make it unique"
-        )
-    # addendum 149: quote-style-flexible rescue - the format hook (and
-    # any formatter) legally rewrites ' to " across the file, so an
-    # old_str written against the pre-format style stops matching
-    # exactly while the CODE is unchanged. Try the quote-swapped
-    # target both ways; uniqueness required, same as the whitespace
-    # rescue. The file's own text is returned, so the apply is exact.
-    swapped = (
-        target.replace(chr(39), chr(34)) if chr(39) in target else target.replace(chr(34), chr(39))
-    )
-    if swapped != target:
-        n_sw = buf.count(swapped)
-        if n_sw == 1:
-            return swapped, target
-        if n_sw > 1:
-            raise CodeEditError(
-                f"block {i}: replace target found {n_sw} times after the "
-                f"quote-style swap - add context to make it unique"
-            )
-    target_lines = target.splitlines()
-    first_target_line = target_lines[0] if target_lines else target
-    needle = first_target_line.strip()
-    hits = [ln for ln in buf.split("\n") if needle and needle in ln]
-    ctx = "\n".join(hits[:3]) if hits else buf[:200]
-    raise CodeEditError(
-        f"block {i}: replace target not found. First target line:\n"
-        f"--- wanted ---\n{first_target_line[:200]}\n--- file's near lines ---\n{ctx}\n--- end ---"
-    )
-
-
 def _apply(src: str, blocks: Sequence[tuple]) -> tuple[str, list[tuple[str, str]]]:
     buf = src
     regions: list[tuple[str, str]] = []
@@ -1069,144 +1321,47 @@ def _apply(src: str, blocks: Sequence[tuple]) -> tuple[str, list[tuple[str, str]
     return buf, regions
 
 
-def safe_append(path: str, addition: str) -> str:
-    """Append text to a file as one verified transaction (session 36,
-    addendum 21: born from the day's heredoc-escaping incidents - the
-    escaped-newline corruption of test files and the triple-repair
-    chain it took). Three guarantees the naive `cat >>` heredoc cannot
-    make:
-    1. IDEMPOTENT: if the addition's first line already exists in the
-       target (the exact append already landed), the file is left
-       untouched and reported as such - a retried command can never
-       double-append.
-    2. NON-CORRUPTING: no shell is involved, so no escaping layer can
-       eat the content; the bytes written are exactly the bytes given.
-    3. ATOMIC: the write goes through _atomic_write_sync (temp file +
-       fsync + os.replace) - a crash mid-append cannot leave a torn
-       file. For .py targets the result is compiled (ast.parse)
-       BEFORE the write - a syntactically broken addition is refused
-       with the file untouched.
-    4. MARKDOWN-CHECKED (session 37, addendum 13): for .md targets
-       the assembled result runs the md auto-fixer and the
-       no-new-violations lint gate BEFORE the write - an append can
-       no longer introduce a table/fence break that the editor
-       itself would have refused.
-    Returns a report string: 'appended N line(s) to <path>' or
-    'idempotent skip: addition already present in <path>'.
-    """
-    existing = open(path, encoding="utf-8").read()
-    first_lines = [ln for ln in addition.split("\n") if ln.strip()]
-    if first_lines and first_lines[0].strip() in existing:
-        return f"idempotent skip: addition already present in {path}"
-    out = existing
-    if out and not out.endswith("\n"):
-        out += "\n"
-    out += addition
-    if _file_type(path) == "python":
-        ast.parse(out)
-    # session 37, addendum 13: an append to a markdown file runs the
-    # SAME pipeline as edit() - the auto-fixer normalizes the
-    # mechanical whitespace (blank lines around any table the
-    # addition introduces, the single trailing newline) and the
-    # no-new-violations lint gate refuses a judgement-class break
-    # (ragged table, broken pipes, unclosed fence) BEFORE the write,
-    # file untouched. The notebook appends (the session's `cat >>
-    # heredoc` pattern) can no longer smuggle a lint break in.
-    if _file_type(path) == "prose" and path.endswith((".md", ".markdown")):
-        out = _fix_markdown(out, path)
-        _check_markdown(existing, out, path)
-    _atomic_write_sync(path, out)
-    n = addition.count("\n") + (1 if addition and not addition.endswith("\n") else 0)
-    return f"appended {n} line(s) to {path}"
+def _structured_file_guard(path: str, repair: bool) -> None:
+    """THE STRUCTURED-FILE RULE (the author's): .json files are
+    always modified via the json module (edit_json is the sanctioned
+    path), .csv via the csv module - never raw text. A raw edit on a
+    structured file is refused; the ONLY exception is a damaged file
+    being REPAIRED (repair=True acknowledges the file is corrupt and
+    the edit's purpose is restoration - the corrupt-state repair
+    precedent)."""
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    if ext in ("json", "csv") and not repair:
+        raise CodeEditError(
+            f"{path}: structured files (.{ext}) are always modified via "
+            f"the {'json (edit_json)' if ext == 'json' else 'csv'} module, "
+            "never raw text - pass repair=True ONLY if the file is "
+            "damaged and this edit repairs it"
+        )
 
 
-def replace_verified(
+def edit(
     path: str,
-    replaces: Sequence[tuple[str, str] | tuple[str, str, int]],
-    count: int = 1,
+    blocks: Sequence[tuple],
+    repair: bool = False,
 ) -> None:
-    """Scripted replaces with asserts, as a first-class transaction
-    (session 37, addendum 12). Born from the session-37 incident class
-    (notebook addendum 6): when the conversational edit tool fails on
-    wrapped-line old_str, the established workaround was a hand-rolled
-    `python3 open/write` script with asserts - which BYPASSES every
-    guarantee of this tool (the md auto-fixer, the md-lint gate, the
-    delimiter check, the atomic synced write). The addendum-6 MD058
-    escaped to git exactly that way. This function is that pattern
-    done right, so there is never a reason to bypass the editor:
-
-    replaces: a list of (old, new) pairs, or (old, new, count) triples
-    for a per-pair expected count (session 37, addendum 82: a mixed
-    transaction - one unique pair plus one all-occurrences pair - had
-    to be split into two calls, doubling the failure surface). Each old
-    must occur EXACTLY its count times (default 1: unique; the assert
-    is the scripted-replace assert, enforced by the tool now). Pairs
-    apply in order against the running buffer, so a later pair may
-    match text a earlier pair inserted. On ANY assert failure the file
-    is untouched (nothing is written until every pair verifies).
-
-    The full edit() pipeline runs on the assembled result: the md
-    auto-fixer (blank lines around tables, trailing newline), the
-    md-lint no-new-violations gate, and the delimiter balance check -
-    a scripted replace can no longer smuggle a lint break into git.
-    """
-    with open(path, encoding="utf-8") as f:
-        src = f.read()
-    blocks: list[tuple] = []
-    for i, item in enumerate(replaces):
-        old, new, pair_count = (item + (count,))[:3] if len(item) == 2 else item
-        n = src.count(old)
-        if n != pair_count:
-            raise CodeEditError(
-                f"{path}: replace pair {i} assert failed: old text occurs "
-                f"{n} time(s), expected exactly {pair_count}"
-            )
-        blocks.append(("replace_n", old, new, 1) if pair_count == 1 else ("replace_all", old, new))
-    edit(path, blocks)
-
-
-def src_count(path: str, text: str) -> int:
-    """How many times text occurs in path right now (the assert helper
-    for replace_verified; exposed for callers that build their own
-    conditions)."""
-    return open(path, encoding="utf-8").read().count(text)
-
-
-def _atomic_write_sync(path: str, content: str) -> None:
-    """Write to a temp file in the same directory, fsync it, os.replace
-    over the target, then fsync the DIRECTORY entry - the rename is
-    what makes it crash-atomic; the dir fsync is what makes the rename
-    itself durable."""
-    d = os.path.dirname(os.path.abspath(path)) or "."
-    fd, tmp = tempfile.mkstemp(dir=d, prefix=".code_edit_", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)
-        dir_fd = os.open(d, os.O_RDONLY)
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
-    except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
-
-
-def edit(path: str, blocks: Sequence[tuple]) -> None:
     """Apply edit blocks to a file as one verified transaction.
 
     Raises CodeEditError (file untouched) when any block cannot be
     verified against the current content.
+
+    THE STRUCTURED-FILE RULE: .json and .csv files are ALWAYS
+    modified via their modules (edit_json for json; the csv module
+    by hand), never raw text - a raw edit risks corruption the
+    module round-trips make impossible. THE ONLY EXCEPTION: the
+    file is DAMAGED and the edit REPAIRS it - pass repair=True to
+    acknowledge (the corrupt-state repair precedent).
     """
     # PRE: the target exists and the blocks are non-empty
     _contract("pre", "edit.target_exists", os.path.isfile(path),
               f"the edit target {path!r} does not exist")
     _contract("pre", "edit.blocks_nonempty", len(blocks) > 0,
               "an edit needs at least one block")
+    _structured_file_guard(path, repair)
     with open(path, encoding="utf-8") as f:
         src = f.read()
     blocks = [_normalize_block(tuple(b)) for b in blocks]
@@ -1280,40 +1435,65 @@ def _verify_result(out: str, blocks: Sequence[tuple], path: str) -> None:
                 )
 
 
-def write(path: str, content: str) -> None:
-    """Create or overwrite a file with the same atomic, synced write
-    as edit(); the ONLY path for new files (an edit on a missing file
-    is still an error - write is deliberate). Markdown content runs
-    through the auto-fixer (session 35, addendum 17)."""
-    content = _fix_markdown(content, path)
-    _atomic_write_sync(path, content)
-    with open(path, encoding="utf-8") as f:
-        if f.read() != content:
-            raise CodeEditError(f"{path}: disk content diverged after write - re-check")
+def replace_verified(
+    path: str,
+    replaces: Sequence[tuple[str, str] | tuple[str, str, int]],
+    count: int = 1,
+) -> None:
+    """Scripted replaces with asserts, as a first-class transaction
+    (session 37, addendum 12). Born from the session-37 incident class
+    (notebook addendum 6): when the conversational edit tool fails on
+    wrapped-line old_str, the established workaround was a hand-rolled
+    `python3 open/write` script with asserts - which BYPASSES every
+    guarantee of this tool (the md auto-fixer, the md-lint gate, the
+    delimiter check, the atomic synced write). The addendum-6 MD058
+    escaped to git exactly that way. This function is that pattern
+    done right, so there is never a reason to bypass the editor:
 
+    replaces: a list of (old, new) pairs, or (old, new, count) triples
+    for a per-pair expected count (session 37, addendum 82: a mixed
+    transaction - one unique pair plus one all-occurrences pair - had
+    to be split into two calls, doubling the failure surface). Each old
+    must occur EXACTLY its count times (default 1: unique; the assert
+    is the scripted-replace assert, enforced by the tool now). Pairs
+    apply in order against the running buffer, so a later pair may
+    match text a earlier pair inserted. On ANY assert failure the file
+    is untouched (nothing is written until every pair verifies).
 
-def preview(path: str, blocks: Sequence[tuple]) -> str:
-    """The unified diff edit() would produce - verifies every block,
-    writes NOTHING. For eyeballing a change before committing to it."""
-    import difflib
-
+    The full edit() pipeline runs on the assembled result: the md
+    auto-fixer (blank lines around tables, trailing newline), the
+    md-lint no-new-violations gate, and the delimiter balance check -
+    a scripted replace can no longer smuggle a lint break into git.
+    """
     with open(path, encoding="utf-8") as f:
         src = f.read()
-    _verify_blocks(src, blocks)
-    out, regions = _apply(src, blocks)
-    _check_delimiters(src, out, path, regions)
-    _check_python_syntax(src, out, path)
-    _verify_result(out, blocks, path)
-    out = _fix_markdown(out, path)
-    _check_markdown(src, out, path)
-    return "".join(
-        difflib.unified_diff(
-            src.splitlines(keepends=True),
-            out.splitlines(keepends=True),
-            fromfile=path,
-            tofile=path + " (edited)",
-        )
-    )
+    blocks: list[tuple] = []
+    for i, item in enumerate(replaces):
+        old, new, pair_count = (item + (count,))[:3] if len(item) == 2 else item
+        n = src.count(old)
+        if n != pair_count:
+            raise CodeEditError(
+                f"{path}: replace pair {i} assert failed: old text occurs "
+                f"{n} time(s), expected exactly {pair_count}"
+            )
+        blocks.append(("replace_n", old, new, 1) if pair_count == 1 else ("replace_all", old, new))
+    edit(path, blocks)
+
+
+def src_count(path: str, text: str) -> int:
+    """How many times text occurs in path right now (the assert helper
+    for replace_verified; exposed for callers that build their own
+    conditions)."""
+    return open(path, encoding="utf-8").read().count(text)
+
+
+# ======================================================================
+# SECTION 5: STRUCTURED FILES - JSON/CSV
+# always modified via their modules, never raw text: edit_json
+# is the sanctioned JSON path; raw text edits on .json/.csv are
+# REFUSED unless repair=True (the damaged-file exception - a
+# corrupt file being repaired by hand)
+# ======================================================================
 
 
 def edit_json(path: str, ops: Sequence[tuple]) -> None:  # noqa: C901
@@ -1442,69 +1622,6 @@ def edit_json(path: str, ops: Sequence[tuple]) -> None:  # noqa: C901
     with open(path, encoding="utf-8") as f:
         if f.read() != out:
             raise CodeEditError(f"{path}: disk content diverged after write - re-check")
-
-
-def edit_many(edits: Sequence[tuple[str, Sequence[tuple]]]) -> None:
-    """Apply one edit() per file as ONE cross-file transaction: every
-    file's blocks are verified FIRST; a failure anywhere touches
-    NOTHING (the whole set rolls back to git - no half-edited sets).
-    edits: [(path, blocks), ...] - paths must be unique."""
-    seen: set[str] = set()
-    specs = []
-    for path, blocks in edits:
-        if path in seen:
-            raise CodeEditError(f"edit_many: duplicate path {path}")
-        seen.add(path)
-        with open(path, encoding="utf-8") as f:
-            src = f.read()
-        _verify_blocks(src, blocks)
-        out, regions = _apply(src, blocks)
-        _check_delimiters(src, out, path, regions)
-        _check_python_syntax(src, out, path)
-        _verify_result(out, blocks, path)
-        out = _fix_markdown(out, path)
-        _check_markdown(src, out, path)
-        specs.append((path, src, out))
-    for path, _src, out in specs:
-        _atomic_write_sync(path, out)
-        with open(path, encoding="utf-8") as f:
-            if f.read() != out:
-                raise CodeEditError(
-                    f"{path}: disk content diverged after write - the file may be corrupt; re-check"
-                )
-
-
-def check(path: str, blocks: Sequence[tuple]) -> str:
-    """Pre-flight a block set WITHOUT writing (session 35, addendum 6):
-    runs every check edit() would run (verify, delimiters, result) and
-    returns the preview diff. A failing check raises CodeEditError with
-    the exact block and reason. Use this to validate blocks before
-    committing to the write."""
-    with open(path, encoding="utf-8") as f:
-        src = f.read()
-    blocks = [_normalize_block(tuple(b)) for b in blocks]
-    _verify_blocks(src, blocks)
-    out, regions = _apply(src, blocks)
-    _check_delimiters(src, out, path, regions)
-    _check_python_syntax(src, out, path)
-    _verify_result(out, blocks, path)
-    out = _fix_markdown(out, path)
-    _check_markdown(src, out, path)
-    import difflib
-
-    return "".join(
-        difflib.unified_diff(
-            src.splitlines(keepends=True),
-            out.splitlines(keepends=True),
-            fromfile=path,
-            tofile=path + " (edited)",
-        )
-    )
-
-
-def apply_patch_blocks(path: str, blocks: Sequence[tuple]) -> None:
-    """Alias kept for callers that think in patch blocks."""
-    edit(path, blocks)
 
 
 if __name__ == "__main__":
