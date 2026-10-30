@@ -58,9 +58,23 @@ from bench.roster import LADDER, roster_from_models_md
 
 TREK_STATE_FILE = "state/trek-state.json"
 
-# the epoch length: corner-to-corner of the grid - (64 - 1) + (15 - 1)
-# = 77 movements (the safe ladder's 15 rungs)
-EPOCH_MOVEMENTS = 77
+# THE EPOCH DERIVES FROM THE GRID DIMENSIONS (the author's ruling):
+# the max movements = n_rows + n_cols - 1 (64 + 15 - 1 = 78 on the
+# safe grid); the max evaluations = n_rows + n_cols (the spawn cell +
+# the steps - 64 + 15 = 79). Computed once from the grid below.
+_EPOCH_MOVEMENTS: int | None = None
+
+
+def epoch_movements(grid: "Grid") -> int:
+    """the walker's movement budget per epoch: n_rows + n_cols - 1,
+    derived from the grid's dimensions (the author's encoding)."""
+    return grid.n_rows + grid.n_cols - 1
+
+
+def epoch_evaluations(grid: "Grid") -> int:
+    """the evaluations per epoch (the spawn cell + the steps):
+    n_rows + n_cols - derived from the grid's dimensions."""
+    return grid.n_rows + grid.n_cols
 
 # the four directions: (row_step, col_step) - no diagonals
 DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -96,8 +110,30 @@ def exam_instance_key(fam: str, rung: str, k_quant: str, v_quant: str) -> int:
 # ---------------------------------------------------------- the grid
 
 
+def _param_of(fam: str) -> float:
+    """the family's parameter count from the roster's models.md table
+    (the params column; the file is the author-maintained truth)."""
+    # parse models.md: the table rows are name | params | f16 | window | repo
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models.md")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for ln in fh:
+                cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+                if len(cells) >= 5 and cells[0] == fam and cells[1] not in ("params", "", "unknown"):
+                    try:
+                        return float(cells[1])
+                    except ValueError:
+                        break
+    except OSError:
+        pass
+    return float("inf")
+
+
 def _models_sorted() -> list[str]:
-    return [fam for fam, _repo in roster_from_models_md()]
+    """the model list, sorted by param size ascending (the author's
+    ruling - the grid's row axis is the param ladder)."""
+    fams = [fam for fam, _repo in roster_from_models_md()]
+    return sorted(fams, key=_param_of)
 
 
 def _bpw(rung: str) -> float:
@@ -139,6 +175,25 @@ class Grid:
             "post", "grid.dimensions",
             self.n_rows == 64 and self.n_cols == len(LADDER),
             f"the grid is {self.n_rows}x{self.n_cols}, expected 64x{len(LADDER)}",
+        )
+        # the author's contracts: the epoch derives from the grid's
+        # dimensions; the models sort by param size ascending; an
+        # epoch ends at exactly n_rows + n_cols - 1 movements with
+        # n_rows + n_cols evaluations behind it
+        warn_contract(
+            "inv", "grid.epoch_derives",
+            epoch_movements(self) == self.n_rows + self.n_cols - 1
+            and epoch_evaluations(self) == self.n_rows + self.n_cols,
+            f"the epoch budgets do not derive from the grid "
+            f"({epoch_movements(self)} movements, {epoch_evaluations(self)} evaluations)",
+        )
+        warn_contract(
+            "post", "grid.models_param_sorted",
+            all(
+                _param_of(self.models[i]) <= _param_of(self.models[i + 1])
+                for i in range(len(self.models) - 1)
+            ),
+            "the model list is not sorted by param size ascending",
         )
 
     def cell(self, row: int, col: int) -> tuple[str, str]:
@@ -558,6 +613,8 @@ def walk(
         ws["draws"] = draws_used
         return DIRECTIONS[rng.randrange(4)]
 
+    epoch_budget = epoch_movements(grid)
+
     def save() -> None:
         ws["life"] = life
         ws["position"] = list(position)
@@ -615,7 +672,15 @@ def walk(
         # the visit - the spawn cell costs no movement
         movements += 1
         total += 1
-        if movements >= EPOCH_MOVEMENTS:
+        if movements >= epoch_budget:
+            # INV (the author's contract): the epoch ends at EXACTLY
+            # the derived budget of movements (n_rows + n_cols - 1);
+            # over-shooting means the boundary check was skipped
+            warn_contract(
+                "inv", "walk.exact_movements",
+                movements == epoch_budget,
+                f"the epoch ended at {movements} movements, expected exactly {epoch_budget}",
+            )
             # THE LIFE ENDS: teleport to the high-score cell
             if best in spawn_high_targets:
                 # no improvement in this life: the spawn's walk ENDS
