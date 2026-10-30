@@ -121,14 +121,71 @@ def check_requirements() -> None:
         )
 
 
+def preflight_gc() -> None:
+    """THE PREFLIGHT GC (the author's ruling): run the garbage
+    collector BEFORE asserting anything - a run needs 16 GiB of
+    headroom on /home for the f16 downloads and the quantization
+    scratch, and the stranded quants / evictable f16s from an
+    abruptly-stopped previous run are the first recovery source.
+    This is the SAME cleanup the runtime watchdog runs (the
+    stranded-quant sweep first, then the least-likely f16 eviction),
+    executed synchronously here until the headroom is met or the
+    sources are exhausted. It never touches the state or the
+    results - only the model files the runtime rules would delete
+    anyway."""
+    import trek_run as R
+
+    free = R._free_gib()
+    if free > R.GC_THRESHOLD_GIB:
+        return  # the headroom already there
+    print(f"[preflight] free {free:.1f} GiB <= {R.GC_THRESHOLD_GIB:g} GiB - running the gc first")
+    # the same exclusions the watchdog uses: nothing active yet
+    R._GC_POOL.clear()
+    R._GC_POOL.extend(R.the_pool())
+    guard = 0
+    while R._free_gib() <= R.GC_THRESHOLD_GIB and guard < 1000:
+        guard += 1
+        # 1. the stranded-quant sweep (crash leftovers), newest kept
+        stranded = R._stranded_quants("models", set())
+        if stranded:
+            for p in stranded:
+                os.remove(p)
+                print(f"[preflight] gc: removed stranded {os.path.basename(p)}")
+            continue
+        # 2. the least-likely f16 eviction (the imatrix stays behind)
+        victim = R._least_likely_f16("models", set(), R._GC_DONE_SET, R._GC_POOL)
+        if not victim:
+            break  # the sources exhausted: the assert will fire with the reason
+        os.remove(victim)
+        print(f"[preflight] gc: evicted the f16 of {os.path.basename(os.path.dirname(victim))}")
+    free = R._free_gib()
+    print(f"[preflight] the gc done: {free:.1f} GiB free")
+
+
 def preflight_selfcheck() -> None:
     """The behavioral self-check (the ruff --fix lesson): syntax and
     lint cannot see the failure class that costs hours - a shadowed
     name silently returning the wrong paper. Before any candidate is
-    touched, the exam machinery, the pool, the state and the disk
-    are verified against the live code. SILENT on success (the
-    quiet-preflight ruling); ANY failure refuses to start the run
-    with a printed reason. ~2s."""
+    touched, THE GC RUNS (the author's ruling - the disk headroom is
+    recovered from the previous run's leftovers first), then the
+    exam machinery, the pool, the state and the disk are verified
+    against the live code. SILENT on success (the quiet-preflight
+    ruling); ANY failure refuses to start the run with a printed
+    reason. ~2s."""
+    import trek_run as R
+
+    # --- THE PREFLIGHT GC (the author's ruling): the disk headroom is
+    # --- recovered from the previous run's leftovers BEFORE asserting;
+    # --- the run needs 16 GiB for the f16 downloads + quant scratch ---
+    preflight_gc()
+    free = R._free_gib()
+    assert free > R.GC_THRESHOLD_GIB, (
+        f"only {free:.1f} GiB free on /home - the run needs "
+        f"{R.GC_THRESHOLD_GIB:g} GiB of headroom (the gc exhausted the "
+        f"stranded quants and the evictable f16s; free some space by hand)"
+    )
+    print(f"[preflight] the disk headroom: {free:.1f} GiB free")
+
     import bench.exam as E
     from bench.roster import LADDER, roster_from_models_md
 
