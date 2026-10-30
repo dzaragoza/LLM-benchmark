@@ -475,7 +475,7 @@ def run_pair(
         # (the restart re-dispatches the cell and the leftover
         # candidates resume - the skip-the-missing bug); a completed
         # sweep clears it so the walk steps away honestly.
-        st.setdefault("walk", {})["dispatched"] = [-1, -1]
+        state.setdefault("walk", {})["dispatched"] = [-1, -1]
         save()
     finally:
         if rung != "F16" and os.path.isfile(gguf):
