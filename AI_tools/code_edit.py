@@ -99,6 +99,22 @@ class CodeEditError(Exception):
     """An edit block failed verification - the file was NOT modified."""
 
 
+class ContractViolationError(AssertionError):
+    """a violated code_edit contract (the repo's design-by-contract
+    philosophy, self-contained in the tool): the greppable tag and
+    the detail ride the exception."""
+
+
+def _contract(kind: str, name: str, ok: bool, detail: str = "") -> None:
+    """code_edit's own contract check (errors, never warnings - the
+    author's philosophy): raises ContractViolationError with the
+    greppable [contract:kind:name] tag when ok is False."""
+    if not ok:
+        raise ContractViolationError(
+            f"[contract:{kind}:{name}] VIOLATED: {detail or 'condition failed'}"
+        )
+
+
 def _as_lines(text: str | Sequence[str]) -> list[str]:
     """new_lines may be a string (one line, newline optional) or a
     list/sequence of lines; returns bare lines (no newline)."""
@@ -334,41 +350,57 @@ def _selftest() -> int:
     return fails
 
 
-def _code_line_numbers(src: str) -> set[int]:
-    """The physical line numbers that carry real CODE - computed by
-    tokenize: a line is CODE iff at least one token STARTS on it that
-    is neither a string literal, nor a comment, nor pure whitespace
-    bookkeeping (NL/NEWLINE/INDENT/DEDENT/ENCODING). Everything else
-    is PROSE: a docstring's interior, a comment, a blank line.
+def _masked_line(src: str) -> dict[int, str]:
+    """Per physical line, the line's content with STRING-LITERAL and
+    COMMENT fragments masked (replaced by spaces, the length
+    preserved). The seam check runs against the masked text: a
+    violation must live in CODE, and masking removes the prose while
+    keeping the line/column geometry. A line whose masked form still
+    carries the seam shape is a code violation; a docstring's
+    interior, a comment, or a string fixture masks to whitespace and
+    can never match.
 
     The self-match lesson (the raw-scan flaw): a gate that scans raw
-    text flags its own documentation DESCRIBING the violation, and
-    false-positives legal multi-line constructs; tokenize draws the
-    line between prose and code, and only code can violate. A glued
-    seam always carries code tokens (the return/raise statement
-    itself), so the gate loses nothing by skipping prose."""
+    text flags its own documentation DESCRIBING the violation and
+    any string FIXTURE encoding one (the selftest's own test cases);
+    masking draws the line between prose and code, and only code can
+    violate."""
     import io
+    import re as _re
     import tokenize as _tk
 
-    code: set[int] = set()
+    lines = src.split("\n")
+    masked = {ln_no: lines[ln_no - 1] for ln_no in range(1, len(lines) + 1)}
     try:
         for tok in _tk.generate_tokens(io.StringIO(src).readline):
-            if tok.type in (
-                _tk.STRING,
-                _tk.COMMENT,
-                _tk.NL,
-                _tk.NEWLINE,
-                _tk.INDENT,
-                _tk.DEDENT,
-                _tk.ENCODING,
-            ):
-                continue
-            code.add(tok.start[0])
+            if tok.type != _tk.STRING:
+                continue  # comments stay visible: a comment glued onto code is the violation's shape
+            # mask the token's span on every line it touches
+            for ln_no in range(tok.start[0], tok.end[0] + 1):
+                if ln_no not in masked:
+                    continue
+                text = list(masked[ln_no])
+                if ln_no == tok.start[0] and ln_no == tok.end[0]:
+                    a, b = tok.start[1], tok.end[1]
+                    for c in range(a, b):
+                        if c < len(text):
+                            text[c] = " "
+                elif ln_no == tok.start[0]:
+                    for c in range(tok.start[1], len(text)):
+                        if c < len(text):
+                            text[c] = " "
+                elif ln_no == tok.end[0]:
+                    for c in range(0, tok.end[1]):
+                        if c < len(text):
+                            text[c] = " "
+                else:
+                    text = [" "] * len(text)
+                masked[ln_no] = "".join(text)
     except _tk.TokenError:
-        # untokenizable (the ast gate catches real breakage); treat
-        # every line as code - the raw scan, never a silent skip
-        return set(range(1, src.count("\n") + 2))
-    return code
+        # untokenizable (the ast gate catches real breakage): no
+        # masking - the raw scan, never a silent skip
+        return {ln_no: lines[ln_no - 1] for ln_no in range(1, len(lines) + 1)}
+    return masked
 
 
 def _check_replacement_seam(out: str, path: str) -> None:
@@ -382,29 +414,43 @@ def _check_replacement_seam(out: str, path: str) -> None:
     structure. The signature: a balanced-paren line whose
     return/raise/break/continue statement is followed by 4+ interior
     spaces and a comment marker or a statement keyword - two
-    statements where one should be. The scan is CODE-ONLY (the
-    self-match fix: prose cannot violate); refuses with the merged
-    lines; the fix is a fresh anchor after re-reading the region."""
+    statements where one should be. The scan runs on the MASKED text
+    (string/comment fragments blanked): prose cannot violate; refuses
+    with the merged lines; the fix is a fresh anchor after re-reading
+    the region."""
     if _file_type(path) != "python":
         return
     _SEAM_PAT = (
         r"\b(return|raise|break|continue)\b"
         r".*\S\s{4,}(?:#|def |class |if |for |while |with |assert )"
     )
-    code_lines = _code_line_numbers(out)
+    masked = _masked_line(out)
     merged = []
-    for ln_no, ln in enumerate(out.split("\n"), start=1):
-        if ln_no not in code_lines:
-            continue  # prose (a string interior, a comment): never a seam
-        m = re.search(_SEAM_PAT, ln)
+    for ln_no in range(1, len(out.split("\n")) + 1):
+        ln = masked.get(ln_no, "")
+        m = re.search(_SEAM_PAT, ln) if ln.strip() else None
         if m and ln.count("(") == ln.count(")"):
-            merged.append(ln)
+            # THE DEPTH CHECK (the ternary false positive): the glue
+            # must sit at PAREN DEPTH 0 - the statement is genuinely
+            # complete. A keyword inside parens (a ternary's 'if',
+            # a comprehension's 'for') is legal code, never a seam.
+            # the depth at the GLUE (the keyword's position), not the
+            # match's start: the incident's glue is outside any parens
+            # (the statement complete); a ternary's 'if' sits inside
+            kw = m.group(0).rstrip()
+            kw_len = len(kw.split()[-1]) + 1  # the keyword + its space
+            kw_pos = m.end() - kw_len
+            prefix = ln[:kw_pos]
+            if prefix.count("(") != prefix.count(")"):
+                continue  # the keyword is inside an expression: legal
+            merged.append(out.split("\n")[ln_no - 1])
     if merged:
         raise CodeEditError(
             f"{path}: the replacement SEAM is broken - a statement is "
             f"glued to the following line (a stale anchor after a format "
             f"pass; re-read the region and re-aim):\n" + "\n".join(merged[:3])
         )
+
 
 
 def _check_python_syntax(src: str, out: str, path: str) -> None:
@@ -1156,6 +1202,11 @@ def edit(path: str, blocks: Sequence[tuple]) -> None:
     Raises CodeEditError (file untouched) when any block cannot be
     verified against the current content.
     """
+    # PRE: the target exists and the blocks are non-empty
+    _contract("pre", "edit.target_exists", os.path.isfile(path),
+              f"the edit target {path!r} does not exist")
+    _contract("pre", "edit.blocks_nonempty", len(blocks) > 0,
+              "an edit needs at least one block")
     with open(path, encoding="utf-8") as f:
         src = f.read()
     blocks = [_normalize_block(tuple(b)) for b in blocks]

@@ -11,6 +11,8 @@ its full prompt and answer for debugging.
 
 from __future__ import annotations
 
+from bench.contracts import warn_contract
+
 import json
 import os
 import random
@@ -68,6 +70,17 @@ def build_chain(seed: int, level: int) -> dict[str, Any]:
     order = list(range(n_pairs))
     rng.shuffle(order)
     rows = [pairs[i] for i in order]
+    # POST: the paper is the level shape - level d = d+1 pairs, the
+    # shuffled rows are the same pairs (no loss, no dupes), and the
+    # chain is one unbroken path
+    warn_contract(
+        "post", "exam.chain_shape",
+        len(rows) == n_pairs
+        and sorted(rows) == sorted(pairs)
+        and len(tokens) == n_pairs + 1,
+        f"the chain paper for level {level} is malformed "
+        f"({len(rows)} rows, {len(tokens)} tokens)",
+    )
     return {
         "part": "chain",
         "level": level,

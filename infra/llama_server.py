@@ -21,6 +21,8 @@ when live-bench was absorbed into speed_gate.py.
 
 from __future__ import annotations
 
+from bench.contracts import warn_contract
+
 import json
 import os
 import re
@@ -68,6 +70,9 @@ def find_server() -> str | None:
 
 
 def wait_healthy(port: int, timeout: float = 300, proc: Any = None) -> bool:
+    """POST (the caller's contract): True means the server answered a
+    health probe - the process is up and accepting; False means it
+    failed (the caller must stop_server regardless)."""
     """Poll /health until 200. Returns True on healthy; if proc dies,
     or the timeout passes, returns False."""
     url = f"http://127.0.0.1:{port}/health"
@@ -178,6 +183,9 @@ def memory_breakdown_gib(log_path: str) -> dict[str, Any] | None:
 
 
 def stop_server(proc: Any, port: int, warn_after: float = 60) -> bool:
+    """POST (the lifecycle's contract): the process is terminated and
+    the port is released - a subsequent launch on the same port
+    starts clean (the exam sweep's per-candidate guarantee)."""
     """Kill the server and verify the port is free (a lingering server
     silently redirects the next run at the WRONG model)."""
     if proc.poll() is None:

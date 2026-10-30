@@ -8,6 +8,8 @@ readers). Extracted verbatim -- addendum citations stay."""
 
 from __future__ import annotations
 
+from bench.contracts import warn_contract
+
 import json
 import os
 import sys
@@ -101,6 +103,9 @@ def validate_state(state: Any) -> dict[str, Any]:
 
 
 def load_state(path: str) -> dict[str, Any]:
+    """POST (the caller's contract): the returned dict is a parsed
+    JSON object - a corrupt file raises here (never a silent
+    empty)."""
     """The state file loader (moved here in the addendum-15 refactor:
     the bench modules save state mid-controller and must not import
     the orchestrator). Session 44, R-22: the loaded file is schema-
@@ -121,6 +126,13 @@ def save_state(path: str, state: dict[str, Any]) -> None:
     failure so the next save starts clean. The state file IS the
     never-re-measure ledger - losing it re-measures everything, so
     its write is the one place the run pays for durability."""
+    # PRE: the state must validate BEFORE the write (the schema
+    # gate is the caller's; this is the store's own shape check)
+    warn_contract(
+        "pre", "state_store.state_is_mapping",
+        isinstance(state, dict),
+        f"the state to save is not a mapping ({type(state).__name__})",
+    )
     tmp = path + ".tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as f:

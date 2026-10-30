@@ -13,6 +13,8 @@ machine.
 
 from __future__ import annotations
 
+from bench.contracts import warn_contract
+
 import os
 import subprocess
 
@@ -45,14 +47,15 @@ def pull_rebase(autostash: bool = True) -> tuple[int, str, str]:
 
     Session 43, R-20: the no_verify bypass is REMOVED - the hooks are
     never omitted; a pull that trips a hook is fixed, not skipped."""
-    if in_rebase():
-        return (
-            128,
-            "",
-            "a rebase is already in progress (unresolved conflicts) - "
-            "resolve it by hand: git status, fix the conflicts, git add, "
-            "git rebase --continue; never commit onto the detached HEAD",
-        )
+    # PRE: never pull inside an open rebase (the 15:53 incident's
+    # guard - the recovery is the operator's, never the tool's)
+    warn_contract(
+        "pre", "git_ops.pull_not_mid_rebase",
+        not in_rebase(),
+        "a rebase is in progress (unresolved conflicts) - resolve it "
+        "by hand: git status, fix the conflicts, git add, git rebase "
+        "--continue; never commit onto the detached HEAD",
+    )
     args = ["git", "pull", "--rebase"]
     if autostash:
         args.append("--autostash")
