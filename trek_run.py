@@ -723,6 +723,32 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
             lines.append(f"| <= {cut:g}s | - | (nothing measured yet) | - |")
     lines.append("")
 
+    # THE CURRENT LIFE (the walker's own progress): the life number,
+    # where it stands, its high score and best cell, and its movement
+    # budget's state - the search's live pulse, one row
+    lines += ["## the walker (the current life)", ""]
+    ws = st.get("walk", {})
+    life = ws.get("life", 1)
+    pos = ws.get("position", [-1, -1])
+    movs = ws.get("movements", 0)
+    high = ws.get("high", -1)
+    best = ws.get("best", pos)
+    best_cell = ""
+    try:
+        fam, rung = grid.cell(best[0], best[1])
+        best_cell = f"{fam} {rung}"
+    except Exception:
+        pass
+    epoch_budget = trek.epoch_movements(grid)
+    status = "at the spawn (the teleport drawn)" if pos == [-1, -1] else (
+        f"movement {movs} of {epoch_budget} in the epoch"
+    )
+    lines += [
+        f"life {life}: {status}; high {high}, best at "
+        f"{best_cell or best}",
+        "",
+    ]
+
     # THE STOP CONDITION'S PROGRESS (the radio): per tier the union
     # bound's sum, the champion, and the certification state
     lines += ["## the radio (the stop condition's progress)", ""]

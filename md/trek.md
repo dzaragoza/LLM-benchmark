@@ -19,6 +19,10 @@ the tier's champion
 | <= 64s | - | (nothing measured yet) | - |
 | <= 128s | - | (nothing measured yet) | - |
 
+## the walker (the current life)
+
+life 1: movement 39 of 78 in the epoch; high -1, best at Qwen3-8B Q3_K_S
+
 ## the radio (the stop condition's progress)
 
 the per-tier certification: the live cells' summed probability
