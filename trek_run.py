@@ -908,6 +908,19 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             f"(high {pick['high']}, best at {pick['best']})"
         )
         run_pair(fam, rung, models_dir, st, port, pick["budget"])
+        # THE HIGH CREDITS IMMEDIATELY (the author's ruling): the
+        # sweep's result lands in the walk record NOW - the teleport
+        # takes the walker to the LAST high score it found, never a
+        # stale best from before the dig's result arrived (the walk's
+        # own no-action path would only learn on a revisit - too late
+        # if the epoch exhausts first and the walker teleports home)
+        swept_score = trek._cell_best_score(
+            st, fam, rung, KV_LADDER, pick["budget"]
+        )
+        ws = st.setdefault("walk", {})
+        if swept_score > ws.get("high", -1):
+            ws["high"] = swept_score
+            ws["best"] = [pick["row"], pick["col"]]
         # PHASE B (the author's #5): the radio fires after the sweep,
         # when the cell's action is done. It says continue (the walk
         # is untouched) or STOP (all 8 tiers certified - the trek is
