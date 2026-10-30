@@ -154,8 +154,9 @@ def preflight_selfcheck() -> None:
     # --- the paper: the unknown-family branch ---
     assert E.bell_window({}, "no-such-family-xyz", "models") is None
 
-    # --- the roster ladder the pool is drawn from ---
-    assert LADDER[-1] == "F16" and len(LADDER) == 32
+    # --- the roster ladder the pool is drawn from (the safe ladder:
+    # --- 15 classic K-quant rungs, F16 last - the imatrix rungs cut) ---
+    assert LADDER[-1] == "F16" and len(LADDER) == 15, "the safe ladder reshaped - update me when the truth changes"
 
     # --- the roster: readable, granite first ---
     roster = roster_from_models_md()
