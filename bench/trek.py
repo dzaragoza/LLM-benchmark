@@ -567,15 +567,23 @@ def walk(
         ws["spawn_targets"] = [list(t) for t in spawn_high_targets]
 
     if position == (-1, -1):
-        # THE SPAWN: a random grid position; the high score starts -1
+        # THE SPAWN IS A TELEPORT, NOT A MOVEMENT (the author's
+        # correction): the walker materializes at a random grid
+        # position with the high score -1; the spawn costs nothing -
+        # the first MOVEMENT is after evaluating the first cell, so a
+        # life evaluates 96 cells (the spawn cell + 95 step-cells).
         position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
         high = -1
         best = position
-        movements = 0
+        movements = 0  # the teleport: free
         save()
 
     row, col = position
-    dispatched = tuple(ws.get("dispatched", position))
+    # THE DISPATCH DEFAULT: nothing dispatched - (-1,-1), never the
+    # current position (the fresh-state bug: the default equaled the
+    # spawn cell, so the spawn's first action was silently skipped -
+    # the walker stepped away without examining its birthplace)
+    dispatched = tuple(ws.get("dispatched", [-1, -1]))
     total = 0
     while total < max_steps:
         fam, rung = grid.cell(row, col)
@@ -602,6 +610,8 @@ def walk(
         if cell_score > high:
             high = cell_score
             best = (row, col)
+        # THE MOVEMENT IS THE STEP AWAY (after the evaluation), not
+        # the visit - the spawn cell costs no movement
         movements += 1
         total += 1
         if movements >= EPOCH_MOVEMENTS:
