@@ -21,4 +21,4 @@ time limit), derived from the shared exam histories
 | budget | position | movements | high | best cell |
 |---|---|---|---|---|
 
-_98 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
+_147 candidates measured (of 2048 pairs x 49 kv = 100,352 total); the histories are the single source of truth, the tables derive on every ledger write._
