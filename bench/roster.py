@@ -20,33 +20,23 @@ import infra.hf_download as hf_download
 # candidates surface. F16 last: the f16 master is the quantization
 # source for every quant of its family, so it is examined (and
 # deleted by the gc) last.
+# THE SAFE LADDER (the author's safety ruling): every imatrix-
+# dependent rung is cut - the imatrix computation is the sole source
+# of the vulkan device-lost crashes (20 of the 22 recorded events,
+# the RADV command-buffer OOM), and no quant is worth a kernel panic.
+# The classic K-quant rungs (Q2_K .. F16) need no importance matrix.
+# The grid reshapes accordingly: 64 models x 15 rungs = 960 pairs.
+# BF16 is cut (the author's ruling: f16 is basically the same thing)
 LADDER = [
-    "IQ1_S",
-    "Q2_0",
-    "Q1_0",
-    "IQ2_XXS",
-    "Q2_K_S",
-    "TQ2_0",
-    "IQ1_M",
-    "IQ2_XS",
-    "IQ2_S",
     "Q2_K",
-    "IQ3_XXS",
-    "IQ2_M",
-    "IQ3_XS",
-    "IQ4_XS",
-    "IQ3_S",
-    "IQ3_M",
     "Q3_K_S",
     "Q4_0",
-    "IQ4_NL",
     "Q3_K_M",
     "Q4_K_S",
     "Q4_1",
     "Q4_K_M",
     "Q3_K_L",
     "Q5_K_S",
-    "TQ1_0",
     "Q5_0",
     "Q5_K_M",
     "Q5_1",
@@ -54,7 +44,6 @@ LADDER = [
     "Q8_0",
     "F16",
 ]
-# BF16 is cut (the author's ruling: f16 is basically the same thing)
 
 # the fallback training window when a config.json cannot be read
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18

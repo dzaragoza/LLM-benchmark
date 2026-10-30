@@ -58,8 +58,9 @@ from bench.roster import LADDER, roster_from_models_md
 
 TREK_STATE_FILE = "state/trek-state.json"
 
-# the epoch length: corner-to-corner (64 - 1) + (32 - 1) = 95
-EPOCH_MOVEMENTS = 95
+# the epoch length: corner-to-corner of the grid - (64 - 1) + (15 - 1)
+# = 77 movements (the safe ladder's 15 rungs)
+EPOCH_MOVEMENTS = 77
 
 # the four directions: (row_step, col_step) - no diagonals
 DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -136,8 +137,8 @@ class Grid:
                 self._idx_to_cell[self.pool_index(row, col)] = (row, col)
         warn_contract(
             "post", "grid.dimensions",
-            self.n_rows == 64 and self.n_cols == 32,
-            f"the grid is {self.n_rows}x{self.n_cols}, expected 64x32",
+            self.n_rows == 64 and self.n_cols == len(LADDER),
+            f"the grid is {self.n_rows}x{self.n_cols}, expected 64x{len(LADDER)}",
         )
 
     def cell(self, row: int, col: int) -> tuple[str, str]:
