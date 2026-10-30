@@ -136389,3 +136389,24 @@ Fix the cause, then RERUN THE SAME COMMAND: the script is
 idempotent and will resume from this phase.
 ============================================================
 [radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
+
+===== 2026-10-30T01:37:08 | full_benchmark.py --clean =====
+[trek] life 1, movement 8: Llama-3.1-8B-Instruct IQ2_S - exam at t=1s (high -1, best at [55, 5])
+  [acquire] Llama-3.1-8B-Instruct IQ2_S - (download/convert/quantize may take minutes)
+  [hub] listing files for meta-llama/Llama-3.1-8B-Instruct ...
+  [hub] 17 files listed
+  [1] downloading safetensors from meta-llama/Llama-3.1-8B-Instruct (safetensors + configs only; once per family; output hidden; shown on error)
+  [2] f16 conversion needs ~15.0 GiB free (the f16 is roughly the source's tensor payload) but only 6.1 GiB is free - free disk space and rerun; the script resumes from this phase
+
+============================================================
+PHASE 2 FAILED at IQ2_S: not enough disk for the f16 conversion
+Possible causes and fixes:
+  - converter deps: pip install -r requirements.txt (needs transformers, torch, gguf, sentencepiece, protobuf)
+  - pinned converter missing: ./llama.cpp must be the matching checkout
+  - quantizer missing: place the b11669 build at ./llama-b11669/
+  - RAM/disk: f16 conversion needs several GB of each
+  - disk space: free some (the f16 gguf is written next to its source; both live together until the verified delete)
+Fix the cause, then RERUN THE SAME COMMAND: the script is
+idempotent and will resume from this phase.
+============================================================
+[radio] t1=- t2=- t4=- t8=- t16=- t32=- t64=- t128=- - certified 0/8
