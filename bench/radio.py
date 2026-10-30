@@ -266,7 +266,19 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                     break
                 p = 1.0 if gap <= 0 else tail.p(gap)
             total += count * p
-        certified = modelable and quorum and total < CERTIFY_EPS
+        # THE FLOOR-CHAMPION GUARD (the early-stop bug the author
+        # caught): a certificate asserts 'the champion cannot be
+        # beaten' - a champion at the FLOOR (C = -1, nothing passed
+        # anywhere at this tier) dominates nothing, and certifying it
+        # stops the search before anything is known (the 4-sweep run:
+        # every candidate timed out at level 0, the pools filled with
+        # zero-gains, every unknown modeled as 'can never pass', all
+        # tiers certified at C = -1). A tier certifies only when its
+        # champion is a REAL measured score - at least one level
+        # passed somewhere at that tier.
+        certified = (
+            modelable and quorum and C[t] >= 0 and total < CERTIFY_EPS
+        )
         tiers[str(t)] = {
             "champion": C[t],
             "live_units": sum(groups.values()),
@@ -275,6 +287,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             "pool_D": d_total,
             "pool_G": g_total,
             "quorum": quorum,
+            "floor_champion": C[t] < 0,  # the guard's flag: nothing passed at this tier yet
             # RULING 2: tier 1's certification rests on the support-cap
             # assumption (G's max genesis is the champion's own) - the
             # flagged eager tier, logged in every radio_stop
