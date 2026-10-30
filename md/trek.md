@@ -14,14 +14,14 @@ the tier's champion
 | <= 2s | - | (nothing measured yet) | - |
 | <= 4s | - | (nothing measured yet) | - |
 | <= 8s | - | (nothing measured yet) | - |
-| <= 16s | 1 | granite-3.3-8b-instruct Q2_K k=iq4_nl v=q8_0 | - |
-| <= 32s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=iq4_nl | - |
-| <= 64s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | - |
-| <= 128s | 3 | granite-3.3-8b-instruct Q2_K k=f16 v=q8_0 | - |
+| <= 16s | - | (nothing measured yet) | - |
+| <= 32s | - | (nothing measured yet) | - |
+| <= 64s | - | (nothing measured yet) | - |
+| <= 128s | - | (nothing measured yet) | - |
 
 ## the walker (the current life)
 
-life 1: movement 45 of 78 in the epoch; high 3, best at granite-3.3-8b-instruct Q2_K
+life 1: movement 0 of 78 in the epoch; high -1, best at Qwen3-8B Q3_K_S
 
 ## the radio (the stop condition's progress)
 
@@ -35,15 +35,15 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | -1 | 941 | 0 | no (floor champion) |
-| t2 | -1 | 949 | 31.5 | no (floor champion) |
-| t4 | -1 | 952 | 62.1 | no (floor champion) |
-| t8 | -1 | 955 | 91.7 | no (floor champion) |
-| t16 | 1 | 957 | 28.9 | no |
-| t32 | 3 | 957 | 2.02 | no |
-| t64 | 3 | 959 | 3.04 | no |
-| t128 | 3 | 959 | 4.25 | no |
+| t1 | -1 | 959 | 0 | no (floor champion) |
+| t2 | -1 | 960 | - | no (floor champion) |
+| t4 | -1 | 960 | - | no (floor champion) |
+| t8 | -1 | 960 | - | no (floor champion) |
+| t16 | -1 | 960 | - | no (floor champion) |
+| t32 | -1 | 960 | - | no (floor champion) |
+| t64 | -1 | 960 | - | no (floor champion) |
+| t128 | -1 | 960 | - | no (floor champion) |
 
 quorum: unmet; not blocked
 
-_931 candidates measured (of 960 pairs x 7 x 7 kv = 47,040 total, 2.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_49 candidates measured (49 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 0.1%); the histories are the single source of truth, the tables derive on every ledger write._
