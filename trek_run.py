@@ -470,6 +470,13 @@ def run_pair(
             if n % n_ladder == 0:
                 print(n, end="", flush=True)
         print()
+        # THE DISPATCH MARKER CLEARS when the cell's work is DONE (the
+        # sweep completed): an interrupted sweep leaves the marker set
+        # (the restart re-dispatches the cell and the leftover
+        # candidates resume - the skip-the-missing bug); a completed
+        # sweep clears it so the walk steps away honestly.
+        st.setdefault("walk", {})["dispatched"] = [-1, -1]
+        save()
     finally:
         if rung != "F16" and os.path.isfile(gguf):
             os.remove(gguf)

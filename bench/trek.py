@@ -531,6 +531,46 @@ def cell_action(
     return ("none", 0)  # every probed candidate closed: the top result a fail
 
 
+def cell_sweep_unfinished(
+    st: dict[str, Any],
+    fam: str,
+    rung: str,
+    kv_ladder: list[str],
+) -> bool:
+    """True when the cell's sweep never completed: any candidate
+    missing entirely (the sweep interrupted before reaching it) or
+    any candidate's exam unfinished (levels recorded but no frontier
+    verdict - the sweep died mid-exam). A COMPLETED sweep leaves all
+    49 candidates with terminal records (a fail verdict counts -
+    terminal is terminal). The walk re-offers such a cell on the
+    restart regardless of the dispatch marker - the leftover
+    candidates resume (the skip-the-missing bug)."""
+    cands = st.get("candidates", {})
+    any_hist = False
+    for k in kv_ladder:
+        for v in kv_ladder:
+            h = cands.get(cand_key(fam, rung, k, v))
+            if h is None:
+                if any_hist:
+                    return True  # some measured, this one missing: interrupted
+                continue
+            any_hist = True
+            # an unfinished exam: passes recorded but no frontier verdict
+            level = 0
+            rec = h.get(level)
+            while rec is not None and rec.get("status") == "pass":
+                level += 1
+                rec = h.get(level)
+            if rec is None and level > 0:
+                return True  # the exam died mid-run
+            if rec is None and not any(
+                isinstance(kk, int) or (isinstance(kk, str) and kk.lstrip("-").isdigit())
+                for kk in h
+            ):
+                return True  # only a _launch marker: never really measured
+    return False
+
+
 def _last_budget_of(h: dict[int, Any]) -> float:
     """the newest timeout budget in a history (for the unfinished-
     exam case): the re-run continues at that budget."""
@@ -646,7 +686,14 @@ def walk(
     while total < max_steps:
         fam, rung = grid.cell(row, col)
         action, budget = cell_action(st, fam, rung, kv_ladder)
-        if action == "exam" and (row, col) != dispatched:
+        # THE UNFINISHED-SWEEP OVERRIDE (the skip-the-missing bug): a
+        # cell whose sweep never completed (an interrupt mid-sweep
+        # leaves the dispatch marker set with candidates unmeasured)
+        # re-dispatches on the restart regardless of the marker - the
+        # leftover candidates resume. A COMPLETED sweep honors the
+        # marker: one action per visit, no escalation loop.
+        unfinished = cell_sweep_unfinished(st, fam, rung, kv_ladder)
+        if action == "exam" and ((row, col) != dispatched or unfinished):
             # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
             # needs exam work and was not yet dispatched THIS visit -
             # hand it to the runner; the phase-B radio then fires (the
