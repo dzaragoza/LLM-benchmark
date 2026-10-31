@@ -186,10 +186,24 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                         if sc > C[t]:
                             C[t] = sc
                     # THE ATTEMPTED BRACKETS: every pair (t, 2t) the
-                    # curve's run covered (2t <= the run's budget)
+                    # curve's run covered (2t <= the run's budget).
+                    # THE STARTED-ONLY RULE (the author's reading,
+                    # the movement-0 incident): a bracket enters D
+                    # only if the curve STARTED (ts[i] >= 0 - level
+                    # 0 passed: score 0 IS 'started'). The -1 -> -1
+                    # non-events are the GENESIS territory (G prices
+                    # 'can it start' once); counting the floor
+                    # curves' continued -1's as climb-zeros let the
+                    # never-starting population double-vote - 198
+                    # fake plateau zeros against 2 real gains - and
+                    # D read 99.3% zeros, so the radio priced
+                    # 'an unknown cell climbs past the champion' at
+                    # 0.03% and certified 8/8 with 18 unmeasured
+                    # cells after one sweep. The climb rate is
+                    # measured on CLIMBERS now.
                     if run_budget > 0:
                         for i in range(len(TIER_LADDER) - 1):
-                            if TIER_LADDER[i + 1] <= run_budget:
+                            if TIER_LADDER[i + 1] <= run_budget and ts[i] >= 0:
                                 D[ts[i + 1] - ts[i]] += 1
                     G[ts[0] + 1] += 1
                     if kind == "open":
