@@ -323,7 +323,7 @@ def git_sync_check() -> None:
         stamp(f"git sync check: no upstream configured - aborting ({remote.stderr.strip()[:100]})")
         raise SystemExit(1)
     remote = remote.stdout.strip()
-    print(f"[preflight] the local commit: {local}")
+    print(f"[preflight] the local commit: {local[:8]}")
     if local != remote:
         stamp(
             f"git OUT OF SYNC - the local HEAD {local[:8]} != the remote "
