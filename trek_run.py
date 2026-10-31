@@ -408,6 +408,26 @@ def run_pair(
     def save() -> None:
         _state_store.save_state(TREK_STATE_FILE, state)
 
+    # THE EMPTY-WORK GUARD (the author's catch, moved to the top):
+    # the work list computes BEFORE the acquire - a dispatch with no
+    # pending work (a no-op re-offer, a settled cell re-offered, any
+    # zero-work path) must not pay the download/quantize, the disk,
+    # or the launch. The guard was originally placed after the
+    # acquire (saved only the exams, not the acquisition - the
+    # expensive part); the author's audit caught the ordering.
+    work_early = [
+        (k, v)
+        for k in KV_LADDER
+        for v in KV_LADDER
+        if trek.needs_rerun(
+            candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s
+        )
+    ]
+    if not work_early:
+        print(f"[trek] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
+        _ACTIVE_FAMILY[0] = ""
+        return
+
     gguf = _acquire(fam, rung, models_dir)
     if not gguf:
         # the acquire failed: mark the launch failure on all 49
@@ -438,22 +458,6 @@ def run_pair(
         save()
         if rung != "F16" and os.path.isfile(gguf):
             os.remove(gguf)
-        _ACTIVE_FAMILY[0] = ""
-        return
-
-    # THE EMPTY-WORK GUARD: compute the work list BEFORE acquiring -
-    # a no-op re-offer (a completed action re-offered on a legacy
-    # record, or any zero-work dispatch) must not pay an acquisition
-    work_early = [
-        (k, v)
-        for k in KV_LADDER
-        for v in KV_LADDER
-        if trek.needs_rerun(
-            candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s
-        )
-    ]
-    if not work_early:
-        print(f"[trek] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
         _ACTIVE_FAMILY[0] = ""
         return
 
