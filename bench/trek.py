@@ -911,6 +911,30 @@ def walk(
         # NO ACTION NEEDED (the marker honored: the dispatched
         # action completed): apply the cell's best settled score to
         # the high score and move on
+        # INV: THE STEP-PAST GUARD (the author's catch, made
+        # permanent): the walk is a deterministic function of (state,
+        # seed) - a restart is a REPLAY of the same standing, and a
+        # cell with live work underfoot is never walked past. If this
+        # line executes with the dispatched action still pending (a
+        # step-past: the movement-48 incident walked off an
+        # interrupted dig and the walk never came back), the contract
+        # fires - the marker may only be honored when the dispatch's
+        # work is genuinely done (the action changed).
+        warn_contract(
+            "inv", "walk.no_step_past_live_work",
+            not (
+                (row, col) == dispatched
+                and action in ("exam", "dig")
+                and (
+                    dispatched_action is None
+                    or dispatched_action == [action, budget]
+                )
+            ),
+            "stepping past a cell whose dispatched work is still "
+            "pending - the completion must show as a CHANGED action "
+            "(the escalation moved on, or the dig closed the cell), "
+            "never assumed (the movement-48 incident)",
+        )
         ws["dispatched"] = [-1, -1]
         ws["dispatched_action"] = None
         cell_score = _cell_best_score(st, fam, rung, kv_ladder, budget)
