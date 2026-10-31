@@ -840,13 +840,31 @@ def walk(
         # re-dispatches on the restart regardless of the marker - the
         # leftover candidates resume. A COMPLETED sweep honors the
         # marker: one action per visit, no escalation loop.
-        unfinished = cell_sweep_unfinished(st, fam, rung, kv_ladder)
-        if action in ("exam", "dig") and ((row, col) != dispatched or unfinished):
-            # INV: THE RECORD ADVANCES ACROSS CALLS - this pick moves,
-            # or advances the epoch, or respawns, or RESUMES unfinished
-            # work (the legitimate repeat); anything else is a frozen
-            # walk - the pin bug's signature (the same cell, the same
-            # movement, dispatched again with no resume to do).
+        # THE RE-OFFER RULE, PRECISE (the author's ruling): the walk
+        # records the dispatched (action, budget) alongside the
+        # marker. On the next call, standing on the same cell:
+        # - the cell's action UNCHANGED (the same kind, the same
+        #   budget): the dispatched sweep was INTERRUPTED (an
+        #   interrupt mid-sweep leaves the histories still showing
+        #   the same pending work - the movement-48 incident: the
+        #   dig's 43 combos, 42 run, the 43rd's older timeout@32
+        #   verdict masked it from the retired detector) -> RE-OFFER,
+        #   the leftovers resume.
+        # - the cell's action CHANGED (the prospect completed and
+        #   escalated; the dig completed and closed): the dispatch
+        #   COMPLETED -> honor the marker, step away (the pin guard:
+        #   the escalation is work, but it belongs to a LATER visit -
+        #   the author's land-exam-move-out ruling).
+        dispatched_action = ws.get("dispatched_action")
+        interrupted = (
+            (row, col) == dispatched
+            and dispatched_action == [action, budget]
+        )
+        if action in ("exam", "dig") and ((row, col) != dispatched or interrupted):
+            # INV: THE RECORD ADVANCES - this pick moves, or the
+            # dispatch is a legitimate RESUME of interrupted work;
+            # a completed action never re-fires (its cell_action
+            # changed, so interrupted is False)
             entry_pos = entry_record.get("position")
             same_cell_as_entry = entry_pos == [row, col]
             nothing_advanced = (
@@ -855,11 +873,12 @@ def walk(
             )
             warn_contract(
                 "inv", "walk.record_advances",
-                not (same_cell_as_entry and nothing_advanced and not unfinished),
+                not (same_cell_as_entry and nothing_advanced and not interrupted),
                 "the walk record did not advance - a frozen walk "
-                "(the same cell re-dispatched at the same movement, "
-                "no unfinished work: the pin bug's signature)",
+                "(the same cell re-dispatched at the same movement "
+                "with no interrupted work: the pin bug's signature)",
             )
+            ws["dispatched_action"] = [action, budget]
             # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
             # needs exam work and was not yet dispatched THIS visit -
             # hand it to the runner; the phase-B radio then fires (the
@@ -880,10 +899,11 @@ def walk(
                 "draws": draws_used,
                 "reason": "evaluate",
             }
-        # NO ACTION NEEDED (or the action was already dispatched this
-        # visit - one action per cell): apply the cell's best settled
-        # score to the high score and move on
+        # NO ACTION NEEDED (the marker honored: the dispatched
+        # action completed): apply the cell's best settled score to
+        # the high score and move on
         ws["dispatched"] = [-1, -1]
+        ws["dispatched_action"] = None
         cell_score = _cell_best_score(st, fam, rung, kv_ladder, budget)
         if cell_score > high:
             high = cell_score
