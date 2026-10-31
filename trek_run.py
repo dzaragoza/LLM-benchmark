@@ -940,12 +940,30 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     # dispatch-return cycles never consumed steps, pass-throughs
     # don't either - the canary pins this determinism).
     ws = st.setdefault("walk", {})
-    if ws.get("spawn") and ws.get("position", [-1, -1]) != [-1, -1]:
-        ws["position"] = list(ws["spawn"])  # the life's origin
+    if ws.get("position", [-1, -1]) != [-1, -1]:
+        # THE LEGACY SPAWN (the third blind spot - the movement-48
+        # saga's final act): a record predating the 'spawn' field
+        # lacks the life's origin. The honest derivation: reset to
+        # (-1,-1) - the walker RE-SPAWNS, drawing fresh coordinates
+        # from the seeded stream; for a life that began at draws base
+        # D, the re-spawn consumes the same stream positions and
+        # re-derives the SAME coordinates (the determinism the canary
+        # pins). The replay is exact even without the recorded field.
+        spawn = ws.get("spawn")
+        if spawn is None:
+            # THE LEGACY SPAWN (the third blind spot - the movement-48
+            # saga's final act): a record predating the 'spawn' field
+            # lacks the life's origin. The honest derivation: reset to
+            # (-1,-1) - the walker RE-SPAWNS, drawing fresh coordinates
+            # from the seeded stream at the life's draws base; the
+            # determinism the canary pins re-derives the SAME
+            # coordinates. The replay is exact even without the field.
+            spawn = [-1, -1]
+        ws["position"] = list(spawn)
         ws["movements"] = 0
         ws["high"] = -1
-        ws["best"] = list(ws["spawn"])
-        ws["epoch_start"] = list(ws["spawn"])
+        ws["best"] = list(spawn) if spawn != [-1, -1] else ws.get("position", [-1, -1])
+        ws["epoch_start"] = list(spawn) if spawn != [-1, -1] else ws.get("position", [-1, -1])
         ws["dispatched"] = [-1, -1]
         ws["dispatched_action"] = None
         # the draws base restores (the life's first draw count) -
@@ -954,9 +972,10 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
         ws["replay_reset"] = True  # the one-shot flag: the first
         # walk() after the reset is the legitimate fresh standing
         trek.save_state(st)
+        origin_desc = f"{spawn}" if spawn != [-1, -1] else "the re-spawn (the stream re-derives)"
         print(
             f"[trek] the replay reset: re-walking life {ws.get('life', 1)} "
-            f"from its origin {ws['spawn']} (the histories answer for "
+            f"from its origin {origin_desc} (the histories answer for "
             f"every visited cell; live work fires in walk order)"
         )
 
