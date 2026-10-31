@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 45 of 78 in the epoch; high 6, best at Qwen3-8B Q3_K_S
+life 1: movement 46 of 78 in the epoch; high 6, best at Qwen3-8B Q3_K_S
 
 ## the radio (the stop condition's progress)
 
@@ -35,7 +35,7 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | -1 | 941 | 0 | no (floor champion) |
+| t1 | -1 | 940 | 0 | no (floor champion) |
 | t2 | -1 | 950 | 7.44 | no (floor champion) |
 | t4 | -1 | 952 | 14.8 | no (floor champion) |
 | t8 | -1 | 956 | 22.2 | no (floor champion) |
@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_931 candidates measured (960 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_980 candidates measured (1,009 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.1%); the histories are the single source of truth, the tables derive on every ledger write._
