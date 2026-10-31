@@ -95,14 +95,14 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # diff - the pin bug, the spawn off-by-one, and the dispatch-default
 # bug would ALL have been canary diffs. Stored as [row, col,
 # movements, budget] tuples.
-# THE SMALL GRID'S CANARY (the 5x3 grid, 7-movement epochs, 3 kv):
+# THE 10-MODEL GRID'S CANARY (the 10x3 grid, 12-movement epochs):
 # the seed-1 walk's first 20 picks on the canonical mock landscape
 WALK_CANARY: list[list] = [
-    [3, 0, 0, 1.0], [3, 1, 1, 1.0], [4, 1, 2, 1.0], [4, 2, 3, 1.0],
-    [3, 2, 4, 1.0], [3, 1, 5, 2.0], [2, 1, 6, 1.0], [4, 2, 0, 2.0],
-    [3, 2, 1, 2.0], [4, 2, 2, 4.0], [4, 1, 3, 2.0], [3, 1, 4, 4.0],
-    [4, 1, 5, 4.0], [3, 1, 6, 8.0], [4, 1, 0, 8.0], [4, 0, 1, 1.0],
-    [3, 0, 2, 2.0], [3, 1, 3, 16.0],
+    [6, 0, 0, 1.0], [6, 1, 1, 1.0], [7, 1, 2, 1.0], [8, 1, 3, 1.0],
+    [7, 1, 4, 2.0], [6, 1, 5, 2.0], [6, 2, 6, 1.0], [5, 2, 7, 1.0],
+    [4, 2, 8, 1.0], [5, 2, 9, 2.0], [6, 2, 10, 2.0], [7, 2, 11, 1.0],
+    [8, 1, 0, 2.0], [8, 0, 1, 1.0], [7, 0, 2, 1.0], [8, 0, 3, 2.0],
+    [7, 0, 4, 2.0], [8, 0, 5, 4.0], [8, 1, 6, 4.0],
 ]
 
 

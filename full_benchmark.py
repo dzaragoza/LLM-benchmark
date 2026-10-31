@@ -358,8 +358,11 @@ def git_tail(args: argparse.Namespace) -> None:
     if os.path.isfile(EI_STATE := "state/trek-state.json"):
         paths += [EI_STATE]
     # the results tree wholesale: exam answers + logs, the historical
-    # dumps and sidecars that predate the split
-    paths += glob.glob("results/**/*", recursive=True)
+    # dumps and sidecars that predate the split. THE ARG-LIST FIX
+    # (the author's report: [Errno 7] Argument list too long): the
+    # tree holds 30k+ files and the glob overflowed exec's argv -
+    # add the DIRECTORIES (git recurses) instead of every file.
+    paths += ["results"]
     # tool failure logs from models/ (quantize/convert/imatrix) are
     # BENCHMARK DEBUG DATA: they explain why a rung could not be
     # created - uploaded, never left stranded on the machine.

@@ -455,8 +455,6 @@ def run_pair(
                 if key not in candidates:
                     candidates[key] = {"_launch": {"status": "failed", "detail": "too large"}}
         save()
-        if rung != "F16" and os.path.isfile(gguf):
-            os.remove(gguf)
         _ACTIVE_FAMILY[0] = ""
         return
 
@@ -519,8 +517,12 @@ def run_pair(
         else:
             print()
     finally:
-        if rung != "F16" and os.path.isfile(gguf):
-            os.remove(gguf)
+        # THE QUANT KEEP RULE (the author's ruling): the intermediate
+        # quants (q4_0, q8_0) STAY on disk after the sweep - the
+        # small model count makes keeping them viable (no re-quantize
+        # on the next visit or the replay). The gc's behavior is
+        # UNCHANGED (the stranded-quant sweep and the f16 eviction
+        # still apply on the disk trigger).
         _ACTIVE_FAMILY[0] = ""
     return
 
