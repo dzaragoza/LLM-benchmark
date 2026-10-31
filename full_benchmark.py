@@ -293,25 +293,44 @@ def check_tooling(args: argparse.Namespace) -> None:
 # =========================================================== git
 
 
-def git_pull_head() -> None:
-    """The forgotten pull, made structural (session 36, addendum 32):
-    every run starts from the freshest state. A failed pull is a HARD
-    STOP - running
-    on a diverged tree measures the wrong thing with confidence."""
-    if os.environ.get("BENCH_NO_GIT_PULL"):
+def git_sync_check() -> None:
+    """THE SYNC CHECK (the author's ruling): the run REFUSES to start
+    unless the local HEAD matches the latest remote commit - the
+    missed-pull incident (the machine ran pre-two-phase code with
+    full confidence, hours of prospect-only sweeps) is the evidence.
+    The pull itself is the OPERATOR's job now: the tool never pulls;
+    it only verifies. A fetch (harmless - it updates the remote
+    refs without touching the tree) precedes the comparison, so the
+    check is against the ACTUAL remote, not a stale tracking ref."""
+    if os.environ.get("BENCH_NO_GIT_SYNC"):
         return
     if not git_ops.inside_work_tree():
-        stamp("git pull skipped - not a git work tree")
+        stamp("git sync skipped - not a git work tree")
         return
-    rc, out, err = git_ops.pull_rebase()
-    if rc != 0:
-        stamp(f"git pull failed - FIX BEFORE RUNNING: {err.strip()[:200]}")
+    import subprocess
+
+    r = subprocess.run(["git", "fetch", "--quiet"], capture_output=True)
+    if r.returncode != 0:
+        stamp("git fetch failed - cannot verify the sync; fix the remote access")
         raise SystemExit(1)
-    out = out.strip()
-    if out and "Already up to date" not in out:
-        stamp(f"git pull: {out.splitlines()[0]}")
-    else:
-        stamp("git pull: already up to date")
+    local = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    remote = subprocess.run(
+        ["git", "rev-parse", "@{u}"], capture_output=True, text=True
+    )
+    if remote.returncode != 0:
+        stamp(f"git sync check: no upstream configured - aborting ({remote.stderr.strip()[:100]})")
+        raise SystemExit(1)
+    remote = remote.stdout.strip()
+    print(f"[preflight] the local commit: {local}")
+    if local != remote:
+        stamp(
+            f"git OUT OF SYNC - the local HEAD {local[:8]} != the remote "
+            f"{remote[:8]}; run: git pull --rebase; and restart "
+            f"(the tool never pulls - the sync is the operator's)"
+        )
+        raise SystemExit(1)
 
 
 def git_tail(args: argparse.Namespace) -> None:
@@ -474,7 +493,6 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
     if args is not None:
         try:
             git_tail(args)
-            git_pull_head()
         except Exception as e:
             stamp(f"git tail failed (ignored): {e}")
     stamp("shutdown complete - goodbye")
@@ -569,7 +587,7 @@ def main() -> None:
 def _run(args: argparse.Namespace) -> None:
     install_sigint_handler(args)
     check_requirements()
-    git_pull_head()
+    git_sync_check()
     tee_output.install()
     kill_stale_server()
     check_tooling(args)
