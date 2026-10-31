@@ -947,6 +947,16 @@ def walk(
     return None
 
 
+def _cell_pass_count(h: dict[str, Any]) -> int:
+    """the count of PASS levels in one candidate's history (0 if
+    none): the prospect's early-exit check - any pass means the
+    candidate reached a score > -1."""
+    n = 0
+    while h.get(n, {}).get("status") == "pass":
+        n += 1
+    return n
+
+
 def _cell_best_score(
     st: dict[str, Any],
     fam: str,

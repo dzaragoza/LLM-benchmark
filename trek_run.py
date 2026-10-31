@@ -445,13 +445,17 @@ def run_pair(
 
     # THE WORK LIST: the candidates needing exam work under this
     # budget (the derivation's needs_rerun)
-    work = []
-    for k in KV_LADDER:
-        for v in KV_LADDER:
-            key = trek.cand_key(fam, rung, k, v)
-            hist = candidates.get(key, {})
-            if trek.needs_rerun(hist, budget_s):
-                work.append((k, v, key, hist))
+    def work_list(budget: float) -> list:
+        w = []
+        for k in KV_LADDER:
+            for v in KV_LADDER:
+                key = trek.cand_key(fam, rung, k, v)
+                hist = candidates.get(key, {})
+                if trek.needs_rerun(hist, budget):
+                    w.append((k, v, key, hist))
+        return w
+
+    work = work_list(budget_s)
     n_settled = len(KV_LADDER) ** 2 - len(work)
     print(
         f"[trek] {len(work)} candidates need work under {budget_s:g}s "
@@ -470,7 +474,31 @@ def run_pair(
             print(".", end="", flush=True)
             if n % n_ladder == 0:
                 print(n, end="", flush=True)
-        print()
+            # THE PROSPECT'S EARLY EXIT (the author's ruling): as soon
+            # as ANY exam reaches a score > -1, ABORT the prospect and
+            # DIG immediately - the full work list at t=128, in this
+            # same visit. No waiting for another walk pick; the cell
+            # closes before the walker moves on.
+            if budget_s < 128.0 and trek._cell_pass_count(hist) > 0:
+                print()
+                print(
+                    f"[trek] a score found in the prospect (k={k} v={v}) - "
+                    f"ABORTING the prospect, DIG at t=128s starts immediately"
+                )
+                dig_work = work_list(128.0)
+                print(
+                    f"[trek] the dig: {len(dig_work)} candidates need work "
+                    f"under 128s"
+                )
+                for k2, v2, key2, hist2 in dig_work:
+                    _run_combo(fam, rung, k2, v2, gguf, ctx, models_dir, port, 128.0, hist2)
+                    candidates[key2] = hist2
+                    save()
+                    print("!", end="", flush=True)
+                print()
+                break
+        else:
+            print()
     finally:
         if rung != "F16" and os.path.isfile(gguf):
             os.remove(gguf)
