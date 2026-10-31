@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 2: movement 1 of 7 in the epoch; high -1, best at gemma-4-e4b-it F16
+life 2: movement 2 of 7 in the epoch; high -1, best at gemma-4-e4b-it F16
 
 ## the radio (the stop condition's progress)
 
@@ -37,7 +37,7 @@ keep searching)
 |---|---|---|---|---|
 | t1 | -1 | 9 | 0 | no (floor champion) |
 | t2 | -1 | 12 | 0 | no (floor champion) |
-| t4 | -1 | 15 | 0 | no (floor champion) |
+| t4 | -1 | 14 | 0 | no (floor champion) |
 | t8 | -1 | 15 | 0 | no (floor champion) |
 | t16 | -1 | 15 | 0 | no (floor champion) |
 | t32 | -1 | 15 | 0 | no (floor champion) |
