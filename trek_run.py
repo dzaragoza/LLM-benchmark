@@ -941,6 +941,32 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     # dispatch-return cycles never consumed steps, pass-throughs
     # don't either - the canary pins this determinism).
     ws = st.setdefault("walk", {})
+    # THE GRID-FINGERPRINT GUARD (the grid-expansion lesson): the
+    # walk record's coordinates are relative to the grid they were
+    # recorded on - the 5->10 model expansion shifted every row's
+    # meaning ([1,2] was gemma-3-1b F16, became MiniCPM4-0.5B F16)
+    # and the reset 'resumed' a life from another lattice. On a
+    # fingerprint mismatch (or a missing fingerprint - a legacy
+    # record), the walk record RESETS ENTIRELY: life 1, a fresh
+    # spawn drawn from the seed on the CURRENT lattice. The
+    # histories (keyed by family) carry over unchanged - the
+    # candidate measurements are grid-independent; only the walk's
+    # path caches are not.
+    from bench import trek as _trek
+
+    fp_now = _trek.grid_fingerprint(_trek.Grid())
+    fp_recorded = ws.get("grid_fp")
+    if fp_recorded != fp_now:
+        print(
+            f"[trek] the grid changed ({fp_recorded or 'a legacy record'} -> "
+            f"{fp_now}) - the walk record resets: life 1, a fresh spawn "
+            f"on the new lattice (the histories carry over)"
+        )
+        ws.clear()
+        ws["life"] = 1
+        ws["position"] = [-1, -1]
+        ws["grid_fp"] = fp_now
+        _trek.save_state(st)
     if ws.get("position", [-1, -1]) != [-1, -1]:
         # THE LEGACY SPAWN (the third blind spot - the movement-48
         # saga's final act): a record predating the 'spawn' field

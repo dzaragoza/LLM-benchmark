@@ -95,6 +95,18 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # diff - the pin bug, the spawn off-by-one, and the dispatch-default
 # bug would ALL have been canary diffs. Stored as [row, col,
 # movements, budget] tuples.
+def grid_fingerprint(grid: "Grid") -> str:
+    """THE GRID FINGERPRINT (the grid-expansion lesson): the walk
+    record's coordinates (spawn, position, best, epoch_start) are
+    meaningful only relative to the grid they were recorded on -
+    the 5-model->10-model expansion shifted every row's meaning
+    ([1,2] was gemma-3-1b F16, became MiniCPM4-0.5B F16) and the
+    replay reset 'resumed' a life whose path was on another
+    lattice. The fingerprint (the models + the rungs) detects the
+    change; the runner's reset then starts a FRESH life."""
+    return f"{grid.n_rows}x{grid.n_cols}:{','.join(grid.models)}"
+
+
 # THE 10-MODEL GRID'S CANARY (the 10x3 grid, 12-movement epochs):
 # the seed-1 walk's first 20 picks on the canonical mock landscape
 WALK_CANARY: list[list] = [
@@ -835,6 +847,7 @@ def walk(
         # startup replay reset re-walks from HERE, deterministically
         ws["spawn"] = list(position)
         ws["life_draws"] = draws_used
+        ws["grid_fp"] = grid_fingerprint(grid)
         save()
 
     row, col = position
