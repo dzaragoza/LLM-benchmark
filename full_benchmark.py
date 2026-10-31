@@ -188,7 +188,7 @@ def preflight_selfcheck() -> None:
 
     import bench.exam as E
     import bench.trek as T
-    from bench.roster import LADDER, roster_from_models_md
+    from bench.roster import LADDER, dyadic_picks
 
     # --- the grader: the flexible subsequence ---
     inst = {"path": ["abc", "def", "ghi"]}
@@ -226,13 +226,15 @@ def preflight_selfcheck() -> None:
 
     # --- the roster ladder the pool is drawn from (the safe ladder:
     # --- 15 classic K-quant rungs, F16 last - the imatrix rungs cut) ---
-    assert LADDER[-1] == "F16" and len(LADDER) == 15, (
-        "the safe ladder reshaped - update me when the truth changes"
+    assert LADDER[-1] == "F16" and len(LADDER) == 3, (
+        "the small grid's ladder reshaped - update me when the truth changes"
     )
 
     # --- the roster: readable, granite first ---
-    roster = roster_from_models_md()
-    assert roster and roster[0][0] == "granite-4.0-h-350m", "roster order broken"
+    roster = dyadic_picks()
+    assert roster and roster[0][0] == "Qwen2.5-0.5B-Instruct", (
+        "the picks' param-ascending order broken"
+    )
 
     # --- the pool: the full v2 candidate census (the dry-run check,
     # folded in): every family x every rung x every kv pair, the
@@ -242,16 +244,19 @@ def preflight_selfcheck() -> None:
     pool = R.the_pool()
     n_kv = len(R.KV_LADDER)
     total = len(pool) * n_kv * n_kv
-    assert len(pool) == 64 * len(LADDER), (
-        f"the model pool must be 64 x {len(LADDER)} = {64 * len(LADDER)} pairs, "
-        f"got {len(pool)} (the safe ladder reshaped the pool - update me when the truth changes)"
+    n_picks = len(dyadic_picks())
+    assert len(pool) == n_picks * len(LADDER), (
+        f"the pool must be {n_picks} x {len(LADDER)} = {n_picks * len(LADDER)} "
+        f"pairs, got {len(pool)} (the grid reshaped - update me when the truth changes)"
     )
-    assert n_kv == 7, f"the KV ladder must be 7 quants, got {n_kv}"
+    assert n_kv == 3, f"the KV ladder must be 3 quants, got {n_kv}"
     assert R.PICK_BITS == 16, "the pick must be 16 bits in v3"
     fams = {f for f, _ in pool}
-    assert len(fams) == 64, f"the roster must carry 64 families, got {len(fams)}"
-    assert len(LADDER) == 15 and LADDER[-1] == "F16", (
-        "the LADDER must be 15 rungs (the safe ladder - update me when the truth changes)"
+    assert len(fams) == len(dyadic_picks()), (
+        f"the grid must carry {len(dyadic_picks())} models, got {len(fams)}"
+    )
+    assert len(LADDER) == 3 and LADDER[-1] == "F16", (
+        "the LADDER must be 3 rungs (the small grid - update me when the truth changes)"
     )
     if os.path.isfile(R.TREK_STATE_FILE):
         with open(R.TREK_STATE_FILE, encoding="utf-8") as fh:

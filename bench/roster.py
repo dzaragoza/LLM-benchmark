@@ -27,26 +27,62 @@ import infra.hf_download as hf_download
 # The classic K-quant rungs (Q2_K .. F16) need no importance matrix.
 # The grid reshapes accordingly: 64 models x 15 rungs = 960 pairs.
 # BF16 is cut (the author's ruling: f16 is basically the same thing)
+# THE SMALL GRID (the author's ruling: the grid is too large for the
+# machine - no algorithm change, just a smaller state space):
+# - the models: one per DYADIC billion-parameter tier (0.5, 1, 2, 4,
+#   8B), the closest with no more than +/-5% difference from the
+#   dyadic (the 16B and 32B tiers have no model within 5% - cut)
+# - the model_quants: q4_0, q8_0, f16
+# - the kv quants: q4_0, q8_0, f16
+# The grid: 5 models x 3 model_quants = 15 pairs x 9 kv = 135
+# candidates (was 64 x 15 x 49 = 47,040).
 LADDER = [
-    "Q2_K",
-    "Q3_K_S",
     "Q4_0",
-    "Q3_K_M",
-    "Q4_K_S",
-    "Q4_1",
-    "Q4_K_M",
-    "Q3_K_L",
-    "Q5_K_S",
-    "Q5_0",
-    "Q5_K_M",
-    "Q5_1",
-    "Q6_K",
     "Q8_0",
     "F16",
 ]
 
 # the fallback training window when a config.json cannot be read
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
+
+
+def dyadic_picks(
+    tiers: list[float] | None = None,
+    tolerance: float = 0.05,
+) -> list[tuple[str, str]]:
+    """THE DYADIC PICKS (the author's small-grid ruling): one model
+    per billion-parameter tier (the dyadic ladder 0.5, 1, 2, 4, 8...),
+    the closest with no more than +/-tolerance difference from the
+    tier; tiers with no model inside the tolerance are cut. Returns
+    (fam, repo) pairs, param-ascending."""
+    if tiers is None:
+        tiers = [0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
+    full = roster_from_models_md()
+    repos = dict(full)
+    params: dict[str, float] = {}
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md"
+    )
+    with open(path, encoding="utf-8") as fh:
+        for ln in fh:
+            cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+            if len(cells) >= 5 and cells[0] in repos and cells[1] not in ("params", "", "unknown"):
+                try:
+                    params[cells[0]] = float(cells[1])
+                except ValueError:
+                    pass
+    picks = []
+    for t in tiers:
+        cands = [
+            (abs(p - t) / t, fam)
+            for fam, p in params.items()
+            if abs(p - t) / t <= tolerance
+        ]
+        if cands:
+            cands.sort()
+            fam = cands[0][1]
+            picks.append((fam, repos[fam]))
+    return picks
 
 
 def roster_from_models_md() -> list[tuple[str, str]]:

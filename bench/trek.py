@@ -52,7 +52,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bench.contracts import warn_contract
-from bench.roster import LADDER, roster_from_models_md
+from bench.roster import LADDER, dyadic_picks, roster_from_models_md
 
 # ------------------------------------------------------------- constants
 
@@ -95,12 +95,14 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # diff - the pin bug, the spawn off-by-one, and the dispatch-default
 # bug would ALL have been canary diffs. Stored as [row, col,
 # movements, budget] tuples.
+# THE SMALL GRID'S CANARY (the 5x3 grid, 7-movement epochs, 3 kv):
+# the seed-1 walk's first 20 picks on the canonical mock landscape
 WALK_CANARY: list[list] = [
-    [55, 1, 0, 1.0], [55, 2, 1, 1.0], [56, 2, 2, 1.0], [57, 2, 3, 1.0],
-    [56, 2, 4, 2.0], [55, 2, 5, 2.0], [55, 3, 6, 1.0], [54, 3, 7, 1.0],
-    [53, 3, 8, 1.0], [54, 3, 9, 2.0], [54, 4, 10, 1.0], [54, 5, 11, 1.0],
-    [55, 5, 12, 1.0], [55, 4, 13, 1.0], [54, 4, 14, 2.0], [55, 4, 15, 2.0],
-    [54, 4, 16, 4.0], [54, 3, 17, 4.0], [53, 3, 18, 2.0], [53, 4, 19, 1.0],
+    [3, 0, 0, 1.0], [3, 1, 1, 1.0], [4, 1, 2, 1.0], [4, 2, 3, 1.0],
+    [3, 2, 4, 1.0], [3, 1, 5, 2.0], [2, 1, 6, 1.0], [4, 2, 0, 2.0],
+    [3, 2, 1, 2.0], [4, 2, 2, 4.0], [4, 1, 3, 2.0], [3, 1, 4, 4.0],
+    [4, 1, 5, 4.0], [3, 1, 6, 8.0], [4, 1, 0, 8.0], [4, 0, 1, 1.0],
+    [3, 0, 2, 2.0], [3, 1, 3, 16.0],
 ]
 
 
@@ -109,7 +111,7 @@ def walk_canary_sequence() -> list[list]:
     canonical mock landscape (deterministic - the same code gives the
     same sequence). Compared against WALK_CANARY by the preflight."""
     grid = Grid()
-    kv7 = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
+    kv7 = ["f16", "q8_0", "q4_0"]  # the small grid's 3
     st: dict[str, Any] = {"candidates": {}, "walk": {}}
     seq: list[list] = []
     for _ in range(20):
@@ -184,9 +186,10 @@ def _param_of(fam: str) -> float:
 
 
 def _models_sorted() -> list[str]:
-    """the model list, sorted by param size ascending (the author's
-    ruling - the grid's row axis is the param ladder)."""
-    fams = [fam for fam, _repo in roster_from_models_md()]
+    """the model list: THE DYADIC PICKS (the author's small-grid
+    ruling), sorted by param size ascending - the grid's row axis is
+    the param ladder, one model per dyadic tier."""
+    fams = [fam for fam, _repo in dyadic_picks()]
     return sorted(fams, key=_param_of)
 
 
@@ -253,8 +256,9 @@ class Grid:
         warn_contract(
             "post",
             "grid.dimensions",
-            self.n_rows == 64 and self.n_cols == len(LADDER),
-            f"the grid is {self.n_rows}x{self.n_cols}, expected 64x{len(LADDER)}",
+            self.n_rows == len(dyadic_picks()) and self.n_cols == len(LADDER),
+            f"the grid is {self.n_rows}x{self.n_cols}, expected "
+            f"{len(dyadic_picks())}x{len(LADDER)}",
         )
         # the author's contracts: the epoch derives from the grid's
         # dimensions; the models sort by param size ascending; an
@@ -736,7 +740,7 @@ def walk(
     high-score target repeated - the trek is done)."""
     grid = Grid()
     if kv_ladder is None:
-        kv_ladder = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
+        kv_ladder = ["f16", "q8_0", "q4_0"]  # the small grid's 3
 
     ws = st.setdefault("walk", {})
     rng = random.Random(f"trek-v3-{walker_seed}-{ws.get('draws', 0)}")

@@ -72,33 +72,30 @@ def entropy_bits(n: int) -> int:
 # the 16-bit pick: 11 bits the model index (the pool index), 5 bits
 # the model rung (LADDER). One chance per PAIR; the pair's pick
 # sweeps every KV_LADDER x KV_LADDER combination (49 candidates).
+# THE SMALL GRID'S KV LADDER (the author's ruling): the 3 kv quants
 KV_LADDER = [
     "f16",
     "q8_0",
     "q4_0",
-    "q4_1",
-    "iq4_nl",
-    "q5_0",
-    "q5_1",
 ]
 PICK_BITS = 16  # 11 model index + 5 rung
 
 
 def the_pool() -> list[tuple[str, str]]:
-    """Every (model, rung) pair, deterministic order - the 16-bit
-    pick space. One chance per pair; the pick sweeps all 49 kv
-    combinations, so the pool of CANDIDATES is 2048 x 49 = 100,352.
+    """The small grid's pool (the author's ruling): the DYADIC PICKS
+    x the ladder - 5 models x 3 rungs = 15 pairs, deterministic
+    order. One chance per pair; the pick sweeps all 9 kv
+    combinations, so the pool of CANDIDATES is 15 x 9 = 135.
 
-    NO SIZE GATE (the author's ruling): every pair is live - the
-    f16 table column stays in md/models.md for the ledger's
-    reference, but no model is pre-marked dead. A candidate too
-    large for the device dies at the llama-server launch, its
-    honest recorded verdict: server_failed - the server auto-shrinks
-    the context to fit when it can, and fails outright when it
-    cannot."""
-    roster = roster_from_models_md()
+    NO SIZE GATE (the author's ruling, unchanged): every pair is
+    live. A candidate too large for the device dies at the
+    llama-server launch, its honest recorded verdict: server_failed
+    - the server auto-shrinks the context to fit when it can, and
+    fails outright when it cannot."""
+    from bench.roster import dyadic_picks
+
     pool: list[tuple[str, str]] = []
-    for fam, _repo in roster:
+    for fam, _repo in dyadic_picks():
         for rung in LADDER:
             pool.append((fam, rung))
     return pool
@@ -396,10 +393,12 @@ def run_pair(
     file is deleted at the end (the gc owns the f16s)."""
     from bench.exam import bell_window
 
+    from bench.roster import dyadic_picks
+
     warn_contract(
         "pre",
         "run_pair.pair",
-        fam in {f for f, _ in roster_from_models_md()} and rung in LADDER,
+        fam in {f for f, _ in dyadic_picks()} and rung in LADDER,
         f"the pair ({fam}, {rung}) is not in the pool",
     )
     _ACTIVE_FAMILY[0] = fam
@@ -737,7 +736,7 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         st = trek.load_state()
     cands = st.get("candidates", {})
     grid = trek.Grid()
-    kv_ladder = ["f16", "q8_0", "q5_1", "q5_0", "q4_1", "q4_0", "iq4_nl"]
+    kv_ladder = ["f16", "q8_0", "q4_0"]  # the small grid's 3
     patience_cuts = trek.CLOCK_LADDER  # 1..128s
 
     # THE PER-CANDIDATE DERIVATIONS at every patience cut
