@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 22 of 78 in the epoch; high 10, best at Qwen3-8B Q3_K_M
+life 1: movement 23 of 78 in the epoch; high 10, best at Qwen3-8B Q3_K_M
 
 ## the radio (the stop condition's progress)
 
@@ -36,13 +36,13 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | -1 | 938 | 0 | no (floor champion) |
-| t2 | -1 | 946 | 66.6 | no (floor champion) |
-| t4 | -1 | 949 | 129 | no (floor champion) |
-| t8 | 0 | 951 | 136 | no |
-| t16 | 1 | 953 | 137 | no |
-| t32 | 4 | 956 | 29.3 | no |
-| t64 | 7 | 956 | 11.3 | no |
-| t128 | 10 | 956 | 2.77 | no |
+| t2 | -1 | 945 | 65.3 | no (floor champion) |
+| t4 | -1 | 949 | 126 | no (floor champion) |
+| t8 | 0 | 951 | 133 | no |
+| t16 | 1 | 953 | 134 | no |
+| t32 | 4 | 956 | 28.5 | no |
+| t64 | 7 | 956 | 10.9 | no |
+| t128 | 10 | 956 | 2.65 | no |
 
 quorum: unmet; not blocked
 
