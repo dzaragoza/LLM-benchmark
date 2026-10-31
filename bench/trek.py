@@ -779,6 +779,10 @@ def walk(
     # (per pick), never between the in-call saves (the spawn's save
     # and the dispatch's save legitimately repeat values within one
     # call - the first-call false positive, caught in verification).
+    # THE REPLAY FLAG (the author's replay principle): a startup
+    # reset rewinds the record to the life's origin - the first pick
+    # after it is the LEGITIMATE fresh standing; honored once.
+    replay_reset = bool(ws.pop("replay_reset", False))
     entry_record = {
         "life": ws.get("life"),
         "movements": ws.get("movements"),
@@ -822,6 +826,11 @@ def walk(
         best = position
         movements = 0  # the teleport: free
         epoch_start = position
+        # THE LIFE'S ORIGIN RECORD (the replay principle): the spawn
+        # coordinates and the draws base at the life's start - the
+        # startup replay reset re-walks from HERE, deterministically
+        ws["spawn"] = list(position)
+        ws["life_draws"] = draws_used
         save()
 
     row, col = position
@@ -882,7 +891,12 @@ def walk(
             )
             warn_contract(
                 "inv", "walk.record_advances",
-                not (same_cell_as_entry and nothing_advanced and not interrupted),
+                not (
+                    same_cell_as_entry
+                    and nothing_advanced
+                    and not interrupted
+                    and not replay_reset
+                ),
                 "the walk record did not advance - a frozen walk "
                 "(the same cell re-dispatched at the same movement "
                 "with no interrupted work: the pin bug's signature)",

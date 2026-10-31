@@ -924,6 +924,38 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     st = trek.load_state()
 
+    # THE STARTUP REPLAY RESET (the author's principle): the walker
+    # replays the WHOLE walk from the origin - the walk record's
+    # position/movements are CACHED, never authoritative. On startup
+    # the record resets to the life's origin (the spawn), and the
+    # walk re-walks its path: settled cells pass through at no exam
+    # cost, and live work fires at its natural standing, in walk
+    # order. The interrupts' positions have no influence - only the
+    # histories and the seed do. The draws re-consume identically
+    # (the directions are a pure function of the cumulative count;
+    # dispatch-return cycles never consumed steps, pass-throughs
+    # don't either - the canary pins this determinism).
+    ws = st.setdefault("walk", {})
+    if ws.get("spawn") and ws.get("position", [-1, -1]) != [-1, -1]:
+        ws["position"] = list(ws["spawn"])  # the life's origin
+        ws["movements"] = 0
+        ws["high"] = -1
+        ws["best"] = list(ws["spawn"])
+        ws["epoch_start"] = list(ws["spawn"])
+        ws["dispatched"] = [-1, -1]
+        ws["dispatched_action"] = None
+        # the draws base restores (the life's first draw count) -
+        # the replay re-consumes the life's own stream
+        ws["draws"] = ws.get("life_draws", 0)
+        ws["replay_reset"] = True  # the one-shot flag: the first
+        # walk() after the reset is the legitimate fresh standing
+        trek.save_state(st)
+        print(
+            f"[trek] the replay reset: re-walking life {ws.get('life', 1)} "
+            f"from its origin {ws['spawn']} (the histories answer for "
+            f"every visited cell; live work fires in walk order)"
+        )
+
     n = 0
     while True:
         pick = trek.walk(st, walker_seed)
