@@ -13,15 +13,15 @@ the tier's champion
 | <= 1s | - | (nothing measured yet) | - |
 | <= 2s | - | (nothing measured yet) | - |
 | <= 4s | - | (nothing measured yet) | - |
-| <= 8s | 0 | Yi-1.5-9B-Chat Q3_K_M k=q5_0 v=q4_1 | 4.14 |
-| <= 16s | 1 | granite-3.3-8b-instruct Q3_K_S k=q8_0 v=q8_0 | 13.46 |
-| <= 32s | 4 | Yi-1.5-9B-Chat Q3_K_M k=f16 v=iq4_nl | 4.26 |
-| <= 64s | 7 | granite-3.3-8b-instruct Q3_K_L k=f16 v=q4_1 | 7.52 |
-| <= 128s | 10 | Qwen3-8B Q3_K_M k=q4_0 v=f16 | 7.33 |
+| <= 8s | - | (nothing measured yet) | - |
+| <= 16s | - | (nothing measured yet) | - |
+| <= 32s | - | (nothing measured yet) | - |
+| <= 64s | - | (nothing measured yet) | - |
+| <= 128s | - | (nothing measured yet) | - |
 
 ## the walker (the current life)
 
-life 1: movement 23 of 78 in the epoch; high 10, best at Qwen3-8B Q3_K_M
+life 1: movement 0 of 7 in the epoch; high -1, best at Qwen3-4B-Instruct-2507 Q4_0
 
 ## the radio (the stop condition's progress)
 
@@ -35,15 +35,15 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | -1 | 938 | 0 | no (floor champion) |
-| t2 | -1 | 945 | 65.3 | no (floor champion) |
-| t4 | -1 | 949 | 126 | no (floor champion) |
-| t8 | 0 | 951 | 133 | no |
-| t16 | 1 | 953 | 134 | no |
-| t32 | 4 | 956 | 28.5 | no |
-| t64 | 7 | 956 | 10.9 | no |
-| t128 | 10 | 956 | 2.65 | no |
+| t1 | -1 | 14 | 0 | no (floor champion) |
+| t2 | -1 | 15 | - | no (floor champion) |
+| t4 | -1 | 15 | - | no (floor champion) |
+| t8 | -1 | 15 | - | no (floor champion) |
+| t16 | -1 | 15 | - | no (floor champion) |
+| t32 | -1 | 15 | - | no (floor champion) |
+| t64 | -1 | 15 | - | no (floor champion) |
+| t128 | -1 | 15 | - | no (floor champion) |
 
 quorum: unmet; not blocked
 
-_1,078 candidates measured (1,624 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.3%); the histories are the single source of truth, the tables derive on every ledger write._
+_9 candidates measured (9 exam levels recorded; a re-run at a bigger budget is new evidence) of 15 pairs x 3 x 3 kv = 135 total, 6.7%); the histories are the single source of truth, the tables derive on every ledger write._
