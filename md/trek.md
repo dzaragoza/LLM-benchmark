@@ -14,14 +14,14 @@ the tier's champion
 | <= 2s | - | (nothing measured yet) | - |
 | <= 4s | - | (nothing measured yet) | - |
 | <= 8s | - | (nothing measured yet) | - |
-| <= 16s | - | (nothing measured yet) | - |
-| <= 32s | 0 | Qwen3-8B Q3_K_S k=q4_1 v=q4_0 | 5.07 |
+| <= 16s | 1 | granite-3.3-8b-instruct Q3_K_S k=q8_0 v=q8_0 | 13.46 |
+| <= 32s | 1 | granite-3.3-8b-instruct Q3_K_S k=q8_0 v=f16 | 13.46 |
 | <= 64s | 6 | Qwen3-8B Q3_K_S k=q4_1 v=q4_0 | 5.07 |
 | <= 128s | 6 | Qwen3-8B Q3_K_S k=q4_1 v=q4_0 | 5.07 |
 
 ## the walker (the current life)
 
-life 1: movement 46 of 78 in the epoch; high 6, best at Qwen3-8B Q3_K_S
+life 1: movement 47 of 78 in the epoch; high 6, best at Qwen3-8B Q3_K_S
 
 ## the radio (the stop condition's progress)
 
@@ -36,14 +36,14 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | -1 | 940 | 0 | no (floor champion) |
-| t2 | -1 | 950 | 7.44 | no (floor champion) |
-| t4 | -1 | 952 | 14.8 | no (floor champion) |
-| t8 | -1 | 956 | 22.2 | no (floor champion) |
-| t16 | -1 | 958 | 29.5 | no (floor champion) |
-| t32 | 0 | 959 | 22.3 | no |
-| t64 | 6 | 960 | 0.243 | no |
-| t128 | 6 | 960 | 0.344 | no |
+| t2 | -1 | 950 | 17.2 | no (floor champion) |
+| t4 | -1 | 952 | 34.1 | no (floor champion) |
+| t8 | -1 | 956 | 50.8 | no (floor champion) |
+| t16 | 1 | 957 | 14.5 | no |
+| t32 | 1 | 959 | 18.3 | no |
+| t64 | 6 | 960 | 0.262 | no |
+| t128 | 6 | 960 | 0.38 | no |
 
 quorum: unmet; not blocked
 
-_980 candidates measured (1,009 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.1%); the histories are the single source of truth, the tables derive on every ledger write._
+_980 candidates measured (1,029 exam levels recorded; a re-run at a bigger budget is new evidence) of 960 pairs x 7 x 7 kv = 47,040 total, 2.1%); the histories are the single source of truth, the tables derive on every ledger write._
