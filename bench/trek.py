@@ -856,9 +856,18 @@ def walk(
         #   the escalation is work, but it belongs to a LATER visit -
         #   the author's land-exam-move-out ruling).
         dispatched_action = ws.get("dispatched_action")
+        # THE LEGACY CASE (the movement-48 lesson's second act): a
+        # dispatch made by the PRE-field code carries the marker but
+        # no dispatched_action - the comparison would fail and the
+        # interrupted dig steps past again. Absent = UNKNOWN, and
+        # unknown re-offers: re-offering a COMPLETED action is a
+        # no-op (its work list is empty - the completed prospect's
+        # timeouts are recorded at its budget, the completed dig's
+        # candidates are settled at 128), so the worst case is one
+        # wasted acquisition; the best case is the resume.
         interrupted = (
             (row, col) == dispatched
-            and dispatched_action == [action, budget]
+            and (dispatched_action is None or dispatched_action == [action, budget])
         )
         if action in ("exam", "dig") and ((row, col) != dispatched or interrupted):
             # INV: THE RECORD ADVANCES - this pick moves, or the

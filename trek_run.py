@@ -441,6 +441,22 @@ def run_pair(
         _ACTIVE_FAMILY[0] = ""
         return
 
+    # THE EMPTY-WORK GUARD: compute the work list BEFORE acquiring -
+    # a no-op re-offer (a completed action re-offered on a legacy
+    # record, or any zero-work dispatch) must not pay an acquisition
+    work_early = [
+        (k, v)
+        for k in KV_LADDER
+        for v in KV_LADDER
+        if trek.needs_rerun(
+            candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s
+        )
+    ]
+    if not work_early:
+        print(f"[trek] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
+        _ACTIVE_FAMILY[0] = ""
+        return
+
     ctx = bell_window(state, fam, models_dir) or 262144
 
     # THE WORK LIST: the candidates needing exam work under this
