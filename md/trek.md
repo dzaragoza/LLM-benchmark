@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 2: movement 19 of 20 in the epoch; high 3, best at MiniCPM3-4B Q4_0
+life 2: movement 2 of 20 in the epoch; high 3, best at MiniCPM3-4B Q4_0
 
 ## the radio (the stop condition's progress)
 
@@ -37,12 +37,12 @@ keep searching)
 |---|---|---|---|---|
 | t1 | 4 | 18 | 0 | yes * |
 | t2 | 4 | 23 | 0.00899 | yes |
-| t4 | 4 | 25 | 0.034 | no |
-| t8 | 4 | 26 | 0.0778 | no |
-| t16 | 4 | 29 | 0.142 | no |
-| t32 | 4 | 32 | 0.23 | no |
-| t64 | 5 | 34 | 0.139 | no |
-| t128 | 5 | 36 | 0.204 | no |
+| t4 | 4 | 24 | 0.034 | no |
+| t8 | 4 | 26 | 0.0772 | no |
+| t16 | 4 | 29 | 0.141 | no |
+| t32 | 4 | 32 | 0.228 | no |
+| t64 | 5 | 34 | 0.138 | no |
+| t128 | 5 | 36 | 0.203 | no |
 
 quorum: unmet; not blocked
 
