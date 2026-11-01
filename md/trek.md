@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 15 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at granite-3.3-8b-instruct Q8_0 (the next teleport's target)
+life 1: movement 19 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at granite-3.3-8b-instruct Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -37,12 +37,12 @@ keep searching)
 |---|---|---|---|---|
 | t1 | 4 | 14 | 0 | yes * |
 | t2 | 4 | 18 | 0.0134 | yes |
-| t4 | 4 | 20 | 0.0468 | no |
-| t8 | 4 | 21 | 0.102 | no |
-| t16 | 4 | 24 | 0.18 | no |
-| t32 | 4 | 28 | 0.283 | no |
-| t64 | 6 | 30 | 0.0863 | no |
-| t128 | 6 | 31 | 0.13 | no |
+| t4 | 4 | 19 | 0.0468 | no |
+| t8 | 4 | 21 | 0.101 | no |
+| t16 | 4 | 24 | 0.178 | no |
+| t32 | 4 | 28 | 0.28 | no |
+| t64 | 6 | 30 | 0.0854 | no |
+| t128 | 6 | 31 | 0.128 | no |
 
 quorum: unmet; not blocked
 
