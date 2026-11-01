@@ -83,14 +83,14 @@ KV_LADDER = [
     "q5_0",
     "q5_1",
 ]
-PICK_BITS = 16  # 11 model index + 5 rung
+PICK_BITS = 16  # 6 model index + 10 rung (the pick is unused in the exhaustive sweep; the comment reflects the full 64-model grid)
 
 
 def the_pool() -> list[tuple[str, str]]:
-    """The small grid's pool (the author's ruling): the DYADIC PICKS
-    x the ladder - 5 models x 3 rungs = 15 pairs, deterministic
-    order. One chance per pair; the pick sweeps all 9 kv
-    combinations, so the pool of CANDIDATES is 15 x 9 = 135.
+    """The grid's pool: the FULL ROSTER (all 64 models of md/models.md)
+    x the ladder - 64 models x 15 rungs = 960 pairs, deterministic
+    order. One chance per pair; the pick sweeps all 49 kv
+    combinations, so the pool of CANDIDATES is 960 x 49 = 47,040.
 
     NO SIZE GATE (the author's ruling, unchanged): every pair is
     live. A candidate too large for the device dies at the

@@ -52,47 +52,11 @@ LADDER = [
 WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
 
 
-def dyadic_picks(
-    tiers: list[float] | None = None,
-    per_tier: int = 3,
-    tolerance: float = 0.28,
-) -> list[tuple[str, str]]:
-    """THE DYADIC PICKS (the author's rulings): per billion-parameter
-    tier (the full dyadic ladder 0.5..32B), the `per_tier` CLOSEST
-    models with no more than +/-tolerance difference from the tier
-    (28%: the sparse tiers carry their thirds at 13-28% off - the
-    0.5B tier's SmolLM2-360M at 27.6% - and the 16B/32B tiers enter
-    at their 12.2B/27.4B models, 23-24%/14% off). Tiers contribute
-    as many picks as the roster holds within the tolerance (the
-    16B tier: 2; the 32B tier: 1). Returns (fam, repo) pairs,
-    param-ascending - 18 picks on the current roster."""
-    if tiers is None:
-        tiers = [0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]  # the full ladder
-    full = roster_from_models_md()
-    repos = dict(full)
-    params: dict[str, float] = {}
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md"
-    )
-    with open(path, encoding="utf-8") as fh:
-        for ln in fh:
-            cells = [c.strip() for c in ln.strip().strip("|").split("|")]
-            if len(cells) >= 5 and cells[0] in repos and cells[1] not in ("params", "", "unknown"):
-                try:
-                    params[cells[0]] = float(cells[1])
-                except ValueError:
-                    pass
-    picks = []
-    for t in tiers:
-        cands = [
-            (abs(p - t) / t, fam)
-            for fam, p in params.items()
-            if abs(p - t) / t <= tolerance
-        ]
-        cands.sort()
-        for _off, fam in cands[:per_tier]:
-            picks.append((fam, repos[fam]))
-    return picks
+def dyadic_picks() -> list[tuple[str, str]]:
+    """THE FULL ROSTER (the author's ruling): every model in
+    md/models.md, in the table's own order (param-ascending) -
+    64 picks on the current roster. Returns (fam, repo) pairs."""
+    return roster_from_models_md()
 
 
 def roster_from_models_md() -> list[tuple[str, str]]:

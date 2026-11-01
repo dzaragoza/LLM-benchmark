@@ -178,7 +178,7 @@ def _param_of(fam: str) -> float:
     """the family's parameter count from the roster's models.md table
     (the params column; the file is the author-maintained truth)."""
     # parse models.md: the table rows are name | params | f16 | window | repo
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models.md")
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md")
     try:
         with open(path, encoding="utf-8") as fh:
             for ln in fh:
@@ -198,9 +198,9 @@ def _param_of(fam: str) -> float:
 
 
 def _models_sorted() -> list[str]:
-    """the model list: THE DYADIC PICKS (the author's small-grid
-    ruling), sorted by param size ascending - the grid's row axis is
-    the param ladder, one model per dyadic tier."""
+    """the model list: THE FULL ROSTER (every model of md/models.md),
+    sorted by param size ascending - the grid's row axis is
+    the param ladder."""
     fams = [fam for fam, _repo in dyadic_picks()]
     return sorted(fams, key=_param_of)
 

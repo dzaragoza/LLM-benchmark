@@ -3,7 +3,7 @@
 walk is retired; the ei is the benchmark).
 
 One command: python full_benchmark.py --task trek. The grid is
-v3: (model, model-quant) pairs - 64 models x 32 rungs = 2,048
+v3: (model, model-quant) pairs - 64 models x 15 rungs = 960
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
 acquisition (a fresh 8-bit exam seed each, a 128s timer per
@@ -188,7 +188,7 @@ def preflight_selfcheck() -> None:
 
     import bench.exam as E
     import bench.trek as T
-    from bench.roster import LADDER, dyadic_picks
+    from bench.roster import LADDER, dyadic_picks, roster_from_models_md
 
     # --- the grader: the flexible subsequence ---
     inst = {"path": ["abc", "def", "ghi"]}
@@ -226,10 +226,13 @@ def preflight_selfcheck() -> None:
         "the ladder must be the full 15 rungs (the exhaustive era)"
     )
 
-    # --- the roster: readable, granite first ---
+    # --- the roster: the full models.md table, param-ascending ---
     roster = dyadic_picks()
-    assert roster and roster[0][0] == "Qwen2.5-0.5B-Instruct", (
-        "the picks' param-ascending order broken"
+    assert roster and roster == roster_from_models_md(), (
+        "the roster must be every model in md/models.md, in table order"
+    )
+    assert roster[0][0] == "granite-4.0-h-350m", (
+        "the roster's param-ascending order broken"
     )
 
     # --- the pool: the full v2 candidate census (the dry-run check,
@@ -516,8 +519,9 @@ def install_sigint_handler(args: argparse.Namespace) -> None:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="the protocol ei: every candidate of the "
-        "2048 pool (roster x LADDER) gets ONE chance - a fresh 8-bit "
-        "exam seed per candidate, a 128s timer per level, results only"
+        "960-pair pool (the full 64-model roster x LADDER) gets ONE "
+        "chance - a fresh 8-bit exam seed per candidate, a 128s timer "
+        "per level, results only"
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -610,8 +614,8 @@ def _run(args: argparse.Namespace) -> None:
     stamp_disk(state, args.state_file)
     if args.task == "trek":
         # protocol ei: the epitome of simplicity - every
-        # candidate of the 2048 pool (roster x LADDER = 11 bits of
-        # real entropy per pick, ONE chance each), a fresh 8-bit
+        # candidate of the 960-pair pool (the full 64-model roster
+        # x LADDER, ONE chance each), a fresh 8-bit
         # exam per candidate, a 128s timer PER LEVEL, results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
