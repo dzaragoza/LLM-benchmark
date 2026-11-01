@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 3: movement 10 of 20 in the epoch; life score 0 (the spawn/teleport baseline); epoch start at Qwen2.5-0.5B-Instruct Q8_0 (the next teleport's target)
+life 3: movement 12 of 20 in the epoch; life score 0 (the spawn/teleport baseline); epoch start at Qwen2.5-0.5B-Instruct Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition)
 
@@ -43,7 +43,7 @@ the SE is the pools' sampling error; '-' = not modelable
 | t16 | 4 | 12 | 0.619 | 0.693 | no |
 | t32 | 4 | 13 | 0.952 | 1.04 | no |
 | t64 | 8 | 15 | 0.562 | 0.628 | no |
-| t128 | 13 | 16 | 0.17 | 0.205 | no |
+| t128 | 13 | 15 | 0.17 | 0.205 | no |
 
 quorum: unmet; not blocked
 
@@ -59,9 +59,9 @@ total: 54 cells x 8 time tiers = 432 possible evaluations
 | t8 (4) | 1 | 4 |
 | t16 (5) | 2 | 10 |
 | t32 (6) | 2 | 12 |
-| t64 (7) | 1 | 7 |
-| t128 (8) | 39 | 312 |
+| t64 (7) | 0 | 0 |
+| t128 (8) | 40 | 320 |
 
-progress: 346 of 432 (80.1%); 8 cells not evaluated at any tier
+progress: 347 of 432 (80.3%); 8 cells not evaluated at any tier
 
 _477 candidates measured (917 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 98.1%); the histories are the single source of truth, the tables derive on every ledger write._
