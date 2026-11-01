@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 2: movement 1 of 20 in the epoch; high -1, best at Qwen3-2B Q4_0
+life 2: movement 2 of 20 in the epoch; high -1, best at Qwen3-2B Q4_0
 
 ## the radio (the stop condition's progress)
 
@@ -35,15 +35,15 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | 4 | 21 | 0 | yes * |
-| t2 | 4 | 25 | 0.0115 | yes |
-| t4 | 4 | 25 | 0.0407 | no |
-| t8 | 4 | 26 | 0.0892 | no |
-| t16 | 4 | 29 | 0.159 | no |
-| t32 | 4 | 34 | 0.252 | no |
-| t64 | 5 | 36 | 0.153 | no |
-| t128 | 5 | 38 | 0.223 | no |
+| t1 | 4 | 20 | 0 | yes * |
+| t2 | 4 | 25 | 0.0106 | yes |
+| t4 | 4 | 25 | 0.0388 | no |
+| t8 | 4 | 26 | 0.0861 | no |
+| t16 | 4 | 29 | 0.154 | no |
+| t32 | 4 | 34 | 0.247 | no |
+| t64 | 5 | 36 | 0.149 | no |
+| t128 | 5 | 38 | 0.218 | no |
 
 quorum: unmet; not blocked
 
-_342 candidates measured (482 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 70.4%); the histories are the single source of truth, the tables derive on every ledger write._
+_351 candidates measured (491 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 72.2%); the histories are the single source of truth, the tables derive on every ledger write._
