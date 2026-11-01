@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 2: movement 2 of 20 in the epoch; life score 3 (the spawn/teleport baseline); epoch start at MiniCPM3-4B Q4_0 (the next teleport's target)
+life 2: movement 8 of 20 in the epoch; life score 3 (the spawn/teleport baseline); epoch start at MiniCPM3-4B Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -41,7 +41,7 @@ keep searching)
 | t8 | 4 | 20 | 0.0857 | no |
 | t16 | 4 | 24 | 0.154 | no |
 | t32 | 4 | 27 | 0.248 | no |
-| t64 | 6 | 30 | 0.0761 | no |
+| t64 | 6 | 29 | 0.0761 | no |
 | t128 | 6 | 31 | 0.116 | no |
 
 quorum: unmet; not blocked
