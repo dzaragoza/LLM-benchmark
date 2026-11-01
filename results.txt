@@ -145109,3 +145109,54 @@ NameError: name 'st' is not defined. Did you mean: 'set'?
 [trek] v3 phase a: the walker acts on every cell; the seed 1
 [trek] gc: /home free > 16 GiB, 4s watchdog
 [trek] the replay reset: re-walking life 3 from its origin [9, 2] (the histories answer for every visited cell; live work fires in walk order)
+
+===== 2026-11-01T12:50:00 | full_benchmark.py =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 566, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 632, in _run
+    R.main(on_progress=push_progress, walker_seed=args.seed)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/trek_run.py", line 1020, in main
+    radio_res = radio.certify(st, KV_LADDER)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/radio.py", line 282, in certify
+    warn_contract(
+    ~~~~~~~~~~~~~^
+        "inv",
+        ^^^^^^
+    ...<2 lines>...
+        f"a live unit's known score exceeds the champion C[{t}]={C[t]}",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/contracts.py", line 45, in warn_contract
+    raise ContractViolationError(f"{tag} VIOLATED: {detail or 'condition failed'}")
+bench.contracts.ContractViolationError: [contract:inv:radio.score_le_champion] VIOLATED: a live unit's known score exceeds the champion C[16]=4
+
+[2026-11-01T12:50:00] CRASH DETECTED - committing artifacts before exit
+
+===== CRASH 2026-11-01T12:50:00 =====
+Traceback (most recent call last):
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 566, in main
+    _run(args)
+    ~~~~^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/full_benchmark.py", line 632, in _run
+    R.main(on_progress=push_progress, walker_seed=args.seed)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/daniela/technical_reports/LLM-benchmark/trek_run.py", line 1020, in main
+    radio_res = radio.certify(st, KV_LADDER)
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/radio.py", line 282, in certify
+    warn_contract(
+    ~~~~~~~~~~~~~^
+        "inv",
+        ^^^^^^
+    ...<2 lines>...
+        f"a live unit's known score exceeds the champion C[{t}]={C[t]}",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/daniela/technical_reports/LLM-benchmark/bench/contracts.py", line 45, in warn_contract
+    raise ContractViolationError(f"{tag} VIOLATED: {detail or 'condition failed'}")
+bench.contracts.ContractViolationError: [contract:inv:radio.score_le_champion] VIOLATED: a live unit's known score exceeds the champion C[16]=4
+
