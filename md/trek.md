@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 6 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at granite-3.3-8b-instruct Q8_0 (the next teleport's target)
+life 1: movement 11 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at granite-3.3-8b-instruct Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_396 candidates measured (601 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 81.5%); the histories are the single source of truth, the tables derive on every ledger write._
+_405 candidates measured (601 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 83.3%); the histories are the single source of truth, the tables derive on every ledger write._
