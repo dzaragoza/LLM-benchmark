@@ -780,25 +780,33 @@ def walk(
     life = ws.get("life", 1)
     position = tuple(ws.get("position", [-1, -1]))
     movements = ws.get("movements", 0)
+    # THE LIFE SCORE (the author's clean spec): the score on the
+    # spawn position cell, before the evaluation action - set once
+    # at the spawn, updated ONLY at teleports (the teleport cell's
+    # score, before movement 0's action). Never updated during the
+    # walk itself.
     high = ws.get("high", -1)
     best = tuple(ws.get("best", position))
     draws_used = ws.get("draws", 0)
-    # THE EPOCH START (the death rule's baseline): the cell where
-    # the current epoch began - the spawn cell or the last teleport
-    # target. Persisted (a resume mid-epoch must know it); replaces
-    # the retired spawn_targets list.
+    # THE EPOCH START (the author's clean spec): the spawn position
+    # initially; moves to any cell whose score exceeds the epoch
+    # score - the update happens just after the action, BEFORE the
+    # movement. No separate epoch-high tracking: the epoch score IS
+    # the epoch start cell's score.
     epoch_start: tuple[int, int] | None = (
         tuple(ws["epoch_start"]) if "epoch_start" in ws else None
     )
     # PRE (phase a): the spawn at (-1,-1) is LEGAL for every life -
-    # each new walker spawns at a random position (the v3 ruling) -
-    # but the HIGH SCORE must reset with it: a spawned life never
-    # inherits the previous life's high
+    # each new walker spawns at a random position and the LIFE SCORE
+    # derives from the spawn cell (the clean spec) - no inherited
+    # state (the runner's life-end handler clears the record's
+    # scores before the spawn)
     warn_contract(
         "pre",
-        "walk.spawn_resets_high",
-        not (position == (-1, -1) and high != -1 and movements > 0),
-        f"the spawn at (-1,-1) must reset the high score (found high {high})",
+        "walk.spawn_fresh_record",
+        not (position == (-1, -1) and movements > 0),
+        f"the spawn at (-1,-1) must carry no mid-epoch state "
+        f"(found movements {movements})",
     )
 
     def draw() -> tuple[int, int]:
@@ -851,13 +859,15 @@ def walk(
             ws["epoch_start"] = list(epoch_start)
 
     if position == (-1, -1):
-        # THE SPAWN IS A TELEPORT, NOT A MOVEMENT (the author's
-        # correction): the walker materializes at a random grid
-        # position with the high score -1; the spawn costs nothing -
-        # the first MOVEMENT is after evaluating the first cell, so a
-        # life evaluates 96 cells (the spawn cell + 95 step-cells).
+        # THE SPAWN (the author's clean spec): a random position;
+        # the LIFE SCORE is the spawn cell's score, before any
+        # evaluation action - the walker's baseline for the life.
+        # The epoch start = the spawn position. No starting-position
+        # memory needed beyond that.
         position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
-        high = -1
+        high = _cell_best_score(
+            st, *grid.cell(*position), kv_ladder, 0.0
+        )
         best = position
         movements = 0  # the teleport: free
         epoch_start = position
@@ -988,9 +998,18 @@ def walk(
         ws["dispatched"] = [-1, -1]
         ws["dispatched_action"] = None
         cell_score = _cell_best_score(st, fam, rung, kv_ladder, budget)
-        if cell_score > high:
-            high = cell_score
-            best = (row, col)
+        # THE EPOCH-START UPDATE (the author's clean spec): just
+        # after the action, BEFORE the movement - a cell scoring
+        # above the EPOCH score (the epoch start cell's score)
+        # becomes the new epoch start. The LIFE score is NOT
+        # updated here.
+        epoch_start_score = (
+            _cell_best_score(st, *grid.cell(*epoch_start), kv_ladder, 0.0)
+            if epoch_start is not None
+            else -1
+        )
+        if cell_score > epoch_start_score:
+            epoch_start = (row, col)
         # THE MOVEMENT IS THE STEP AWAY (after the evaluation), not
         # the visit - the spawn cell costs no movement
         movements += 1
@@ -1014,24 +1033,36 @@ def walk(
             # spawn-targets list of the old rule was redundant
             # machinery (a repeated target anywhere implies this
             # local condition fires at the same epoch or earlier).
-            if best == epoch_start:
-                # the teleport goes home to the epoch's start: the
-                # life ENDS - a new walker spawns at random
+            # THE TELEPORT (the author's clean spec): to the LAST
+            # EPOCH START. The life score vs the epoch start's score:
+            # EQUAL -> the walker dies, a new life spawns at random;
+            # otherwise the LIFE SCORE UPDATES to the current cell's
+            # score (the teleport cell - before movement 0's action)
+            # and the next epoch continues from here.
+            teleport = epoch_start if epoch_start is not None else (row, col)
+            tp_score = _cell_best_score(
+                st, *grid.cell(*teleport), kv_ladder, 0.0
+            )
+            if tp_score == high:
+                # no improvement over the life's baseline: the life
+                # ENDS - a new walker spawns at random
                 save()
                 return {
-                    "row": best[0], "col": best[1],
-                    "fam": grid.cell(best[0], best[1])[0],
-                    "rung": grid.cell(best[0], best[1])[1],
+                    "row": teleport[0], "col": teleport[1],
+                    "fam": grid.cell(*teleport)[0],
+                    "rung": grid.cell(*teleport)[1],
                     "action": "none",
                     "budget": 0,
                     "high": high,
-                    "best": list(best),
+                    "best": list(teleport),
                     "life": life,
                     "movements": movements,
                     "draws": draws_used,
                     "reason": "ended",
                 }
-            row, col = best
+            high = tp_score
+            best = teleport
+            row, col = teleport
             position = (row, col)
             movements = 0
             epoch_start = (row, col)
