@@ -849,8 +849,9 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         if pos == [-1, -1]
         else (f"movement {movs} of {epoch_budget} in the epoch")
     )
+    ep = ws.get("epoch", 1)
     lines += [
-        f"life {life}: {status}; life score {life_score} "
+        f"life {life}, epoch {ep}: {status}; life score {life_score} "
         f"(the spawn/teleport baseline); epoch start at "
         f"{es_cell or epoch_start} (the next teleport's target)",
         "",
@@ -1111,6 +1112,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             ws["life"] = ws.get("life", 1) + 1
             ws["position"] = [-1, -1]  # the spawn
             ws["movements"] = 0
+            ws["epoch"] = 1  # the new life's first epoch
             ws["high"] = -1  # the new life's score derives at the spawn
             ws.pop("epoch_start", None)  # the new epoch starts at the spawn
             ws.pop("dispatched_action", None)
@@ -1119,7 +1121,8 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             continue
         fam, rung = pick["fam"], pick["rung"]
         print(
-            f"[trek] life {pick['life']}, movement {pick['movements']}: "
+            f"[trek] life {pick['life']}, epoch {pick.get('epoch', 1)}, "
+            f"movement {pick['movements']}: "
             f"{fam} {rung} - {pick['action']} at t={pick['budget']:g}s "
             f"(high {pick['high']}, best at {pick['best']})"
         )

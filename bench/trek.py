@@ -780,6 +780,11 @@ def walk(
     life = ws.get("life", 1)
     position = tuple(ws.get("position", [-1, -1]))
     movements = ws.get("movements", 0)
+    # THE EPOCH COUNTER (the author's readability request): the life's
+    # epoch ordinal - increments at each teleport (and the death/respawn
+    # resets it). The console/ledger print it, so a boundary crossing
+    # never reads as movements going backwards.
+    epoch = ws.get("epoch", 1)
     # THE LIFE SCORE (the author's clean spec): the score on the
     # spawn position cell, before the evaluation action - set once
     # at the spawn, updated ONLY at teleports (the teleport cell's
@@ -850,6 +855,7 @@ def walk(
                 f"({entry_record['high']} -> {high})",
             )
         ws["life"] = life
+        ws["epoch"] = epoch
         ws["position"] = list(position)
         ws["movements"] = movements
         ws["high"] = high
@@ -870,6 +876,7 @@ def walk(
         )
         best = position
         movements = 0  # the teleport: free
+        epoch = 1
         epoch_start = position
         # THE LIFE'S ORIGIN RECORD (the replay principle): the spawn
         # coordinates and the draws base at the life's start - the
@@ -965,6 +972,7 @@ def walk(
                 "best": list(best),
                 "life": life,
                 "movements": movements,
+                "epoch": epoch,
                 "draws": draws_used,
                 "reason": "evaluate",
             }
@@ -1057,6 +1065,7 @@ def walk(
                     "best": list(teleport),
                     "life": life,
                     "movements": movements,
+                    "epoch": epoch,
                     "draws": draws_used,
                     "reason": "ended",
                 }
@@ -1065,6 +1074,7 @@ def walk(
             row, col = teleport
             position = (row, col)
             movements = 0
+            epoch += 1
             epoch_start = (row, col)
             save()
             continue
