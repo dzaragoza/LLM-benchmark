@@ -16,12 +16,12 @@ the tier's champion
 | <= 8s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
 | <= 16s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
 | <= 32s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
-| <= 64s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
+| <= 64s | 5 | gemma-4-e4b-it Q4_0 k=f16 v=f16 | 4.95 |
 | <= 128s | 5 | gemma-4-e4b-it Q8_0 k=f16 v=f16 | 6.96 |
 
 ## the walker (the current life)
 
-life 1: movement 2 of 12 in the epoch; high 5, best at gemma-4-e4b-it Q8_0
+life 1: movement 3 of 12 in the epoch; high 5, best at gemma-4-e4b-it Q8_0
 
 ## the radio (the stop condition's progress)
 
@@ -36,14 +36,14 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | 4 | 14 | 0 | yes * |
-| t2 | 4 | 18 | 0.00893 | yes |
-| t4 | 4 | 20 | 0.0247 | no |
-| t8 | 4 | 22 | 0.0479 | no |
-| t16 | 4 | 23 | 0.0789 | no |
-| t32 | 4 | 24 | 0.118 | no |
-| t64 | 4 | 24 | 0.165 | no |
-| t128 | 5 | 24 | 0.122 | no |
+| t2 | 4 | 18 | 0.0223 | no |
+| t4 | 4 | 20 | 0.086 | no |
+| t8 | 4 | 21 | 0.195 | no |
+| t16 | 4 | 22 | 0.351 | no |
+| t32 | 4 | 23 | 0.554 | no |
+| t64 | 5 | 23 | 0.4 | no |
+| t128 | 5 | 23 | 0.569 | no |
 
 quorum: unmet; not blocked
 
-_139 candidates measured (223 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 51.5%); the histories are the single source of truth, the tables derive on every ledger write._
+_139 candidates measured (259 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 51.5%); the histories are the single source of truth, the tables derive on every ledger write._
