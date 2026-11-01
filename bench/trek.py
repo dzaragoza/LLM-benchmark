@@ -56,7 +56,7 @@ from bench.roster import LADDER, dyadic_picks, roster_from_models_md
 
 # ------------------------------------------------------------- constants
 
-TREK_STATE_FILE = "state/trek-state.json"
+TREK_STATE_FILE = "state/exhaustive-state.json"
 
 # THE EPOCH DERIVES FROM THE GRID DIMENSIONS (the author's ruling):
 # the max movements = n_rows + n_cols - 1 (64 + 15 - 1 = 78 on the

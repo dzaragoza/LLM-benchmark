@@ -291,7 +291,7 @@ def disk_watchdog(
 
 # the ei's state file (module-level: full_benchmark's
 # --clean wipes it before main() runs)
-TREK_STATE_FILE = "state/trek-state.json"
+TREK_STATE_FILE = "state/exhaustive-state.json"
 
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]

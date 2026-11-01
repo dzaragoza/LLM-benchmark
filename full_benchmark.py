@@ -2,7 +2,7 @@
 """full_benchmark.py -- the ei's envelope (the v9.5 exam
 walk is retired; the ei is the benchmark).
 
-One command: python full_benchmark.py --task trek. The grid is
+One command: python full_benchmark.py --task exhaustive. The grid is
 v3: (model, model-quant) pairs - 64 models x 15 rungs = 960
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
@@ -353,7 +353,7 @@ def git_tail(args: argparse.Namespace) -> None:
     # the latest regeneration (the progress pushes depend on it)
     if os.path.isfile("md/trek.md"):
         paths += ["md/trek.md"]
-    if os.path.isfile(EI_STATE := "state/trek-state.json"):
+    if os.path.isfile(EI_STATE := "state/exhaustive-state.json"):
         paths += [EI_STATE]
     # the results tree wholesale: exam answers + logs, the historical
     # dumps and sidecars that predate the split. THE ARG-LIST FIX
@@ -528,14 +528,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--results-file", default=RESULTS_FILE_DEFAULT)
     ap.add_argument(
         "--task",
-        default="trek",
-        choices=["trek"],
-        help="the benchmark: the protocol ei (the v9.5 exam walk is retired)",
+        default="exhaustive",
+        choices=["exhaustive"],
+        help="the benchmark: the exhaustive sweep (trek is deprecated)",
     )
     ap.add_argument(
         "--clean",
         action="store_true",
-        help="delete the trek state UP FRONT - a fresh pool, "
+        help="delete the exhaustive state UP FRONT - a fresh pool, "
         "every chance restored; era changes only",
     )
     ap.add_argument(
@@ -612,7 +612,7 @@ def _run(args: argparse.Namespace) -> None:
     preflight_selfcheck()
     state = load_state(args.state_file)
     stamp_disk(state, args.state_file)
-    if args.task == "trek":
+    if args.task == "exhaustive":
         # protocol ei: the epitome of simplicity - every
         # candidate of the 960-pair pool (the full 64-model roster
         # x LADDER, ONE chance each), a fresh 8-bit
