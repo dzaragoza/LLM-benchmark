@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 3: movement 2 of 12 in the epoch; high 4, best at Qwen2.5-0.5B-Instruct Q8_0
+life 3: movement 4 of 12 in the epoch; high 4, best at Qwen2.5-0.5B-Instruct Q8_0
 
 ## the radio (the stop condition's progress)
 
@@ -38,11 +38,11 @@ keep searching)
 | t1 | 4 | 3 | 0 | yes * |
 | t2 | 4 | 6 | 0.00204 | yes |
 | t4 | 4 | 8 | 0.00874 | yes |
-| t8 | 4 | 12 | 0.0219 | no |
-| t16 | 4 | 13 | 0.0447 | no |
-| t32 | 4 | 16 | 0.0785 | no |
-| t64 | 5 | 16 | 0.0489 | no |
-| t128 | 5 | 18 | 0.0758 | no |
+| t8 | 4 | 11 | 0.0219 | no |
+| t16 | 4 | 13 | 0.044 | no |
+| t32 | 4 | 16 | 0.077 | no |
+| t64 | 5 | 16 | 0.0481 | no |
+| t128 | 5 | 18 | 0.0745 | no |
 
 quorum: unmet; not blocked
 
