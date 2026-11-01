@@ -7,9 +7,9 @@ a candidate can top every tier
 
 | tier | score | candidate | time (s) |
 |---|---|---|---|
-| <= 32s | 1 | granite-4.0-h-350m Q5_K_S k=q4_1 v=f16 | 1.5 |
-| <= 64s | 1 | granite-4.0-h-350m Q5_K_S k=q4_1 v=f16 | 1.5 |
-| <= 128s | 1 | granite-4.0-h-350m Q5_K_S k=q4_1 v=f16 | 1.5 |
+| <= 32s | 1 | granite-4.0-h-350m Q5_K_M k=f16 v=q4_1 | 1.4 |
+| <= 64s | 1 | granite-4.0-h-350m Q5_K_M k=f16 v=q4_1 | 1.4 |
+| <= 128s | 1 | granite-4.0-h-350m Q5_K_M k=f16 v=q4_1 | 1.4 |
 
 ## the per-model best (t=128s)
 
@@ -18,7 +18,7 @@ t=128s and the quant that achieved it; ties break by time
 
 | model | best score | quant | kv | time (s) |
 |---|---|---|---|---|
-| granite-4.0-h-350m | 1 | Q5_K_S | k=q4_1 v=f16 | 1.5 |
+| granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
 | granite-4.0-350m | - | (not measured) | - | - |
 | SmolLM2-360M-Instruct | - | (not measured) | - | - |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
