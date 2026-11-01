@@ -534,7 +534,15 @@ def needs_rerun(history: dict[int, Any], budget_s: float) -> bool:
     """does this candidate need exam work under this budget? True
     when the history's frontier is unsettled: the next unmeasured
     level exists and all prior levels pass under the budget, or a
-    prior level timed out under a SMALLER budget (unknown here)."""
+    prior level timed out under a SMALLER budget (unknown here).
+    A LAUNCH-FAILED candidate is settled: the pair cannot run on
+    this machine (too large / no repo / quantize failed) - its
+    verdict is terminal at every budget, exactly like a wrong
+    answer (the Mistral-Nemo pin: the _launch mark was recorded
+    but the derivation never read it - the walk re-dispatched the
+    unmeasurable cell at every visit, across every restart)."""
+    if history.get("_launch", {}).get("status") == "failed":
+        return False  # the launch failure: terminal, never re-run
     level = 0
     while True:
         rec = history.get(level)
@@ -627,10 +635,19 @@ def cell_action(
     # the failing level as the score in the timeout branch.)
     open_caps: list[float] = []
     any_hist = False
+    any_launch_failed = False
     for k in kv_ladder:
         for v in kv_ladder:
             h = history_of(st, fam, rung, k, v)
             if not h:
+                continue
+            # THE LAUNCH-FAILED CANDIDATE (the Mistral-Nemo pin): the
+            # pair cannot run on this machine - the mark is a TERMINAL
+            # verdict, exactly like a wrong answer; the cell derives
+            # nothing from it (and the all-launch-failed cell is
+            # settled: 'none', the walker moves on)
+            if h.get("_launch", {}).get("status") == "failed":
+                any_launch_failed = True
                 continue
             any_hist = True
             # the frontier: the first non-pass level
@@ -647,6 +664,8 @@ def cell_action(
                 open_caps.append(float(rec.get("timeout_s", 1.0)))
             # wrong answer / out of paper / error: closed - nothing here
     if not any_hist:
+        if any_launch_failed:
+            return ("none", 0)  # the unmeasurable cell: settled forever
         return ("exam", 1.0)  # a new cell: the first exam at t=1
     if open_caps:
         # THE ONE TIMEOUT SETTING (the author's rule): the cell's live
