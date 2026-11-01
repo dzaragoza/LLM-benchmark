@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 0 of 20 in the epoch; high -1, best at Llama-3.1-8B-Instruct Q4_0
+life 1: movement 1 of 20 in the epoch; high -1, best at Llama-3.1-8B-Instruct Q4_0
 
 ## the radio (the stop condition's progress)
 
@@ -36,13 +36,13 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | 4 | 24 | 0 | yes * |
-| t2 | 4 | 27 | 0.0141 | yes |
-| t4 | 4 | 28 | 0.0476 | no |
-| t8 | 4 | 28 | 0.103 | no |
-| t16 | 4 | 30 | 0.181 | no |
-| t32 | 4 | 34 | 0.285 | no |
-| t64 | 5 | 36 | 0.173 | no |
-| t128 | 5 | 38 | 0.249 | no |
+| t2 | 4 | 26 | 0.0141 | yes |
+| t4 | 4 | 28 | 0.047 | no |
+| t8 | 4 | 28 | 0.102 | no |
+| t16 | 4 | 30 | 0.179 | no |
+| t32 | 4 | 34 | 0.282 | no |
+| t64 | 5 | 36 | 0.171 | no |
+| t128 | 5 | 38 | 0.247 | no |
 
 quorum: unmet; not blocked
 
