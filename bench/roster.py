@@ -48,18 +48,20 @@ WINDOW_DEFAULT = 262144  # every Qwen3.5 trains at 2**18
 
 def dyadic_picks(
     tiers: list[float] | None = None,
-    per_tier: int = 2,
-    tolerance: float = 0.15,
+    per_tier: int = 3,
+    tolerance: float = 0.28,
 ) -> list[tuple[str, str]]:
     """THE DYADIC PICKS (the author's rulings): per billion-parameter
-    tier (the dyadic ladder 0.5, 1, 2, 4, 8...), the `per_tier`
-    CLOSEST models with no more than +/-tolerance difference from the
-    tier (the roster's sparse tiers - 0.5B, 1B, 2B - carry their
-    second pick at 8-14% off; the dense tiers stay within 5%); tiers
-    with no model inside the tolerance are cut. Returns (fam, repo)
-    pairs, param-ascending."""
+    tier (the full dyadic ladder 0.5..32B), the `per_tier` CLOSEST
+    models with no more than +/-tolerance difference from the tier
+    (28%: the sparse tiers carry their thirds at 13-28% off - the
+    0.5B tier's SmolLM2-360M at 27.6% - and the 16B/32B tiers enter
+    at their 12.2B/27.4B models, 23-24%/14% off). Tiers contribute
+    as many picks as the roster holds within the tolerance (the
+    16B tier: 2; the 32B tier: 1). Returns (fam, repo) pairs,
+    param-ascending - 18 picks on the current roster."""
     if tiers is None:
-        tiers = [0.5, 1.0, 2.0, 4.0, 8.0]  # the machine's ladder: to 8B
+        tiers = [0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]  # the full ladder
     full = roster_from_models_md()
     repos = dict(full)
     params: dict[str, float] = {}
