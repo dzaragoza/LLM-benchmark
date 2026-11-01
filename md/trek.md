@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_270 candidates measured (448 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_270 candidates measured (450 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
