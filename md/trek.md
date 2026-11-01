@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 6: movement 4 of 12 in the epoch; high 3, best at MiniCPM3-4B Q8_0
+life 1: movement 0 of 20 in the epoch; high -1, best at Llama-3.1-8B-Instruct Q4_0
 
 ## the radio (the stop condition's progress)
 
@@ -35,15 +35,15 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | 4 | 0 | 0 | yes * |
-| t2 | 4 | 4 | 0 | yes |
-| t4 | 4 | 4 | 0.00251 | yes |
-| t8 | 4 | 4 | 0.00783 | yes |
-| t16 | 4 | 6 | 0.0162 | no |
-| t32 | 4 | 10 | 0.0291 | no |
-| t64 | 5 | 12 | 0.0175 | no |
-| t128 | 5 | 14 | 0.0292 | no |
+| t1 | 4 | 24 | 0 | yes * |
+| t2 | 4 | 27 | 0.0141 | yes |
+| t4 | 4 | 28 | 0.0476 | no |
+| t8 | 4 | 28 | 0.103 | no |
+| t16 | 4 | 30 | 0.181 | no |
+| t32 | 4 | 34 | 0.285 | no |
+| t64 | 5 | 36 | 0.173 | no |
+| t128 | 5 | 38 | 0.249 | no |
 
 quorum: unmet; not blocked
 
-_270 candidates measured (462 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_270 candidates measured (462 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 55.6%); the histories are the single source of truth, the tables derive on every ledger write._
