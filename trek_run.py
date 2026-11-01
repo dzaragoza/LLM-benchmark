@@ -32,6 +32,7 @@ from bench import state_store as _state_store
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
+    bell_window,
     build_chain,
     build_elevator,
     chain_prompt,
