@@ -180,6 +180,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             cell_kind = "unknown"
             cell_cap = 0.0
             cell_s = -1
+            cell_ts: list[int] = [-1] * len(TIER_LADDER)  # the per-tier best
             cell_has_hist = False
             cell_unfinished = False
             for k in kv_ladder:
@@ -195,6 +196,9 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                         cell_unfinished = True
                         continue
                     ts = [_tier_score(times, t) for t in TIER_LADDER]
+                    for i, sc in enumerate(ts):
+                        if sc > cell_ts[i]:
+                            cell_ts[i] = sc  # the cell's per-tier best
                     for t, sc in zip(TIER_LADDER, ts, strict=True):
                         if sc > C[t]:
                             C[t] = sc
@@ -230,9 +234,9 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             if cell_unfinished:
                 blocked = True
             if not cell_has_hist:
-                units.append(("unknown", 0.0, -1))
+                units.append(("unknown", 0.0, -1, None))
                 continue
-            units.append((cell_kind, cell_cap, cell_s))
+            units.append((cell_kind, cell_cap, cell_s, cell_ts))
             cells_seen.add((fam, rung))
 
     d_total = sum(D.values())
@@ -268,22 +272,33 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
     all_certified = not blocked
     for t in TIER_LADDER:
         groups: Counter = Counter()
-        for kind, cap, s in units:
+        ti = TIER_LADDER.index(t)
+        for kind, cap, s, cell_ts in units:
             if kind == "closed" or kind == "unfinished":
                 continue
+            # THE PER-TIER SCORE (the crash fix): the unit's threat
+            # at tier t is measured by its PER-TIER score - the
+            # score it achieves WITHIN t seconds - not its
+            # budget-free best. A cell scoring 6 over 20-65s passes
+            # NOTHING within 16s: at t16 it is no threat at all,
+            # but the budget-free s=6 against C[16]=4 crashed the
+            # contract and priced the cell as a CERTAIN beater
+            # (gap -1 -> p 1.0). Apples to apples now.
+            s_t = (cell_ts[ti] if cell_ts is not None else -1)
             if kind == "open":
                 if t <= cap:
                     continue  # known at this tier
                 d = max(1, int(round(math.log2(t / cap))))
-                groups[("open", s, d)] += 1
+                groups[("open", s_t, d)] += 1
             else:  # unknown
                 groups[("unknown", -1, int(round(math.log2(t))))] += 1
-        # EDGE: a live unit's known score cannot exceed the champion
+        # EDGE: a live unit's per-tier score cannot exceed the
+        # champion (both now measured at the same tier)
         warn_contract(
             "inv",
             "radio.score_le_champion",
             all(s <= C[t] for (_kind, s, _d) in groups),
-            f"a live unit's known score exceeds the champion C[{t}]={C[t]}",
+            f"a live unit's per-tier score exceeds the champion C[{t}]={C[t]}",
         )
         total = 0.0
         var_sum = 0.0
