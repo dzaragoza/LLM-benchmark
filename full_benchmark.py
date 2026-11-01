@@ -351,8 +351,8 @@ def git_tail(args: argparse.Namespace) -> None:
     paths = [args.state_file, args.results_file, "results.txt"]
     # the ledger is a first-class artifact: every commit carries
     # the latest regeneration (the progress pushes depend on it)
-    if os.path.isfile("md/trek.md"):
-        paths += ["md/trek.md"]
+    if os.path.isfile("md/exhaustive.md"):
+        paths += ["md/exhaustive.md"]
     if os.path.isfile(EI_STATE := "state/exhaustive-state.json"):
         paths += [EI_STATE]
     # the results tree wholesale: exam answers + logs, the historical

@@ -707,16 +707,16 @@ def _run_combo(
 
 
 def write_ledger(st: dict[str, Any] | None = None) -> None:
-    """THE EXHAUSTIVE LEDGER (md/trek.md), the author's spec:
-    - per model: the best scoring candidate (ties break by time)
-    - the top three candidates by time tier: 32s, 64s, 128s
-      (a candidate can top every category)
+    """THE EXHAUSTIVE LEDGER (md/exhaustive.md), the author's spec:
+    - at the top: the top scoring candidate in each time tier
+      (<=32s, <=64s, <=128s)
+    - per model: the highest score at t=128s, with the quant
+      (rung + kv) that achieved it; ties break by time
     Simple as possible: collect the data, make predictions after.
     """
     if st is None:
         st = trek.load_state()
     cands = st.get("candidates", {})
-    kv_ladder = KV_LADDER
     from bench.roster import dyadic_picks
     from bench.trek import _param_of
 
@@ -725,81 +725,76 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
 
     # the per-candidate scores at the report tiers
     TIER_CUTS = [32.0, 64.0, 128.0]
+
+    def time_under(hist: dict[int, Any], cut: float) -> float:
+        # the sum of the pass times that count under this budget
+        return sum(
+            rec.get("time_s", 0.0)
+            for lv, rec in hist.items()
+            if isinstance(lv, int)
+            and isinstance(rec, dict)
+            and rec.get("status") == "pass"
+            and rec.get("time_s", 1e9) <= cut
+        )
+
     rows: list[dict[str, Any]] = []
     for key, hist in cands.items():
         parts = key.split("|")
         if len(parts) != 4:
             continue
         fam, rung, k, v = parts
-        s128 = trek.score_under(hist, 128.0)
-        # the candidate's total time to its frontier at 128 (the sum
-        # of its pass times - ties break by time)
-        total_time = sum(
-            rec.get("time_s", 0.0)
-            for lv, rec in hist.items()
-            if isinstance(lv, int) and isinstance(rec, dict) and rec.get("status") == "pass"
-        )
-        rec = {
-            "fam": fam,
-            "rung": rung,
-            "k": k,
-            "v": v,
-            "s128": s128 if s128 is not None else -1,
-            "time": total_time,
-        }
+        rec = {"fam": fam, "rung": rung, "k": k, "v": v}
         for cut in TIER_CUTS:
             s = trek.score_under(hist, cut)
             rec[f"s{int(cut)}"] = s if s is not None else -1
+            rec[f"t{int(cut)}"] = time_under(hist, cut)
         rows.append(rec)
 
+    def cand_str(r: dict[str, Any]) -> str:
+        return f"{r['fam']} {r['rung']} k={r['k']} v={r['v']}"
+
     lines = [
-        "# trek.md - the exhaustive ledger",
+        "# exhaustive.md - the exhaustive ledger",
         "",
-        "## the per-model best candidate",
+        "## the top candidate by time tier",
         "",
-        "per model (parameter size ascending): the best scoring",
-        "candidate at t=128s; ties break by time (the sum of the",
-        "candidate's pass times - faster wins)",
+        "the highest score within each tier (ties break by time);",
+        "a candidate can top every tier",
         "",
-        "| model | best score | candidate | time (s) |",
+        "| tier | score | candidate | time (s) |",
         "|---|---|---|---|",
+    ]
+    for cut in TIER_CUTS:
+        col, tcol = f"s{int(cut)}", f"t{int(cut)}"
+        top = sorted(rows, key=lambda r: (-r[col], r[tcol]))[:1]
+        if top:
+            r = top[0]
+            lines.append(f"| <= {int(cut)}s | {r[col]} | {cand_str(r)} | {r[tcol]:.1f} |")
+        else:
+            lines.append(f"| <= {int(cut)}s | - | (not measured) | - |")
+
+    lines += [
+        "",
+        "## the per-model best (t=128s)",
+        "",
+        "per model (parameter size ascending): the highest score at",
+        "t=128s and the quant that achieved it; ties break by time",
+        "",
+        "| model | best score | quant | kv | time (s) |",
+        "|---|---|---|---|---|",
     ]
     for fam in models:
         fam_rows = [r for r in rows if r["fam"] == fam]
         if not fam_rows:
-            lines.append(f"| {fam} | - | (not measured) | - |")
+            lines.append(f"| {fam} | - | (not measured) | - | - |")
             continue
-        best = min(fam_rows, key=lambda r: (-r["s128"], r["time"]))
+        best = min(fam_rows, key=lambda r: (-r["s128"], r["t128"]))
         lines.append(
-            f"| {fam} | {best['s128']} | {best['rung']} k={best['k']} "
-            f"v={best['v']} | {best['time']:.1f} |"
+            f"| {fam} | {best['s128']} | {best['rung']} | "
+            f"k={best['k']} v={best['v']} | {best['t128']:.1f} |"
         )
 
-    lines += [
-        "",
-        "## the top three candidates by time tier",
-        "",
-        "the top three at each report tier (32s, 64s, 128s); a",
-        "candidate can top every category",
-        "",
-    ]
-    for cut in TIER_CUTS:
-        col = f"s{int(cut)}"
-        lines += [
-            f"### tier t{int(cut)}s",
-            "",
-            "| rank | score | candidate |",
-            "|---|---|---|",
-        ]
-        top = sorted(rows, key=lambda r: (-r[col], r["time"]))[:3]
-        for rank, r in enumerate(top, start=1):
-            lines.append(
-                f"| {rank} | {r[col]} | {r['fam']} {r['rung']} "
-                f"k={r['k']} v={r['v']} |"
-            )
-        lines.append("")
-
-    with open("md/trek.md", "w", encoding="utf-8") as fh:
+    with open("md/exhaustive.md", "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
 
 
@@ -903,12 +898,19 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     n_done = 0
     n_total = len(models) * len(RUNG_LADDER)
 
+    def progress() -> None:
+        # the progress ruler: a marker every 7 pairs - 0.......7.......14...
+        nonlocal n_done
+        write_ledger(st)
+        if (n_done - 1) % 7 == 0:
+            print(f"{n_done - 1}", end="", flush=True)
+
     for fam in models:
         famdir = os.path.join(models_dir, fam)
         for rung in RUNG_LADDER:
             n_done += 1
             print(
-                f"[exhaustive] {fam} {rung} "
+                f"\n[exhaustive] {fam} {rung} "
                 f"(pair {n_done} of {n_total})"
             )
             # skip: every candidate settled at 128 already?
@@ -923,6 +925,9 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             if not work:
                 print(f"[exhaustive] {fam} {rung}: all 49 settled from history - skip")
                 _delete_quant(famdir, rung)
+                progress()
+                if on_progress is not None:
+                    on_progress(n_done)
                 continue
             # THE ACQUIRE (the existing machinery)
             gguf = _acquire(fam, rung, models_dir)
@@ -939,6 +944,9 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                         }
                 save()
                 _delete_quant(famdir, rung)
+                progress()
+                if on_progress is not None:
+                    on_progress(n_done)
                 continue
             ctx = bell_window(st, fam, models_dir) or 262144
             for k, v in work:
@@ -951,8 +959,10 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             print()
             # THE FILE RULE (the author's): the quant dies after its run
             _delete_quant(famdir, rung)
+            progress()
             if on_progress is not None:
                 on_progress(n_done)
         # the f16 dies after all the quants + the F16 rung
         _delete_f16(famdir)
+    print(f"\n{n_total}")
     print("[exhaustive] the sweep is complete")
