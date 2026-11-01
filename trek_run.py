@@ -895,50 +895,80 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         ]
     lines.append("")
 
-    # THE PROGRESS (the author's ruling): the CLOSED CELLS at every
-    # time tier vs the total cells at every tier - the search's
-    # completion, tier by tier. A cell is CLOSED at tier t when its
-    # every candidate's curve is settled WITHIN t seconds (a verdict:
-    # a fail or a timeout at t) - the fraction of the grid the tier
-    # can speak about.
+    # THE PROGRESS (the author's spec): the WEIGHTED evaluation
+    # count. Total = cells x time tiers (every cell could, in
+    # principle, be evaluated at every tier). Progress = the sum
+    # over tiers of (cells evaluated at that tier) x (the tier's
+    # ordinal) - the example: 50 cells, 2 tiers = 100 possible; 3
+    # cells at tier 1 and 5 at tier 2 = 3x1 + 5x2 = 13 of 100.
+    # A cell counts as EVALUATED at tier t when its candidates
+    # carry settled verdicts within t seconds (the same closure
+    # rule as before - the honest per-tier evaluation state).
     n_cells_total = grid.n_rows * grid.n_cols
-    lines += ["## the progress (closed cells per tier)", ""]
+    n_tiers = len(radio.TIER_LADDER)
+    total_evals = n_cells_total * n_tiers
+    lines += ["## the progress (evaluated cells, tier-weighted)", ""]
     lines += [
-        f"the cells closed at each time tier (every candidate settled",
-        f"with a verdict within the tier's seconds) of {n_cells_total}",
-        f"total cells",
+        f"total: {n_cells_total} cells x {n_tiers} time tiers = "
+        f"{total_evals} possible evaluations",
         "",
-        "| tier | closed cells | total | progress |",
-        "|---|---|---|---|",
+        "| tier (weight) | evaluated cells | contribution |",
+        "|---|---|---|",
     ]
-    for t in radio.TIER_LADDER:
-        n_closed = 0
-        for fam in grid.models:
-            for rung in grid.rungs:
-                prefix = f"{fam}|{rung}|"
-                cell_closed = True
-                cell_any = False
-                for k in kv_ladder:
-                    for v in kv_ladder:
-                        h = cands.get(prefix + k + "|" + v)
-                        if h is None:
-                            cell_closed = False  # unmeasured: not closed
-                            continue
-                        cell_any = True
-                        kind, _cap, _s, times, _rb = radio._curve(h)
-                        if kind in ("unfinished", "infeasible"):
-                            cell_closed = False
-                            continue
-                        # closed at t: the frontier verdict holds within t
-                        # (a fail is closed at every tier; a timeout at
-                        # t' is closed at t >= t')
-                        if kind == "open" and _cell_open_beyond(h, t):
-                            cell_closed = False
-                if cell_any and cell_closed:
-                    n_closed += 1
-        pct_t = 100.0 * n_closed / n_cells_total if n_cells_total else 0.0
-        lines.append(f"| t{t} | {n_closed} | {n_cells_total} | {pct_t:.1f}% |")
-    lines.append("")
+    # THE DISJOINT COUNT (the overcount caught in verification):
+    # the closure rule is cumulative (a cell closed at t128 is also
+    # closed at every tier above its verdicts), so summing the
+    # per-tier counts double-counted (165% on the live state).
+    # Each cell contributes ONCE - at its EVALUATION DEPTH tier:
+    # the deepest tier the cell's candidates RAN AT (the max run
+    # budget among its settled curves). A fast-fail cell ran at t1
+    # -> depth 1; a dug cell ran at 128 -> depth 8. (Not the max
+    # tier where it's CLOSED - a fail closes at every tier, which
+    # put every closed cell at t128 in the first cut, caught in
+    # verification.)
+    def _cell_depth_tier(fam: str, rung: str) -> int:
+        """the cell's evaluation-depth tier ordinal (1..n_tiers):
+        the deepest tier its settled candidates ran at; 0 if none
+        of its candidates carry a settled verdict."""
+        prefix = f"{fam}|{rung}|"
+        max_budget = 0.0
+        any_settled = False
+        for k in kv_ladder:
+            for v in kv_ladder:
+                h = cands.get(prefix + k + "|" + v)
+                if h is None:
+                    continue
+                kind, _cap, _s, _times, rb = radio._curve(h)
+                if kind in ("closed", "open"):
+                    any_settled = True
+                    if rb > max_budget:
+                        max_budget = rb
+        if not any_settled:
+            return 0
+        # the ordinal of the deepest tier the run budget reached
+        for ti, t in enumerate(radio.TIER_LADDER, start=1):
+            if t >= max_budget:
+                return ti
+        return len(radio.TIER_LADDER)
+
+    per_tier_count: dict[int, int] = {}
+    for fam in grid.models:
+        for rung in grid.rungs:
+            d = _cell_depth_tier(fam, rung)
+            per_tier_count[d] = per_tier_count.get(d, 0) + 1
+    progress_sum = 0
+    for ti, t in enumerate(radio.TIER_LADDER, start=1):
+        n_eval = per_tier_count.get(ti, 0)
+        progress_sum += n_eval * ti
+        lines.append(f"| t{t} ({ti}) | {n_eval} | {n_eval * ti} |")
+    n_unevaluated = per_tier_count.get(0, 0)
+    pct_p = 100.0 * progress_sum / total_evals if total_evals else 0.0
+    lines += [
+        "",
+        f"progress: {progress_sum} of {total_evals} ({pct_p:.1f}%); "
+        f"{n_unevaluated} cells not evaluated at any tier",
+        "",
+    ]
 
     # THE MEASURED POOL (the corrected count: the safe grid's 64 x 15
     # pairs x 49 kv candidates)

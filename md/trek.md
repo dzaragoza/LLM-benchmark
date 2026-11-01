@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 6: movement 1 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at gemma-3-12b-it Q4_0 (the next teleport's target)
+life 6: movement 2 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Mistral-Nemo-Instruct-2407 Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition)
 
@@ -37,31 +37,31 @@ the SE is the pools' sampling error; '-' = not modelable
 | tier | champion | live cells | sum p | 2-sig upper | certified |
 |---|---|---|---|---|---|
 | t1 | 4 | 10 | 0 | 0 | yes |
-| t2 | 4 | 12 | 0.0433 | 0.0644 | no |
-| t4 | 4 | 13 | 0.121 | 0.156 | no |
-| t8 | 4 | 14 | 0.234 | 0.283 | no |
-| t16 | 4 | 18 | 0.388 | 0.45 | no |
-| t32 | 4 | 20 | 0.68 | 0.758 | no |
-| t64 | 8 | 22 | 0.235 | 0.278 | no |
-| t128 | 11 | 22 | 0.159 | 0.193 | no |
+| t2 | 4 | 12 | 0.0419 | 0.0626 | no |
+| t4 | 4 | 13 | 0.117 | 0.152 | no |
+| t8 | 4 | 14 | 0.226 | 0.274 | no |
+| t16 | 4 | 17 | 0.373 | 0.433 | no |
+| t32 | 4 | 19 | 0.652 | 0.728 | no |
+| t64 | 8 | 21 | 0.226 | 0.267 | no |
+| t128 | 11 | 21 | 0.153 | 0.186 | no |
 
 quorum: unmet; not blocked
 
-## the progress (closed cells per tier)
+## the progress (evaluated cells, tier-weighted)
 
-the cells closed at each time tier (every candidate settled
-with a verdict within the tier's seconds) of 54
-total cells
+total: 54 cells x 8 time tiers = 432 possible evaluations
 
-| tier | closed cells | total | progress |
-|---|---|---|---|
-| t1 | 10 | 54 | 18.5% |
-| t2 | 10 | 54 | 18.5% |
-| t4 | 10 | 54 | 18.5% |
-| t8 | 13 | 54 | 24.1% |
-| t16 | 15 | 54 | 27.8% |
-| t32 | 17 | 54 | 31.5% |
-| t64 | 17 | 54 | 31.5% |
-| t128 | 41 | 54 | 75.9% |
+| tier (weight) | evaluated cells | contribution |
+|---|---|---|
+| t1 (1) | 1 | 1 |
+| t2 (2) | 0 | 0 |
+| t4 (3) | 1 | 3 |
+| t8 (4) | 3 | 12 |
+| t16 (5) | 2 | 10 |
+| t32 (6) | 2 | 12 |
+| t64 (7) | 0 | 0 |
+| t128 (8) | 35 | 280 |
 
-_459 candidates measured (776 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 94.4%); the histories are the single source of truth, the tables derive on every ledger write._
+progress: 318 of 432 (73.6%); 10 cells not evaluated at any tier
+
+_459 candidates measured (806 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 94.4%); the histories are the single source of truth, the tables derive on every ledger write._
