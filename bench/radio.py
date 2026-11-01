@@ -40,7 +40,20 @@ from typing import Any
 from bench.contracts import warn_contract
 
 TIER_LADDER = [1, 2, 4, 8, 16, 32, 64, 128]
-CERTIFY_EPS = 0.01
+# THE 2-SIGMA CERTIFICATION (the author's ruling: '1% is too
+# strict'): the fixed 0.01 threshold becomes the 2-sigma confidence
+# bound on the sum. The pool-based p's are ESTIMATES (thin pools
+# carry error); the union sum inherits it. A tier certifies iff
+#   sum_p + 2 * SE(sum_p) < 0.05
+# - the conventional 2-sigma (95%) level: the search ends when the
+# 95% upper bound on 'the champion can be beaten' is under 5%.
+# The SE: each pool p_hat has SE = sqrt(p(1-p)/n_pool); the sum of
+# k unit-probabilities (each estimated from the same pools) is
+# conservative-weighted: SE(sum) = sqrt(sum of k*p*(1-p)/n) - the
+# independent-Bernoulli approximation, treating each unit's
+# probability as a pool estimate.
+CERTIFY_ANCHOR = 0.05
+CERTIFY_SIGMA = 2.0
 MAX_TIER = 128
 MAX_D = 7  # log2(128/1)
 
@@ -273,6 +286,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             f"a live unit's known score exceeds the champion C[{t}]={C[t]}",
         )
         total = 0.0
+        var_sum = 0.0
         modelable = True
         for (kind, s, d), count in sorted(groups.items()):
             gap = C[t] + 1 - s
@@ -293,6 +307,24 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                     break
                 p = 1.0 if gap <= 0 else tail.p(gap)
             total += count * p
+            # THE SE TERM: each unit's p is a pool estimate with
+            # sampling error; the sum inherits it. SE per unit ~
+            # sqrt(p(1-p)/n) with n = the feeding pool's size; the
+            # sum's SE = sqrt(sum of k*var) (independent units,
+            # shared pools - the conservative treatment would
+            # multiply, the honest one adds).
+            n_pool = d_total if kind == "open" else g_total
+            if n_pool > 0:
+                var_sum += count * p * (1.0 - p) / n_pool
+        # THE 2-SIGMA CERTIFICATION (the author's ruling: the 1%
+        # fixed threshold was too strict): a tier certifies iff the
+        # 95% upper confidence bound on the sum is under 5% -
+        #   sum_p + 2 * SE(sum_p) < 0.05
+        # The SE is the pools' sampling error propagated into the
+        # union bound; thin pools inflate SE and refuse early,
+        # thick pools earn the certificate.
+        se = math.sqrt(var_sum) if var_sum > 0 else 0.0
+        upper = total + CERTIFY_SIGMA * se
         # THE FLOOR-CHAMPION GUARD (the early-stop bug the author
         # caught): a certificate asserts 'the champion cannot be
         # beaten' - a champion at the FLOOR (C = -1, nothing passed
@@ -303,11 +335,15 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
         # tiers certified at C = -1). A tier certifies only when its
         # champion is a REAL measured score - at least one level
         # passed somewhere at that tier.
-        certified = modelable and quorum and C[t] >= 0 and total < CERTIFY_EPS
+        certified = (
+            modelable and quorum and C[t] >= 0 and upper < CERTIFY_ANCHOR
+        )
         tiers[str(t)] = {
             "champion": C[t],
             "live_units": sum(groups.values()),
             "sum_p": total if modelable else None,
+            "se": se if modelable else None,
+            "upper_2sig": upper if modelable else None,
             "certified": certified,
             "pool_D": d_total,
             "pool_G": g_total,
