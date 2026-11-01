@@ -1006,6 +1006,26 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             f"every visited cell; live work fires in walk order)"
         )
 
+    # THE STARTUP RADIO (the author's ruling): the radio fires
+    # BEFORE the walk - no need to measure in movement 0 if the
+    # radio says stop. A restart on an all-certified state (the
+    # trek already ended, or a state file carried a full
+    # certificate) must not re-run sweeps to rediscover what the
+    # histories already prove: the certificate is exact from the
+    # state, and the walk's first movement would cost a quantize
+    # for nothing.
+    radio_res = radio.certify(st, KV_LADDER)
+    st["radio"] = {
+        "tiers": radio_res["tiers"],
+        "all_certified": radio_res["all_certified"],
+        "blocked": radio_res["blocked"],
+    }
+    print(radio.summary(radio_res))
+    if radio_res["all_certified"]:
+        print("[trek] THE RADIO: all tiers certified at startup - the search ENDS")
+        print("[trek] the trek has ENDED: no improvement found by any spawn")
+        return
+
     n = 0
     while True:
         pick = trek.walk(st, walker_seed)
