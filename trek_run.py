@@ -959,55 +959,30 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     fp_now = _trek.grid_fingerprint(_trek.Grid())
     fp_recorded = ws.get("grid_fp")
+    # THE ALWAYS-RESET (the author's unconditional ruling): when
+    # starting full_benchmark the walker starts at its first life,
+    # first epoch, first movement - ALWAYS. Not only on grid
+    # changes, not only when the record is stale: EVERY startup
+    # re-walks from the origin. The histories (keyed by family)
+    # carry over - every measurement answers on the re-walk; the
+    # walk record is a CACHE, and the cache always starts cold.
+    # The settled cells pass through at zero exam cost; live work
+    # fires at its natural standing, in walk order.
     if fp_recorded != fp_now:
         print(
             f"[trek] the grid changed ({fp_recorded or 'a legacy record'} -> "
-            f"{fp_now}) - the walk record resets: life 1, a fresh spawn "
-            f"on the new lattice (the histories carry over)"
+            f"{fp_now}) - the walk record resets"
         )
-        ws.clear()
-        ws["life"] = 1
-        ws["position"] = [-1, -1]
-        ws["grid_fp"] = fp_now
-        _trek.save_state(st)
-    if ws.get("position", [-1, -1]) != [-1, -1]:
-        # THE LEGACY SPAWN (the third blind spot - the movement-48
-        # saga's final act): a record predating the 'spawn' field
-        # lacks the life's origin. The honest derivation: reset to
-        # (-1,-1) - the walker RE-SPAWNS, drawing fresh coordinates
-        # from the seeded stream; for a life that began at draws base
-        # D, the re-spawn consumes the same stream positions and
-        # re-derives the SAME coordinates (the determinism the canary
-        # pins). The replay is exact even without the recorded field.
-        spawn = ws.get("spawn")
-        if spawn is None:
-            # THE LEGACY SPAWN (the third blind spot - the movement-48
-            # saga's final act): a record predating the 'spawn' field
-            # lacks the life's origin. The honest derivation: reset to
-            # (-1,-1) - the walker RE-SPAWNS, drawing fresh coordinates
-            # from the seeded stream at the life's draws base; the
-            # determinism the canary pins re-derives the SAME
-            # coordinates. The replay is exact even without the field.
-            spawn = [-1, -1]
-        ws["position"] = list(spawn)
-        ws["movements"] = 0
-        ws["high"] = -1
-        ws["best"] = list(spawn) if spawn != [-1, -1] else ws.get("position", [-1, -1])
-        ws["epoch_start"] = list(spawn) if spawn != [-1, -1] else ws.get("position", [-1, -1])
-        ws["dispatched"] = [-1, -1]
-        ws["dispatched_action"] = None
-        # the draws base restores (the life's first draw count) -
-        # the replay re-consumes the life's own stream
-        ws["draws"] = ws.get("life_draws", 0)
-        ws["replay_reset"] = True  # the one-shot flag: the first
-        # walk() after the reset is the legitimate fresh standing
-        trek.save_state(st)
-        origin_desc = f"{spawn}" if spawn != [-1, -1] else "the re-spawn (the stream re-derives)"
-        print(
-            f"[trek] the replay reset: re-walking life {ws.get('life', 1)} "
-            f"from its origin {origin_desc} (the histories answer for "
-            f"every visited cell; live work fires in walk order)"
-        )
+    print(
+        "[trek] the startup reset: life 1, epoch 1, movement 0 - "
+        "the walk re-derives from the origin (the histories answer "
+        "for every visited cell)"
+    )
+    ws.clear()
+    ws["life"] = 1
+    ws["position"] = [-1, -1]
+    ws["grid_fp"] = fp_now
+    _trek.save_state(st)
 
     # THE STARTUP RADIO (the author's ruling): the radio fires
     # BEFORE the walk - no need to measure in movement 0 if the
