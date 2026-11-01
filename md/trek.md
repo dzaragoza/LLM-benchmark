@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 3: movement 16 of 20 in the epoch; life score 0 (the spawn/teleport baseline); epoch start at Qwen2.5-0.5B-Instruct Q8_0 (the next teleport's target)
+life 3: movement 2 of 20 in the epoch; life score 4 (the spawn/teleport baseline); epoch start at Qwen2.5-0.5B-Instruct Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition)
 
@@ -36,14 +36,14 @@ the SE is the pools' sampling error; '-' = not modelable
 
 | tier | champion | live cells | sum p | 2-sig upper | certified |
 |---|---|---|---|---|---|
-| t1 | 4 | 8 | 0 | 0 | yes |
-| t2 | 4 | 10 | 0.105 | 0.136 | no |
-| t4 | 4 | 11 | 0.247 | 0.294 | no |
-| t8 | 4 | 11 | 0.416 | 0.478 | no |
-| t16 | 4 | 12 | 0.619 | 0.693 | no |
-| t32 | 4 | 13 | 0.952 | 1.04 | no |
-| t64 | 8 | 14 | 0.559 | 0.625 | no |
-| t128 | 13 | 15 | 0.17 | 0.205 | no |
+| t1 | 4 | 7 | 0 | 0 | yes |
+| t2 | 4 | 10 | 0.103 | 0.133 | no |
+| t4 | 4 | 11 | 0.242 | 0.288 | no |
+| t8 | 4 | 11 | 0.409 | 0.469 | no |
+| t16 | 4 | 12 | 0.61 | 0.682 | no |
+| t32 | 4 | 13 | 0.941 | 1.03 | no |
+| t64 | 8 | 14 | 0.556 | 0.621 | no |
+| t128 | 13 | 15 | 0.169 | 0.204 | no |
 
 quorum: unmet; not blocked
 
@@ -53,7 +53,7 @@ total: 54 cells x 8 time tiers = 432 possible evaluations
 
 | tier (weight) | evaluated cells | contribution |
 |---|---|---|
-| t1 (1) | 1 | 1 |
+| t1 (1) | 2 | 2 |
 | t2 (2) | 0 | 0 |
 | t4 (3) | 0 | 0 |
 | t8 (4) | 1 | 4 |
@@ -62,6 +62,6 @@ total: 54 cells x 8 time tiers = 432 possible evaluations
 | t64 (7) | 1 | 7 |
 | t128 (8) | 40 | 320 |
 
-progress: 348 of 432 (80.6%); 8 cells not evaluated at any tier
+progress: 349 of 432 (80.8%); 7 cells not evaluated at any tier
 
-_477 candidates measured (917 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 98.1%); the histories are the single source of truth, the tables derive on every ledger write._
+_486 candidates measured (926 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
