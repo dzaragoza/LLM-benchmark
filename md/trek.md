@@ -17,11 +17,11 @@ the tier's champion
 | <= 16s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
 | <= 32s | 4 | Qwen2.5-0.5B-Instruct Q8_0 k=q8_0 v=q8_0 | 0.75 |
 | <= 64s | 6 | granite-3.3-8b-instruct Q8_0 k=q8_0 v=q8_0 | 14.74 |
-| <= 128s | 6 | granite-3.3-8b-instruct Q8_0 k=f16 v=f16 | 14.83 |
+| <= 128s | 8 | Ministral-3-3B-Instruct-2512 Q8_0 k=f16 v=q4_0 | 14.91 |
 
 ## the walker (the current life)
 
-life 2: movement 5 of 20 in the epoch; life score 4 (the spawn/teleport baseline); epoch start at MiniCPM3-4B F16 (the next teleport's target)
+life 2: movement 8 of 20 in the epoch; life score 4 (the spawn/teleport baseline); epoch start at gemma-4-e4b-it Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -37,13 +37,13 @@ keep searching)
 |---|---|---|---|---|
 | t1 | 4 | 11 | 0 | yes * |
 | t2 | 4 | 14 | 0.0109 | yes |
-| t4 | 4 | 17 | 0.0421 | no |
-| t8 | 4 | 19 | 0.0977 | no |
-| t16 | 4 | 23 | 0.181 | no |
-| t32 | 4 | 25 | 0.296 | no |
-| t64 | 6 | 27 | 0.0883 | no |
-| t128 | 6 | 29 | 0.137 | no |
+| t4 | 4 | 17 | 0.0425 | no |
+| t8 | 4 | 19 | 0.0992 | no |
+| t16 | 4 | 22 | 0.184 | no |
+| t32 | 4 | 24 | 0.3 | no |
+| t64 | 6 | 26 | 0.0891 | no |
+| t128 | 8 | 28 | 0.0244 | yes |
 
 quorum: unmet; not blocked
 
-_450 candidates measured (649 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 92.6%); the histories are the single source of truth, the tables derive on every ledger write._
+_450 candidates measured (674 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 92.6%); the histories are the single source of truth, the tables derive on every ledger write._
