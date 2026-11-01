@@ -35,15 +35,15 @@ keep searching)
 
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
-| t1 | 4 | 1 | 0 | yes * |
-| t2 | 4 | 4 | 0.000606 | yes |
-| t4 | 4 | 4 | 0.00385 | yes |
-| t8 | 4 | 6 | 0.00997 | yes |
-| t16 | 4 | 9 | 0.0204 | no |
-| t32 | 4 | 13 | 0.0373 | no |
-| t64 | 5 | 14 | 0.0236 | no |
-| t128 | 5 | 15 | 0.0387 | no |
+| t1 | 4 | 0 | 0 | yes * |
+| t2 | 4 | 4 | 0 | yes |
+| t4 | 4 | 4 | 0.00254 | yes |
+| t8 | 4 | 6 | 0.00787 | yes |
+| t16 | 4 | 9 | 0.0174 | no |
+| t32 | 4 | 13 | 0.0335 | no |
+| t64 | 5 | 14 | 0.021 | no |
+| t128 | 5 | 15 | 0.0354 | no |
 
 quorum: unmet; not blocked
 
-_270 candidates measured (441 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
+_270 candidates measured (445 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
