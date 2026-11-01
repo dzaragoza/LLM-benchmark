@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 3: movement 6 of 20 in the epoch; high 2, best at Qwen3-4B-Instruct-2507 Q8_0
+life 3: movement 12 of 20 in the epoch; high 3, best at MiniCPM3-4B Q8_0
 
 ## the radio (the stop condition's progress)
 
