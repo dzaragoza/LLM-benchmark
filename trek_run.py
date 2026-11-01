@@ -813,20 +813,21 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
             lines.append(f"| <= {cut:g}s | - | (nothing measured yet) | - |")
     lines.append("")
 
-    # THE CURRENT LIFE (the walker's own progress): the life number,
-    # where it stands, its high score and best cell, and its movement
-    # budget's state - the search's live pulse, one row
+    # THE WALKER (the clean life/epoch spec): the life number, where
+    # it stands, the LIFE SCORE (the spawn/teleport baseline - not a
+    # running high), and the EPOCH START (the last cell that strictly
+    # beat the epoch score - where the next teleport goes)
     lines += ["## the walker (the current life)", ""]
     ws = st.get("walk", {})
     life = ws.get("life", 1)
     pos = ws.get("position", [-1, -1])
     movs = ws.get("movements", 0)
-    high = ws.get("high", -1)
-    best = ws.get("best", pos)
-    best_cell = ""
+    life_score = ws.get("high", -1)
+    epoch_start = ws.get("epoch_start", pos)
+    es_cell = ""
     try:
-        fam, rung = grid.cell(best[0], best[1])
-        best_cell = f"{fam} {rung}"
+        fam, rung = grid.cell(epoch_start[0], epoch_start[1])
+        es_cell = f"{fam} {rung}"
     except Exception:
         pass
     epoch_budget = trek.epoch_movements(grid)
@@ -836,7 +837,9 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         else (f"movement {movs} of {epoch_budget} in the epoch")
     )
     lines += [
-        f"life {life}: {status}; high {high}, best at {best_cell or best}",
+        f"life {life}: {status}; life score {life_score} "
+        f"(the spawn/teleport baseline); epoch start at "
+        f"{es_cell or epoch_start} (the next teleport's target)",
         "",
     ]
 
