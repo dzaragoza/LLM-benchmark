@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 15 of 20 in the epoch; life score 1 (the spawn/teleport baseline); epoch start at Mistral-Nemo-Instruct-2407 Q4_0 (the next teleport's target)
+life 1: movement 14 of 20 in the epoch; life score 11 (the spawn/teleport baseline); epoch start at Mistral-Nemo-Instruct-2407 Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition)
 
@@ -39,11 +39,11 @@ the SE is the pools' sampling error; '-' = not modelable
 | t1 | 4 | 10 | 0 | 0 | yes |
 | t2 | 4 | 12 | 0.0418 | 0.0625 | no |
 | t4 | 4 | 13 | 0.117 | 0.151 | no |
-| t8 | 4 | 14 | 0.226 | 0.273 | no |
-| t16 | 4 | 16 | 0.371 | 0.43 | no |
-| t32 | 4 | 19 | 0.645 | 0.722 | no |
-| t64 | 8 | 20 | 0.225 | 0.266 | no |
-| t128 | 11 | 20 | 0.153 | 0.185 | no |
+| t8 | 4 | 13 | 0.224 | 0.271 | no |
+| t16 | 4 | 16 | 0.366 | 0.426 | no |
+| t32 | 4 | 19 | 0.638 | 0.714 | no |
+| t64 | 8 | 20 | 0.225 | 0.265 | no |
+| t128 | 11 | 20 | 0.152 | 0.185 | no |
 
 quorum: unmet; not blocked
 
@@ -55,13 +55,13 @@ total: 54 cells x 8 time tiers = 432 possible evaluations
 |---|---|---|
 | t1 (1) | 1 | 1 |
 | t2 (2) | 0 | 0 |
-| t4 (3) | 1 | 3 |
-| t8 (4) | 2 | 8 |
+| t4 (3) | 0 | 0 |
+| t8 (4) | 3 | 12 |
 | t16 (5) | 3 | 15 |
 | t32 (6) | 1 | 6 |
 | t64 (7) | 0 | 0 |
 | t128 (8) | 36 | 288 |
 
-progress: 321 of 432 (74.3%); 10 cells not evaluated at any tier
+progress: 322 of 432 (74.5%); 10 cells not evaluated at any tier
 
 _459 candidates measured (809 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 94.4%); the histories are the single source of truth, the tables derive on every ledger write._
