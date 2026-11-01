@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 1 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Llama-3.1-8B-Instruct Q4_0 (the next teleport's target)
+life 1: movement 2 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Llama-3.1-8B-Instruct Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -36,14 +36,14 @@ keep searching)
 | tier | champion | live cells | sum p | certified |
 |---|---|---|---|---|
 | t1 | 4 | 15 | 0 | yes * |
-| t2 | 4 | 20 | 0.0122 | yes |
-| t4 | 4 | 20 | 0.0409 | no |
-| t8 | 4 | 21 | 0.0865 | no |
-| t16 | 4 | 25 | 0.15 | no |
-| t32 | 4 | 29 | 0.253 | no |
-| t64 | 6 | 31 | 0.249 | no |
-| t128 | 6 | 32 | 0.335 | no |
+| t2 | 4 | 20 | 0.0147 | yes |
+| t4 | 4 | 20 | 0.0515 | no |
+| t8 | 4 | 21 | 0.11 | no |
+| t16 | 4 | 24 | 0.192 | no |
+| t32 | 4 | 28 | 0.299 | no |
+| t64 | 6 | 30 | 0.0909 | no |
+| t128 | 6 | 31 | 0.136 | no |
 
 quorum: unmet; not blocked
 
-_396 candidates measured (589 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 81.5%); the histories are the single source of truth, the tables derive on every ledger write._
+_396 candidates measured (601 exam levels recorded; a re-run at a bigger budget is new evidence) of 54 pairs x 3 x 3 kv = 486 total, 81.5%); the histories are the single source of truth, the tables derive on every ledger write._
