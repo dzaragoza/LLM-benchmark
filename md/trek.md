@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 1: movement 0 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Llama-3.1-8B-Instruct Q4_0 (the next teleport's target)
+life 1: movement 1 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Llama-3.1-8B-Instruct Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -40,8 +40,8 @@ keep searching)
 | t4 | 4 | 20 | 0.0409 | no |
 | t8 | 4 | 21 | 0.0865 | no |
 | t16 | 4 | 25 | 0.15 | no |
-| t32 | 4 | 30 | 0.253 | no |
-| t64 | 6 | 31 | 0.25 | no |
+| t32 | 4 | 29 | 0.253 | no |
+| t64 | 6 | 31 | 0.249 | no |
 | t128 | 6 | 32 | 0.335 | no |
 
 quorum: unmet; not blocked
