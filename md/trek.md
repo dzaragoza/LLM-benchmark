@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 3: movement 15 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Ministral-3-3B-Instruct-2512 Q4_0 (the next teleport's target)
+life 3: movement 16 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at Ministral-3-3B-Instruct-2512 Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -42,7 +42,7 @@ keep searching)
 | t16 | 4 | 21 | 0.204 | no |
 | t32 | 4 | 23 | 0.41 | no |
 | t64 | 6 | 25 | 0.429 | no |
-| t128 | 8 | 27 | 0.401 | no |
+| t128 | 8 | 26 | 0.401 | no |
 
 quorum: unmet; not blocked
 
