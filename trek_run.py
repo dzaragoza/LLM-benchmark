@@ -718,6 +718,19 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     return round(f16 * _bpw(r.get("rung", "")) / 16.0, 3)
 
 
+def _cell_open_beyond(h: dict[str, Any], t: float) -> bool:
+    """the progress helper: is this candidate's curve still OPEN at
+    tier t? True when the frontier's timeout cap exceeds t (the
+    curve could still climb when the budget doubles past t) - the
+    candidate has no settled verdict within t seconds."""
+    from bench import radio as _radio
+
+    kind, cap, _s, _times, _rb = _radio._curve(h)
+    if kind != "open":
+        return False
+    return cap > t
+
+
 def write_ledger(st: dict[str, Any] | None = None) -> None:
     """THE LEDGER (md/trek.md): the practitioner tables, derived from
     the exam histories - v2's single source of truth. Every table
@@ -843,34 +856,36 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         "",
     ]
 
-    # THE STOP CONDITION'S PROGRESS (the radio): per tier the union
-    # bound's sum, the champion, and the certification state
-    lines += ["## the radio (the stop condition's progress)", ""]
+    # THE RADIO (the stop condition): per tier the union bound's
+    # sum (the live cells' per-tier threat), the 2-sigma confidence
+    # bound, the champion, and the certification state
+    lines += ["## the radio (the stop condition)", ""]
     radio_rec = st.get("radio", {})
     tiers_rec = radio_rec.get("tiers", {})
     lines += [
-        "the per-tier certification: the live cells' summed probability",
-        "of beating the tier's champion (the union bound); a tier is",
-        "certified when the sum < 0.01 AND the quorum (>= 2 cells",
-        "pooled) AND a real champion (not the floor); the * marks the",
-        "eager tier (tier 1 - its certification rests on the",
-        "support-cap assumption); '-' = not modelable (a pool empty:",
-        "keep searching)",
+        "the per-tier certification: each live cell's PER-TIER threat",
+        "(the score it achieves within the tier's seconds) priced by",
+        "the pools (the started-climb pool D, the genesis pool G),",
+        "summed (the union bound); a tier certifies when the 95%",
+        "upper confidence bound sum_p + 2*SE < 0.05 AND the quorum",
+        "(>= 2 cells pooled) AND a real champion (not the floor);",
+        "the SE is the pools' sampling error; '-' = not modelable",
+        "(a pool empty: keep searching)",
         "",
-        "| tier | champion | live cells | sum p | certified |",
-        "|---|---|---|---|---|",
+        "| tier | champion | live cells | sum p | 2-sig upper | certified |",
+        "|---|---|---|---|---|---|",
     ]
     for t in radio.TIER_LADDER:
         rec = tiers_rec.get(str(t), {})
         sp = rec.get("sum_p")
+        up = rec.get("upper_2sig")
         cert = "yes" if rec.get("certified") else "no"
         if rec.get("floor_champion"):
             cert += " (floor champion)"
-        if t == 1 and rec.get("certified"):
-            cert += " *"
         lines.append(
             f"| t{t} | {rec.get('champion', '-')} | {rec.get('live_units', '-')} | "
-            f"{'-' if sp is None else f'{sp:.3g}'} | {cert} |"
+            f"{'-' if sp is None else f'{sp:.3g}'} | "
+            f"{'-' if up is None else f'{up:.3g}'} | {cert} |"
         )
     if radio_rec:
         lines += [
@@ -878,6 +893,51 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
             f"quorum: {'met' if radio_rec.get('quorum', False) else 'unmet'}; "
             f"{'blocked (an unfinished exam)' if radio_rec.get('blocked') else 'not blocked'}",
         ]
+    lines.append("")
+
+    # THE PROGRESS (the author's ruling): the CLOSED CELLS at every
+    # time tier vs the total cells at every tier - the search's
+    # completion, tier by tier. A cell is CLOSED at tier t when its
+    # every candidate's curve is settled WITHIN t seconds (a verdict:
+    # a fail or a timeout at t) - the fraction of the grid the tier
+    # can speak about.
+    n_cells_total = grid.n_rows * grid.n_cols
+    lines += ["## the progress (closed cells per tier)", ""]
+    lines += [
+        f"the cells closed at each time tier (every candidate settled",
+        f"with a verdict within the tier's seconds) of {n_cells_total}",
+        f"total cells",
+        "",
+        "| tier | closed cells | total | progress |",
+        "|---|---|---|---|",
+    ]
+    for t in radio.TIER_LADDER:
+        n_closed = 0
+        for fam in grid.models:
+            for rung in grid.rungs:
+                prefix = f"{fam}|{rung}|"
+                cell_closed = True
+                cell_any = False
+                for k in kv_ladder:
+                    for v in kv_ladder:
+                        h = cands.get(prefix + k + "|" + v)
+                        if h is None:
+                            cell_closed = False  # unmeasured: not closed
+                            continue
+                        cell_any = True
+                        kind, _cap, _s, times, _rb = radio._curve(h)
+                        if kind in ("unfinished", "infeasible"):
+                            cell_closed = False
+                            continue
+                        # closed at t: the frontier verdict holds within t
+                        # (a fail is closed at every tier; a timeout at
+                        # t' is closed at t >= t')
+                        if kind == "open" and _cell_open_beyond(h, t):
+                            cell_closed = False
+                if cell_any and cell_closed:
+                    n_closed += 1
+        pct_t = 100.0 * n_closed / n_cells_total if n_cells_total else 0.0
+        lines.append(f"| t{t} | {n_closed} | {n_cells_total} | {pct_t:.1f}% |")
     lines.append("")
 
     # THE MEASURED POOL (the corrected count: the safe grid's 64 x 15
