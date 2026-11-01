@@ -27,17 +27,23 @@ import infra.hf_download as hf_download
 # The classic K-quant rungs (Q2_K .. F16) need no importance matrix.
 # The grid reshapes accordingly: 64 models x 15 rungs = 960 pairs.
 # BF16 is cut (the author's ruling: f16 is basically the same thing)
-# THE SMALL GRID (the author's ruling: the grid is too large for the
-# machine - no algorithm change, just a smaller state space):
-# - the models: one per DYADIC billion-parameter tier (0.5, 1, 2, 4,
-#   8B), the closest with no more than +/-5% difference from the
-#   dyadic (the 16B and 32B tiers have no model within 5% - cut)
-# - the model_quants: q4_0, q8_0, f16
-# - the kv quants: q4_0, q8_0, f16
-# The grid: 5 models x 3 model_quants = 15 pairs x 9 kv = 135
-# candidates (was 64 x 15 x 49 = 47,040).
+# THE FULL SAFE LADDER (the exhaustive era): the 15 rungs,
+# bits-per-weight ascending - the exhaustive collection sweeps them
+# all (the author's ruling: collect the data, predict after).
 LADDER = [
+    "Q2_K",
+    "Q3_K_S",
     "Q4_0",
+    "Q3_K_M",
+    "Q4_K_S",
+    "Q4_1",
+    "Q4_K_M",
+    "Q3_K_L",
+    "Q5_K_S",
+    "Q5_0",
+    "Q5_K_M",
+    "Q5_1",
+    "Q6_K",
     "Q8_0",
     "F16",
 ]

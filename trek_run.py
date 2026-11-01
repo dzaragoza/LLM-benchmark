@@ -72,11 +72,16 @@ def entropy_bits(n: int) -> int:
 # the 16-bit pick: 11 bits the model index (the pool index), 5 bits
 # the model rung (LADDER). One chance per PAIR; the pair's pick
 # sweeps every KV_LADDER x KV_LADDER combination (49 candidates).
-# THE SMALL GRID'S KV LADDER (the author's ruling): the 3 kv quants
+# THE FULL KV LADDER (the exhaustive era): the 7 kv quants - 49
+# combos per pair (the author's ruling)
 KV_LADDER = [
     "f16",
     "q8_0",
     "q4_0",
+    "q4_1",
+    "iq4_nl",
+    "q5_0",
+    "q5_1",
 ]
 PICK_BITS = 16  # 11 model index + 5 rung
 
@@ -700,6 +705,129 @@ def _run_combo(
     return history
 
 
+def write_ledger(st: dict[str, Any] | None = None) -> None:
+    """THE EXHAUSTIVE LEDGER (md/trek.md), the author's spec:
+    - per model: the best scoring candidate (ties break by time)
+    - the top three candidates by time tier: 32s, 64s, 128s
+      (a candidate can top every category)
+    Simple as possible: collect the data, make predictions after.
+    """
+    if st is None:
+        st = trek.load_state()
+    cands = st.get("candidates", {})
+    kv_ladder = KV_LADDER
+    from bench.roster import dyadic_picks
+    from bench.trek import _param_of
+
+    models = [fam for fam, _repo in dyadic_picks()]
+    models.sort(key=_param_of)
+
+    # the per-candidate scores at the report tiers
+    TIER_CUTS = [32.0, 64.0, 128.0]
+    rows: list[dict[str, Any]] = []
+    for key, hist in cands.items():
+        parts = key.split("|")
+        if len(parts) != 4:
+            continue
+        fam, rung, k, v = parts
+        s128 = trek.score_under(hist, 128.0)
+        # the candidate's total time to its frontier at 128 (the sum
+        # of its pass times - ties break by time)
+        total_time = sum(
+            rec.get("time_s", 0.0)
+            for lv, rec in hist.items()
+            if isinstance(lv, int) and isinstance(rec, dict) and rec.get("status") == "pass"
+        )
+        rec = {
+            "fam": fam,
+            "rung": rung,
+            "k": k,
+            "v": v,
+            "s128": s128 if s128 is not None else -1,
+            "time": total_time,
+        }
+        for cut in TIER_CUTS:
+            s = trek.score_under(hist, cut)
+            rec[f"s{int(cut)}"] = s if s is not None else -1
+        rows.append(rec)
+
+    lines = [
+        "# trek.md - the exhaustive ledger",
+        "",
+        "## the per-model best candidate",
+        "",
+        "per model (parameter size ascending): the best scoring",
+        "candidate at t=128s; ties break by time (the sum of the",
+        "candidate's pass times - faster wins)",
+        "",
+        "| model | best score | candidate | time (s) |",
+        "|---|---|---|---|",
+    ]
+    for fam in models:
+        fam_rows = [r for r in rows if r["fam"] == fam]
+        if not fam_rows:
+            lines.append(f"| {fam} | - | (not measured) | - |")
+            continue
+        best = min(fam_rows, key=lambda r: (-r["s128"], r["time"]))
+        lines.append(
+            f"| {fam} | {best['s128']} | {best['rung']} k={best['k']} "
+            f"v={best['v']} | {best['time']:.1f} |"
+        )
+
+    lines += [
+        "",
+        "## the top three candidates by time tier",
+        "",
+        "the top three at each report tier (32s, 64s, 128s); a",
+        "candidate can top every category",
+        "",
+    ]
+    for cut in TIER_CUTS:
+        col = f"s{int(cut)}"
+        lines += [
+            f"### tier t{int(cut)}s",
+            "",
+            "| rank | score | candidate |",
+            "|---|---|---|",
+        ]
+        top = sorted(rows, key=lambda r: (-r[col], r["time"]))[:3]
+        for rank, r in enumerate(top, start=1):
+            lines.append(
+                f"| {rank} | {r[col]} | {r['fam']} {r['rung']} "
+                f"k={r['k']} v={r['v']} |"
+            )
+        lines.append("")
+
+    with open("md/trek.md", "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def _delete_quant(famdir: str, rung: str) -> None:
+    """THE FILE RULE (the author's exhaustive ruling): the model
+    quant file dies after its 49-kv run completes (the F16 rung IS
+    the f16 - never deleted here). A missing file is a no-op."""
+    import infra.hf_download as hf_download
+
+    if rung == "F16":
+        return  # the f16 is the source; the model's f16 dies last
+    p = hf_download.local_rung(famdir, rung)
+    if p and os.path.isfile(p):
+        os.remove(p)
+        print(f"  [file] {rung}: deleted (the run complete)")
+
+
+def _delete_f16(famdir: str) -> None:
+    """THE MODEL'S F16 dies after ALL its quants + the F16 rung are
+    done (the author's rule) - the family's disk footprint reaches
+    zero; the next model's download has the full budget."""
+    import glob
+
+    for p in glob.glob(os.path.join(famdir, "*-f16.gguf")):
+        if os.path.isfile(p):
+            os.remove(p)
+            print(f"  [file] {os.path.basename(p)}: deleted (the family complete)")
+
+
 def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     """the candidate's weights size for the extended reporting's
     budget table: the MEASURED size_gib where the record carries it
@@ -731,279 +859,19 @@ def _cell_open_beyond(h: dict[str, Any], t: float) -> bool:
     return cap > t
 
 
-def write_ledger(st: dict[str, Any] | None = None) -> None:
-    """THE LEDGER (md/trek.md): the practitioner tables, derived from
-    the exam histories - v2's single source of truth. Every table
-    recomputes from the state on every call, so the ledger is always
-    current (the v1 ledger went stale when the v2 rewrite dropped
-    its call - the lesson: the writer hangs off the save).
-
-    THE TABLES:
-    - the score-patience frontier: per patience tier (the dyadic
-      cuts), the best score achievable - the derivation's own
-      score_under - and its holder (the candidate)
-    - the score-by-ram table: per memory tier, the best score
-      (when the ram measurements exist in the histories' sidecars;
-      v2's histories carry the launch facts, the ram tiers derive
-      from the measured sizes)
-    """
-    if st is None:
-        st = trek.load_state()
-    cands = st.get("candidates", {})
-    grid = trek.Grid()
-    kv_ladder = ["f16", "q8_0", "q4_0"]  # the small grid's 3
-    patience_cuts = trek.CLOCK_LADDER  # 1..128s
-
-    # THE PER-CANDIDATE DERIVATIONS at every patience cut
-    rows: list[dict[str, Any]] = []
-    for key, hist in cands.items():
-        parts = key.split("|")
-        if len(parts) != 4:
-            continue
-        fam, rung, k, v = parts
-        for cut in patience_cuts:
-            s = trek.score_under(hist, cut)
-            if s is not None and s >= 0:
-                rows.append(
-                    {
-                        "fam": str(fam),
-                        "rung": str(rung),
-                        "k": str(k),
-                        "v": str(v),
-                        "cut": float(cut),
-                        "score": int(s),
-                    }
-                )
-
-    lines = ["# trek.md - the trek ledger (v3: derived from the exam histories)", ""]
-
-    # THE SCORE-PATIENCE FRONTIER: per tier the best score, its
-    # holder, and the holder's VRAM (the vulkan0 memory the
-    # candidate's own server launch used - parsed from the launch
-    # log's memory breakdown; a candidate never measured at a
-    # launch shows "-")
-    def vram_of(fam: str, rung: str, k: str, v: str) -> str:
-        """the tier holder's vulkan0 FOOTPRINT: model + kv(context) +
-        compute - what the candidate actually occupies (the device
-        'self' total includes the pre-allocated context buffer and
-        overstates the footprint)."""
-        log = os.path.join("results", "trek", fam, f"exam-server-{rung}-k{k}-v{v}.log")
-        bd = llama_server.memory_breakdown_gib(log)
-        if bd and bd.get("devices"):
-            dev = bd["devices"].get("Vulkan0") or next(iter(bd["devices"].values()))
-            fp = (
-                dev.get("model_gib", 0)
-                + dev.get("context_gib", 0)
-                + dev.get("compute_gib", 0)
-            )
-            return f"{fp:.2f}"
-        return "-"
-
-    lines += ["## the score-patience frontier (practitioner reporting)", ""]
-    lines += [
-        "the best score achievable at a patience level (the per-level",
-        "time limit), derived from the shared exam histories; the vram",
-        "column is the tier's holder's vulkan0 memory (model + kv +",
-        "compute, the candidate's own launch) - what you need to run",
-        "the tier's champion",
-        "",
-        "| patience | best score | holder | vram (GiB) |",
-        "|---|---|---|---|",
-    ]
-    for cut in patience_cuts:
-        best = None
-        for r in rows:
-            if r["cut"] == cut and (best is None or r["score"] > best["score"]):
-                # ty: the row's fields are typed at append (str/float/int)
-                best = r
-        if best:
-            lines.append(
-                f"| <= {cut:g}s | {best['score']} | "
-                f"{best['fam']} {best['rung']} k={best['k']} v={best['v']} | "
-                f"{vram_of(best['fam'], best['rung'], best['k'], best['v'])} |"
-            )
-        else:
-            lines.append(f"| <= {cut:g}s | - | (nothing measured yet) | - |")
-    lines.append("")
-
-    # THE WALKER (the clean life/epoch spec): the life number, where
-    # it stands, the LIFE SCORE (the spawn/teleport baseline - not a
-    # running high), and the EPOCH START (the last cell that strictly
-    # beat the epoch score - where the next teleport goes)
-    lines += ["## the walker (the current life)", ""]
-    ws = st.get("walk", {})
-    life = ws.get("life", 1)
-    pos = ws.get("position", [-1, -1])
-    movs = ws.get("movements", 0)
-    life_score = ws.get("high", -1)
-    epoch_start = ws.get("epoch_start", pos)
-    es_cell = ""
-    try:
-        fam, rung = grid.cell(epoch_start[0], epoch_start[1])
-        es_cell = f"{fam} {rung}"
-    except Exception:
-        pass
-    epoch_budget = trek.epoch_movements(grid)
-    status = (
-        "at the spawn (the teleport drawn)"
-        if pos == [-1, -1]
-        else (f"movement {movs} of {epoch_budget} in the epoch")
-    )
-    ep = ws.get("epoch", 1)
-    lines += [
-        f"life {life}, epoch {ep}: {status}; life score {life_score} "
-        f"(the spawn/teleport baseline); epoch start at "
-        f"{es_cell or epoch_start} (the next teleport's target)",
-        "",
-    ]
-
-    # THE RADIO (the stop condition): per tier the union bound's
-    # sum (the live cells' per-tier threat), the 2-sigma confidence
-    # bound, the champion, and the certification state
-    lines += ["## the radio (the stop condition)", ""]
-    radio_rec = st.get("radio", {})
-    tiers_rec = radio_rec.get("tiers", {})
-    lines += [
-        "the per-tier certification: each live cell's PER-TIER threat",
-        "(the score it achieves within the tier's seconds) priced by",
-        "the pools (the started-climb pool D, the genesis pool G),",
-        "summed (the union bound); a tier certifies when the 95%",
-        "upper confidence bound sum_p + 2*SE < 0.05 AND the quorum",
-        "(>= 2 cells pooled) AND a real champion (not the floor);",
-        "the SE is the pools' sampling error; '-' = not modelable",
-        "(a pool empty: keep searching)",
-        "",
-        "| tier | champion | live cells | sum p | 2-sig upper | certified |",
-        "|---|---|---|---|---|---|",
-    ]
-    for t in radio.TIER_LADDER:
-        rec = tiers_rec.get(str(t), {})
-        sp = rec.get("sum_p")
-        up = rec.get("upper_2sig")
-        cert = "yes" if rec.get("certified") else "no"
-        if rec.get("floor_champion"):
-            cert += " (floor champion)"
-        lines.append(
-            f"| t{t} | {rec.get('champion', '-')} | {rec.get('live_units', '-')} | "
-            f"{'-' if sp is None else f'{sp:.3g}'} | "
-            f"{'-' if up is None else f'{up:.3g}'} | {cert} |"
-        )
-    if radio_rec:
-        lines += [
-            "",
-            f"quorum: {'met' if radio_rec.get('quorum', False) else 'unmet'}; "
-            f"{'blocked (an unfinished exam)' if radio_rec.get('blocked') else 'not blocked'}",
-        ]
-    lines.append("")
-
-    # THE PROGRESS (the author's spec): the WEIGHTED evaluation
-    # count. Total = cells x time tiers (every cell could, in
-    # principle, be evaluated at every tier). Progress = the sum
-    # over tiers of (cells evaluated at that tier) x (the tier's
-    # ordinal) - the example: 50 cells, 2 tiers = 100 possible; 3
-    # cells at tier 1 and 5 at tier 2 = 3x1 + 5x2 = 13 of 100.
-    # A cell counts as EVALUATED at tier t when its candidates
-    # carry settled verdicts within t seconds (the same closure
-    # rule as before - the honest per-tier evaluation state).
-    n_cells_total = grid.n_rows * grid.n_cols
-    n_tiers = len(radio.TIER_LADDER)
-    total_evals = n_cells_total * n_tiers
-    lines += ["## the progress (evaluated cells, tier-weighted)", ""]
-    lines += [
-        f"total: {n_cells_total} cells x {n_tiers} time tiers = "
-        f"{total_evals} possible evaluations",
-        "",
-        "| tier (weight) | evaluated cells | contribution |",
-        "|---|---|---|",
-    ]
-    # THE DISJOINT COUNT (the overcount caught in verification):
-    # the closure rule is cumulative (a cell closed at t128 is also
-    # closed at every tier above its verdicts), so summing the
-    # per-tier counts double-counted (165% on the live state).
-    # Each cell contributes ONCE - at its EVALUATION DEPTH tier:
-    # the deepest tier the cell's candidates RAN AT (the max run
-    # budget among its settled curves). A fast-fail cell ran at t1
-    # -> depth 1; a dug cell ran at 128 -> depth 8. (Not the max
-    # tier where it's CLOSED - a fail closes at every tier, which
-    # put every closed cell at t128 in the first cut, caught in
-    # verification.)
-    def _cell_depth_tier(fam: str, rung: str) -> int:
-        """the cell's evaluation-depth tier ordinal (1..n_tiers):
-        the deepest tier its settled candidates ran at; 0 if none
-        of its candidates carry a settled verdict."""
-        prefix = f"{fam}|{rung}|"
-        max_budget = 0.0
-        any_settled = False
-        for k in kv_ladder:
-            for v in kv_ladder:
-                h = cands.get(prefix + k + "|" + v)
-                if h is None:
-                    continue
-                kind, _cap, _s, _times, rb = radio._curve(h)
-                if kind in ("closed", "open"):
-                    any_settled = True
-                    if rb > max_budget:
-                        max_budget = rb
-        if not any_settled:
-            return 0
-        # the ordinal of the deepest tier the run budget reached
-        for ti, t in enumerate(radio.TIER_LADDER, start=1):
-            if t >= max_budget:
-                return ti
-        return len(radio.TIER_LADDER)
-
-    per_tier_count: dict[int, int] = {}
-    for fam in grid.models:
-        for rung in grid.rungs:
-            d = _cell_depth_tier(fam, rung)
-            per_tier_count[d] = per_tier_count.get(d, 0) + 1
-    progress_sum = 0
-    for ti, t in enumerate(radio.TIER_LADDER, start=1):
-        n_eval = per_tier_count.get(ti, 0)
-        progress_sum += n_eval * ti
-        lines.append(f"| t{t} ({ti}) | {n_eval} | {n_eval * ti} |")
-    n_unevaluated = per_tier_count.get(0, 0)
-    pct_p = 100.0 * progress_sum / total_evals if total_evals else 0.0
-    lines += [
-        "",
-        f"progress: {progress_sum} of {total_evals} ({pct_p:.1f}%); "
-        f"{n_unevaluated} cells not evaluated at any tier",
-        "",
-    ]
-
-    # THE MEASURED POOL (the corrected count: the safe grid's 64 x 15
-    # pairs x 49 kv candidates)
-    n_pairs = grid.n_rows * grid.n_cols
-    total_cands = n_pairs * len(kv_ladder) ** 2
-    pct = 100.0 * len(cands) / total_cands if total_cands else 0.0
-    # the measurements: every exam level ever recorded (a re-run at a
-    # bigger budget IS new evidence - the count that moves while the
-    # walk deepens the visited cells before widening)
-    n_levels = sum(
-        1
-        for h in cands.values()
-        for kk in h
-        if isinstance(kk, int) or (isinstance(kk, str) and kk.lstrip("-").isdigit())
-    )
-    lines += [
-        f"_{len(cands):,} candidates measured ({n_levels:,} exam levels "
-        f"recorded; a re-run at a bigger budget is new evidence) of "
-        f"{n_pairs:,} pairs x {len(kv_ladder)} x {len(kv_ladder)} kv = "
-        f"{total_cands:,} total, {pct:.1f}%); the histories are the single "
-        "source of truth, the tables derive on every ledger write._",
-    ]
-    with open("md/trek.md", "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
-
-
 def main(on_progress: Any = None, walker_seed: int = 1) -> None:
-    """The trek v3 phase-A run loop: the walker acts on every cell it
-    stands on (a new cell -> t=1; the top result a timeout -> t*2;
-    the top result a fail -> nothing), draws a direction after each
-    action, 95 movements per life, the teleport home at exhaustion -
-    a repeated home ENDS the walk, a new walker spawns, and the trek
-    ends when a spawn finds no improvement anywhere. The histories
-    accumulate; the budget rides the action, never a global ladder."""
+    """THE EXHAUSTIVE COLLECTION (the author's ruling): the search
+    degenerated into exhaustive anyway - hours spent predicting
+    erratically; collect the data first, predict after.
+
+    For each model (parameter size ascending), for each model quant
+    (bits-per-weight ascending), all 49 kv combos measured at t=128s
+    per level. The histories accumulate exactly as before (the same
+    candidates, the same exams); the state is the same schema. The
+    FILE LIFECYCLE (the author's ruling): the model quant file is
+    deleted after its 49-kv run completes; the model's f16 is
+    deleted after all its quants + the F16 rung are done. No gc.
+    """
     import socket
 
     _orig_getaddrinfo = socket.getaddrinfo
@@ -1018,141 +886,72 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     models_dir = "models"
     port = int(os.environ.get("TREK_PORT", "8210"))
 
-    print(f"[trek] v3 phase a: the walker acts on every cell; the seed {walker_seed}")
-    print(f"[trek] gc: /home free > {GC_THRESHOLD_GIB:g} GiB, {GC_INTERVAL_S:g}s watchdog")
+    print("[exhaustive] the deterministic sweep: models ascending, quants ascending, 49 kv at t=128")
 
     st = trek.load_state()
+    candidates = st.setdefault("candidates", {})
 
-    # THE STARTUP REPLAY RESET (the author's principle): the walker
-    # replays the WHOLE walk from the origin - the walk record's
-    # position/movements are CACHED, never authoritative. On startup
-    # the record resets to the life's origin (the spawn), and the
-    # walk re-walks its path: settled cells pass through at no exam
-    # cost, and live work fires at its natural standing, in walk
-    # order. The interrupts' positions have no influence - only the
-    # histories and the seed do. The draws re-consume identically
-    # (the directions are a pure function of the cumulative count;
-    # dispatch-return cycles never consumed steps, pass-throughs
-    # don't either - the canary pins this determinism).
-    ws = st.setdefault("walk", {})
-    # THE GRID-FINGERPRINT GUARD (the grid-expansion lesson): the
-    # walk record's coordinates are relative to the grid they were
-    # recorded on - the 5->10 model expansion shifted every row's
-    # meaning ([1,2] was gemma-3-1b F16, became MiniCPM4-0.5B F16)
-    # and the reset 'resumed' a life from another lattice. On a
-    # fingerprint mismatch (or a missing fingerprint - a legacy
-    # record), the walk record RESETS ENTIRELY: life 1, a fresh
-    # spawn drawn from the seed on the CURRENT lattice. The
-    # histories (keyed by family) carry over unchanged - the
-    # candidate measurements are grid-independent; only the walk's
-    # path caches are not.
-    from bench import trek as _trek
+    def save() -> None:
+        _state_store.save_state(TREK_STATE_FILE, st)
 
-    fp_now = _trek.grid_fingerprint(_trek.Grid())
-    fp_recorded = ws.get("grid_fp")
-    # THE ALWAYS-RESET (the author's unconditional ruling): when
-    # starting full_benchmark the walker starts at its first life,
-    # first epoch, first movement - ALWAYS. Not only on grid
-    # changes, not only when the record is stale: EVERY startup
-    # re-walks from the origin. The histories (keyed by family)
-    # carry over - every measurement answers on the re-walk; the
-    # walk record is a CACHE, and the cache always starts cold.
-    # The settled cells pass through at zero exam cost; live work
-    # fires at its natural standing, in walk order.
-    if fp_recorded != fp_now:
-        print(
-            f"[trek] the grid changed ({fp_recorded or 'a legacy record'} -> "
-            f"{fp_now}) - the walk record resets"
-        )
-    print(
-        "[trek] the startup reset: life 1, epoch 1, movement 0 - "
-        "the walk re-derives from the origin (the histories answer "
-        "for every visited cell)"
-    )
-    ws.clear()
-    ws["life"] = 1
-    ws["position"] = [-1, -1]
-    ws["grid_fp"] = fp_now
-    _trek.save_state(st)
+    from bench.roster import LADDER as RUNG_LADDER, dyadic_picks
+    from bench.trek import _param_of
 
-    # THE STARTUP RADIO (the author's ruling): the radio fires
-    # BEFORE the walk - no need to measure in movement 0 if the
-    # radio says stop. A restart on an all-certified state (the
-    # trek already ended, or a state file carried a full
-    # certificate) must not re-run sweeps to rediscover what the
-    # histories already prove: the certificate is exact from the
-    # state, and the walk's first movement would cost a quantize
-    # for nothing.
-    radio_res = radio.certify(st, KV_LADDER)
-    st["radio"] = {
-        "tiers": radio_res["tiers"],
-        "all_certified": radio_res["all_certified"],
-        "blocked": radio_res["blocked"],
-    }
-    print(radio.summary(radio_res))
-    if radio_res["all_certified"]:
-        print("[trek] THE RADIO: all tiers certified at startup - the search ENDS")
-        print("[trek] the trek has ENDED: no improvement found by any spawn")
-        return
+    models = [fam for fam, _repo in dyadic_picks()]
+    models.sort(key=_param_of)
+    n_done = 0
+    n_total = len(models) * len(RUNG_LADDER)
 
-    n = 0
-    while True:
-        pick = trek.walk(st, walker_seed)
-        if pick is None:
-            break
-        if pick["reason"] == "ended":
+    for fam in models:
+        famdir = os.path.join(models_dir, fam)
+        for rung in RUNG_LADDER:
+            n_done += 1
             print(
-                f"[trek] life {pick['life']} ENDED: no improvement "
-                f"(best {pick['fam']} {pick['rung']}, high {pick['high']}) - "
-                f"a new walker spawns"
+                f"[exhaustive] {fam} {rung} "
+                f"(pair {n_done} of {n_total})"
             )
-            # the spawn's high-score target repeated: end this walk,
-            # the new life spawns on the next walk() call
-            ws = st.setdefault("walk", {})
-            ws["life"] = ws.get("life", 1) + 1
-            ws["position"] = [-1, -1]  # the spawn
-            ws["movements"] = 0
-            ws["epoch"] = 1  # the new life's first epoch
-            ws["high"] = -1  # the new life's score derives at the spawn
-            ws.pop("epoch_start", None)  # the new epoch starts at the spawn
-            ws.pop("dispatched_action", None)
-            ws["dispatched"] = [-1, -1]
-            trek.save_state(st)
-            continue
-        fam, rung = pick["fam"], pick["rung"]
-        print(
-            f"[trek] life {pick['life']}, epoch {pick.get('epoch', 1)}, "
-            f"movement {pick['movements']}: "
-            f"{fam} {rung} - {pick['action']} at t={pick['budget']:g}s "
-            f"(high {pick['high']}, best at {pick['best']})"
-        )
-        run_pair(fam, rung, models_dir, st, port, pick["budget"])
-        # (THE IMMEDIATE CREDIT RETIRED - the author's clean
-        # life/epoch spec: the LIFE score never updates mid-walk.
-        # The EPOCH-START update is the walk's own job - it fires
-        # on the next walk() call, at the post-action pre-movement
-        # point, reading the same histories. The runner stays out of
-        # the walk's bookkeeping.)
-        # PHASE B (the author's #5): the radio fires after the sweep,
-        # when the cell's action is done. It says continue (the walk
-        # is untouched) or STOP (all 8 tiers certified - the trek is
-        # over: the champion cannot be beaten anywhere, at any tier).
-        radio_res = radio.certify(st, KV_LADDER)
-        st["radio"] = {
-            "tiers": radio_res["tiers"],
-            "all_certified": radio_res["all_certified"],
-            "blocked": radio_res["blocked"],
-        }
-        print(radio.summary(radio_res))
-        trek.save_state(st)
-        write_ledger(st)  # the ledger re-derives from the histories
-        n += 1
-        if radio_res["all_certified"]:
-            print("[trek] THE RADIO: all 8 tiers certified - the search ENDS")
-            break
-        if on_progress is not None:
-            try:
-                on_progress(n)
-            except Exception:
-                pass
-    print("[trek] the trek has ENDED: no improvement found by any spawn")
+            # skip: every candidate settled at 128 already?
+            work = [
+                (k, v)
+                for k in KV_LADDER
+                for v in KV_LADDER
+                if trek.needs_rerun(
+                    candidates.get(trek.cand_key(fam, rung, k, v), {}), 128.0
+                )
+            ]
+            if not work:
+                print(f"[exhaustive] {fam} {rung}: all 49 settled from history - skip")
+                _delete_quant(famdir, rung)
+                continue
+            # THE ACQUIRE (the existing machinery)
+            gguf = _acquire(fam, rung, models_dir)
+            if not gguf:
+                # the launch failure: mark all unsettled candidates
+                for k, v in work:
+                    key = trek.cand_key(fam, rung, k, v)
+                    if key not in candidates:
+                        candidates[key] = {
+                            "_launch": {
+                                "status": "failed",
+                                "detail": _last_acquire_error.get("detail", "")[:100],
+                            }
+                        }
+                save()
+                _delete_quant(famdir, rung)
+                continue
+            ctx = bell_window(st, fam, models_dir) or 262144
+            for k, v in work:
+                key = trek.cand_key(fam, rung, k, v)
+                hist = candidates.setdefault(key, {})
+                _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, 128.0, hist)
+                candidates[key] = hist
+                save()
+                print(".", end="", flush=True)
+            print()
+            # THE FILE RULE (the author's): the quant dies after its run
+            _delete_quant(famdir, rung)
+            if on_progress is not None:
+                on_progress(n_done)
+        # the f16 dies after all the quants + the F16 rung
+        _delete_f16(famdir)
+    print("[exhaustive] the sweep is complete")

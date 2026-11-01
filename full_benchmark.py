@@ -217,17 +217,13 @@ def preflight_selfcheck() -> None:
     # --- regenerated and compared against the frozen sequence. Any
     # --- walk semantics change is a diff: the walk is the protocol's
     # --- determinism carrier, and its behavior is pinned here.
-    canary_now = T.walk_canary_sequence()
-    assert canary_now == T.WALK_CANARY, (
-        f"the walk canary diverged - the walk semantics changed "
-        f"(regenerate WALK_CANARY if the change is intended):\n"
-        f"  was: {T.WALK_CANARY[:4]}...\n  now: {canary_now[:4]}..."
-    )
+    # (THE WALK CANARY RETIRED: the exhaustive era replaced the walk;
+    # the frozen sequence pinned the walk's semantics - moot now)
 
     # --- the roster ladder the pool is drawn from (the safe ladder:
     # --- 15 classic K-quant rungs, F16 last - the imatrix rungs cut) ---
-    assert LADDER[-1] == "F16" and len(LADDER) == 3, (
-        "the small grid's ladder reshaped - update me when the truth changes"
+    assert LADDER[-1] == "F16" and len(LADDER) == 15, (
+        "the ladder must be the full 15 rungs (the exhaustive era)"
     )
 
     # --- the roster: readable, granite first ---
@@ -249,14 +245,14 @@ def preflight_selfcheck() -> None:
         f"the pool must be {n_picks} x {len(LADDER)} = {n_picks * len(LADDER)} "
         f"pairs, got {len(pool)} (the grid reshaped - update me when the truth changes)"
     )
-    assert n_kv == 3, f"the KV ladder must be 3 quants, got {n_kv}"
+    assert n_kv == 7, f"the KV ladder must be 7 quants, got {n_kv}"
     assert R.PICK_BITS == 16, "the pick must be 16 bits in v3"
     fams = {f for f, _ in pool}
     assert len(fams) == len(dyadic_picks()), (
         f"the grid must carry {len(dyadic_picks())} models, got {len(fams)}"
     )
-    assert len(LADDER) == 3 and LADDER[-1] == "F16", (
-        "the LADDER must be 3 rungs (the small grid - update me when the truth changes)"
+    assert len(LADDER) == 15 and LADDER[-1] == "F16", (
+        "the LADDER must be the full 15 rungs (the exhaustive era)"
     )
     if os.path.isfile(R.TREK_STATE_FILE):
         with open(R.TREK_STATE_FILE, encoding="utf-8") as fh:
