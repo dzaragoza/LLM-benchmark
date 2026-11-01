@@ -328,7 +328,6 @@ def git_sync_check() -> None:
         stamp(f"git sync check: no upstream configured - aborting ({remote.stderr.strip()[:100]})")
         raise SystemExit(1)
     remote = remote.stdout.strip()
-    print(f"[preflight] the local commit: {local[:8]}")
     if local != remote:
         stamp(
             f"git OUT OF SYNC - the local HEAD {local[:8]} != the remote "
@@ -597,6 +596,17 @@ def _run(args: argparse.Namespace) -> None:
     check_requirements()
     git_sync_check()
     tee_output.install()
+    # THE COMMIT ID IN THE LOG (the author's audit request): the
+    # sync check runs before the tee, so its print never reached
+    # results.txt - the pulls were invisible in the log. The id
+    # stamps here, INSIDE the tee, so every section carries the
+    # running code's identity.
+    import subprocess as _sp
+
+    _local = _sp.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    print(f"[preflight] the local commit: {_local[:8]}")
     kill_stale_server()
     check_tooling(args)
     preflight_selfcheck()
