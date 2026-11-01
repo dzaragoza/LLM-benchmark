@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 5: movement 16 of 20 in the epoch; life score 3 (the spawn/teleport baseline); epoch start at Qwen3-1.7B F16 (the next teleport's target)
+life 6: movement 0 of 20 in the epoch; life score -1 (the spawn/teleport baseline); epoch start at gemma-3-12b-it Q4_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
@@ -38,9 +38,9 @@ keep searching)
 | t1 | 4 | 10 | 0 | yes * |
 | t2 | 4 | 12 | 0.0121 | yes |
 | t4 | 4 | 13 | 0.0439 | no |
-| t8 | 4 | 15 | 0.0967 | no |
-| t16 | 4 | 19 | 0.173 | no |
-| t32 | 4 | 21 | 0.353 | no |
+| t8 | 4 | 14 | 0.0967 | no |
+| t16 | 4 | 19 | 0.172 | no |
+| t32 | 4 | 21 | 0.35 | no |
 | t64 | 6 | 23 | 0.404 | no |
 | t128 | 8 | 23 | 0.484 | no |
 
