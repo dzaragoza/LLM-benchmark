@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 2: movement 9 of 20 in the epoch; life score 4 (the spawn/teleport baseline); epoch start at Ministral-3-3B-Instruct-2512 Q8_0 (the next teleport's target)
+life 2: movement 11 of 20 in the epoch; life score 4 (the spawn/teleport baseline); epoch start at Ministral-3-3B-Instruct-2512 Q8_0 (the next teleport's target)
 
 ## the radio (the stop condition's progress)
 
