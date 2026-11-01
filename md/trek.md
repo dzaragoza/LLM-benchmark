@@ -21,7 +21,7 @@ the tier's champion
 
 ## the walker (the current life)
 
-life 5: movement 1 of 12 in the epoch; high 5, best at gemma-4-e4b-it Q8_0
+life 5: movement 2 of 12 in the epoch; high 5, best at gemma-4-e4b-it Q8_0
 
 ## the radio (the stop condition's progress)
 
@@ -46,4 +46,4 @@ keep searching)
 
 quorum: unmet; not blocked
 
-_261 candidates measured (441 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 96.7%); the histories are the single source of truth, the tables derive on every ledger write._
+_270 candidates measured (441 exam levels recorded; a re-run at a bigger budget is new evidence) of 30 pairs x 3 x 3 kv = 270 total, 100.0%); the histories are the single source of truth, the tables derive on every ledger write._
