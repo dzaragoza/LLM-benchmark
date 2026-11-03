@@ -23,7 +23,7 @@ t=128s and the quant that achieved it; ties break by time
 | SmolLM2-360M-Instruct | 1 | Q4_1 | k=q5_0 v=f16 | 1.1 |
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 128.0 |
 | Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
-| Qwen3-0.6B | 1 | Q3_K_S | k=f16 v=q5_0 | 1.9 |
+| Qwen3-0.6B | 1 | Q4_0 | k=f16 v=iq4_nl | 1.6 |
 | Qwen3.5-0.8B | - | (not measured) | - | - |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
