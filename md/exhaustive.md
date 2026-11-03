@@ -7,9 +7,9 @@ a candidate can top every tier
 
 | tier | score | candidate | time (s) |
 |---|---|---|---|
-| <= 32s | 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
-| <= 64s | 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
-| <= 128s | 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
+| <= 32s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
+| <= 64s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
+| <= 128s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
 
 ## the per-model best (t=128s)
 
@@ -24,7 +24,7 @@ t=128s and the quant that achieved it; ties break by time
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 128.0 |
 | Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | 4 | Q4_1 | k=f16 v=q8_0 | 6.6 |
+| Qwen3.5-0.8B | 5 | Q6_K | k=q5_0 v=q5_1 | 9.7 |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
