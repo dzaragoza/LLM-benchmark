@@ -756,22 +756,23 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     lines = [
         "# exhaustive.md - the exhaustive ledger",
         "",
-        "## the top candidate by time tier",
+        "## the score frontier (t=128s)",
         "",
-        "the highest score within each tier (ties break by the",
-        "cumulative time); a candidate can top every tier",
+        "for each score value, descending: the candidate that",
+        "reaches it the fastest (the smallest cumulative time -",
+        "the sum of its pass times, 128s PER LEVEL)",
         "",
-        "| tier | score | candidate | total time (s) |",
-        "|---|---|---|---|",
+        "| score | candidate | total time (s) |",
+        "|---|---|---|",
     ]
-    for cut in TIER_CUTS:
-        col, tcol = f"s{int(cut)}", f"t{int(cut)}"
-        top = sorted(rows, key=lambda r: (-r[col], r[tcol]))[:1]
-        if top:
-            r = top[0]
-            lines.append(f"| <= {int(cut)}s | {r[col]} | {cand_str(r)} | {r[tcol]:.1f} |")
-        else:
-            lines.append(f"| <= {int(cut)}s | - | (not measured) | - |")
+    max_s = max((r["s128"] for r in rows), default=-1)
+    for s in range(max_s, -1, -1):
+        reach = [r for r in rows if r["s128"] >= s]
+        if not reach:
+            lines.append(f"| {s} | - | - |")
+            continue
+        fastest = min(reach, key=lambda r: (r["t128"], -r["s128"]))
+        lines.append(f"| {s} | {cand_str(fastest)} | {fastest['t128']:.1f} |")
 
     lines += [
         "",
