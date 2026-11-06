@@ -758,10 +758,10 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         "",
         "## the top candidate by time tier",
         "",
-        "the highest score within each tier (ties break by time);",
-        "a candidate can top every tier",
+        "the highest score within each tier (ties break by the",
+        "cumulative time); a candidate can top every tier",
         "",
-        "| tier | score | candidate | time (s) |",
+        "| tier | score | candidate | total time (s) |",
         "|---|---|---|---|",
     ]
     for cut in TIER_CUTS:
@@ -778,9 +778,11 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         "## the per-model best (t=128s)",
         "",
         "per model (parameter size ascending): the highest score at",
-        "t=128s and the quant that achieved it; ties break by time",
+        "t=128s and the quant that achieved it; ties break by the",
+        "cumulative time (the sum of the pass times - 128s is PER",
+        "LEVEL, so a multi-level pass can total well over 128s)",
         "",
-        "| model | best score | quant | kv | time (s) |",
+        "| model | best score | quant | kv | total time (s) |",
         "|---|---|---|---|---|",
     ]
     for fam in models:
