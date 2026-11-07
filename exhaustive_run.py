@@ -915,17 +915,20 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     n_total = len(models) * len(RUNG_LADDER)
 
     def progress() -> None:
-        # the progress ruler: a marker every 7 pairs - 0.......7.......14...
+        # the progress ruler: one dot per pair, a number every 7 pairs -
+        # the bar opens with 0 (printed before the loop) -> 0.......7.......14...
         nonlocal n_done
         write_ledger(st)
-        if (n_done - 1) % 7 == 0:
-            print(f"{n_done - 1}", end="", flush=True)
+        print(".", end="", flush=True)
+        if n_done % 7 == 0:
+            print(n_done, end="", flush=True)
 
+    print("0", end="", flush=True)  # the ruler starts at 0
     for fam in models:
         famdir = os.path.join(models_dir, fam)
         for rung in RUNG_LADDER:
             n_done += 1
-            print(f"\n[exhaustive] {fam} {rung} (pair {n_done} of {n_total})")
+            print(f" [exhaustive] {fam} {rung} (pair {n_done} of {n_total})", end="", flush=True)
             # skip: every candidate settled at 128 already?
             work = [
                 (k, v)
@@ -965,8 +968,6 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                 _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, 128.0, hist, st)
                 candidates[key] = hist
                 save()
-                print(".", end="", flush=True)
-            print()
             # THE FILE RULE (the author's): the quant dies after its run
             _delete_quant(famdir, rung)
             progress()
