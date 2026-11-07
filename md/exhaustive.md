@@ -21,7 +21,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
 | granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
-| granite-4.0-350m | 1 | Q5_K_M | k=q5_0 v=iq4_nl | 4.9 |
+| granite-4.0-350m | 1 | Q5_1 | k=f16 v=q8_0 | 4.8 |
 | SmolLM2-360M-Instruct | - | (not measured) | - | - |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
 | Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
