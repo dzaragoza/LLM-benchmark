@@ -406,7 +406,7 @@ STATE_SCHEMA: dict[str, Any] = {
                             "additionalProperties": False,
                         },
                         {  # a settled failure (the closing budget rides
-                            # the record - the exhaustive_radio's attempted-bracket
+                            # the record - the attempted-bracket
                             # evidence needs it)
                             "type": "object",
                             "required": ["status"],
@@ -968,7 +968,7 @@ def walk(
             ws["dispatched_action"] = [action, budget]
             # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
             # needs exam work and was not yet dispatched THIS visit -
-            # hand it to the runner; the phase-B exhaustive_radio then fires (the
+            # hand it to the runner; the stop condition then fires (the
             # author's #5), and the NEXT walk() steps away from here
             ws["dispatched"] = [row, col]
             save()

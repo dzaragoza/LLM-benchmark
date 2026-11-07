@@ -21,7 +21,7 @@ import os
 import sys
 import threading
 import time
-from typing import Any, cast
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -865,19 +865,6 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     if f16 is None:
         return None
     return round(f16 * _bpw(r.get("rung", "")) / 16.0, 3)
-
-
-def _cell_open_beyond(h: dict[str, Any], t: float) -> bool:
-    """the progress helper: is this candidate's curve still OPEN at
-    tier t? True when the frontier's timeout cap exceeds t (the
-    curve could still climb when the budget doubles past t) - the
-    candidate has no settled verdict within t seconds."""
-    from bench import exhaustive_radio as _radio
-
-    kind, cap, _s, _times, _rb = _radio._curve(cast("dict[int, Any]", h))
-    if kind != "open":
-        return False
-    return cap > t
 
 
 def main(on_progress: Any = None, walker_seed: int = 1) -> None:
