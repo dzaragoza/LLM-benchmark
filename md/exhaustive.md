@@ -8,8 +8,6 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
-| 1 | granite-4.0-h-350m Q5_K_M k=f16 v=q4_1 | 1.4 |
-| 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
 ## the per-model best (t=128s)
 
@@ -20,7 +18,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
-| granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
+| granite-4.0-h-350m | -1 | Q2_K | k=f16 v=f16 | 0.0 |
 | granite-4.0-350m | - | (not measured) | - | - |
 | SmolLM2-360M-Instruct | - | (not measured) | - | - |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
