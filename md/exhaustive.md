@@ -1,22 +1,28 @@
 # exhaustive.md - the exhaustive ledger
 
-## the top candidate by time tier
+## the score frontier (t=128s)
 
-the highest score within each tier (ties break by time);
-a candidate can top every tier
+for each score value, descending: the candidate that
+reaches it the fastest (the smallest cumulative time -
+the sum of its pass times, 128s PER LEVEL)
 
-| tier | score | candidate | time (s) |
-|---|---|---|---|
-| <= 32s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
-| <= 64s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
-| <= 128s | 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
+| score | candidate | total time (s) |
+|---|---|---|
+| 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.7 |
+| 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
+| 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.5 |
+| 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
+| 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
+| 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
 ## the per-model best (t=128s)
 
 per model (parameter size ascending): the highest score at
-t=128s and the quant that achieved it; ties break by time
+t=128s and the quant that achieved it; ties break by the
+cumulative time (the sum of the pass times - 128s is PER
+LEVEL, so a multi-level pass can total well over 128s)
 
-| model | best score | quant | kv | time (s) |
+| model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
 | granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
 | granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.8 |
