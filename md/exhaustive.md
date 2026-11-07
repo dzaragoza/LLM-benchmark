@@ -31,7 +31,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
 | Qwen3.5-0.8B | 0 | Q4_1 | k=f16 v=q8_0 | 1.0 |
 | gemma-3-1b-it | 0 | Q4_0 | k=f16 v=q5_1 | 1.1 |
-| MiniCPM5-1B | - | (not measured) | - | - |
+| MiniCPM5-1B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
 | MiniCPM-1B-sft | - | (not measured) | - | - |
 | phi-1 | - | (not measured) | - | - |
