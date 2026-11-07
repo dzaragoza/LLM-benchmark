@@ -380,7 +380,28 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # gets its own clock, started when its question is sent to the server,
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
+# THE PER-LEVEL TIME ALLOCATION (the author's ruling): a level's
+# timer is 2x the BEST pass time any candidate has recorded for it;
+# a level nobody has passed yet gets the full 128s.
 LEVEL_TIMEOUT_S = 128.0
+
+
+def level_timeout_s(st: dict[str, Any], level: int) -> float:
+    """The level's time allocation: 2x the best (smallest) pass time
+    recorded for this level across ALL candidates in the state, or
+    the full LEVEL_TIMEOUT_S when no candidate has passed it yet."""
+    best: float | None = None
+    for hist in st.get("candidates", {}).values():
+        if not isinstance(hist, dict):
+            continue
+        rec = hist.get(level)
+        if isinstance(rec, dict) and rec.get("status") == "pass":
+            t = rec.get("time_s")
+            if isinstance(t, (int, float)) and (best is None or t < best):
+                best = float(t)
+    if best is None:
+        return LEVEL_TIMEOUT_S
+    return 2.0 * best
 
 
 def run_pair(
@@ -490,7 +511,7 @@ def run_pair(
     n_ladder = len(KV_LADDER)
     try:
         for k, v, key, hist in work:
-            _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, budget_s, hist)
+            _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, budget_s, hist, state)
             candidates[key] = hist
             save()
             n += 1
@@ -514,7 +535,7 @@ def run_pair(
                     f"under 128s"
                 )
                 for k2, v2, key2, hist2 in dig_work:
-                    _run_combo(fam, rung, k2, v2, gguf, ctx, models_dir, port, 128.0, hist2)
+                    _run_combo(fam, rung, k2, v2, gguf, ctx, models_dir, port, 128.0, hist2, state)
                     candidates[key2] = hist2
                     save()
                     print("!", end="", flush=True)
@@ -544,6 +565,7 @@ def _run_combo(
     port: int,
     budget_s: float,
     history: dict[Any, Any],
+    state: dict[str, Any] | None = None,
 ) -> dict[Any, Any]:
     """One candidate's exam CONTINUATION under the walker's budget.
     The candidate's history is the record: the exam resumes at the
@@ -621,7 +643,11 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            deadline = level_t0 + budget_s
+            # the adaptive per-level timer: 2x the best pass time for
+            # this level, or 128s when nobody has passed it yet
+            lvl_budget = level_timeout_s(state, level) if state is not None else budget_s
+            deadline = level_t0 + lvl_budget
+            print(f"[exam] level {level}: timer {lvl_budget:.1f}s", flush=True)
             insts = {
                 "chain": build_chain(instance_key, level),
                 "elevator": build_elevator(instance_key, level),
@@ -687,19 +713,19 @@ def _run_combo(
             level_time = round(time.monotonic() - level_t0, 1)
             if not level_pass:
                 if fail_reason == "timeout":
-                    history[level] = {"status": "timeout", "timeout_s": budget_s}
+                    history[level] = {"status": "timeout", "timeout_s": lvl_budget}
                 elif fail_reason == "wrong answer":
-                    history[level] = {"status": "wrong answer", "budget_s": budget_s}
+                    history[level] = {"status": "wrong answer", "budget_s": lvl_budget}
                 elif fail_reason == "out of paper":
-                    history[level] = {"status": "out of paper", "budget_s": budget_s}
+                    history[level] = {"status": "out of paper", "budget_s": lvl_budget}
                 else:
                     history[level] = {
                         "status": "error",
                         "detail": fail_reason[:100],
-                        "budget_s": budget_s,
+                        "budget_s": lvl_budget,
                     }
                 break
-            history[level] = {"status": "pass", "time_s": level_time}
+            history[level] = {"status": "pass", "time_s": level_time, "budget_s": lvl_budget}
             level += 1
     finally:
         llama_server.stop_server(proc, port)
@@ -864,8 +890,9 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     erratically; collect the data first, predict after.
 
     For each model (parameter size ascending), for each model quant
-    (bits-per-weight ascending), all 49 kv combos measured at t=128s
-    per level. The histories accumulate exactly as before (the same
+    (bits-per-weight ascending), all 49 kv combos measured with the
+    adaptive per-level timer (2x the level's best pass time, else
+    128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
     deleted after its 49-kv run completes; the model's f16 is
@@ -885,7 +912,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     models_dir = "models"
     port = int(os.environ.get("TREK_PORT", "8210"))
 
-    print("[exhaustive] the deterministic sweep: models ascending, quants ascending, 49 kv at t=128")
+    print("[exhaustive] the deterministic sweep: models ascending, quants ascending, 49 kv, per-level timer 2x best (else 128s)")
 
     st = trek.load_state()
     candidates = st.setdefault("candidates", {})
@@ -955,7 +982,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             for k, v in work:
                 key = trek.cand_key(fam, rung, k, v)
                 hist = candidates.setdefault(key, {})
-                _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, 128.0, hist)
+                _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, 128.0, hist, st)
                 candidates[key] = hist
                 save()
                 print(".", end="", flush=True)

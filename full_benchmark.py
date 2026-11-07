@@ -6,8 +6,8 @@ One command: python full_benchmark.py --task exhaustive. The grid is
 v3: (model, model-quant) pairs - 64 models x 15 rungs = 960
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
-acquisition (a fresh 8-bit exam seed each, a 128s timer per
-level), results only.
+acquisition (a fresh 8-bit exam seed each, a per-level timer of
+2x the best pass time for that level, else 128s), results only.
 
 The envelope owns what the ei must never worry about: the
 requirements check, the git pull/push rail, the crash commit, the
@@ -520,8 +520,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         description="the protocol ei: every candidate of the "
         "960-pair pool (the full 64-model roster x LADDER) gets ONE "
-        "chance - a fresh 8-bit exam seed per candidate, a 128s timer "
-        "per level, results only"
+        "chance - a fresh 8-bit exam seed per candidate, a per-level "
+        "timer of 2x the level's best pass time (else 128s), results only"
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -616,7 +616,8 @@ def _run(args: argparse.Namespace) -> None:
         # protocol ei: the epitome of simplicity - every
         # candidate of the 960-pair pool (the full 64-model roster
         # x LADDER, ONE chance each), a fresh 8-bit
-        # exam per candidate, a 128s timer PER LEVEL, results only.
+        # exam per candidate, a per-level timer of 2x the level's
+        # best pass time (else 128s), results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
         import trek_run as R
