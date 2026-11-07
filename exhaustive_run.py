@@ -937,9 +937,9 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             if not work:
                 print(f"[exhaustive] {fam} {rung}: all 49 settled from history - skip")
                 _delete_quant(famdir, rung)
+                # NO COMMIT on a skip: on_progress is the commit/push
+                # hook - a pair where no candidate ran must not commit
                 progress()
-                if on_progress is not None:
-                    on_progress(n_done)
                 continue
             # THE ACQUIRE (the existing machinery)
             gguf = _acquire(fam, rung, models_dir)
@@ -956,9 +956,8 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                         }
                 save()
                 _delete_quant(famdir, rung)
+                # NO COMMIT on an acquire failure either - no candidate ran
                 progress()
-                if on_progress is not None:
-                    on_progress(n_done)
                 continue
             ctx = bell_window(st, fam, models_dir) or 262144
             for k, v in work:
