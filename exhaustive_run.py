@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""trek_run.py - protocol trek v2: walkers over exam histories.
+"""exhaustive_run.py - protocol exhaustive v2: walkers over exam histories.
 
-The STATE is the exam-history store (bench/trek.py): per candidate
+The STATE is the exam-history store (bench/exhaustive.py): per candidate
 (model, model_quant, k, v), a level-by-level record - pass times
 and timeout budgets. The walker derives its scores from the
 histories under its budget; the runner CONTINUES each candidate's
@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
 from bench import state_store as _state_store
-from bench import trek
+from bench import exhaustive
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
@@ -294,7 +294,7 @@ def disk_watchdog(
 
 # the ei's state file (module-level: full_benchmark's
 # --clean wipes it before main() runs)
-TREK_STATE_FILE = "state/exhaustive-state.json"
+EXHAUSTIVE_STATE_FILE = "state/exhaustive-state.json"
 
 # the active family: a one-slot holder the watchdog reads
 _ACTIVE_FAMILY: list[str] = [""]
@@ -433,7 +433,7 @@ def run_pair(
     candidates = state.setdefault("candidates", {})
 
     def save() -> None:
-        _state_store.save_state(TREK_STATE_FILE, state)
+        _state_store.save_state(EXHAUSTIVE_STATE_FILE, state)
 
     # THE EMPTY-WORK GUARD (the author's catch, moved to the top):
     # the work list computes BEFORE the acquire - a dispatch with no
@@ -446,10 +446,10 @@ def run_pair(
         (k, v)
         for k in KV_LADDER
         for v in KV_LADDER
-        if trek.needs_rerun(candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s)
+        if exhaustive.needs_rerun(candidates.get(exhaustive.cand_key(fam, rung, k, v), {}), budget_s)
     ]
     if not work_early:
-        print(f"[trek] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
+        print(f"[exhaustive] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
         _ACTIVE_FAMILY[0] = ""
         return
 
@@ -460,7 +460,7 @@ def run_pair(
         # scoreless, not worth re-acquiring under any budget)
         for k in KV_LADDER:
             for v in KV_LADDER:
-                key = trek.cand_key(fam, rung, k, v)
+                key = exhaustive.cand_key(fam, rung, k, v)
                 if key not in candidates:
                     candidates[key] = {
                         "_launch": {
@@ -477,7 +477,7 @@ def run_pair(
     if size_gib > hf_download.DEVICE_LIMIT_GIB:
         for k in KV_LADDER:
             for v in KV_LADDER:
-                key = trek.cand_key(fam, rung, k, v)
+                key = exhaustive.cand_key(fam, rung, k, v)
                 if key not in candidates:
                     candidates[key] = {"_launch": {"status": "failed", "detail": "too large"}}
         save()
@@ -492,16 +492,16 @@ def run_pair(
         w = []
         for k in KV_LADDER:
             for v in KV_LADDER:
-                key = trek.cand_key(fam, rung, k, v)
+                key = exhaustive.cand_key(fam, rung, k, v)
                 hist = candidates.get(key, {})
-                if trek.needs_rerun(hist, budget):
+                if exhaustive.needs_rerun(hist, budget):
                     w.append((k, v, key, hist))
         return w
 
     work = work_list(budget_s)
     n_settled = len(KV_LADDER) ** 2 - len(work)
     print(
-        f"[trek] {len(work)} candidates need work under {budget_s:g}s "
+        f"[exhaustive] {len(work)} candidates need work under {budget_s:g}s "
         f"({n_settled} settled from history)"
     )
 
@@ -522,14 +522,14 @@ def run_pair(
             # DIG immediately - the full work list at t=128, in this
             # same visit. No waiting for another walk pick; the cell
             # closes before the walker moves on.
-            if budget_s < 128.0 and trek._cell_pass_count(hist) > 0:
+            if budget_s < 128.0 and exhaustive._cell_pass_count(hist) > 0:
                 print()
                 print(
-                    f"[trek] a score found in the prospect (k={k} v={v}) - "
+                    f"[exhaustive] a score found in the prospect (k={k} v={v}) - "
                     f"ABORTING the prospect, DIG at t=128s starts immediately"
                 )
                 dig_work = work_list(128.0)
-                print(f"[trek] the dig: {len(dig_work)} candidates need work under 128s")
+                print(f"[exhaustive] the dig: {len(dig_work)} candidates need work under 128s")
                 for k2, v2, key2, hist2 in dig_work:
                     _run_combo(fam, rung, k2, v2, gguf, ctx, models_dir, port, 128.0, hist2, state)
                     candidates[key2] = hist2
@@ -570,10 +570,10 @@ def _run_combo(
     the history in place. The candidate-deterministic exam seed
     means the exam instance is the SAME as any previous run - the
     continuation is faithful."""
-    exam_seed = trek.EXAM_SEED  # the repetition counter: always 1 (one exam per candidate)
-    instance_key = trek.exam_instance_key(fam, rung, k_quant, v_quant)
+    exam_seed = exhaustive.EXAM_SEED  # the repetition counter: always 1 (one exam per candidate)
+    instance_key = exhaustive.exam_instance_key(fam, rung, k_quant, v_quant)
     kv_tag = f"{rung}-k{k_quant}-v{v_quant}"
-    answers_dir = os.path.join("results", "trek", fam)
+    answers_dir = os.path.join("results", "exhaustive", fam)
     os.makedirs(answers_dir, exist_ok=True)
     answers_path = os.path.join(answers_dir, f"{kv_tag}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{kv_tag}.log")
@@ -737,10 +737,10 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     Simple as possible: collect the data, make predictions after.
     """
     if st is None:
-        st = trek.load_state()
+        st = exhaustive.load_state()
     cands = st.get("candidates", {})
     from bench.roster import dyadic_picks
-    from bench.trek import _param_of
+    from bench.exhaustive import _param_of
 
     models = [fam for fam, _repo in dyadic_picks()]
     models.sort(key=_param_of)
@@ -767,7 +767,7 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         fam, rung, k, v = parts
         rec = {"fam": fam, "rung": rung, "k": k, "v": v}
         for cut in TIER_CUTS:
-            s = trek.score_under(hist, cut)
+            s = exhaustive.score_under(hist, cut)
             rec[f"s{int(cut)}"] = s if s is not None else -1
             rec[f"t{int(cut)}"] = time_under(hist, cut)
         rows.append(rec)
@@ -856,10 +856,10 @@ def _est_size_gib_of(r: dict[str, Any]) -> float | None:
     roster (f16 x bpw/16). The catalog lookup is cached: the ledger
     writes call this per record, a rebuild per record was the
     table-render timeout."""
-    # the local derivation (bench.trek._est_size_gib_of was the v1
+    # the local derivation (bench.exhaustive._est_size_gib_of was the v1
     # helper, retired with the v2 state rework; the local one is the
     # ledger's own)
-    from bench.trek import _bpw
+    from bench.exhaustive import _bpw
 
     f16 = _f16_gib_from_models_md(r.get("fam", ""))
     if f16 is None:
@@ -872,7 +872,7 @@ def _cell_open_beyond(h: dict[str, Any], t: float) -> bool:
     tier t? True when the frontier's timeout cap exceeds t (the
     curve could still climb when the budget doubles past t) - the
     candidate has no settled verdict within t seconds."""
-    from bench import radio as _radio
+    from bench import exhaustive_radio as _radio
 
     kind, cap, _s, _times, _rb = _radio._curve(cast("dict[int, Any]", h))
     if kind != "open":
@@ -906,22 +906,22 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     socket.getaddrinfo = _ipv4_first  # ty: ignore[invalid-assignment]
     models_dir = "models"
-    port = int(os.environ.get("TREK_PORT", "8210"))
+    port = int(os.environ.get("EXHAUSTIVE_PORT", "8210"))
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
         "quants ascending, 49 kv, per-level timer 2x best (else 128s)"
     )
 
-    st = trek.load_state()
+    st = exhaustive.load_state()
     candidates = st.setdefault("candidates", {})
 
     def save() -> None:
-        _state_store.save_state(TREK_STATE_FILE, st)
+        _state_store.save_state(EXHAUSTIVE_STATE_FILE, st)
 
     from bench.roster import LADDER as RUNG_LADDER
     from bench.roster import dyadic_picks
-    from bench.trek import _param_of
+    from bench.exhaustive import _param_of
 
     models = [fam for fam, _repo in dyadic_picks()]
     models.sort(key=_param_of)
@@ -945,7 +945,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                 (k, v)
                 for k in KV_LADDER
                 for v in KV_LADDER
-                if trek.needs_rerun(candidates.get(trek.cand_key(fam, rung, k, v), {}), 128.0)
+                if exhaustive.needs_rerun(candidates.get(exhaustive.cand_key(fam, rung, k, v), {}), 128.0)
             ]
             if not work:
                 print(f"[exhaustive] {fam} {rung}: all 49 settled from history - skip")
@@ -959,7 +959,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
             if not gguf:
                 # the launch failure: mark all unsettled candidates
                 for k, v in work:
-                    key = trek.cand_key(fam, rung, k, v)
+                    key = exhaustive.cand_key(fam, rung, k, v)
                     if key not in candidates:
                         candidates[key] = {
                             "_launch": {
@@ -975,7 +975,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
                 continue
             ctx = bell_window(st, fam, models_dir) or 262144
             for k, v in work:
-                key = trek.cand_key(fam, rung, k, v)
+                key = exhaustive.cand_key(fam, rung, k, v)
                 hist = candidates.setdefault(key, {})
                 _run_combo(fam, rung, k, v, gguf, ctx, models_dir, port, 128.0, hist, st)
                 candidates[key] = hist

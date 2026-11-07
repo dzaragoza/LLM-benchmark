@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.llama_server as llama_server
-import trek_run as R
+import exhaustive_run as R
 from bench.exam import bell_window
 from bench.roster import roster_from_models_md
 

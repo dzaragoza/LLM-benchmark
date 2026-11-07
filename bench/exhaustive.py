@@ -1,4 +1,4 @@
-"""bench.trek -- protocol trek v2: walkers over exam histories.
+"""bench.exhaustive -- protocol exhaustive v2: walkers over exam histories.
 
 THE STATE (the author's v2 redesign): the single source of truth is
 the EXAM HISTORY per candidate (model, model_quant, k, v):
@@ -24,7 +24,7 @@ score achievable under the budget - a level settled as timeout at a
 smaller budget may pass at a bigger one). The walk's movements are
 the only accounting: 95 per epoch, every step costs one, teleport to
 the best on the epoch's end, a repeated teleport target doubles the
-budget (or ends the trek at 128s).
+budget (or ends the exhaustive at 128s).
 
 THE GRID: 64 models (rows, params-ascending) x 32 quants (cols,
 bpw-ascending); (0,0) is the top-left corner.
@@ -56,7 +56,7 @@ from bench.roster import LADDER, dyadic_picks, roster_from_models_md
 
 # ------------------------------------------------------------- constants
 
-TREK_STATE_FILE = "state/exhaustive-state.json"
+EXHAUSTIVE_STATE_FILE = "state/exhaustive-state.json"
 
 # THE EPOCH DERIVES FROM THE GRID DIMENSIONS (the author's ruling):
 # the max movements = n_rows + n_cols - 1 (64 + 15 - 1 = 78 on the
@@ -350,7 +350,7 @@ def _int_keys(history: dict[str, Any]) -> dict[int, Any]:
     return out
 
 
-def load_state(state_file: str = TREK_STATE_FILE) -> dict[str, Any]:
+def load_state(state_file: str = EXHAUSTIVE_STATE_FILE) -> dict[str, Any]:
     """the v2 state: {'candidates': {candidate_key: history}, ...}.
     The candidate key: 'fam|rung|k|v'. The history: {level: record}
     - with the level keys normalized back to ints (JSON stringifies
@@ -406,7 +406,7 @@ STATE_SCHEMA: dict[str, Any] = {
                             "additionalProperties": False,
                         },
                         {  # a settled failure (the closing budget rides
-                            # the record - the radio's attempted-bracket
+                            # the record - the exhaustive_radio's attempted-bracket
                             # evidence needs it)
                             "type": "object",
                             "required": ["status"],
@@ -484,11 +484,11 @@ def _validate_state(st: dict[str, Any], where: str) -> None:
         jsonschema.validate(st, STATE_SCHEMA)
     except jsonschema.ValidationError as e:
         raise ValueError(
-            f"the trek state fails its schema ({where}): {e.message} at {list(e.absolute_path)}"
+            f"the exhaustive state fails its schema ({where}): {e.message} at {list(e.absolute_path)}"
         ) from e
 
 
-def save_state(st: dict[str, Any], state_file: str = TREK_STATE_FILE) -> None:
+def save_state(st: dict[str, Any], state_file: str = EXHAUSTIVE_STATE_FILE) -> None:
     """Save the state, SCHEMA-VALIDATED: a violation refuses to
     write (corrupt data never lands on disk - the crash-rail
     philosophy applied to the state itself)."""
@@ -773,7 +773,7 @@ def walk(
     high-score cell and explores again. If it teleports to a cell
     ALREADY marked with the high score (no improvement found in the
     life), the walk ENDS: a new walker spawns at a random position
-    and starts a new life. The trek ends when a spawned walker's
+    and starts a new life. The exhaustive ends when a spawned walker's
     high-score-teleport target repeats - no improvement anywhere.
 
     THE REPLAY is exact from the persisted walk state: the spawn,
@@ -786,13 +786,13 @@ def walk(
     'best','life','movements','draws','spawn','reason'} - reason
     'evaluate' (the cell needs the action), 'teleport' (the walker
     returns to its best), 'ended' (the walk finished: the spawn's
-    high-score target repeated - the trek is done)."""
+    high-score target repeated - the exhaustive is done)."""
     grid = Grid()
     if kv_ladder is None:
         kv_ladder = ["f16", "q8_0", "q4_0"]  # the small grid's 3
 
     ws = st.setdefault("walk", {})
-    rng = random.Random(f"trek-v3-{walker_seed}-{ws.get('draws', 0)}")
+    rng = random.Random(f"exhaustive-v3-{walker_seed}-{ws.get('draws', 0)}")
 
     # THE WALK STATE (persisted; the replay's complete truth)
     life = ws.get("life", 1)
@@ -968,7 +968,7 @@ def walk(
             ws["dispatched_action"] = [action, budget]
             # THE ONE-ACTION-PER-VISIT RULE (the author's #4): the cell
             # needs exam work and was not yet dispatched THIS visit -
-            # hand it to the runner; the phase-B radio then fires (the
+            # hand it to the runner; the phase-B exhaustive_radio then fires (the
             # author's #5), and the NEXT walk() steps away from here
             ws["dispatched"] = [row, col]
             save()

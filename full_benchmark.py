@@ -133,7 +133,7 @@ def preflight_gc() -> None:
     sources are exhausted. It never touches the state or the
     results - only the model files the runtime rules would delete
     anyway."""
-    import trek_run as R
+    import exhaustive_run as R
 
     free = R._free_gib()
     if free > R.GC_THRESHOLD_GIB:
@@ -172,7 +172,7 @@ def preflight_selfcheck() -> None:
     against the live code. SILENT on success (the quiet-preflight
     ruling); ANY failure refuses to start the run with a printed
     reason. ~2s."""
-    import trek_run as R
+    import exhaustive_run as R
 
     # --- THE PREFLIGHT GC (the author's ruling): the disk headroom is
     # --- recovered from the previous run's leftovers BEFORE asserting;
@@ -235,7 +235,7 @@ def preflight_selfcheck() -> None:
     # --- the pool: the full v2 candidate census (the dry-run check,
     # folded in): every family x every rung x every kv pair, the
     # drawn-set coherent with the state file ---
-    import trek_run as R
+    import exhaustive_run as R
 
     pool = R.the_pool()
     n_kv = len(R.KV_LADDER)
@@ -254,8 +254,8 @@ def preflight_selfcheck() -> None:
     assert len(LADDER) == 15 and LADDER[-1] == "F16", (
         "the LADDER must be the full 15 rungs (the exhaustive era)"
     )
-    if os.path.isfile(R.TREK_STATE_FILE):
-        with open(R.TREK_STATE_FILE, encoding="utf-8") as fh:
+    if os.path.isfile(R.EXHAUSTIVE_STATE_FILE):
+        with open(R.EXHAUSTIVE_STATE_FILE, encoding="utf-8") as fh:
             st = json.load(fh)
         drawn = set(st.get("done", []))
         assert len(drawn) <= total, "the drawn-set exceeds the pool - corrupt state"
@@ -472,7 +472,7 @@ def sigint_shutdown(_signum: int, _frame: Any, args: argparse.Namespace | None =
     # (the 119MB granite-3.1 lesson)
     import glob as _glob
 
-    for p in _glob.glob("results/trek/**/exam-server-*.log", recursive=True):
+    for p in _glob.glob("results/exhaustive/**/exam-server-*.log", recursive=True):
         try:
             if os.path.getsize(p) > 20 * 2**20:
                 with open(p, encoding="utf-8", errors="replace") as fh:
@@ -525,7 +525,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--task",
         default="exhaustive",
         choices=["exhaustive"],
-        help="the benchmark: the exhaustive sweep (trek is deprecated)",
+        help="the benchmark: the exhaustive sweep (exhaustive is deprecated)",
     )
     ap.add_argument(
         "--clean",
@@ -613,12 +613,12 @@ def _run(args: argparse.Namespace) -> None:
         # best pass time (else 128s), results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
-        import trek_run as R
+        import exhaustive_run as R
 
-        if args.clean and os.path.isfile(R.TREK_STATE_FILE):
+        if args.clean and os.path.isfile(R.EXHAUSTIVE_STATE_FILE):
             # simple: delete the state file - main() treats a
             # missing file as a fresh pool, every chance restored
-            os.remove(R.TREK_STATE_FILE)
+            os.remove(R.EXHAUSTIVE_STATE_FILE)
             stamp("ei: state deleted (--clean) - a fresh pool")
 
         def push_progress(n: int) -> None:

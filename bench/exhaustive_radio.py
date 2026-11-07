@@ -1,4 +1,4 @@
-"""bench.radio - trek v3 phase B: the per-tier end condition (the radio).
+"""bench.exhaustive_radio - exhaustive v3 phase B: the per-tier end condition (the exhaustive_radio).
 
 THE MODEL (the author's draft): every candidate (model, quant, k, v)
 is a threat unit at every tier t in {1..128} where its checkpoint-t
@@ -138,7 +138,7 @@ class _Tail:
         # ACCEPTANCE 1: every convolution row sums to 1
         warn_contract(
             "inv",
-            "radio.row_sums_1",
+            "exhaustive_radio.row_sums_1",
             abs(suf[0] - 1.0) < 1e-9,
             f"the convolution row sums to {suf[0]!r}, not 1",
         )
@@ -151,9 +151,9 @@ class _Tail:
 def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
     """the per-tier certification, computed exactly from the state.
     Returns {'tiers': {t: {...}}, 'all_certified': bool, 'blocked': bool}."""
-    from bench import trek
+    from bench import exhaustive
 
-    grid = trek.Grid()
+    grid = exhaustive.Grid()
     cands = st.get("candidates", {})
     D: Counter[int] = Counter()
     G: Counter[int] = Counter()
@@ -213,7 +213,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
                     # curves' continued -1's as climb-zeros let the
                     # never-starting population double-vote - 198
                     # fake plateau zeros against 2 real gains - and
-                    # D read 99.3% zeros, so the radio priced
+                    # D read 99.3% zeros, so the exhaustive_radio priced
                     # 'an unknown cell climbs past the champion' at
                     # 0.03% and certified 8/8 with 18 unmeasured
                     # cells after one sweep. The climb rate is
@@ -297,7 +297,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
         # champion (both now measured at the same tier)
         warn_contract(
             "inv",
-            "radio.score_le_champion",
+            "exhaustive_radio.score_le_champion",
             all(s <= C[t] for (_kind, s, _d) in groups),
             f"a live unit's per-tier score exceeds the champion C[{t}]={C[t]}",
         )
@@ -365,7 +365,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             "floor_champion": C[t] < 0,  # the guard's flag: nothing passed at this tier yet
             # RULING 2: tier 1's certification rests on the support-cap
             # assumption (G's max genesis is the champion's own) - the
-            # flagged eager tier, logged in every radio_stop
+            # flagged eager tier, logged in every exhaustive_radio_stop
             "eager_tier": t == 1,
         }
         all_certified = all_certified and certified
@@ -378,23 +378,23 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
     }
 
 
-def summary(radio: dict[str, Any]) -> str:
+def summary(exhaustive_radio: dict[str, Any]) -> str:
     """one console line: the per-tier sums and the certified count.
     Tier 1 carries the * flag (RULING 2: its certification rests on
     the support-cap assumption - G's max genesis is the champion's
     own, so unknowns are structurally 0 at any sample size; the eager
-    tier, flagged in every radio line and the radio_stop record)."""
+    tier, flagged in every exhaustive_radio line and the exhaustive_radio_stop record)."""
     parts = []
     n = 0
     for t in TIER_LADDER:
-        rec = radio["tiers"].get(str(t), {})
+        rec = exhaustive_radio["tiers"].get(str(t), {})
         sp = rec.get("sum_p")
         flag = "*" if rec.get("eager_tier") and rec.get("certified") else ""
         parts.append(f"t{t}={'-' if sp is None else f'{sp:.3g}'}{flag}")
         if rec.get("certified"):
             n += 1
-    if not radio.get("quorum"):
+    if not exhaustive_radio.get("quorum"):
         parts.append("no-quorum(<2 cells)")
-    if radio.get("blocked"):
+    if exhaustive_radio.get("blocked"):
         parts.append("blocked(an unfinished exam)")
-    return f"[radio] {' '.join(parts)} - certified {n}/8"
+    return f"[exhaustive-exhaustive_radio] {' '.join(parts)} - certified {n}/8"
