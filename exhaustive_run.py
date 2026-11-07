@@ -643,7 +643,6 @@ def _run_combo(
             # this level, or 128s when nobody has passed it yet
             lvl_budget = level_timeout_s(state, level) if state is not None else budget_s
             deadline = level_t0 + lvl_budget
-            print(f"[exam] level {level}: timer {lvl_budget:.1f}s", flush=True)
             insts = {
                 "chain": build_chain(instance_key, level),
                 "elevator": build_elevator(instance_key, level),
