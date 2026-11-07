@@ -383,27 +383,31 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
 # THE PER-LEVEL TIME ALLOCATION (the author's ruling): a level's
-# timer is 2x the BEST pass time any candidate has recorded for it;
-# a level nobody has passed yet gets the full 128s.
+# timer is 2x the SECOND-BEST pass time any candidate has recorded
+# for it (the best x2 was too tight - the fastest candidate set a
+# bar nobody else could clear); a level with fewer than two passes
+# gets the full 128s.
 LEVEL_TIMEOUT_S = 128.0
 
 
 def level_timeout_s(st: dict[str, Any], level: int) -> float:
-    """The level's time allocation: 2x the best (smallest) pass time
+    """The level's time allocation: 2x the second-smallest pass time
     recorded for this level across ALL candidates in the state, or
-    the full LEVEL_TIMEOUT_S when no candidate has passed it yet."""
-    best: float | None = None
+    the full LEVEL_TIMEOUT_S when fewer than two candidates have
+    passed it yet."""
+    times: list[float] = []
     for hist in st.get("candidates", {}).values():
         if not isinstance(hist, dict):
             continue
         rec = hist.get(level)
         if isinstance(rec, dict) and rec.get("status") == "pass":
             t = rec.get("time_s")
-            if isinstance(t, (int, float)) and (best is None or t < best):
-                best = float(t)
-    if best is None:
+            if isinstance(t, (int, float)):
+                times.append(float(t))
+    if len(times) < 2:
         return LEVEL_TIMEOUT_S
-    return 2.0 * best
+    times.sort()
+    return 2.0 * times[1]
 
 
 def run_pair(
@@ -639,7 +643,7 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            # the adaptive per-level timer: 2x the best pass time for
+            # the adaptive per-level timer: 2x the second-best pass time for
             # this level, or 128s when nobody has passed it yet
             lvl_budget = level_timeout_s(state, level) if state is not None else budget_s
             deadline = level_t0 + lvl_budget
@@ -873,7 +877,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     For each model (parameter size ascending), for each model quant
     (bits-per-weight ascending), all 49 kv combos measured with the
-    adaptive per-level timer (2x the level's best pass time, else
+    adaptive per-level timer (2x the level's second-best pass time, else
     128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
@@ -896,7 +900,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
-        "quants ascending, 49 kv, per-level timer 2x best (else 128s)"
+        "quants ascending, 49 kv, per-level timer 2x second-best (else 128s)"
     )
 
     st = exhaustive.load_state()
