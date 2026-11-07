@@ -83,6 +83,7 @@ DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 # the budget ladder: 1, 2, 4, ..., 128
 CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 
+
 # THE CANDIDATE-DETERMINISTIC EXAM SEED: the same candidate always
 # gets the same exam instance (the same levels, the same papers) -
 # the histories are reproducible and shared across walkers/seeds
@@ -95,7 +96,7 @@ CLOCK_LADDER = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
 # diff - the pin bug, the spawn off-by-one, and the dispatch-default
 # bug would ALL have been canary diffs. Stored as [row, col,
 # movements, budget] tuples.
-def grid_fingerprint(grid: "Grid") -> str:
+def grid_fingerprint(grid: Grid) -> str:
     """THE GRID FINGERPRINT (the grid-expansion lesson): the walk
     record's coordinates (spawn, position, best, epoch_start) are
     meaningful only relative to the grid they were recorded on -
@@ -110,11 +111,26 @@ def grid_fingerprint(grid: "Grid") -> str:
 # THE 18-MODEL GRID'S CANARY (the 18x3 grid, 20-movement epochs):
 # the seed-1 walk's first 20 picks on the canonical mock landscape
 WALK_CANARY: list[list] = [
-    [13, 0, 0, 1.0], [13, 1, 1, 1.0], [14, 1, 2, 1.0], [15, 1, 3, 1.0],
-    [14, 1, 4, 2.0], [13, 1, 5, 2.0], [13, 2, 6, 1.0], [12, 2, 7, 1.0],
-    [11, 2, 8, 1.0], [12, 2, 9, 2.0], [13, 2, 10, 2.0], [14, 2, 11, 1.0],
-    [14, 1, 12, 4.0], [13, 1, 13, 4.0], [14, 1, 14, 8.0], [13, 1, 15, 8.0],
-    [13, 0, 16, 2.0], [12, 0, 17, 1.0], [12, 1, 18, 1.0], [12, 0, 19, 2.0],
+    [13, 0, 0, 1.0],
+    [13, 1, 1, 1.0],
+    [14, 1, 2, 1.0],
+    [15, 1, 3, 1.0],
+    [14, 1, 4, 2.0],
+    [13, 1, 5, 2.0],
+    [13, 2, 6, 1.0],
+    [12, 2, 7, 1.0],
+    [11, 2, 8, 1.0],
+    [12, 2, 9, 2.0],
+    [13, 2, 10, 2.0],
+    [14, 2, 11, 1.0],
+    [14, 1, 12, 4.0],
+    [13, 1, 13, 4.0],
+    [14, 1, 14, 8.0],
+    [13, 1, 15, 8.0],
+    [13, 0, 16, 2.0],
+    [12, 0, 17, 1.0],
+    [12, 1, 18, 1.0],
+    [12, 0, 19, 2.0],
 ]
 
 
@@ -178,7 +194,9 @@ def _param_of(fam: str) -> float:
     """the family's parameter count from the roster's models.md table
     (the params column; the file is the author-maintained truth)."""
     # parse models.md: the table rows are name | params | f16 | window | repo
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md")
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "md", "models.md"
+    )
     try:
         with open(path, encoding="utf-8") as fh:
             for ln in fh:
@@ -798,9 +816,7 @@ def walk(
     # score - the update happens just after the action, BEFORE the
     # movement. No separate epoch-high tracking: the epoch score IS
     # the epoch start cell's score.
-    epoch_start: tuple[int, int] | None = (
-        tuple(ws["epoch_start"]) if "epoch_start" in ws else None
-    )
+    epoch_start: tuple[int, int] | None = tuple(ws["epoch_start"]) if "epoch_start" in ws else None
     # PRE (phase a): the spawn at (-1,-1) is LEGAL for every life -
     # each new walker spawns at a random position and the LIFE SCORE
     # derives from the spawn cell (the clean spec) - no inherited
@@ -810,8 +826,7 @@ def walk(
         "pre",
         "walk.spawn_fresh_record",
         not (position == (-1, -1) and movements > 0),
-        f"the spawn at (-1,-1) must carry no mid-epoch state "
-        f"(found movements {movements})",
+        f"the spawn at (-1,-1) must carry no mid-epoch state (found movements {movements})",
     )
 
     def draw() -> tuple[int, int]:
@@ -842,17 +857,19 @@ def walk(
     def save() -> None:
         # INV: movements within the epoch budget, never negative
         warn_contract(
-            "inv", "walk.movements_in_budget",
+            "inv",
+            "walk.movements_in_budget",
             0 <= movements <= epoch_budget,
             f"movements {movements} outside [0, {epoch_budget}]",
         )
         # INV: the high score never decreases within a life
-        if life == entry_record.get("life") and entry_record.get("high") is not None:
+        prev_high = entry_record.get("high")
+        if life == entry_record.get("life") and isinstance(prev_high, int):
             warn_contract(
-                "inv", "walk.high_monotone",
-                high >= entry_record["high"],
-                f"the high score decreased within a life "
-                f"({entry_record['high']} -> {high})",
+                "inv",
+                "walk.high_monotone",
+                high >= prev_high,
+                f"the high score decreased within a life ({prev_high} -> {high})",
             )
         ws["life"] = life
         ws["epoch"] = epoch
@@ -871,9 +888,7 @@ def walk(
         # The epoch start = the spawn position. No starting-position
         # memory needed beyond that.
         position = (rng.randrange(grid.n_rows), rng.randrange(grid.n_cols))
-        high = _cell_best_score(
-            st, *grid.cell(*position), kv_ladder, 0.0
-        )
+        high = _cell_best_score(st, *grid.cell(*position), kv_ladder, 0.0)
         best = position
         movements = 0  # the teleport: free
         epoch = 1
@@ -927,9 +942,8 @@ def walk(
         # timeouts are recorded at its budget, the completed dig's
         # candidates are settled at 128), so the worst case is one
         # wasted acquisition; the best case is the resume.
-        interrupted = (
-            (row, col) == dispatched
-            and (dispatched_action is None or dispatched_action == [action, budget])
+        interrupted = (row, col) == dispatched and (
+            dispatched_action is None or dispatched_action == [action, budget]
         )
         if action in ("exam", "dig") and ((row, col) != dispatched or interrupted):
             # INV: THE RECORD ADVANCES - this pick moves, or the
@@ -938,17 +952,14 @@ def walk(
             # changed, so interrupted is False)
             entry_pos = entry_record.get("position")
             same_cell_as_entry = entry_pos == [row, col]
-            nothing_advanced = (
-                movements == entry_record.get("movements")
-                and life == entry_record.get("life")
-            )
+            nothing_advanced = movements == entry_record.get(
+                "movements"
+            ) and life == entry_record.get("life")
             warn_contract(
-                "inv", "walk.record_advances",
+                "inv",
+                "walk.record_advances",
                 not (
-                    same_cell_as_entry
-                    and nothing_advanced
-                    and not interrupted
-                    and not replay_reset
+                    same_cell_as_entry and nothing_advanced and not interrupted and not replay_reset
                 ),
                 "the walk record did not advance - a frozen walk "
                 "(the same cell re-dispatched at the same movement "
@@ -989,14 +1000,12 @@ def walk(
         # fires - the marker may only be honored when the dispatch's
         # work is genuinely done (the action changed).
         warn_contract(
-            "inv", "walk.no_step_past_live_work",
+            "inv",
+            "walk.no_step_past_live_work",
             not (
                 (row, col) == dispatched
                 and action in ("exam", "dig")
-                and (
-                    dispatched_action is None
-                    or dispatched_action == [action, budget]
-                )
+                and (dispatched_action is None or dispatched_action == [action, budget])
             ),
             "stepping past a cell whose dispatched work is still "
             "pending - the completion must show as a CHANGED action "
@@ -1031,7 +1040,7 @@ def walk(
                 "walk.exact_movements",
                 movements == epoch_budget,
                 f"the epoch ended at {movements} movements, expected exactly {epoch_budget}",
-            )            # THE DEATH RULE (the author's corrected spec): the
+            )  # THE DEATH RULE (the author's corrected spec): the
             # walker dies when the teleport returns to the cell the
             # EPOCH STARTED FROM - the epoch found nothing better
             # than its own start. The epoch's start is the entry
@@ -1048,15 +1057,14 @@ def walk(
             # score (the teleport cell - before movement 0's action)
             # and the next epoch continues from here.
             teleport = epoch_start if epoch_start is not None else (row, col)
-            tp_score = _cell_best_score(
-                st, *grid.cell(*teleport), kv_ladder, 0.0
-            )
+            tp_score = _cell_best_score(st, *grid.cell(*teleport), kv_ladder, 0.0)
             if tp_score == high:
                 # no improvement over the life's baseline: the life
                 # ENDS - a new walker spawns at random
                 save()
                 return {
-                    "row": teleport[0], "col": teleport[1],
+                    "row": teleport[0],
+                    "col": teleport[1],
                     "fam": grid.cell(*teleport)[0],
                     "rung": grid.cell(*teleport)[1],
                     "action": "none",

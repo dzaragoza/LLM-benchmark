@@ -21,8 +21,6 @@ when live-bench was absorbed into speed_gate.py.
 
 from __future__ import annotations
 
-from bench.contracts import warn_contract
-
 import json
 import os
 import re

@@ -21,14 +21,14 @@ import os
 import sys
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import infra.hf_download as hf_download
 import infra.llama_server as llama_server
-from bench import radio, trek
 from bench import state_store as _state_store
+from bench import trek
 from bench.contracts import warn_contract
 from bench.exam import (
     ask_exam,
@@ -39,7 +39,7 @@ from bench.exam import (
     elevator_prompt,
     score_exam,
 )
-from bench.roster import LADDER, roster_from_models_md
+from bench.roster import LADDER
 
 # --- the entropy source: real randomness, never pseudorandom -------------
 
@@ -84,7 +84,9 @@ KV_LADDER = [
     "q5_0",
     "q5_1",
 ]
-PICK_BITS = 16  # 6 model index + 10 rung (the pick is unused in the exhaustive sweep; the comment reflects the full 64-model grid)
+# 6 model index + 10 rung; unused in the exhaustive sweep, kept for
+# the full 64-model grid's pick encoding
+PICK_BITS = 16
 
 
 def the_pool() -> list[tuple[str, str]]:
@@ -419,7 +421,6 @@ def run_pair(
     nothing (the derivation reads the history). The pair's quant
     file is deleted at the end (the gc owns the f16s)."""
     from bench.exam import bell_window
-
     from bench.roster import dyadic_picks
 
     warn_contract(
@@ -445,9 +446,7 @@ def run_pair(
         (k, v)
         for k in KV_LADDER
         for v in KV_LADDER
-        if trek.needs_rerun(
-            candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s
-        )
+        if trek.needs_rerun(candidates.get(trek.cand_key(fam, rung, k, v), {}), budget_s)
     ]
     if not work_early:
         print(f"[trek] {fam} {rung}: no work under {budget_s:g}s - nothing to do")
@@ -530,10 +529,7 @@ def run_pair(
                     f"ABORTING the prospect, DIG at t=128s starts immediately"
                 )
                 dig_work = work_list(128.0)
-                print(
-                    f"[trek] the dig: {len(dig_work)} candidates need work "
-                    f"under 128s"
-                )
+                print(f"[trek] the dig: {len(dig_work)} candidates need work under 128s")
                 for k2, v2, key2, hist2 in dig_work:
                     _run_combo(fam, rung, k2, v2, gguf, ctx, models_dir, port, 128.0, hist2, state)
                     candidates[key2] = hist2
@@ -878,7 +874,7 @@ def _cell_open_beyond(h: dict[str, Any], t: float) -> bool:
     candidate has no settled verdict within t seconds."""
     from bench import radio as _radio
 
-    kind, cap, _s, _times, _rb = _radio._curve(h)
+    kind, cap, _s, _times, _rb = _radio._curve(cast("dict[int, Any]", h))
     if kind != "open":
         return False
     return cap > t
@@ -912,7 +908,10 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     models_dir = "models"
     port = int(os.environ.get("TREK_PORT", "8210"))
 
-    print("[exhaustive] the deterministic sweep: models ascending, quants ascending, 49 kv, per-level timer 2x best (else 128s)")
+    print(
+        "[exhaustive] the deterministic sweep: models ascending, "
+        "quants ascending, 49 kv, per-level timer 2x best (else 128s)"
+    )
 
     st = trek.load_state()
     candidates = st.setdefault("candidates", {})
@@ -920,7 +919,8 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
     def save() -> None:
         _state_store.save_state(TREK_STATE_FILE, st)
 
-    from bench.roster import LADDER as RUNG_LADDER, dyadic_picks
+    from bench.roster import LADDER as RUNG_LADDER
+    from bench.roster import dyadic_picks
     from bench.trek import _param_of
 
     models = [fam for fam, _repo in dyadic_picks()]
@@ -939,18 +939,13 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
         famdir = os.path.join(models_dir, fam)
         for rung in RUNG_LADDER:
             n_done += 1
-            print(
-                f"\n[exhaustive] {fam} {rung} "
-                f"(pair {n_done} of {n_total})"
-            )
+            print(f"\n[exhaustive] {fam} {rung} (pair {n_done} of {n_total})")
             # skip: every candidate settled at 128 already?
             work = [
                 (k, v)
                 for k in KV_LADDER
                 for v in KV_LADDER
-                if trek.needs_rerun(
-                    candidates.get(trek.cand_key(fam, rung, k, v), {}), 128.0
-                )
+                if trek.needs_rerun(candidates.get(trek.cand_key(fam, rung, k, v), {}), 128.0)
             ]
             if not work:
                 print(f"[exhaustive] {fam} {rung}: all 49 settled from history - skip")

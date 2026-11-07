@@ -11,8 +11,6 @@ its full prompt and answer for debugging.
 
 from __future__ import annotations
 
-from bench.contracts import warn_contract
-
 import json
 import os
 import random
@@ -20,6 +18,8 @@ import re
 import sys
 import time
 from typing import Any
+
+from bench.contracts import warn_contract
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -74,12 +74,10 @@ def build_chain(seed: int, level: int) -> dict[str, Any]:
     # shuffled rows are the same pairs (no loss, no dupes), and the
     # chain is one unbroken path
     warn_contract(
-        "post", "exam.chain_shape",
-        len(rows) == n_pairs
-        and sorted(rows) == sorted(pairs)
-        and len(tokens) == n_pairs + 1,
-        f"the chain paper for level {level} is malformed "
-        f"({len(rows)} rows, {len(tokens)} tokens)",
+        "post",
+        "exam.chain_shape",
+        len(rows) == n_pairs and sorted(rows) == sorted(pairs) and len(tokens) == n_pairs + 1,
+        f"the chain paper for level {level} is malformed ({len(rows)} rows, {len(tokens)} tokens)",
     )
     return {
         "part": "chain",

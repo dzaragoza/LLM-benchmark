@@ -158,7 +158,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
     D: Counter[int] = Counter()
     G: Counter[int] = Counter()
     C = {t: -1 for t in TIER_LADDER}
-    units: list[tuple[str, float, int]] = []
+    units: list[tuple[str, float, int, list[int] | None]] = []
     blocked = False
     # RULING 1: the pools are ATTEMPTED BRACKETS ONLY. A checkpoint
     # pair (t, 2t) enters D iff the curve RAN AT budget >= 2t (the
@@ -273,9 +273,10 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
     for t in TIER_LADDER:
         groups: Counter = Counter()
         ti = TIER_LADDER.index(t)
-        for kind, cap, s, cell_ts in units:
+        for kind, cap, _s, cell_ts_raw in units:
             if kind == "closed" or kind == "unfinished":
                 continue
+            cell_ts = cell_ts_raw if cell_ts_raw is not None else [-1] * len(TIER_LADDER)
             # THE PER-TIER SCORE (the crash fix): the unit's threat
             # at tier t is measured by its PER-TIER score - the
             # score it achieves WITHIN t seconds - not its
@@ -284,7 +285,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
             # but the budget-free s=6 against C[16]=4 crashed the
             # contract and priced the cell as a CERTAIN beater
             # (gap -1 -> p 1.0). Apples to apples now.
-            s_t = (cell_ts[ti] if cell_ts is not None else -1)
+            s_t = cell_ts[ti]
             if kind == "open":
                 if t <= cap:
                     continue  # known at this tier
@@ -350,9 +351,7 @@ def certify(st: dict[str, Any], kv_ladder: list[str]) -> dict[str, Any]:
         # tiers certified at C = -1). A tier certifies only when its
         # champion is a REAL measured score - at least one level
         # passed somewhere at that tier.
-        certified = (
-            modelable and quorum and C[t] >= 0 and upper < CERTIFY_ANCHOR
-        )
+        certified = modelable and quorum and C[t] >= 0 and upper < CERTIFY_ANCHOR
         tiers[str(t)] = {
             "champion": C[t],
             "live_units": sum(groups.values()),

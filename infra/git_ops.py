@@ -13,10 +13,10 @@ machine.
 
 from __future__ import annotations
 
-from bench.contracts import warn_contract
-
 import os
 import subprocess
+
+from bench.contracts import warn_contract
 
 
 def _run(args: list[str], text: bool = True) -> subprocess.CompletedProcess:
@@ -50,7 +50,8 @@ def pull_rebase(autostash: bool = True) -> tuple[int, str, str]:
     # PRE: never pull inside an open rebase (the 15:53 incident's
     # guard - the recovery is the operator's, never the tool's)
     warn_contract(
-        "pre", "git_ops.pull_not_mid_rebase",
+        "pre",
+        "git_ops.pull_not_mid_rebase",
         not in_rebase(),
         "a rebase is in progress (unresolved conflicts) - resolve it "
         "by hand: git status, fix the conflicts, git add, git rebase "

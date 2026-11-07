@@ -78,6 +78,8 @@ import os
 import re
 import sys
 import tempfile
+from collections.abc import Sequence
+from typing import Any
 
 __all__ = [
     "CodeEditError",
@@ -120,6 +122,13 @@ def _selftest() -> int:
     a hand-rolled harness. Returns the failure count (0 = clean)."""
     import tempfile
 
+    def _tmp(suffix: str) -> str:
+        # mkstemp, not the deprecated mktemp: mktemp is a race (the
+        # name is handed out before the file exists)
+        fd, p = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        return p
+
     fails = 0
 
     def check(label: str, ok: bool) -> None:
@@ -129,7 +138,7 @@ def _selftest() -> int:
             fails += 1
 
     def try_edit(content: str, blocks: list, want: str) -> bool:
-        tmp = tempfile.mktemp(suffix=".py")
+        tmp = _tmp(".py")
         with open(tmp, "w", encoding="utf-8") as fh:
             fh.write(content)
         got = "accepted"
@@ -147,8 +156,7 @@ def _selftest() -> int:
         "seam: the real glued seam refused",
         try_edit(
             "def f(x):\n    if x:\n        return helper(x)\n    # c\n    y = 2\n    return y\n",
-            [("replace", "return helper(x)\n    # c",
-              "return helper(x)        # c")],
+            [("replace", "return helper(x)\n    # c", "return helper(x)        # c")],
             "refused",
         ),
     )
@@ -191,7 +199,7 @@ def _selftest() -> int:
         ),
     )
     # THE WRITE ROUND-TRIP: a legal edit lands and reads back
-    tmp = tempfile.mktemp(suffix=".py")
+    tmp = _tmp(".py")
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write("def d(x):\n    return 41\n")
     edit(tmp, [("replace", "return 41", "return 42")])
@@ -202,7 +210,7 @@ def _selftest() -> int:
 
     # THE STRUCTURED-FILE RULE: a raw edit on .json/.csv is refused;
     # the repair exception allows it
-    tmp_json = tempfile.mktemp(suffix=".json")
+    tmp_json = _tmp(".json")
     with open(tmp_json, "w", encoding="utf-8") as fh:
         fh.write('{"a": 1}')
     got = "accepted"
@@ -213,7 +221,7 @@ def _selftest() -> int:
     check("structured: a raw json edit refused", got == "refused")
     if os.path.exists(tmp_json):
         os.remove(tmp_json)
-    tmp_json2 = tempfile.mktemp(suffix=".json")
+    tmp_json2 = _tmp(".json")
     with open(tmp_json2, "w", encoding="utf-8") as fh:
         fh.write('{"a": 1}')
     got = "refused"
@@ -226,7 +234,7 @@ def _selftest() -> int:
     if os.path.exists(tmp_json2):
         os.remove(tmp_json2)
     # edit_json is the sanctioned json path
-    tmp_json3 = tempfile.mktemp(suffix=".json")
+    tmp_json3 = _tmp(".json")
     with open(tmp_json3, "w", encoding="utf-8") as fh:
         fh.write('{"a": 1}')
     edit_json(tmp_json3, [("set", "a", 2)])
@@ -236,7 +244,7 @@ def _selftest() -> int:
     if os.path.exists(tmp_json3):
         os.remove(tmp_json3)
     # csv refused raw
-    tmp_csv = tempfile.mktemp(suffix=".csv")
+    tmp_csv = _tmp(".csv")
     with open(tmp_csv, "w", encoding="utf-8") as fh:
         fh.write("a,b\n1,2\n")
     got = "accepted"
@@ -472,7 +480,6 @@ def _masked_line(src: str) -> dict[int, str]:
     masking draws the line between prose and code, and only code can
     violate."""
     import io
-    import re as _re
     import tokenize as _tk
 
     lines = src.split("\n")
@@ -480,7 +487,9 @@ def _masked_line(src: str) -> dict[int, str]:
     try:
         for tok in _tk.generate_tokens(io.StringIO(src).readline):
             if tok.type != _tk.STRING:
-                continue  # comments stay visible: a comment glued onto code is the violation's shape
+                # comments stay visible: a comment glued onto code
+                # is the violation's shape
+                continue
             # mask the token's span on every line it touches
             for ln_no in range(tok.start[0], tok.end[0] + 1):
                 if ln_no not in masked:
@@ -1357,10 +1366,13 @@ def edit(
     acknowledge (the corrupt-state repair precedent).
     """
     # PRE: the target exists and the blocks are non-empty
-    _contract("pre", "edit.target_exists", os.path.isfile(path),
-              f"the edit target {path!r} does not exist")
-    _contract("pre", "edit.blocks_nonempty", len(blocks) > 0,
-              "an edit needs at least one block")
+    _contract(
+        "pre",
+        "edit.target_exists",
+        os.path.isfile(path),
+        f"the edit target {path!r} does not exist",
+    )
+    _contract("pre", "edit.blocks_nonempty", len(blocks) > 0, "an edit needs at least one block")
     _structured_file_guard(path, repair)
     with open(path, encoding="utf-8") as f:
         src = f.read()

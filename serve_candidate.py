@@ -29,16 +29,14 @@ from bench.roster import roster_from_models_md
 
 PORT_DEFAULT = 9000
 
-_SPEC_RE = re.compile(
-    r"^(?P<fam>\S+)\s+(?P<rung>\S+)\s+k=(?P<k>\S+)\s+v=(?P<v>\S+)\s*$"
-)
+_SPEC_RE = re.compile(r"^(?P<fam>\S+)\s+(?P<rung>\S+)\s+k=(?P<k>\S+)\s+v=(?P<v>\S+)\s*$")
 
 
 def parse_spec(spec: str) -> tuple[str, str, str, str]:
     m = _SPEC_RE.match(spec.strip())
     if not m:
         raise SystemExit(
-            f"cannot parse {spec!r} - expected: \"<model> <rung> k=<k> v=<v>\" "
+            f'cannot parse {spec!r} - expected: "<model> <rung> k=<k> v=<v>" '
             'e.g. "granite-4.0-350m Q6_K k=f16 v=iq4_nl"'
         )
     return m.group("fam"), m.group("rung"), m.group("k"), m.group("v")

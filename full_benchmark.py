@@ -187,7 +187,6 @@ def preflight_selfcheck() -> None:
     print(f"[preflight] the disk headroom: {free:.1f} GiB free")
 
     import bench.exam as E
-    import bench.trek as T
     from bench.roster import LADDER, dyadic_picks, roster_from_models_md
 
     # --- the grader: the flexible subsequence ---
@@ -231,9 +230,7 @@ def preflight_selfcheck() -> None:
     assert roster and roster == roster_from_models_md(), (
         "the roster must be every model in md/models.md, in table order"
     )
-    assert roster[0][0] == "granite-4.0-h-350m", (
-        "the roster's param-ascending order broken"
-    )
+    assert roster[0][0] == "granite-4.0-h-350m", "the roster's param-ascending order broken"
 
     # --- the pool: the full v2 candidate census (the dry-run check,
     # folded in): every family x every rung x every kv pair, the
@@ -320,9 +317,7 @@ def git_sync_check() -> None:
     local = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True
     ).stdout.strip()
-    remote = subprocess.run(
-        ["git", "rev-parse", "@{u}"], capture_output=True, text=True
-    )
+    remote = subprocess.run(["git", "rev-parse", "@{u}"], capture_output=True, text=True)
     if remote.returncode != 0:
         stamp(f"git sync check: no upstream configured - aborting ({remote.stderr.strip()[:100]})")
         raise SystemExit(1)
@@ -603,9 +598,7 @@ def _run(args: argparse.Namespace) -> None:
     # running code's identity.
     import subprocess as _sp
 
-    _local = _sp.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-    ).stdout.strip()
+    _local = _sp.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     print(f"[preflight] the local commit: {_local[:8]}")
     kill_stale_server()
     check_tooling(args)

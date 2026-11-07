@@ -8,13 +8,13 @@ readers). Extracted verbatim -- addendum citations stay."""
 
 from __future__ import annotations
 
-from bench.contracts import warn_contract
-
 import json
 import os
 import sys
 import time
 from typing import Any
+
+from bench.contracts import warn_contract
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -129,7 +129,8 @@ def save_state(path: str, state: dict[str, Any]) -> None:
     # PRE: the state must validate BEFORE the write (the schema
     # gate is the caller's; this is the store's own shape check)
     warn_contract(
-        "pre", "state_store.state_is_mapping",
+        "pre",
+        "state_store.state_is_mapping",
         isinstance(state, dict),
         f"the state to save is not a mapping ({type(state).__name__})",
     )
