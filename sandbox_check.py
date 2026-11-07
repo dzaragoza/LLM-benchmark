@@ -103,9 +103,9 @@ except Exception as exc:  # noqa: BLE001 - report, do not crash the preflight
 
 print("== local repo ==")
 try:
-    out = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=15, check=True
-    )
+    import infra.git_ops as git_ops
+
+    out = git_ops.run(["git", "rev-parse", "HEAD"], check=True, timeout=15)
     print(f"  OK   local HEAD {out.stdout.strip()[:10]}")
 except subprocess.CalledProcessError as exc:
     check("local git repo", False, str(exc))

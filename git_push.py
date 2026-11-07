@@ -115,10 +115,10 @@ def push_files(
 
 def push_working_tree(message: str) -> str:
     """Collect every changed/untracked file (vs the local HEAD) and push it."""
-    import subprocess
+    import infra.git_ops as git_ops
 
     def git(*args: str) -> str:
-        out = subprocess.run(["git", *args], capture_output=True, text=True, check=True)
+        out = git_ops.run(["git", *args], check=True)
         return out.stdout
 
     files: list[tuple[str, str | None]] = []

@@ -23,7 +23,6 @@ import glob
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
 from typing import Any
@@ -308,20 +307,17 @@ def git_sync_check() -> None:
     if not git_ops.inside_work_tree():
         stamp("git sync skipped - not a git work tree")
         return
-    import subprocess
-
-    r = subprocess.run(["git", "fetch", "--quiet"], capture_output=True)
-    if r.returncode != 0:
+    rc = git_ops.fetch()
+    if rc != 0:
         stamp("git fetch failed - cannot verify the sync; fix the remote access")
         raise SystemExit(1)
-    local = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-    ).stdout.strip()
-    remote = subprocess.run(["git", "rev-parse", "@{u}"], capture_output=True, text=True)
-    if remote.returncode != 0:
-        stamp(f"git sync check: no upstream configured - aborting ({remote.stderr.strip()[:100]})")
+    _rc, local, _err = git_ops.rev_parse("HEAD")
+    local = local.strip()
+    remote_rc, remote, remote_err = git_ops.rev_parse("@{u}")
+    if remote_rc != 0:
+        stamp(f"git sync check: no upstream configured - aborting ({remote_err.strip()[:100]})")
         raise SystemExit(1)
-    remote = remote.stdout.strip()
+    remote = remote.strip()
     if local != remote:
         stamp(
             f"git OUT OF SYNC - the local HEAD {local[:8]} != the remote "
@@ -366,15 +362,7 @@ def git_tail(args: argparse.Namespace) -> None:
     paths += glob.glob("models/*/quantize-*.log")
     paths += glob.glob("models/*/convert-f16.log")
     paths += glob.glob("models/*/imatrix.log")
-    deleted = [
-        p
-        for p in subprocess.run(
-            ["git", "ls-files", "-d", "--", "models/"],
-            capture_output=True,
-            text=True,
-        ).stdout.splitlines()
-        if p
-    ]
+    deleted = git_ops.ls_files_deleted("models/")
     if deleted:
         rc, err = git_ops.add(deleted)
         if rc != 0:
@@ -596,10 +584,8 @@ def _run(args: argparse.Namespace) -> None:
     # results.txt - the pulls were invisible in the log. The id
     # stamps here, INSIDE the tee, so every section carries the
     # running code's identity.
-    import subprocess as _sp
-
-    _local = _sp.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-    print(f"[preflight] the local commit: {_local[:8]}")
+    _rc, _local, _err = git_ops.rev_parse("HEAD")
+    print(f"[preflight] the local commit: {_local.strip()[:8]}")
     kill_stale_server()
     check_tooling(args)
     preflight_selfcheck()

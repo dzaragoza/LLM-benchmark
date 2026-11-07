@@ -23,10 +23,40 @@ def _run(args: list[str], text: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=text)
 
 
+def run(args: list[str], check: bool = False, timeout: float | None = None) -> subprocess.CompletedProcess:
+    """Public seam for git invocations the named wrappers do not
+    cover (e.g. status --porcelain, rev-parse with a timeout). Every
+    git call in the repo goes through this module - the bottom layer
+    owns the git binary."""
+    return subprocess.run(args, capture_output=True, text=True, check=check, timeout=timeout)
+
+
 def inside_work_tree() -> bool:
     """True when the CWD is a git work tree."""
     r = _run(["git", "rev-parse", "--is-inside-work-tree"])
     return r.returncode == 0 and r.stdout.strip() == "true"
+
+
+def fetch(quiet: bool = True) -> int:
+    """git fetch (harmless - updates remote refs without touching the
+    tree). Returns the return code."""
+    args = ["git", "fetch"] + (["--quiet"] if quiet else [])
+    return _run(args).returncode
+
+
+def rev_parse(ref: str) -> tuple[int, str, str]:
+    """git rev-parse <ref>. Returns (rc, stdout, stderr)."""
+    r = _run(["git", "rev-parse", ref])
+    return r.returncode, r.stdout, r.stderr
+
+
+def ls_files_deleted(pathspec: str) -> list[str]:
+    """git ls-files -d -- <pathspec>: the deleted-but-unstaged files
+    under the pathspec. Returns the paths (empty list on failure)."""
+    r = _run(["git", "ls-files", "-d", "--", pathspec])
+    if r.returncode != 0:
+        return []
+    return [p for p in r.stdout.splitlines() if p]
 
 
 def in_rebase() -> bool:
