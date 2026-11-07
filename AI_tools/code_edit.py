@@ -189,6 +189,17 @@ def _selftest() -> int:
             "refused",
         ),
     )
+    # THE MID-COMMENT REGION (the apostrophe false positive): a
+    # replace whose covered region starts mid-comment-line must not
+    # read the prose apostrophe as an unclosed quote
+    check(
+        "delimiter: mid-comment region with an apostrophe accepted",
+        try_edit(
+            "def m(x):\n    # the level's timer\n    return x\n",
+            [("replace", "the level's timer", "the level's top-4 sum")],
+            "accepted",
+        ),
+    )
     # THE UNIQUENESS: a duplicate target refused
     check(
         "uniqueness: a duplicate target refused",
@@ -726,7 +737,19 @@ def _check_delimiters(src: str, out: str, path: str, regions: Sequence[tuple[str
             i = src2.find(old_text)
             j = out.find(new_text)
             if i >= 0 and j >= 0:
-                covered.append((j, j + len(new_text)))
+                # extend the region to WHOLE LINES: a region that starts
+                # mid-line can start mid-comment or mid-string, and the
+                # scanner then misses the "#" / opening quote and reads
+                # prose apostrophes ("level's") as unclosed quotes -
+                # a false positive (observed on a docstring edit whose
+                # region began mid-comment-line). Line-bounded regions
+                # keep the true positives: a truncated/duplicated
+                # fragment still breaks the balance of its whole lines.
+                j0 = out.rfind("\n", 0, j) + 1
+                j1 = out.find("\n", j + len(new_text))
+                if j1 < 0:
+                    j1 = len(out)
+                covered.append((j0, j1))
             src2 = src2.replace(old_text, "", 1)
         covered = list(covered)
         if not covered and balance(src) is None:
