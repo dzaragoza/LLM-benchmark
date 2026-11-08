@@ -33,7 +33,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | gemma-3-1b-it | 2 | Q5_0 | k=q4_1 v=f16 | 4.6 |
 | MiniCPM5-1B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
 | Llama-3.2-1B-Instruct | 3 | Q4_1 | k=q8_0 v=f16 | 5.4 |
-| MiniCPM-1B-sft | 2 | Q4_K_S | k=f16 v=q4_1 | 7.9 |
+| MiniCPM-1B-sft | 2 | Q4_K_M | k=q4_1 v=q5_0 | 7.2 |
 | phi-1 | - | (not measured) | - | - |
 | granite-4.0-h-1b | - | (not measured) | - | - |
 | Qwen2.5-1.5B-Instruct | - | (not measured) | - | - |
