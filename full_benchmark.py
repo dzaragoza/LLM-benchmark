@@ -7,7 +7,7 @@ v3: (model, model-quant) pairs - 64 models x 15 rungs = 960
 pairs; every pick is 16 bits of real entropy, ONE chance per pair,
 and the pick sweeps all 49 (k, v) cache-quant combinations in one
 acquisition (a fresh 8-bit exam seed each, a per-level timer of
-min(sum of the top-4 pass times for that level, 128s)), results only.
+min(sum of the top-8 pass times for that level, 128s)), results only.
 
 The envelope owns what the ei must never worry about: the
 requirements check, the git pull/push rail, the crash commit, the
@@ -504,7 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="the protocol ei: every candidate of the "
         "960-pair pool (the full 64-model roster x LADDER) gets ONE "
         "chance - a fresh 8-bit exam seed per candidate, a per-level "
-        "timer of min(sum of the level's top-4 pass times, 128s), results only"
+        "timer of min(sum of the level's top-8 pass times, 128s), results only"
     )
     ap.add_argument("--models-dir", default=MODELS_DIR_DEFAULT)
     ap.add_argument("--state-file", default=STATE_FILE_DEFAULT)
@@ -596,7 +596,7 @@ def _run(args: argparse.Namespace) -> None:
         # candidate of the 960-pair pool (the full 64-model roster
         # x LADDER, ONE chance each), a fresh 8-bit
         # exam per candidate, a per-level timer of min(sum of the
-        # level's top-4 pass times, 128s), results only.
+        # level's top-8 pass times, 128s), results only.
         # Runs INSIDE full_benchmark's envelope: the crash rail, the
         # SIGINT saves, the artifact commits, the log truncation.
         import exhaustive_run as R

@@ -383,14 +383,14 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
 # THE PER-LEVEL TIME ALLOCATION (the author's ruling): a level's
-# timer is the SUM of the TOP-4 (fastest) pass times recorded for it
+# timer is the SUM of the TOP-8 (fastest) pass times recorded for it
 # across all candidates, capped at the full 128s - min(sum of the
-# top 4 times, 128s). A level with no passes yet gets the full 128s.
+# top 8 times, 128s). A level with no passes yet gets the full 128s.
 LEVEL_TIMEOUT_S = 128.0
 
 
 def level_timeout_s(st: dict[str, Any], level: int) -> float:
-    """The level's time allocation: min(sum of the 4 smallest pass
+    """The level's time allocation: min(sum of the 8 smallest pass
     times recorded for this level across ALL candidates in the
     state, LEVEL_TIMEOUT_S). No passes yet -> the full 128s."""
     times: list[float] = []
@@ -405,7 +405,7 @@ def level_timeout_s(st: dict[str, Any], level: int) -> float:
     if not times:
         return LEVEL_TIMEOUT_S
     times.sort()
-    return min(sum(times[:4]), LEVEL_TIMEOUT_S)
+    return min(sum(times[:8]), LEVEL_TIMEOUT_S)
 
 
 def run_pair(
@@ -641,7 +641,7 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            # the adaptive per-level timer: min(sum of the top-4 pass times for
+            # the adaptive per-level timer: min(sum of the top-8 pass times for
             # this level, or 128s when nobody has passed it yet
             lvl_budget = level_timeout_s(state, level) if state is not None else budget_s
             deadline = level_t0 + lvl_budget
@@ -875,7 +875,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     For each model (parameter size ascending), for each model quant
     (bits-per-weight ascending), all 49 kv combos measured with the
-    adaptive per-level timer (min(sum of the level's top-4 pass times, 128s), else
+    adaptive per-level timer (min(sum of the level's top-8 pass times, 128s), else
     128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
@@ -898,7 +898,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
-        "quants ascending, 49 kv, per-level timer min(sum top-4 times, 128s)"
+        "quants ascending, 49 kv, per-level timer min(sum top-8 times, 128s)"
     )
 
     st = exhaustive.load_state()
