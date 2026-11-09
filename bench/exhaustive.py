@@ -393,6 +393,12 @@ STATE_SCHEMA: dict[str, Any] = {
                             "properties": {
                                 "status": {"const": "pass"},
                                 "time_s": {"type": "number", "minimum": 0},
+                                # the timer the level ran under, and the
+                                # pair's gguf size (GiB) - the level's
+                                # fastest-pass record feeds the size-scaled
+                                # time allocation
+                                "budget_s": {"type": "number", "exclusiveMinimum": 0},
+                                "gguf_gib": {"type": "number", "exclusiveMinimum": 0},
                             },
                             "additionalProperties": False,
                         },

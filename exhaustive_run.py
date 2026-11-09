@@ -382,30 +382,35 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # gets its own clock, started when its question is sent to the server,
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
-# THE PER-LEVEL TIME ALLOCATION (the author's ruling): a level's
-# timer is the SUM of the TOP-8 (fastest) pass times recorded for it
-# across all candidates, capped at the full 128s - min(sum of the
-# top 8 times, 128s). A level with no passes yet gets the full 128s.
+# THE PER-LEVEL TIME ALLOCATION (the author's ruling): each level's
+# fastest pass record carries the pair's gguf size; the timer for a
+# pair under test is min((pair gguf size / fastest pair gguf size) x
+# shortest time x 2, 128s). A level with no sized pass yet gets the
+# full 128s.
 LEVEL_TIMEOUT_S = 128.0
 
 
-def level_timeout_s(st: dict[str, Any], level: int) -> float:
-    """The level's time allocation: min(sum of the 8 smallest pass
-    times recorded for this level across ALL candidates in the
-    state, LEVEL_TIMEOUT_S). No passes yet -> the full 128s."""
-    times: list[float] = []
+def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> float:
+    """The level's time allocation: the level's shortest pass time and
+    the gguf size of the pair that set it are recorded per level; a
+    candidate's timer is min((its pair's gguf size / the fastest
+    pair's gguf size) * shortest time * 2, LEVEL_TIMEOUT_S). No sized
+    pass yet -> the full 128s."""
+    best: tuple[float, float] | None = None  # (shortest time_s, its gguf_gib)
     for hist in st.get("candidates", {}).values():
         if not isinstance(hist, dict):
             continue
         rec = hist.get(level)
         if isinstance(rec, dict) and rec.get("status") == "pass":
             t = rec.get("time_s")
-            if isinstance(t, (int, float)):
-                times.append(float(t))
-    if not times:
+            g = rec.get("gguf_gib")
+            if isinstance(t, (int, float)) and isinstance(g, (int, float)) and g > 0:
+                if best is None or t < best[0]:
+                    best = (float(t), float(g))
+    if best is None:
         return LEVEL_TIMEOUT_S
-    times.sort()
-    return min(sum(times[:8]), LEVEL_TIMEOUT_S)
+    shortest, fastest_gib = best
+    return min((pair_gguf_gib / fastest_gib) * shortest * 2.0, LEVEL_TIMEOUT_S)
 
 
 def run_pair(
@@ -580,6 +585,8 @@ def _run_combo(
     answers_path = os.path.join(answers_dir, f"{kv_tag}.jsonl")
     log_path = os.path.join(answers_dir, f"exam-server-{kv_tag}.log")
 
+    pair_gguf_gib = round(os.path.getsize(gguf) / (2**30), 3)
+
     kv_args: list[str] = []
     if k_quant != "f16":
         kv_args += ["--cache-type-k", k_quant]
@@ -641,9 +648,13 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            # the adaptive per-level timer: min(sum of the top-8 pass times for
+            # the adaptive per-level timer: min(sum of the size-scaled pass times for
             # this level, or 128s when nobody has passed it yet
-            lvl_budget = level_timeout_s(state, level) if state is not None else budget_s
+            lvl_budget = (
+                level_timeout_s(state, level, pair_gguf_gib)
+                if state is not None
+                else budget_s
+            )
             deadline = level_t0 + lvl_budget
             insts = {
                 "chain": build_chain(instance_key, level),
@@ -722,7 +733,12 @@ def _run_combo(
                         "budget_s": lvl_budget,
                     }
                 break
-            history[level] = {"status": "pass", "time_s": level_time, "budget_s": lvl_budget}
+            history[level] = {
+                "status": "pass",
+                "time_s": level_time,
+                "budget_s": lvl_budget,
+                "gguf_gib": pair_gguf_gib,
+            }
             level += 1
     finally:
         llama_server.stop_server(proc, port)
@@ -875,7 +891,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     For each model (parameter size ascending), for each model quant
     (bits-per-weight ascending), all 49 kv combos measured with the
-    adaptive per-level timer (min(sum of the level's top-8 pass times, 128s), else
+    adaptive per-level timer (min((pair gguf size / fastest pair gguf size) x shortest time x 2, 128s), else
     128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
@@ -898,7 +914,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
-        "quants ascending, 49 kv, per-level timer min(sum top-8 times, 128s)"
+        "quants ascending, 49 kv, per-level timer min(size-ratio x shortest x 2, 128s)"
     )
 
     st = exhaustive.load_state()
