@@ -8,6 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
+| 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.5 |
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.5 |
 | 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
@@ -29,7 +30,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM4-0.5B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
 | Qwen2.5-0.5B-Instruct | 4 | Q3_K_S | k=q8_0 v=q5_1 | 4.6 |
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | 4 | Q4_1 | k=f16 v=q8_0 | 6.4 |
+| Qwen3.5-0.8B | 5 | Q6_K | k=q5_0 v=q5_1 | 9.5 |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
