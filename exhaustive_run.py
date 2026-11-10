@@ -391,11 +391,10 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 LEVEL_TIMEOUT_S = 128.0
 
 
-def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> float:
-    """The level's time allocation: min(pair_gguf_gib * p95_rate * 2,
-    LEVEL_TIMEOUT_S), where p95_rate is the 95th percentile of
+def level_p95_rate(st: dict[str, Any], level: int) -> float | None:
+    """The level's anchor: the 95th percentile (nearest-rank) of
     time_s/gguf_gib across all pass records at this level that carry a
-    gguf size. No sized pass yet -> the full 128s."""
+    gguf size. None when no sized pass exists yet."""
     rates: list[float] = []
     for hist in st.get("candidates", {}).values():
         if not isinstance(hist, dict):
@@ -407,9 +406,18 @@ def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> flo
             if isinstance(t, (int, float)) and isinstance(g, (int, float)) and g > 0:
                 rates.append(float(t) / float(g))
     if not rates:
-        return LEVEL_TIMEOUT_S
+        return None
     rates.sort()
-    p95 = rates[int(0.95 * (len(rates) - 1))]  # nearest-rank p95
+    return rates[int(0.95 * (len(rates) - 1))]
+
+
+def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> float:
+    """The level's time allocation: min(pair_gguf_gib * p95_rate * 2,
+    LEVEL_TIMEOUT_S), where p95_rate is the level's p95 per-GiB pass
+    rate (see level_p95_rate). No sized pass yet -> the full 128s."""
+    p95 = level_p95_rate(st, level)
+    if p95 is None:
+        return LEVEL_TIMEOUT_S
     return min(pair_gguf_gib * p95 * 2.0, LEVEL_TIMEOUT_S)
 
 
@@ -829,12 +837,13 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
     ]
     seen_lv = sorted({lv for h in cands.values() if isinstance(h, dict) for lv in h if isinstance(lv, int)})
     for lv in range(0, (max(seen_lv) + 1) if seen_lv else 1):
-        t1 = level_timeout_s(st, lv, 1.0)
-        # p95 rate for display: recover from the timer (t1 = min(p95*2, 128))
-        if t1 >= LEVEL_TIMEOUT_S:
-            lines.append(f"| {lv} | - | 128.0 (cap/fallback) |")
-        else:
-            lines.append(f"| {lv} | {t1 / 2.0:.2f} | {t1:.1f} |")
+        rate = level_p95_rate(st, lv)
+        if rate is None:
+            lines.append(f"| {lv} | - | 128.0 (no sized passes yet) |")
+            continue
+        t1 = min(1.0 * rate * 2.0, LEVEL_TIMEOUT_S)
+        cap = " (capped)" if t1 >= LEVEL_TIMEOUT_S else ""
+        lines.append(f"| {lv} | {rate:.2f} | {t1:.1f}{cap} |")
 
     lines += [
         "",
