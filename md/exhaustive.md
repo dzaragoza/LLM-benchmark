@@ -12,6 +12,19 @@ the sum of its pass times, 128s PER LEVEL)
 | 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
 | 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
+## the per-level timers (current anchor)
+
+the p95 per-GiB pass-rate anchor per level, and the timer a
+1 GiB pair gets: min(1 GiB x p95 rate x 2, 128s). A pair's own
+timer scales with its gguf size; no sized passes yet -> 128s
+
+| level | p95 rate (s/GiB) | timer @1 GiB (s) |
+|---|---|---|
+| 0 | - | 128.0 (cap/fallback) |
+| 1 | 21.98 | 44.0 |
+| 2 | 24.18 | 48.4 |
+| 3 | - | 128.0 (cap/fallback) |
+
 ## the per-model best (t=128s)
 
 per model (parameter size ascending): the highest score at
