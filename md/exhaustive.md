@@ -20,10 +20,10 @@ timer scales with its gguf size; no sized passes yet -> 128s
 
 | level | p95 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|
-| 0 | - | 128.0 (cap/fallback) |
+| 0 | 92.24 | 128.0 (capped) |
 | 1 | 21.98 | 44.0 |
 | 2 | 24.18 | 48.4 |
-| 3 | - | 128.0 (cap/fallback) |
+| 3 | - | 128.0 (no sized passes yet) |
 
 ## the per-model best (t=128s)
 
