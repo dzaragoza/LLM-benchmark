@@ -813,6 +813,29 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         fastest = min(reach, key=lambda r: (r["t128"], -r["s128"]))
         lines.append(f"| {s} | {cand_str(fastest)} | {fastest['t128']:.1f} |")
 
+    # the current per-level timers: the p95 per-GiB anchor rate per
+    # level and the timer it gives a 1 GiB pair (timer scales linearly
+    # with the pair's gguf size; 128s cap / no-sized-pass fallback)
+    lines += [
+        "",
+        "## the per-level timers (current anchor)",
+        "",
+        "the p95 per-GiB pass-rate anchor per level, and the timer a",
+        "1 GiB pair gets: min(1 GiB x p95 rate x 2, 128s). A pair's own",
+        "timer scales with its gguf size; no sized passes yet -> 128s",
+        "",
+        "| level | p95 rate (s/GiB) | timer @1 GiB (s) |",
+        "|---|---|---|",
+    ]
+    seen_lv = sorted({lv for h in cands.values() if isinstance(h, dict) for lv in h if isinstance(lv, int)})
+    for lv in range(0, (max(seen_lv) + 1) if seen_lv else 1):
+        t1 = level_timeout_s(st, lv, 1.0)
+        # p95 rate for display: recover from the timer (t1 = min(p95*2, 128))
+        if t1 >= LEVEL_TIMEOUT_S:
+            lines.append(f"| {lv} | - | 128.0 (cap/fallback) |")
+        else:
+            lines.append(f"| {lv} | {t1 / 2.0:.2f} | {t1:.1f} |")
+
     lines += [
         "",
         "## the per-model best (t=128s)",
