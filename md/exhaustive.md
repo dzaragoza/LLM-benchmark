@@ -20,7 +20,7 @@ timer scales with its gguf size; no sized passes yet -> 128s
 
 | level | p95 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|
-| 0 | 92.24 | 128.0 (capped) |
+| 0 | 93.97 | 128.0 (capped) |
 | 1 | 21.98 | 44.0 |
 | 2 | 24.18 | 48.4 |
 | 3 | - | 128.0 (no sized passes yet) |
@@ -37,7 +37,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
 | granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.7 |
 | SmolLM2-360M-Instruct | 2 | Q5_0 | k=q4_0 v=q4_0 | 13.1 |
-| MiniCPM4-0.5B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 61.4 |
 | Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
 | Qwen3-0.6B | - | (not measured) | - | - |
 | Qwen3.5-0.8B | - | (not measured) | - | - |
