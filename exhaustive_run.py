@@ -383,18 +383,21 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
 # THE PER-LEVEL TIME ALLOCATION (the author's ruling): each level's
-# anchor is the P95 per-GiB pass rate (time_s / gguf_gib over all sized
-# passes at that level) - broad enough that one freak fast small
-# model does not set the base, robust against slow outliers; the
-# timer for a pair under test is min(pair gguf size x p95 rate x 2,
-# 128s). A level with no sized pass yet gets the full 128s.
+# anchor is the P90 per-GiB pass rate (time_s / gguf_gib over all sized
+# passes at that level), used only once the level has at least
+# MIN_ANCHOR_SAMPLES sized passes - k = n(1-q) = 10 tail points is the
+# Wilson-95% floor (n=100 at p90); below that the anchor is unsettled
+# and the level gets the full 128s. The timer for a pair under test is
+# min(pair gguf size x p90 rate x 2, 128s).
 LEVEL_TIMEOUT_S = 128.0
+MIN_ANCHOR_SAMPLES = 100
+ANCHOR_Q = 0.90
 
 
-def level_p95_rate(st: dict[str, Any], level: int) -> float | None:
-    """The level's anchor: the 95th percentile (nearest-rank) of
-    time_s/gguf_gib across all pass records at this level that carry a
-    gguf size. None when no sized pass exists yet."""
+def level_anchor_rate(st: dict[str, Any], level: int) -> float | None:
+    """The level's anchor: the p90 (nearest-rank) of time_s/gguf_gib
+    across all pass records at this level that carry a gguf size.
+    None until the level has MIN_ANCHOR_SAMPLES sized passes."""
     rates: list[float] = []
     for hist in st.get("candidates", {}).values():
         if not isinstance(hist, dict):
@@ -405,20 +408,21 @@ def level_p95_rate(st: dict[str, Any], level: int) -> float | None:
             g = rec.get("gguf_gib")
             if isinstance(t, (int, float)) and isinstance(g, (int, float)) and g > 0:
                 rates.append(float(t) / float(g))
-    if not rates:
+    if len(rates) < MIN_ANCHOR_SAMPLES:
         return None
     rates.sort()
-    return rates[int(0.95 * (len(rates) - 1))]
+    return rates[int(ANCHOR_Q * (len(rates) - 1))]
 
 
 def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> float:
-    """The level's time allocation: min(pair_gguf_gib * p95_rate * 2,
-    LEVEL_TIMEOUT_S), where p95_rate is the level's p95 per-GiB pass
-    rate (see level_p95_rate). No sized pass yet -> the full 128s."""
-    p95 = level_p95_rate(st, level)
-    if p95 is None:
+    """The level's time allocation: min(pair_gguf_gib * p90_rate * 2,
+    LEVEL_TIMEOUT_S), where p90_rate is the level's p90 per-GiB pass
+    rate (see level_anchor_rate). Fewer than MIN_ANCHOR_SAMPLES sized
+    passes yet -> the full 128s."""
+    rate = level_anchor_rate(st, level)
+    if rate is None:
         return LEVEL_TIMEOUT_S
-    return min(pair_gguf_gib * p95 * 2.0, LEVEL_TIMEOUT_S)
+    return min(pair_gguf_gib * rate * 2.0, LEVEL_TIMEOUT_S)
 
 
 def run_pair(
@@ -656,8 +660,8 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            # the adaptive per-level timer: min(pair gguf x p95
-            # per-GiB rate x 2, 128s); 128s when no sized pass yet
+            # the adaptive per-level timer: min(pair gguf x p90
+            # per-GiB rate x 2, 128s); 128s until 100 sized passes
             lvl_budget = (
                 level_timeout_s(state, level, pair_gguf_gib)
                 if state is not None
@@ -821,29 +825,39 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         fastest = min(reach, key=lambda r: (r["t128"], -r["s128"]))
         lines.append(f"| {s} | {cand_str(fastest)} | {fastest['t128']:.1f} |")
 
-    # the current per-level timers: the p95 per-GiB anchor rate per
-    # level and the timer it gives a 1 GiB pair (timer scales linearly
-    # with the pair's gguf size; 128s cap / no-sized-pass fallback)
+    # the current per-level timers: the p90 per-GiB anchor rate per
+    # level (used once n >= MIN_ANCHOR_SAMPLES) and the timer it gives
+    # a 1 GiB pair (timer scales linearly with the pair's gguf size;
+    # 128s cap / unsettled-anchor fallback)
     lines += [
         "",
         "## the per-level timers (current anchor)",
         "",
-        "the p95 per-GiB pass-rate anchor per level, and the timer a",
-        "1 GiB pair gets: min(1 GiB x p95 rate x 2, 128s). A pair's own",
-        "timer scales with its gguf size; no sized passes yet -> 128s",
+        "the p90 per-GiB pass-rate anchor per level (only once the level",
+        "has >= 100 sized passes), and the timer a 1 GiB pair gets:",
+        "min(1 GiB x p90 rate x 2, 128s). A pair's own timer scales with",
+        "its gguf size; < 100 sized passes -> 128s",
         "",
-        "| level | p95 rate (s/GiB) | timer @1 GiB (s) |",
-        "|---|---|---|",
+        "| level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |",
+        "|---|---|---|---|",
     ]
     seen_lv = sorted({lv for h in cands.values() if isinstance(h, dict) for lv in h if isinstance(lv, int)})
     for lv in range(0, (max(seen_lv) + 1) if seen_lv else 1):
-        rate = level_p95_rate(st, lv)
+        n_sized = sum(
+            1
+            for h in cands.values()
+            if isinstance(h, dict)
+            and isinstance(h.get(lv), dict)
+            and isinstance(h[lv].get("gguf_gib"), (int, float))
+            and h[lv].get("status") == "pass"
+        )
+        rate = level_anchor_rate(st, lv)
         if rate is None:
-            lines.append(f"| {lv} | - | 128.0 (no sized passes yet) |")
+            lines.append(f"| {lv} | {n_sized} | - | 128.0 (anchor unsettled) |")
             continue
         t1 = min(1.0 * rate * 2.0, LEVEL_TIMEOUT_S)
         cap = " (capped)" if t1 >= LEVEL_TIMEOUT_S else ""
-        lines.append(f"| {lv} | {rate:.2f} | {t1:.1f}{cap} |")
+        lines.append(f"| {lv} | {n_sized} | {rate:.2f} | {t1:.1f}{cap} |")
 
     lines += [
         "",
@@ -923,7 +937,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     For each model (parameter size ascending), for each model quant
     (bits-per-weight ascending), all 49 kv combos measured with the
-    adaptive per-level timer (min(pair gguf x p95 per-GiB rate x 2, 128s), else
+    adaptive per-level timer (min(pair gguf x p90 per-GiB rate x 2, 128s), else
     128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
@@ -946,7 +960,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
-        "quants ascending, 49 kv, per-level timer min(gguf x p95-rate x 2, 128s)"
+        "quants ascending, 49 kv, per-level timer min(gguf x p90-rate x 2, 128s)"
     )
 
     st = exhaustive.load_state()
