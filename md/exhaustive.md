@@ -22,7 +22,7 @@ timer scales with its gguf size; no sized passes yet -> 128s
 
 | level | p95 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|
-| 0 | 92.24 | 128.0 (capped) |
+| 0 | 90.95 | 128.0 (capped) |
 | 1 | 21.59 | 43.2 |
 | 2 | 24.18 | 48.4 |
 | 3 | 2.11 | 4.2 |
