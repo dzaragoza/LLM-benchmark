@@ -9,7 +9,7 @@ the sum of its pass times, 128s PER LEVEL)
 | score | candidate | total time (s) |
 |---|---|---|
 | 2 | granite-4.0-350m Q6_K k=f16 v=iq4_nl | 7.6 |
-| 1 | granite-4.0-h-350m Q5_K_M k=f16 v=q4_1 | 1.4 |
+| 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
 | 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
 ## the per-level timers (current anchor)
@@ -21,8 +21,8 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 291 | 21.02 | 42.0 |
-| 1 | 61 | - | 128.0 (anchor unsettled) |
+| 0 | 330 | 21.98 | 44.0 |
+| 1 | 66 | - | 128.0 (anchor unsettled) |
 | 2 | 3 | - | 128.0 (anchor unsettled) |
 | 3 | 0 | - | 128.0 (anchor unsettled) |
 
@@ -37,7 +37,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 |---|---|---|---|---|
 | granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
 | granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.6 |
-| SmolLM2-360M-Instruct | 0 | Q2_K | k=iq4_nl v=q4_1 | 0.6 |
+| SmolLM2-360M-Instruct | 1 | Q4_1 | k=q5_0 v=f16 | 1.1 |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
 | Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
 | Qwen3-0.6B | - | (not measured) | - | - |
