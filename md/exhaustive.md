@@ -9,8 +9,8 @@ the sum of its pass times, 128s PER LEVEL)
 | score | candidate | total time (s) |
 |---|---|---|
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
-| 3 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
-| 2 | Qwen2.5-0.5B-Instruct Q4_0 k=q8_0 v=q5_0 | 2.0 |
+| 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
+| 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
 | 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
 | 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
@@ -25,7 +25,7 @@ timer scales with its gguf size; no sized passes yet -> 128s
 | 0 | 92.24 | 128.0 (capped) |
 | 1 | 21.59 | 43.2 |
 | 2 | 24.18 | 48.4 |
-| 3 | 3.49 | 7.0 |
+| 3 | 2.11 | 4.2 |
 | 4 | 3.81 | 7.6 |
 | 5 | - | 128.0 (no sized passes yet) |
 
