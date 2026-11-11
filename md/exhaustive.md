@@ -8,26 +8,17 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
-| 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
-| 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
-| 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
-| 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
-| 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
 ## the per-level timers (current anchor)
 
-the p95 per-GiB pass-rate anchor per level, and the timer a
-1 GiB pair gets: min(1 GiB x p95 rate x 2, 128s). A pair's own
-timer scales with its gguf size; no sized passes yet -> 128s
+the p90 per-GiB pass-rate anchor per level (only once the level
+has >= 100 sized passes), and the timer a 1 GiB pair gets:
+min(1 GiB x p90 rate x 2, 128s). A pair's own timer scales with
+its gguf size; < 100 sized passes -> 128s
 
-| level | p95 rate (s/GiB) | timer @1 GiB (s) |
-|---|---|---|
-| 0 | 74.38 | 128.0 (capped) |
-| 1 | 20.45 | 40.9 |
-| 2 | 21.21 | 42.4 |
-| 3 | 2.55 | 5.1 |
-| 4 | 2.76 | 5.5 |
-| 5 | - | 128.0 (no sized passes yet) |
+| level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
+|---|---|---|---|
+| 0 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
 
@@ -38,12 +29,12 @@ LEVEL, so a multi-level pass can total well over 128s)
 
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
-| granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
-| granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.7 |
-| SmolLM2-360M-Instruct | 2 | Q5_0 | k=q4_0 v=q4_0 | 13.1 |
-| MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 61.4 |
-| Qwen2.5-0.5B-Instruct | 4 | Q3_K_S | k=q8_0 v=q5_1 | 4.6 |
-| Qwen3-0.6B | 2 | Q4_K_S | k=f16 v=q4_1 | 10.0 |
+| granite-4.0-h-350m | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| granite-4.0-350m | - | (not measured) | - | - |
+| SmolLM2-360M-Instruct | - | (not measured) | - | - |
+| MiniCPM4-0.5B | - | (not measured) | - | - |
+| Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
+| Qwen3-0.6B | - | (not measured) | - | - |
 | Qwen3.5-0.8B | - | (not measured) | - | - |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
