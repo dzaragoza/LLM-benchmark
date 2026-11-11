@@ -23,11 +23,11 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 1125 | 15.69 | 31.4 |
-| 1 | 401 | 9.24 | 18.5 |
-| 2 | 113 | 3.42 | 6.8 |
-| 3 | 18 | - | 128.0 (anchor unsettled) |
-| 4 | 4 | - | 128.0 (anchor unsettled) |
+| 0 | 1171 | 14.63 | 29.3 |
+| 1 | 436 | 8.50 | 17.0 |
+| 2 | 131 | 3.39 | 6.8 |
+| 3 | 20 | - | 128.0 (anchor unsettled) |
+| 4 | 5 | - | 128.0 (anchor unsettled) |
 | 5 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
