@@ -25,8 +25,8 @@ timer scales with its gguf size; no sized passes yet -> 128s
 | 0 | 76.21 | 128.0 (capped) |
 | 1 | 21.35 | 42.7 |
 | 2 | 21.21 | 42.4 |
-| 3 | 2.31 | 4.6 |
-| 4 | 3.81 | 7.6 |
+| 3 | 2.55 | 5.1 |
+| 4 | 2.76 | 5.5 |
 | 5 | - | 128.0 (no sized passes yet) |
 
 ## the per-model best (t=128s)
