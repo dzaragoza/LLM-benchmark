@@ -10,7 +10,7 @@ the sum of its pass times, 128s PER LEVEL)
 |---|---|---|
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.7 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.7 |
-| 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=f16 | 2.2 |
+| 2 | Qwen2.5-0.5B-Instruct Q4_0 k=q8_0 v=q5_0 | 2.0 |
 | 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
 | 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
@@ -23,9 +23,9 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 425 | 23.01 | 46.0 |
-| 1 | 81 | - | 128.0 (anchor unsettled) |
-| 2 | 9 | - | 128.0 (anchor unsettled) |
+| 0 | 440 | 22.71 | 45.4 |
+| 1 | 86 | - | 128.0 (anchor unsettled) |
+| 2 | 10 | - | 128.0 (anchor unsettled) |
 | 3 | 1 | - | 128.0 (anchor unsettled) |
 | 4 | 1 | - | 128.0 (anchor unsettled) |
 | 5 | 0 | - | 128.0 (anchor unsettled) |
