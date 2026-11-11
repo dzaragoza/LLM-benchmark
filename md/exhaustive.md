@@ -8,6 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
+| 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.8 |
 | 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
 | 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
@@ -23,12 +24,13 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 1266 | 11.90 | 23.8 |
-| 1 | 509 | 7.00 | 14.0 |
-| 2 | 164 | 3.21 | 6.4 |
-| 3 | 27 | - | 128.0 (anchor unsettled) |
-| 4 | 5 | - | 128.0 (anchor unsettled) |
-| 5 | 0 | - | 128.0 (anchor unsettled) |
+| 0 | 1312 | 11.19 | 22.4 |
+| 1 | 549 | 6.28 | 12.6 |
+| 2 | 188 | 3.21 | 6.4 |
+| 3 | 31 | - | 128.0 (anchor unsettled) |
+| 4 | 6 | - | 128.0 (anchor unsettled) |
+| 5 | 1 | - | 128.0 (anchor unsettled) |
+| 6 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
 
@@ -45,7 +47,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 16.6 |
 | Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | 4 | Q4_1 | k=f16 v=q8_0 | 6.4 |
+| Qwen3.5-0.8B | 5 | Q6_K | k=q5_0 v=q5_1 | 9.8 |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
