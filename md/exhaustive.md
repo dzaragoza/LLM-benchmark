@@ -8,6 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
+| 0 | granite-4.0-h-350m Q4_0 k=q4_0 v=f16 | 0.9 |
 
 ## the per-level timers (current anchor)
 
@@ -18,7 +19,8 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 0 | - | 128.0 (anchor unsettled) |
+| 0 | 1 | - | 128.0 (anchor unsettled) |
+| 1 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
 
@@ -29,7 +31,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
-| granite-4.0-h-350m | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| granite-4.0-h-350m | 0 | Q4_0 | k=q4_0 v=f16 | 0.9 |
 | granite-4.0-350m | - | (not measured) | - | - |
 | SmolLM2-360M-Instruct | - | (not measured) | - | - |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
