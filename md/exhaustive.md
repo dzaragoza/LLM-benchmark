@@ -20,7 +20,7 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 170 | 4.83 | 9.7 |
+| 0 | 173 | 6.44 | 12.9 |
 | 1 | 26 | - | 128.0 (anchor unsettled) |
 | 2 | 0 | - | 128.0 (anchor unsettled) |
 
