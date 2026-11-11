@@ -20,8 +20,8 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 173 | 6.44 | 12.9 |
-| 1 | 26 | - | 128.0 (anchor unsettled) |
+| 0 | 181 | 9.50 | 19.0 |
+| 1 | 28 | - | 128.0 (anchor unsettled) |
 | 2 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
@@ -34,7 +34,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
 | granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
-| granite-4.0-350m | 0 | Q4_K_S | k=q4_0 v=q4_0 | 0.6 |
+| granite-4.0-350m | 1 | Q5_K_M | k=q5_0 v=iq4_nl | 5.3 |
 | SmolLM2-360M-Instruct | - | (not measured) | - | - |
 | MiniCPM4-0.5B | - | (not measured) | - | - |
 | Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
