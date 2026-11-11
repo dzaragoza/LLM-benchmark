@@ -23,7 +23,7 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 866 | 18.33 | 36.7 |
+| 0 | 870 | 18.72 | 37.4 |
 | 1 | 254 | 12.06 | 24.1 |
 | 2 | 49 | - | 128.0 (anchor unsettled) |
 | 3 | 7 | - | 128.0 (anchor unsettled) |
@@ -45,7 +45,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 16.6 |
 | Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| Qwen3.5-0.8B | 0 | Q3_K_S | k=q4_0 v=q8_0 | 5.5 |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
