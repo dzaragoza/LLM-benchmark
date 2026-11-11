@@ -23,11 +23,11 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 968 | 17.58 | 35.2 |
-| 1 | 302 | 10.42 | 20.8 |
-| 2 | 68 | - | 128.0 (anchor unsettled) |
-| 3 | 9 | - | 128.0 (anchor unsettled) |
-| 4 | 3 | - | 128.0 (anchor unsettled) |
+| 0 | 1011 | 17.42 | 34.8 |
+| 1 | 325 | 10.26 | 20.5 |
+| 2 | 78 | - | 128.0 (anchor unsettled) |
+| 3 | 10 | - | 128.0 (anchor unsettled) |
+| 4 | 4 | - | 128.0 (anchor unsettled) |
 | 5 | 0 | - | 128.0 (anchor unsettled) |
 
 ## the per-model best (t=128s)
@@ -45,7 +45,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 16.6 |
 | Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
 | Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | 3 | Q4_0 | k=q4_1 v=q5_1 | 5.6 |
+| Qwen3.5-0.8B | 4 | Q4_1 | k=f16 v=q8_0 | 6.4 |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
 | Llama-3.2-1B-Instruct | - | (not measured) | - | - |
