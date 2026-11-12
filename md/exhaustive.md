@@ -24,8 +24,8 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 2329 | 16.44 | 32.9 |
-| 1 | 887 | 5.17 | 10.3 |
+| 0 | 2353 | 16.49 | 33.0 |
+| 1 | 890 | 5.69 | 11.4 |
 | 2 | 290 | 3.21 | 6.4 |
 | 3 | 47 | - | 128.0 (anchor unsettled) |
 | 4 | 8 | - | 128.0 (anchor unsettled) |
@@ -53,7 +53,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Llama-3.2-1B-Instruct | 4 | Q4_1 | k=q8_0 v=f16 | 7.3 |
 | MiniCPM-1B-sft | 3 | Q5_1 | k=q4_0 v=q5_1 | 10.8 |
 | phi-1 | 0 | Q4_K_M | k=q4_0 v=q5_0 | 22.4 |
-| granite-4.0-h-1b | 1 | Q3_K_S | k=f16 v=q4_0 | 12.7 |
+| granite-4.0-h-1b | 1 | Q3_K_M | k=q4_1 v=q4_0 | 9.7 |
 | Qwen2.5-1.5B-Instruct | - | (not measured) | - | - |
 | granite-4.0-1b | - | (not measured) | - | - |
 | SmolLM2-1.7B-Instruct | - | (not measured) | - | - |
