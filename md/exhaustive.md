@@ -24,7 +24,7 @@ its gguf size; < 100 sized passes -> 128s
 
 | level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
 |---|---|---|---|
-| 0 | 2727 | 37.90 | 75.8 |
+| 0 | 2729 | 37.90 | 75.8 |
 | 1 | 1082 | 20.19 | 40.4 |
 | 2 | 295 | 3.21 | 6.4 |
 | 3 | 48 | - | 128.0 (anchor unsettled) |
@@ -54,7 +54,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM-1B-sft | 3 | Q5_1 | k=q4_0 v=q5_1 | 10.8 |
 | phi-1 | 0 | Q4_K_M | k=q4_0 v=q5_0 | 22.4 |
 | granite-4.0-h-1b | 3 | Q8_0 | k=iq4_nl v=iq4_nl | 155.8 |
-| Qwen2.5-1.5B-Instruct | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| Qwen2.5-1.5B-Instruct | 0 | Q3_K_S | k=f16 v=q8_0 | 9.2 |
 | granite-4.0-1b | - | (not measured) | - | - |
 | SmolLM2-1.7B-Instruct | - | (not measured) | - | - |
 | Qwen3-1.7B | - | (not measured) | - | - |
