@@ -382,47 +382,22 @@ def _acquire(fam: str, rung: str, models_dir: str) -> str | None:
 # gets its own clock, started when its question is sent to the server,
 # shared across the level's two parts (one paper, one deadline - the
 # v9.5 shape). A timeout ends the run at that level.
-# THE PER-LEVEL TIME ALLOCATION (the author's ruling): each level's
-# anchor is the P90 per-GiB pass rate (time_s / gguf_gib over all sized
-# passes at that level), used only once the level has at least
-# MIN_ANCHOR_SAMPLES sized passes - k = n(1-q) = 10 tail points is the
-# Wilson-95% floor (n=100 at p90); below that the anchor is unsettled
-# and the level gets the full 128s. The timer for a pair under test is
-# min(pair gguf size x p90 rate x 2, 128s).
+# THE PER-LEVEL TIME ALLOCATION (the author's ruling, final): every
+# exam level gets the SAME flat timer - LEVEL_TIMEOUT_S (128s). The
+# adaptive per-GiB anchors (p90/p95 rate scaling) were removed: the
+# linear-in-size assumption under-provisioned larger models (cache-
+# resident tiny models look super fast per GiB), causing mass
+# timeouts at level 0-2 for bigger models.
 LEVEL_TIMEOUT_S = 128.0
-MIN_ANCHOR_SAMPLES = 100
-ANCHOR_Q = 0.90
-
-
-def level_anchor_rate(st: dict[str, Any], level: int) -> float | None:
-    """The level's anchor: the p90 (nearest-rank) of time_s/gguf_gib
-    across all pass records at this level that carry a gguf size.
-    None until the level has MIN_ANCHOR_SAMPLES sized passes."""
-    rates: list[float] = []
-    for hist in st.get("candidates", {}).values():
-        if not isinstance(hist, dict):
-            continue
-        rec = hist.get(level)
-        if isinstance(rec, dict) and rec.get("status") == "pass":
-            t = rec.get("time_s")
-            g = rec.get("gguf_gib")
-            if isinstance(t, (int, float)) and isinstance(g, (int, float)) and g > 0:
-                rates.append(float(t) / float(g))
-    if len(rates) < MIN_ANCHOR_SAMPLES:
-        return None
-    rates.sort()
-    return rates[int(ANCHOR_Q * (len(rates) - 1))]
 
 
 def level_timeout_s(st: dict[str, Any], level: int, pair_gguf_gib: float) -> float:
-    """The level's time allocation: min(pair_gguf_gib * p90_rate * 2,
-    LEVEL_TIMEOUT_S), where p90_rate is the level's p90 per-GiB pass
-    rate (see level_anchor_rate). Fewer than MIN_ANCHOR_SAMPLES sized
-    passes yet -> the full 128s."""
-    rate = level_anchor_rate(st, level)
-    if rate is None:
-        return LEVEL_TIMEOUT_S
-    return min(pair_gguf_gib * rate * 2.0, LEVEL_TIMEOUT_S)
+    """The level's time allocation: always the flat LEVEL_TIMEOUT_S.
+    (st/level/pair_gguf_gib are kept for the call-site signature; the
+    gguf size is still recorded on passes for analysis but no longer
+    scales the timer.)"""
+    _ = (st, level, pair_gguf_gib)
+    return LEVEL_TIMEOUT_S
 
 
 def run_pair(
@@ -660,13 +635,8 @@ def _run_combo(
         # THE EXAM CONTINUATION from the frontier level
         while True:
             level_t0 = time.monotonic()
-            # the adaptive per-level timer: min(pair gguf x p90
-            # per-GiB rate x 2, 128s); 128s until 100 sized passes
-            lvl_budget = (
-                level_timeout_s(state, level, pair_gguf_gib)
-                if state is not None
-                else budget_s
-            )
+            # the flat per-level timer: every level gets the full 128s
+            lvl_budget = level_timeout_s(state, level, pair_gguf_gib)
             deadline = level_t0 + lvl_budget
             insts = {
                 "chain": build_chain(instance_key, level),
@@ -825,39 +795,20 @@ def write_ledger(st: dict[str, Any] | None = None) -> None:
         fastest = min(reach, key=lambda r: (r["t128"], -r["s128"]))
         lines.append(f"| {s} | {cand_str(fastest)} | {fastest['t128']:.1f} |")
 
-    # the current per-level timers: the p90 per-GiB anchor rate per
-    # level (used once n >= MIN_ANCHOR_SAMPLES) and the timer it gives
-    # a 1 GiB pair (timer scales linearly with the pair's gguf size;
-    # 128s cap / unsettled-anchor fallback)
+    # the per-level timer: flat - every exam level gets the full 128s
+    # (the adaptive per-GiB anchor scaling was removed)
+    seen_lv = sorted({lv for h in cands.values() if isinstance(h, dict) for lv in h if isinstance(lv, int)})
     lines += [
         "",
-        "## the per-level timers (current anchor)",
+        "## the per-level timers",
         "",
-        "the p90 per-GiB pass-rate anchor per level (only once the level",
-        "has >= 100 sized passes), and the timer a 1 GiB pair gets:",
-        "min(1 GiB x p90 rate x 2, 128s). A pair's own timer scales with",
-        "its gguf size; < 100 sized passes -> 128s",
+        "flat: every exam level gets the full 128s (no adaptive scaling)",
         "",
-        "| level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |",
-        "|---|---|---|---|",
+        "| level | timer (s) |",
+        "|---|---|",
     ]
-    seen_lv = sorted({lv for h in cands.values() if isinstance(h, dict) for lv in h if isinstance(lv, int)})
     for lv in range(0, (max(seen_lv) + 1) if seen_lv else 1):
-        n_sized = sum(
-            1
-            for h in cands.values()
-            if isinstance(h, dict)
-            and isinstance(h.get(lv), dict)
-            and isinstance(h[lv].get("gguf_gib"), (int, float))
-            and h[lv].get("status") == "pass"
-        )
-        rate = level_anchor_rate(st, lv)
-        if rate is None:
-            lines.append(f"| {lv} | {n_sized} | - | 128.0 (anchor unsettled) |")
-            continue
-        t1 = min(1.0 * rate * 2.0, LEVEL_TIMEOUT_S)
-        cap = " (capped)" if t1 >= LEVEL_TIMEOUT_S else ""
-        lines.append(f"| {lv} | {n_sized} | {rate:.2f} | {t1:.1f}{cap} |")
+        lines.append(f"| {lv} | {LEVEL_TIMEOUT_S:.1f} |")
 
     lines += [
         "",
@@ -937,7 +888,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     For each model (parameter size ascending), for each model quant
     (bits-per-weight ascending), all 49 kv combos measured with the
-    adaptive per-level timer (min(pair gguf x p90 per-GiB rate x 2, 128s), else
+    flat per-level timer (128s every level, no size scaling), else
     128s). The histories accumulate exactly as before (the same
     candidates, the same exams); the state is the same schema. The
     FILE LIFECYCLE (the author's ruling): the model quant file is
@@ -960,7 +911,7 @@ def main(on_progress: Any = None, walker_seed: int = 1) -> None:
 
     print(
         "[exhaustive] the deterministic sweep: models ascending, "
-        "quants ascending, 49 kv, per-level timer min(gguf x p90-rate x 2, 128s)"
+        "quants ascending, 49 kv, flat per-level timer 128s"
     )
 
     st = exhaustive.load_state()
