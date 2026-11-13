@@ -8,29 +8,14 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
-| 5 | Qwen3.5-0.8B Q6_K k=q5_0 v=q5_1 | 9.8 |
-| 4 | Qwen2.5-0.5B-Instruct Q6_K k=f16 v=q8_0 | 4.6 |
-| 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
-| 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
-| 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
-| 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
-## the per-level timers (current anchor)
+## the per-level timers
 
-the p90 per-GiB pass-rate anchor per level (only once the level
-has >= 100 sized passes), and the timer a 1 GiB pair gets:
-min(1 GiB x p90 rate x 2, 128s). A pair's own timer scales with
-its gguf size; < 100 sized passes -> 128s
+flat: every exam level gets the full 128s (no adaptive scaling)
 
-| level | sized passes | p90 rate (s/GiB) | timer @1 GiB (s) |
-|---|---|---|---|
-| 0 | 2831 | 37.41 | 74.8 |
-| 1 | 1119 | 20.19 | 40.4 |
-| 2 | 297 | 3.28 | 6.6 |
-| 3 | 48 | - | 128.0 (anchor unsettled) |
-| 4 | 8 | - | 128.0 (anchor unsettled) |
-| 5 | 1 | - | 128.0 (anchor unsettled) |
-| 6 | 0 | - | 128.0 (anchor unsettled) |
+| level | timer (s) |
+|---|---|
+| 0 | 128.0 |
 
 ## the per-model best (t=128s)
 
@@ -41,21 +26,21 @@ LEVEL, so a multi-level pass can total well over 128s)
 
 | model | best score | quant | kv | total time (s) |
 |---|---|---|---|---|
-| granite-4.0-h-350m | 1 | Q5_K_M | k=f16 v=q4_1 | 1.4 |
-| granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.6 |
-| SmolLM2-360M-Instruct | 1 | Q4_1 | k=q5_0 v=f16 | 1.1 |
-| MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 16.6 |
-| Qwen2.5-0.5B-Instruct | 4 | Q6_K | k=f16 v=q8_0 | 4.6 |
-| Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
-| Qwen3.5-0.8B | 5 | Q6_K | k=q5_0 v=q5_1 | 9.8 |
-| gemma-3-1b-it | 2 | Q5_0 | k=q4_1 v=f16 | 4.7 |
-| MiniCPM5-1B | -1 | Q2_K | k=f16 v=f16 | 0.0 |
-| Llama-3.2-1B-Instruct | 4 | Q4_1 | k=q8_0 v=f16 | 7.3 |
-| MiniCPM-1B-sft | 3 | Q5_1 | k=q4_0 v=q5_1 | 10.8 |
-| phi-1 | 0 | Q4_K_M | k=q4_0 v=q5_0 | 22.4 |
-| granite-4.0-h-1b | 3 | Q8_0 | k=iq4_nl v=iq4_nl | 155.8 |
-| Qwen2.5-1.5B-Instruct | 2 | Q4_K_M | k=f16 v=f16 | 23.2 |
-| granite-4.0-1b | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| granite-4.0-h-350m | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| granite-4.0-350m | - | (not measured) | - | - |
+| SmolLM2-360M-Instruct | - | (not measured) | - | - |
+| MiniCPM4-0.5B | - | (not measured) | - | - |
+| Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
+| Qwen3-0.6B | - | (not measured) | - | - |
+| Qwen3.5-0.8B | - | (not measured) | - | - |
+| gemma-3-1b-it | - | (not measured) | - | - |
+| MiniCPM5-1B | - | (not measured) | - | - |
+| Llama-3.2-1B-Instruct | - | (not measured) | - | - |
+| MiniCPM-1B-sft | - | (not measured) | - | - |
+| phi-1 | - | (not measured) | - | - |
+| granite-4.0-h-1b | - | (not measured) | - | - |
+| Qwen2.5-1.5B-Instruct | - | (not measured) | - | - |
+| granite-4.0-1b | - | (not measured) | - | - |
 | SmolLM2-1.7B-Instruct | - | (not measured) | - | - |
 | Qwen3-1.7B | - | (not measured) | - | - |
 | Qwen3.5-2B | - | (not measured) | - | - |
