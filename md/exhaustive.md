@@ -8,7 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
-| 2 | granite-4.0-350m Q6_K k=f16 v=iq4_nl | 7.6 |
+| 2 | Qwen2.5-0.5B-Instruct Q2_K k=f16 v=f16 | 2.2 |
 | 1 | SmolLM2-360M-Instruct Q4_1 k=q5_0 v=f16 | 1.1 |
 | 0 | granite-4.0-h-350m Q5_K_S k=f16 v=q4_0 | 0.6 |
 
@@ -36,7 +36,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | granite-4.0-350m | 2 | Q6_K | k=f16 v=iq4_nl | 7.6 |
 | SmolLM2-360M-Instruct | 1 | Q4_1 | k=q5_0 v=f16 | 1.1 |
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 128.0 |
-| Qwen2.5-0.5B-Instruct | - | (not measured) | - | - |
+| Qwen2.5-0.5B-Instruct | 2 | Q2_K | k=f16 v=f16 | 2.2 |
 | Qwen3-0.6B | - | (not measured) | - | - |
 | Qwen3.5-0.8B | - | (not measured) | - | - |
 | gemma-3-1b-it | - | (not measured) | - | - |
