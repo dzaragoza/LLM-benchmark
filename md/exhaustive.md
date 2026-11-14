@@ -41,7 +41,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | SmolLM2-360M-Instruct | 1 | Q4_1 | k=q5_0 v=f16 | 1.1 |
 | MiniCPM4-0.5B | 0 | Q6_K | k=q4_0 v=q5_0 | 128.0 |
 | Qwen2.5-0.5B-Instruct | 4 | Q3_K_S | k=q8_0 v=q5_1 | 4.6 |
-| Qwen3-0.6B | 2 | Q4_K_M | k=q5_1 v=q4_0 | 5.1 |
+| Qwen3-0.6B | 2 | Q5_K_S | k=q8_0 v=iq4_nl | 3.2 |
 | Qwen3.5-0.8B | - | (not measured) | - | - |
 | gemma-3-1b-it | - | (not measured) | - | - |
 | MiniCPM5-1B | - | (not measured) | - | - |
