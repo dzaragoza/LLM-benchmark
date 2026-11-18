@@ -8,6 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
+| 5 | granite-4.0-h-1b Q5_0 k=q5_0 v=iq4_nl | 456.4 |
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
 | 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
@@ -26,6 +27,7 @@ flat: every exam level gets the full 128s (no adaptive scaling)
 | 3 | 128.0 |
 | 4 | 128.0 |
 | 5 | 128.0 |
+| 6 | 128.0 |
 
 ## the per-model best (t=128s)
 
@@ -48,7 +50,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Llama-3.2-1B-Instruct | 2 | Q4_1 | k=f16 v=q5_1 | 4.2 |
 | MiniCPM-1B-sft | 3 | Q5_1 | k=q4_0 v=q5_1 | 10.8 |
 | phi-1 | 0 | Q8_0 | k=q8_0 v=f16 | 32.6 |
-| granite-4.0-h-1b | 4 | Q4_K_S | k=q5_0 v=q4_1 | 293.3 |
+| granite-4.0-h-1b | 5 | Q5_0 | k=q5_0 v=iq4_nl | 456.4 |
 | Qwen2.5-1.5B-Instruct | - | (not measured) | - | - |
 | granite-4.0-1b | - | (not measured) | - | - |
 | SmolLM2-1.7B-Instruct | - | (not measured) | - | - |
