@@ -51,7 +51,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | MiniCPM-1B-sft | 3 | Q5_1 | k=q4_0 v=q5_1 | 10.8 |
 | phi-1 | 0 | Q8_0 | k=q8_0 v=f16 | 32.6 |
 | granite-4.0-h-1b | 5 | Q5_0 | k=q5_0 v=iq4_nl | 456.4 |
-| Qwen2.5-1.5B-Instruct | 2 | Q4_0 | k=f16 v=q5_0 | 23.4 |
+| Qwen2.5-1.5B-Instruct | 3 | Q3_K_L | k=f16 v=iq4_nl | 51.2 |
 | granite-4.0-1b | - | (not measured) | - | - |
 | SmolLM2-1.7B-Instruct | - | (not measured) | - | - |
 | Qwen3-1.7B | - | (not measured) | - | - |
