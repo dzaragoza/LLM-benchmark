@@ -53,7 +53,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | granite-4.0-h-1b | 5 | Q5_0 | k=q5_0 v=iq4_nl | 456.4 |
 | Qwen2.5-1.5B-Instruct | 3 | Q5_0 | k=f16 v=q4_0 | 43.8 |
 | granite-4.0-1b | -1 | Q2_K | k=f16 v=f16 | 0.0 |
-| SmolLM2-1.7B-Instruct | -1 | Q2_K | k=f16 v=f16 | 0.0 |
+| SmolLM2-1.7B-Instruct | 0 | Q3_K_S | k=f16 v=q4_0 | 2.5 |
 | Qwen3-1.7B | - | (not measured) | - | - |
 | Qwen3.5-2B | - | (not measured) | - | - |
 | Qwen3-2B | - | (not measured) | - | - |
