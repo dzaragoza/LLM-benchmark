@@ -8,7 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
-| 5 | granite-4.0-h-1b Q5_0 k=q5_0 v=iq4_nl | 456.4 |
+| 5 | Qwen3-1.7B Q5_0 k=f16 v=f16 | 120.4 |
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
 | 2 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=q4_1 | 1.9 |
@@ -54,7 +54,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Qwen2.5-1.5B-Instruct | 3 | Q5_0 | k=f16 v=q4_0 | 43.8 |
 | granite-4.0-1b | -1 | Q2_K | k=f16 v=f16 | 0.0 |
 | SmolLM2-1.7B-Instruct | 2 | Q4_K_S | k=q5_1 v=q4_0 | 29.0 |
-| Qwen3-1.7B | 4 | Q5_K_S | k=q5_0 v=q5_0 | 96.8 |
+| Qwen3-1.7B | 5 | Q5_0 | k=f16 v=f16 | 120.4 |
 | Qwen3.5-2B | - | (not measured) | - | - |
 | Qwen3-2B | - | (not measured) | - | - |
 | MiniCPM5-2B | - | (not measured) | - | - |
