@@ -61,7 +61,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Qwen3-2B | 3 | Q3_K_M | k=q4_1 v=q4_1 | 136.3 |
 | MiniCPM5-2B | 1 | Q4_K_M | k=iq4_nl v=q8_0 | 205.5 |
 | granite-3.1-2b-instruct | 6 | Q4_1 | k=iq4_nl v=f16 | 308.5 |
-| granite-3.2-2b-instruct | 2 | Q2_K | k=q8_0 v=q4_1 | 17.3 |
+| granite-3.2-2b-instruct | 3 | Q4_0 | k=f16 v=q5_0 | 18.8 |
 | granite-3.3-2b-instruct | - | (not measured) | - | - |
 | gemma-2-2b-it | - | (not measured) | - | - |
 | granite-3.0-2b-instruct | - | (not measured) | - | - |
