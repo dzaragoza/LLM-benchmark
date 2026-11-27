@@ -8,6 +8,7 @@ the sum of its pass times, 128s PER LEVEL)
 
 | score | candidate | total time (s) |
 |---|---|---|
+| 6 | granite-3.1-2b-instruct Q4_1 k=iq4_nl v=f16 | 308.5 |
 | 5 | Qwen3-1.7B Q5_0 k=f16 v=f16 | 120.4 |
 | 4 | Qwen2.5-0.5B-Instruct Q3_K_S k=q8_0 v=q5_1 | 4.6 |
 | 3 | Qwen2.5-0.5B-Instruct Q3_K_M k=f16 v=f16 | 2.6 |
@@ -28,6 +29,7 @@ flat: every exam level gets the full 128s (no adaptive scaling)
 | 4 | 128.0 |
 | 5 | 128.0 |
 | 6 | 128.0 |
+| 7 | 128.0 |
 
 ## the per-model best (t=128s)
 
@@ -58,7 +60,7 @@ LEVEL, so a multi-level pass can total well over 128s)
 | Qwen3.5-2B | 4 | Q3_K_S | k=q4_1 v=q4_1 | 149.1 |
 | Qwen3-2B | 3 | Q3_K_M | k=q4_1 v=q4_1 | 136.3 |
 | MiniCPM5-2B | 1 | Q4_K_M | k=iq4_nl v=q8_0 | 205.5 |
-| granite-3.1-2b-instruct | 4 | Q4_0 | k=q4_0 v=q5_1 | 62.4 |
+| granite-3.1-2b-instruct | 6 | Q4_1 | k=iq4_nl v=f16 | 308.5 |
 | granite-3.2-2b-instruct | - | (not measured) | - | - |
 | granite-3.3-2b-instruct | - | (not measured) | - | - |
 | gemma-2-2b-it | - | (not measured) | - | - |
